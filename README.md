@@ -140,15 +140,15 @@ Q2D-MHDfoam parity and blanket validation remain open.
 
 ![B2 two-update CPU and GPU scaling evidence](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/strong_scaling.webp)
 
-The current B2 smoke agrees on 1/2/4 CPU and 1/2 GPU devices. At
-`128 × 67 × 67`, two GPUs reduce 2.780 s to 2.400 s (1.159×); this misses the
-1.2× promotion gate, so no production-scaling speedup is claimed.
+Schema-6 B2 agrees on 1/2/4 forced CPU devices with exact restart replay. At
+`256 × 67 × 67`, two/four devices reach 1.229×/1.360×; four devices still miss
+the promotion gate, and schema-6 GPU topology remains pending.
 [Protocol and results →](https://lmx.readthedocs.io/en/latest/performance.html)
 
 ## Quality and citation
 
-The portable gate records **840 passing tests**, **95.56% combined line/branch
-coverage**, and **152.8 s** on six Apple-Silicon workers.
+The portable gate records **846 passing tests**, **95.33% combined line/branch
+coverage**, and **140.7 s** on six Apple-Silicon workers.
 [Testing](https://lmx.readthedocs.io/en/latest/testing.html) ·
 [Theory](https://lmx.readthedocs.io/en/latest/theory.html) ·
 [Numerics](https://lmx.readthedocs.io/en/latest/numerics.html) ·

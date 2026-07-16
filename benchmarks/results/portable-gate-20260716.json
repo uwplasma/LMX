@@ -1,0 +1,100 @@
+{
+  "schema_version": 19,
+  "date": "2026-07-16",
+  "commit": "05a6f4132ecf28b811ee14ec8da1eb09ab25eb9e",
+  "hardware": {
+    "model": "Mac mini (Mac16,10)",
+    "chip": "Apple M4",
+    "cores": 10,
+    "memory_gib": 24,
+    "platform": "Darwin arm64"
+  },
+  "gate": {
+    "python": "3.12.13",
+    "jax": "0.10.2",
+    "jaxlib": "0.10.2",
+    "workers": 6,
+    "budget_seconds": 600,
+    "engineering_target_seconds": 300,
+    "minimum_combined_coverage_percent": 95.0
+  },
+  "result": {
+    "test_files": 30,
+    "test_lines": 20730,
+    "passed": 846,
+    "skipped": 8,
+    "pytest_seconds": 140.38,
+    "gate_seconds": 140.7,
+    "covered_lines": 14084,
+    "total_lines": 14497,
+    "covered_branches": 2565,
+    "total_branches": 2968,
+    "combined_line_branch_coverage_percent": 95.32779845405096,
+    "passed_gate": true
+  },
+  "artifacts": {
+    "coverage_xml_sha256": "0f3cd665cb1fa04d1753a6b11a754b09a998e9eae57b30b98c57d03be9a56a82",
+    "junit_xml_sha256": "8ef93ce679542a4b70e9fbc74d7e04b965bf21e74877c8899a178c5620dacba4"
+  },
+  "duration_note": "Durations come from the current six-worker JUnit record; concurrent-node times identify CI pressure but are not isolated timings.",
+  "slowest_tests": [
+    {"seconds": 53.414, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
+    {"seconds": 48.386, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]"},
+    {"seconds": 24.229, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
+    {"seconds": 19.956, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
+    {"seconds": 17.813, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
+    {"seconds": 17.716, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"},
+    {"seconds": 16.011, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[base]"},
+    {"seconds": 15.764, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"},
+    {"seconds": 15.180, "nodeid": "tests.test_fringing::test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradient"},
+    {"seconds": 14.628, "nodeid": "tests.test_autodiff::test_extruded_rect_projection_inverse_design_reduces_loss"}
+  ],
+  "comparison": {
+    "previous_gate_seconds": 152.8,
+    "wall_time_change_percent": -7.918848167539267,
+    "budget_fraction": 0.2345,
+    "engineering_target_fraction": 0.469,
+    "interpretation": "The post-schema-6 gate remains below half of the engineering target. Shared-host variation and changed tests preclude a suite-speed promotion claim."
+  },
+  "scheduling_probe": {
+    "source_commit": "f379f6bab2e25acd8c2785eebe1c88a10ed854a9",
+    "protocol": "The same six slow JAX nodes in fresh no-coverage processes using worksteal; 180-second ceiling per arm.",
+    "all_nodes_passed": true,
+    "six_workers_seconds": 37.689,
+    "four_workers_seconds": 36.410,
+    "four_worker_reduction_fraction": 0.03393563108599335,
+    "promotion_threshold_fraction": 0.10,
+    "decision": "retain six workers; the 3.4% change is below the promotion threshold, and module grouping would imbalance fringing and autodiff owners"
+  },
+  "architecture": {
+    "source_commit": "05a6f4132ecf28b811ee14ec8da1eb09ab25eb9e",
+    "package_modules": 35,
+    "package_lines": 34764,
+    "maintained_core_lines": 7908,
+    "maintenance_scripts": 13,
+    "tracked_checkout_bytes": 3758640,
+    "stable_root_exports": 30,
+    "curated_examples": 11
+  },
+  "distribution": {
+    "source_commit": "a207bf9c3e9fd2a29b5dc754941ce2656330ccdf",
+    "wheel_bytes": 313854,
+    "wheel_members": 48,
+    "sdist_bytes": 296630,
+    "sdist_members": 54,
+    "twine_passed": true,
+    "clean_python": "3.12.13",
+    "clean_jax": "0.10.2",
+    "clean_solvax": "0.8.3",
+    "matplotlib_in_core_install": false,
+    "pillow_in_core_install": false,
+    "tiny_hartmann_residual": 9.950455126528368e-9,
+    "numerical_modules_import_without_visualization": true
+  },
+  "hosted_ci": {
+    "status": "administratively_not_started",
+    "reason": "GitHub Actions reported an account billing or spending-limit failure before runner assignment; every affected job had zero executed steps.",
+    "code_failure_observed": false,
+    "rerun_required_after_billing_resolution": true
+  }
+}

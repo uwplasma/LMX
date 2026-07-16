@@ -10,7 +10,7 @@ devices alone is not evidence of parallel execution.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 840 pass, 8 skip, 95.56% combined line/branch coverage, 152.8 s | timing delta treated as host variance; below five-minute target |
+| portable test gate | Apple M4, six workers | 846 pass, 8 skip, 95.33% combined line/branch coverage, 140.7 s | timing delta treated as host variance; below five-minute target |
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | B2 pseudo-time gate | Apple M4, corrected warm `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x/32x/16x map-rate spread 0.0768%; raw updates halve; exact restart | 64x refrozen; versioned stopping threshold open |
 | B2 physical-residual probe | Apple M4, `7 x 7 x 7` | residual 0.03870 at step 90; omitted reconstruction force is 0.0880 at step 4 | diagnostic has a plausible coarse split floor; never a stopping gate |
@@ -246,7 +246,7 @@ Authoritative records:
 - `benchmarks/results/b2-gpu-profile-20260715.json`
 - `benchmarks/results/b2-gpu-device-equivalence-20260715.json`
 - `benchmarks/results/b1-retained-modal-blocks-20260713.json`
-- `benchmarks/results/portable-gate-20260715.json`
+- `benchmarks/results/portable-gate-20260716.json`
 
 ## Run a bounded benchmark
 

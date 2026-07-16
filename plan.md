@@ -15,7 +15,7 @@ stopping. Its fixed-relaxation memory reduction
 is keyed to `791e496`, and its exact operator contract is keyed to `2d0fb50`.
 Commit `3e731fa` removes the projection reconstruction floor and refreezes the
 64x pseudo-time cap on a warm same-state ladder.
-The latest complete portable gate exercised pre-schema-6 source `7d8887a`.
+The latest complete portable gate exercised schema-6 source `05a6f41`.
 CPU/GPU calibration at
 `413185a` remains historical; deterministic GPU equivalence at `3a22078` has
 been replaced by the current `8b6f97d` result and the refreshed calibration
@@ -135,7 +135,7 @@ shared without removing cases or assertions.
 | test files / lines | 30 / 20,730 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 179 | no new file without retiring another owner | 180 |
-| tracked checkout | 3,758,640 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,761,468 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -173,13 +173,12 @@ lines. These readable contracts remain inside every architecture ceiling, but
 they require an ownership-slimming pass after the parallel algorithm settles;
 do not hide the increase through dense formatting.
 
-No complete portable gate has yet exercised schema 6. The latest artifact,
-keyed to `7d8887a`, records 840 passes, 8 expected
-external-data skips, 95.5572% combined line/branch coverage, and 152.8 seconds on
-the reference Apple M4. It is 4.1% faster than the prior 159.4-second record,
-but the persistence-only source change cannot explain that shared-host delta.
+The portable-gate artifact keyed to `05a6f41` records 846 passes, 8 expected
+external-data skips, 95.3278% combined line/branch coverage, and 140.7 seconds on
+the reference Apple M4. It is 7.9% faster than the prior 152.8-second record,
+but source and tests both changed, so the shared-host delta is not a speed claim.
 Do not promote a suite-speed claim from wall-time variance. The gate stays below
-51% of the 300-second engineering target and 26% of the 600-second hard limit.
+47% of the 300-second engineering target and 24% of the 600-second hard limit.
 The 95.5%
 engineering target is now met; retain the 95% enforced floor until a second
 Python endpoint or hosted run independently confirms the margin. The
