@@ -474,8 +474,21 @@ win. After 0.8.4 is published, use one
 `anderson_weights` result for scaled fields and compact-flux histories, and use
 `linear_solve(has_aux=True)` to retain momentum diagnostics without a final
 extra matvec. Raise the minimum dependency in that same correctness tranche.
-The next upstream slimming candidate is a released, CPU/GPU/gradient-gated
-complex tridiagonal solve, replacing paired real/imaginary calls in LMX.
+The complex-tridiagonal candidate is now closed as an LMX no-go under its
+precommitted performance gate. SOLVAX draft PR 22 at `b059e18` provides the
+transparent complex API, current/minimum-JAX differentiation, and genuinely
+complex Thomas fallback without a new module. Both Python/JAX endpoints pass
+274 tests at 98.90% coverage, strict docs and lint pass, and complex64/128
+correctness, JVP, gradient, and actual two-A4000 batch sharding pass. The first
+packed-right-hand-side design was rejected before review: it was about 604x
+slower on one GPU and 485x slower on two with no memory reduction. The safe
+revision is bit-exact with the explicit pair and restores baseline performance,
+but its measured gains are only 1.053x on one GPU and 1.070x on two, with
+identical compiled memory. That misses the required 1.10x speedup or 10% memory
+reduction. Retain LMX's two explicit pairs and the released dependency even
+though the transparent call would remove four lines. PR 22 may proceed as a
+reviewed SOLVAX capability; it does not self-authorize LMX adoption, merge, tag,
+or publication.
 
 The released `block_thomas_factor_fn` B1 prototype is exact against the current
 materialized retained-modal factors and through JVP. At `7 x 9 x 16` and
