@@ -173,12 +173,6 @@ def magnetic_obstacle_literature_reference_cases() -> dict[str, dict[str, object
     }
 
 
-def _broadcast_station_profile(values: jnp.ndarray, ny: int, nz: int) -> jnp.ndarray:
-    return jnp.broadcast_to(
-        jnp.asarray(values, dtype=float)[:, None, None], (values.shape[0], ny, nz)
-    )
-
-
 def _broadcast_cross_section(values: jnp.ndarray, nx: int) -> jnp.ndarray:
     return jnp.broadcast_to(
         jnp.asarray(values, dtype=float)[None, :, :], (nx,) + tuple(values.shape)
@@ -2179,41 +2173,40 @@ def _sample_volume_field(volume_field, x, y, z):
     return sampled[..., 0], sampled[..., 1], sampled[..., 2]
 
 
-def _sample_station_magnetic_field_duct(
+def _sample_station_magnetic_field(
     case: CaseSpec,
-    mesh,
     *,
     field_scale: jnp.ndarray,
+    x: jnp.ndarray,
+    y: jnp.ndarray,
+    z: jnp.ndarray,
     volume_field: Callable[..., jnp.ndarray] | None = None,
-    nx: int,
-    ny: int,
-    nz: int,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """Sample one field family on geometry-prepared station coordinates."""
+
+    nx, (ny, nz) = field_scale.shape[0], y.shape
     if volume_field is not None:
-        xx, yy, zz = jnp.meshgrid(
-            mesh.x_centers, mesh.y_centers, mesh.z_centers, indexing="ij"
+        shape = (nx, ny, nz)
+        return _sample_volume_field(
+            volume_field,
+            jnp.broadcast_to(x[:, None, None], shape),
+            jnp.broadcast_to(y[None, :, :], shape),
+            jnp.broadcast_to(z[None, :, :], shape),
         )
-        return _sample_volume_field(volume_field, xx, yy, zz)
     x_coords = np.asarray(
         case.geometry.length * jnp.linspace(0.0, 1.0, nx), dtype=float
     )
-    y_coords = np.asarray(mesh.y_centers, dtype=float)
-    z_coords = np.asarray(mesh.z_centers, dtype=float)
     if case.magnetic_field.kind == "constant":
         base_field = case.magnetic_field.value or (0.0, 0.0, 0.0)
-        bx = _broadcast_station_profile(field_scale * float(base_field[0]), ny, nz)
-        by = _broadcast_station_profile(field_scale * float(base_field[1]), ny, nz)
-        bz = _broadcast_station_profile(field_scale * float(base_field[2]), ny, nz)
-        return bx, by, bz
+        shape = (nx, ny, nz)
+        return tuple(
+            jnp.broadcast_to(field_scale[:, None, None] * float(value), shape)
+            for value in base_field
+        )
     if case.magnetic_field.kind == "analytic":
         if case.magnetic_field.fn is None:
             raise ValueError("Analytic magnetic field requires fn")
-        yc, zc = jnp.meshgrid(
-            jnp.asarray(mesh.y_centers, dtype=float),
-            jnp.asarray(mesh.z_centers, dtype=float),
-            indexing="ij",
-        )
-        sampled = jnp.asarray(case.magnetic_field.fn(yc, zc), dtype=float)
+        sampled = jnp.asarray(case.magnetic_field.fn(y, z), dtype=float)
         bx0 = _broadcast_cross_section(sampled[..., 0], nx)
         by0 = _broadcast_cross_section(sampled[..., 1], nx)
         bz0 = _broadcast_cross_section(sampled[..., 2], nx)
@@ -2223,73 +2216,12 @@ def _sample_station_magnetic_field_duct(
         if case.magnetic_field.table_path is None:
             raise ValueError("Tabulated magnetic field requires table_path")
         table = load_tabulated_field(case.magnetic_field.table_path)
-        xx, yy, zz = np.meshgrid(x_coords, y_coords, z_coords, indexing="ij")
+        shape = (nx, ny, nz)
         sampled = sample_tabulated_field_volume(
-            case.magnetic_field.table_path, x=xx, y=yy, z=zz
-        )
-        if "x" not in table:
-            sampled = sampled * np.asarray(
-                field_scale[:, None, None, None], dtype=float
-            )
-        return (
-            jnp.asarray(sampled[..., 0], dtype=float),
-            jnp.asarray(sampled[..., 1], dtype=float),
-            jnp.asarray(sampled[..., 2], dtype=float),
-        )
-    raise ValueError(f"Unsupported magnetic-field kind {case.magnetic_field.kind!r}")
-
-
-def _sample_station_magnetic_field_pipe(
-    case: CaseSpec,
-    *,
-    rr: jnp.ndarray,
-    theta_grid: jnp.ndarray,
-    field_scale: jnp.ndarray,
-    x: jnp.ndarray,
-    volume_field: Callable[..., jnp.ndarray] | None = None,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    x_coords = np.asarray(
-        case.geometry.length * jnp.linspace(0.0, 1.0, rr.shape[0]), dtype=float
-    )
-    yy = np.asarray(rr[0] * jnp.cos(theta_grid[0]), dtype=float)
-    zz = np.asarray(rr[0] * jnp.sin(theta_grid[0]), dtype=float)
-    if volume_field is not None:
-        xx = jnp.broadcast_to(jnp.asarray(x)[:, None, None], rr.shape)
-        yy3 = rr * jnp.cos(theta_grid)
-        zz3 = rr * jnp.sin(theta_grid)
-        return _sample_volume_field(volume_field, xx, yy3, zz3)
-    if case.magnetic_field.kind == "constant":
-        base_field = case.magnetic_field.value or (0.0, 0.0, 0.0)
-        bx = jnp.broadcast_to(
-            field_scale[:, None, None] * float(base_field[0]), rr.shape
-        )
-        by = jnp.broadcast_to(
-            field_scale[:, None, None] * float(base_field[1]), rr.shape
-        )
-        bz = jnp.broadcast_to(
-            field_scale[:, None, None] * float(base_field[2]), rr.shape
-        )
-        return bx, by, bz
-    if case.magnetic_field.kind == "analytic":
-        if case.magnetic_field.fn is None:
-            raise ValueError("Analytic magnetic field requires fn")
-        sampled = jnp.asarray(
-            case.magnetic_field.fn(jnp.asarray(yy), jnp.asarray(zz)), dtype=float
-        )
-        bx0 = jnp.broadcast_to(sampled[..., 0][None, :, :], rr.shape)
-        by0 = jnp.broadcast_to(sampled[..., 1][None, :, :], rr.shape)
-        bz0 = jnp.broadcast_to(sampled[..., 2][None, :, :], rr.shape)
-        station_scale = field_scale[:, None, None]
-        return station_scale * bx0, station_scale * by0, station_scale * bz0
-    if case.magnetic_field.kind == "tabulated":
-        if case.magnetic_field.table_path is None:
-            raise ValueError("Tabulated magnetic field requires table_path")
-        table = load_tabulated_field(case.magnetic_field.table_path)
-        xx = np.broadcast_to(x_coords[:, None, None], rr.shape)
-        yy3 = np.broadcast_to(yy[None, :, :], rr.shape)
-        zz3 = np.broadcast_to(zz[None, :, :], rr.shape)
-        sampled = sample_tabulated_field_volume(
-            case.magnetic_field.table_path, x=xx, y=yy3, z=zz3
+            case.magnetic_field.table_path,
+            x=np.broadcast_to(x_coords[:, None, None], shape),
+            y=np.broadcast_to(np.asarray(y)[None, :, :], shape),
+            z=np.broadcast_to(np.asarray(z)[None, :, :], shape),
         )
         if "x" not in table:
             sampled = sampled * np.asarray(
@@ -6256,12 +6188,12 @@ def _solve_extruded_projection(
         theta_grid = jnp.broadcast_to(theta[None, None, :], (nx, nr, ntheta))
         forcing = float(case.forcing)
         field_scale = jnp.asarray(problem.profile.field_scale, dtype=float)
-        bx, by, bz = _sample_station_magnetic_field_pipe(
+        bx, by, bz = _sample_station_magnetic_field(
             case,
-            rr=rr,
-            theta_grid=theta_grid,
             field_scale=field_scale,
             x=problem.profile.x,
+            y=rr[0] * jnp.cos(theta_grid[0]),
+            z=rr[0] * jnp.sin(theta_grid[0]),
             volume_field=problem.profile.volume_field,
         )
         br = by * jnp.cos(theta_grid) + bz * jnp.sin(theta_grid)
@@ -7165,14 +7097,14 @@ def _solve_extruded_projection(
     cell_area = _broadcast_cross_section(dy[:, None] * dz[None, :], nx)
     forcing = float(case.forcing)
     field_scale = jnp.asarray(problem.profile.field_scale, dtype=float)
-    bx, by, bz = _sample_station_magnetic_field_duct(
+    field_y, field_z = jnp.meshgrid(y, z, indexing="ij")
+    bx, by, bz = _sample_station_magnetic_field(
         case,
-        mesh,
         field_scale=field_scale,
+        x=x,
+        y=field_y,
+        z=field_z,
         volume_field=problem.profile.volume_field,
-        nx=nx,
-        ny=ny,
-        nz=nz,
     )
 
     if initial_bundle is not None:
