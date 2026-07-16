@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-16. Current LMX source through `a92b4e6` consumes released SOLVAX 0.8.4;
+Status: 2026-07-16. Current LMX source through `838e505` consumes released SOLVAX 0.8.4;
 `aaa41b1` made the
 frozen B2 path Anderson depth two with one shared weight vector for mapped
 scaled fields and conservative compact flux. Restart schema 6 stores one raw
@@ -150,7 +150,7 @@ large reusable artifacts go in checksummed releases.
 | Matched B2 harness | deterministic inputs, pinned sources, independent observers, and native two-update LMX/FreeMHD execution pass every frozen schema-3 smoke gate | production acceptance and mesh convergence remain open |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
 | README/docs | concise feature-led README, sourced comparison table, feature-specific visuals, seven-second Hunt/blanket/Q2D loops, and Li/AlN convergence | refresh B2/scaling panels only from accepted canonical records |
-| SOLVAX | released 0.8.4 owns generic algebra, Anderson weights, and accepted `linear_solve(has_aux=True)` diagnostics consumed by LMX | no worthwhile ownership deletion remains; re-audit new compatible releases |
+| SOLVAX | released 0.8.4 owns generic algebra, point Jacobi, Anderson weights, and accepted `linear_solve(has_aux=True)` diagnostics consumed by LMX | no worthwhile ownership deletion remains; re-audit new compatible releases |
 | Distribution | lean installed wheel loads all frozen A/B references and runs a tiny solve without Matplotlib/Pillow; plotting is an explicit extra; source artifact excludes repository tests | bump 1.1.3 before publication; hosted release gate must be green |
 
 Current structure reflects completed ownership moves: frozen resources are
@@ -162,12 +162,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,778 | stay below 34,790 while preserving the scaling and Q2D gates | 35,100 |
-| maintained-core lines | 7,888 | stay below 7,900 | 8,000 |
-| test files / lines | 30 / 21,084 | no new file; stay below 21,090 | 31 / 21,100 |
+| package lines | 34,702 | stay below 34,710 while preserving the scaling and Q2D gates | 35,100 |
+| maintained-core lines | 7,880 | stay below 7,890 | 8,000 |
+| test files / lines | 30 / 21,086 | no new file; stay below 21,090 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,555,312 bytes | direct visual evidence only; keep below 4,560,000 | 4,718,592 bytes |
+| tracked checkout | 4,548,144 bytes | direct visual evidence only; keep below 4,550,000 | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -240,6 +240,15 @@ All solver tests and focused Hartmann differentiation checks pass. Commit
 `694e291` merges the two uniform-stencil test setups while retaining every
 unique assertion, deleting 16 test lines and restoring the 21,084-line test
 baseline.
+Commit `954e24e` replaces duplicated duct and pipe magnetic-field dispatch with
+one geometry-neutral sampler and removes the unused station-profile broadcaster.
+Constant, analytic, volume, 2-D table, and true 3-D table workflows remain green
+across ducts, layered ducts, straight/bent pipes, and WHAM; the change deletes
+68 package lines and two private owners. Commit `838e505` then delegates
+five-point point-Jacobi application to released SOLVAX, deleting eight
+package/core lines and two nested functions. All three accepted preconditioner
+aliases, the implicit gradient, and the velocity-mask integration gate pass;
+compiled work is unchanged, so this is ownership simplification, not speedup.
 
 The portable-gate artifact keyed to `28c4fa2` records 859 passes, 8 expected
 external-data skips, 95.3219% combined line/branch coverage, and 143.5 seconds on
