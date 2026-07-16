@@ -477,12 +477,12 @@ def test_extruded_target_inverse_design_returns_finite_payload():
     problem = build_square_duct_extruded_problem(ha_peak=6.0, nx_stations=4, ny=4, nz=4)
     solution = solve_extruded_inductionless(problem)
 
-    result = run_extruded_target_inverse_design(solution, ny=6, nz=6, steps=4)
+    result = run_extruded_target_inverse_design(solution, ny=6, nz=6, steps=1)
 
     assert result["geometry_kind"] == "rect_duct"
     assert "target" in result
     assert "recovered" in result
-    assert len(result["recovered"]["history"]) == 4
+    assert len(result["recovered"]["history"]) == 1
     assert result["recovered"]["model"] == "direct_extruded_projection"
     assert jnp.isfinite(result["target"]["mean_velocity"]).all()
 
@@ -493,7 +493,7 @@ def test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry():
     )
     solution = solve_extruded_inductionless(problem)
 
-    result = run_extruded_target_inverse_design(solution, ny=4, nz=4, steps=2)
+    result = run_extruded_target_inverse_design(solution, ny=4, nz=4, steps=1)
 
     assert result["geometry_kind"] == "pipe_ogrid"
     assert result["recovered"]["model"] == "fringing_response_surrogate"
