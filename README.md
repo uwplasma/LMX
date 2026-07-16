@@ -75,9 +75,10 @@ observables pass the 1% finite-grid gate.
 
 ![Accepted eight-row Samper Benchmark A validation](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/samper_benchmark_a.webp)
 
+![LMX analytical duct ladder and accepted FreeMHD closed-channel observables](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/freemhd_closed_channel_observable_parity.webp)
+
 <p align="center">
-  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/freemhd_closed_channel_observable_parity.webp" alt="LMX and FreeMHD closed-channel observable parity" width="48%">
-  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-hunt-startup.webp" alt="Seven-second Hunt and Shercliff startup comparison" width="48%">
+  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-hunt-startup.webp" alt="Seven-second Hunt and Shercliff startup comparison" width="82%">
 </p>
 
 [Validation evidence →](https://lmx.readthedocs.io/en/latest/validation_report.html)

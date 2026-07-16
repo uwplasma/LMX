@@ -22,7 +22,7 @@ or command, observable, and acceptance limit or uncertainty.
 |---|---|---|
 | Hartmann CLI/Python and Shercliff/Hunt cases | analytical profiles and side-by-side startup dynamics | complete |
 | manufactured operators | observed-order convergence | complete |
-| FreeMHD closed-channel parity | accepted observable comparison | complete; add validation-ladder composite |
+| FreeMHD closed-channel parity | analytical validation ladder plus accepted observable comparison | complete |
 | portable fringing workflow | bounded solver-family response and B2 panel | complete; research-stage |
 | exact restart/replay | direct-versus-resumed state comparison | complete |
 | custom fields and mapped geometry | field response and geometry panels | complete |
@@ -39,7 +39,7 @@ serve one claim family.
 
 ## Tracked web set
 
-Twenty files in `docs/_static/` total 1,210,244 bytes. The `showcase` section of
+Twenty files in `docs/_static/` total 1,268,448 bytes. The `showcase` section of
 [`release-assets.json`](release-assets.json) records every byte count and
 SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 
@@ -47,7 +47,7 @@ SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 |---|---:|---|---|
 | duct profiles | 71,620 | 1,338 × 816 WebP | released analytical-profile PNG `f55c380c...` |
 | exact restart | 24,514 | 1,200 × 629 WebP | portable 3+3 versus direct six-step state; all field differences zero |
-| accepted FreeMHD observables | 21,086 | 1,200 × 641 WebP | acceptance record `9f94ea15...`; generated at `72f2049` |
+| duct ladder and accepted FreeMHD observables | 79,290 | 1,200 × 1,471 WebP | released ladder `46a9f21c...` plus acceptance record `9f94ea15...`; Python/Pillow composition, no solver rerun |
 | fringing solver family | 46,678 | 1,200 × 843 WebP | released source `5fd83110...`; bounded internal diagnosis only |
 | mapped-pipe profiles | 52,768 | 1,100 × 655 WebP | released source `d3343a09...`; failing FreeMHD-profile diagnostic, not ALEX |
 | Votyakov obstacle target | 32,966 | 1,100 × 458 WebP | released source `7bb3ca51...`; strict reverse-flow mismatch |

@@ -572,7 +572,7 @@
   },
   "schema_version": 2,
   "showcase": {
-    "bytes": 1210244,
+    "bytes": 1268448,
     "files": [
       {
         "bytes": 71620,
@@ -585,9 +585,9 @@
         "sha256": "955fdd0d31f1768224750214d4ed62b2f5f91b779ea62803b659b208ef8e4de5"
       },
       {
-        "bytes": 21086,
+        "bytes": 79290,
         "path": "docs/_static/freemhd_closed_channel_observable_parity.webp",
-        "sha256": "99f99b4b725860feaba8fc652ea5615ecc035bc8c6a7d3dcff5146358f01d2c7"
+        "sha256": "3d9b86300db2a77111753ee22b5339015934448d8c8d0d2a04a7c96e8955eb8b"
       },
       {
         "bytes": 46678,

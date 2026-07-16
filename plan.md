@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-16. Current LMX source through `de49a29` consumes released SOLVAX 0.8.4;
+Status: 2026-07-16. Current LMX source through `694e291` consumes released SOLVAX 0.8.4;
 `aaa41b1` made the
 frozen B2 path Anderson depth two with one shared weight vector for mapped
 scaled fields and conservative compact flux. Restart schema 6 stores one raw
@@ -164,12 +164,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,799 | stay below 34,810 while preserving the scaling and Q2D gates | 35,100 |
-| maintained-core lines | 7,908 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 21,100 | no new file; return below 21,090 through ownership consolidation | 31 / 21,100 |
+| package lines | 34,778 | stay below 34,790 while preserving the scaling and Q2D gates | 35,100 |
+| maintained-core lines | 7,888 | stay below 7,900 | 8,000 |
+| test files / lines | 30 / 21,084 | no new file; stay below 21,090 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,490,848 bytes | direct visual evidence only; keep below 4,510,000 | 4,718,592 bytes |
+| tracked checkout | 4,555,313 bytes | direct visual evidence only; keep below 4,560,000 | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -233,6 +233,15 @@ fail-closed before a long worker starts. Every rung now requires checksummed
 positive memory measurements, and physical GPU UUID/PCI identity. Matched
 inputs are regenerated deterministically, and the default remote ceiling is
 1,800 seconds. All 35 scaling tests pass in 7.3 seconds.
+Commit `14c13be` additionally binds admitted CPU evidence to the worker's
+actual Linux affinity and GPU evidence to the launcher's selected device
+indices; a preflight record cannot be attached to another allocation. Commit
+`6629660` then replaces eight directional transverse-stencil helpers with four
+axis-parameterized owners, deleting 21 package lines and four private symbols.
+All solver tests and focused Hartmann differentiation checks pass. Commit
+`694e291` merges the two uniform-stencil test setups while retaining every
+unique assertion, deleting 16 test lines and restoring the 21,084-line test
+baseline.
 
 The portable-gate artifact keyed to `497af1b` records 860 passes, 8 expected
 external-data skips, 95.3273% combined line/branch coverage, and 144.4 seconds on
@@ -787,7 +796,10 @@ trajectories.
 The documentation source is now self-contained. The Hunt/Shercliff, blanket,
 and Q2D animations replace link-only posters and redundant tracked MP4s; all
 20 tracked derivatives, including the detailed Q2D and blanket composites,
-total 1,210,244 bytes, below the 1.25 MiB media cap. Read the Docs still serves the
+total 1,268,448 bytes, below the 1.25 MiB media cap. The closed-channel
+derivative now combines the released Ha=20/100 analytical ladder with accepted
+FreeMHD observables under its existing filename; no solver or new tracked file
+was needed. Read the Docs still serves the
 2026-05-01 build at `6be8622`. Build `33554636` failed with `commit: None` and
 Git exit 128 because the builder had no credentials to clone the private GitHub
 repository; the active repository webhook's latest response is HTTP 406. An

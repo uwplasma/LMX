@@ -4,12 +4,15 @@ This page summarizes current claims. Machine-readable records in `benchmarks/`
 are authoritative when prose and results differ.
 
 <p align="center">
-  <img src="_static/analytic_velocity_profiles.webp" alt="Analytical and LMX duct profiles" width="47%">
-  <img src="_static/freemhd_closed_channel_observable_parity.webp" alt="LMX and FreeMHD closed-channel observable parity" width="47%">
+  <img src="_static/analytic_velocity_profiles.webp" alt="Analytical and LMX duct profiles" width="82%">
+</p>
+<p align="center">
+  <img src="_static/freemhd_closed_channel_observable_parity.webp" alt="LMX analytical duct ladder and accepted FreeMHD closed-channel observables" width="82%">
 </p>
 
-The FreeMHD panel is generated from the accepted `85 x 63` primary observables
-in `benchmarks/results/benchmark-a-acceptance.json`.
+The composite combines the released Ha=20/100 analytical validation ladder
+with accepted `85 x 63` FreeMHD observables from
+`benchmarks/results/benchmark-a-acceptance.json`; no solver was rerun.
 
 <p align="center">
   <img src="_static/samper_benchmark_a.webp" alt="Accepted Samper Benchmark A high-Hartmann validation ladder" width="82%">

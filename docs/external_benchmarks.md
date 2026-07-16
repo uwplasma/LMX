@@ -55,6 +55,8 @@ velocity, Lorentz-force, and pressure-gradient observables for Shercliff and
 Hunt are below the 1% finite-grid target. Current closure and power identities
 pass independently.
 
+![LMX analytical duct ladder and accepted FreeMHD closed-channel observables](_static/freemhd_closed_channel_observable_parity.webp)
+
 The original Docker examples were found to describe physical `Ha = 1000`, not
 the nominal `Ha = 20` comparison. Those outputs are historical workflow data,
 not accepted parity evidence. The audited case specification is authoritative.
