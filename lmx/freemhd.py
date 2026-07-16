@@ -702,19 +702,20 @@ def observe_lmx_b2_output(
     ):
         raise ValueError("LMX B2 restart stopping state differs")
     # Keep replay-driving state separate from recomputed fields and solver histories.
-    state_names = """x y z field_scale u v w p residual volumetric_flow_rate
-        mean_velocity axial_pressure_loss_gradient
-        transverse_pressure_difference iteration_residual_history
-        iteration_pressure_residual_history iteration_courant_history""".split()
+    state_names = """x y z field_scale u v w p phi
+        axial_pressure_loss_gradient""".split()
     flux_names = "rho_phi_plus rho_phi_inlet".split()
-    derived_names = """phi jx jy jz lorentz_x lorentz_y lorentz_z axial_current
+    derived_names = """residual volumetric_flow_rate mean_velocity
+        transverse_pressure_difference jx jy jz lorentz_x lorentz_y lorentz_z axial_current
         wall_current_leakage current_scaled_pressure_proxy charge_balance_residual
         boundary_current_residual""".split()
     history_names = """iteration_component_residual_history
         iteration_pressure_linear_history iteration_electric_linear_history
-        iteration_potential_residual_history""".split()
+        iteration_potential_residual_history iteration_residual_history
+        iteration_pressure_residual_history iteration_courant_history""".split()
     grouped_differences = {name: [] for name in ("state", "flux", "derived", "history")}
     state_relative, state_tolerance_ratio, flux_relative = [], [], []
+    state_tolerance_by_array = {}
     for group, names in (("state", state_names), ("flux", flux_names), ("derived", derived_names),
                          ("history", history_names)):
         for name in names:
@@ -730,8 +731,13 @@ def observe_lmx_b2_output(
                     (state_relative if group == "state" else flux_relative).append(relative)
                     if group == "state":
                         tolerance = 2.0e-9 + 2.0e-8 * np.maximum(np.abs(left), np.abs(right))
-                        state_tolerance_ratio.append(float(np.max(np.abs(left - right) / tolerance)))
-    for left, right in zip(
+                        ratio = float(np.max(np.abs(left - right) / tolerance))
+                        state_tolerance_ratio.append(ratio)
+                        state_tolerance_by_array[name] = ratio
+    acceleration_components = (("mapped", "residual", "rho_phi_plus", "rho_phi_inlet")
+        if acceleration == "anderson" else ("residual", "relaxation", "steady_streak"))
+    for component, left, right in zip(
+            acceleration_components,
             getattr(direct.bundle, acceleration_name),
             getattr(resumed.bundle, acceleration_name),
             strict=True):
@@ -743,7 +749,9 @@ def observe_lmx_b2_output(
             scale = max(np.linalg.norm(left), np.linalg.norm(right), 1.0e-30)
             state_relative.append(float(np.linalg.norm(left - right) / scale))
             tolerance = 2.0e-9 + 2.0e-8 * np.maximum(np.abs(left), np.abs(right))
-            state_tolerance_ratio.append(float(np.max(np.abs(left - right) / tolerance)))
+            ratio = float(np.max(np.abs(left - right) / tolerance))
+            state_tolerance_ratio.append(ratio)
+            state_tolerance_by_array[f"{label.lower()}_{component}"] = ratio
     restart_differences = {
         name: max(values, default=0.0) for name, values in grouped_differences.items()
     }
@@ -771,6 +779,7 @@ def observe_lmx_b2_output(
         **{f"restart_{name}_max_abs": value for name, value in restart_differences.items()},
         "restart_state_relative_l2": max(state_relative, default=0.0),
         "restart_state_tolerance_ratio": max(state_tolerance_ratio, default=0.0),
+        "restart_state_tolerance_ratio_by_array": state_tolerance_by_array,
         "restart_flux_relative_l2": max(flux_relative, default=0.0),
         "wall_seconds": float(metadata["wall_seconds"]),
     }
