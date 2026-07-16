@@ -570,7 +570,37 @@
     "status": "uploaded",
     "tag": "lmx-research-assets-v1"
   },
-  "schema_version": 1,
+  "schema_version": 2,
+  "showcase": {
+    "bytes": 168237,
+    "files": [
+      {
+        "bytes": 71620,
+        "path": "docs/_static/analytic_velocity_profiles.webp",
+        "sha256": "af02395951fe399d1bfed7462e897cebace6c79d5489a748f2359524ab8f5120"
+      },
+      {
+        "bytes": 21086,
+        "path": "docs/_static/freemhd_closed_channel_observable_parity.webp",
+        "sha256": "99f99b4b725860feaba8fc652ea5615ecc035bc8c6a7d3dcff5146358f01d2c7"
+      },
+      {
+        "bytes": 35171,
+        "path": "docs/_static/readme_hunt_startup_2d.mp4",
+        "sha256": "ad1095279f4af84ebdb5c2b1d4677aed322c8b54a11107cdc7ceda40268563b7"
+      },
+      {
+        "bytes": 13000,
+        "path": "docs/_static/readme_hunt_startup_2d_poster.webp",
+        "sha256": "a4ada2e53c72cd2a57da99db072fc47a5477784aaf4938fc8efa83318b3456a4"
+      },
+      {
+        "bytes": 27360,
+        "path": "docs/_static/strong_scaling.webp",
+        "sha256": "b277641b4725c0f3712babc281582972b5e3ce6fa6f0fd206240f79e91404026"
+      }
+    ]
+  },
   "summary": {
     "logical_bytes": 27833716,
     "logical_file_count": 65,

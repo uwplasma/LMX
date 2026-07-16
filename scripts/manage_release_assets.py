@@ -35,6 +35,21 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _tracked_showcase(root: Path = ROOT) -> dict[str, Any]:
+    """Inventory the small media derivatives kept in the repository."""
+
+    paths = sorted(path for path in (root / "docs" / "_static").glob("*") if path.is_file())
+    files = [
+        {
+            "bytes": path.stat().st_size,
+            "path": str(path.relative_to(root)),
+            "sha256": _sha256(path),
+        }
+        for path in paths
+    ]
+    return {"bytes": sum(item["bytes"] for item in files), "files": files}
+
+
 def build_manifest(root: Path = ROOT) -> dict[str, Any]:
     """Build the canonical source-asset inventory, grouping duplicate content."""
 
@@ -58,7 +73,7 @@ def build_manifest(root: Path = ROOT) -> dict[str, Any]:
             }
         )
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_by": "scripts/manage_release_assets.py",
         "release": {
             "archive_name": ARCHIVE_NAME,
@@ -67,6 +82,7 @@ def build_manifest(root: Path = ROOT) -> dict[str, Any]:
             "status": "planned",
             "tag": RELEASE_TAG,
         },
+        "showcase": _tracked_showcase(root),
         "summary": {
             "logical_bytes": sum(
                 asset["bytes"] * len(asset["paths"]) for asset in assets
@@ -96,11 +112,15 @@ def write_manifest(path: Path = MANIFEST_PATH, root: Path = ROOT) -> dict[str, A
 
 def check_manifest(path: Path = MANIFEST_PATH, root: Path = ROOT) -> dict[str, Any]:
     tracked = json.loads(path.read_text(encoding="utf-8"))
+    if tracked.get("schema_version") != 2:
+        raise ValueError("Release-asset manifest schema_version must be 2")
     release = tracked.get("release", {})
     if release.get("status") not in {"planned", "uploaded"}:
         raise ValueError("Release status must be 'planned' or 'uploaded'")
     if release.get("status") == "uploaded" and not release.get("archive_sha256"):
         raise ValueError("Uploaded release assets require archive_sha256")
+    if tracked.get("showcase") != _tracked_showcase(root):
+        raise ValueError("Tracked showcase media differ from the manifest")
     expected = {
         relative: (int(asset["bytes"]), str(asset["sha256"]))
         for asset in tracked.get("assets", [])

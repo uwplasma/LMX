@@ -11,10 +11,17 @@ The package wheel contains no media.
 
 ## Tracked web set
 
-Six files in `docs/_static/` total 390,625 bytes: duct profiles, FreeMHD parity,
-the B1 comparison, current CPU plus historical GPU scaling, and the Hunt movie/poster pair. The
-44,582-byte scaling WebP has SHA-256
-`60c83033c11239384cbf4a6fea7bb5ca5a4a7b98f1e1224b56961730637f4740`.
+Five files in `docs/_static/` total 168,237 bytes. The `showcase` section of
+[`release-assets.json`](release-assets.json) records every byte count and
+SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
+
+| Derivative | Bytes | Display | Provenance |
+|---|---:|---|---|
+| duct profiles | 71,620 | 1,338 × 816 WebP | released analytical-profile PNG `f55c380c...` |
+| accepted FreeMHD observables | 21,086 | 1,200 × 641 WebP | acceptance record `9f94ea15...`; generated at `72f2049` |
+| B2 scaling evidence | 27,360 | 1,400 × 661 WebP | CPU/GPU records `cf9fafb8...` / `5f032be4...`; generated at `72f2049` |
+| Hunt startup | 35,171 | 640 × 416 H.264, 7 s | existing 24.08-second transient; no solver rerun |
+| Hunt poster | 13,000 | 640 × 416 WebP | released poster PNG `cac2125e...` |
 
 The 35,171-byte Hunt H.264 loop (SHA-256
 `ad1095279f4af84ebdb5c2b1d4677aed322c8b54a11107cdc7ceda40268563b7`)

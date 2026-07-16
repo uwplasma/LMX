@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-15. The current two-update B2/FreeMHD smoke and schema-5
+Status: 2026-07-16. The current two-update B2/FreeMHD smoke and schema-5
 stopping contract are keyed to `0ab33b2`; current one-/two-/four-CPU-device
 equivalence is keyed to `4c94389`.
 The post-map nonlinear momentum residual and
@@ -128,9 +128,9 @@ symmetry, sharding, and compact-flux wrappers:
 | package modules | 35 | no new module | 35 |
 | package lines | 34,954 | stay below 35,000 while preserving the physical residual | 35,100 |
 | maintained-core lines | 7,931 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,868 | no new file; stay below 21,000 | 31 / 21,100 |
+| test files / lines | 30 / 20,878 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,327,567 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,330,467 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -174,14 +174,15 @@ experimental acceptance, and steady scaling remain open.
 
 ## Priority 2: unblock fast iteration and real strong scaling
 
-After the accepted smoke, run these disjoint workstreams in parallel. Timing
-measurements themselves run alone.
+Two workstreams followed the smoke: maintain the portable critical path and
+establish canonical sharding. Their current decisions are below; timing
+measurements run alone.
 
 ### CI critical path
 
 The modal pipe test reuses one physical projection and verifies direct
 mode-factor algebra without a second integration run. In the latest six-worker
-gate it reports 53.4 seconds, versus 49.5 seconds for reduced B2 and 24.9
+gate it reports 53.3 seconds, versus 49.4 seconds for reduced B2 and 25.5
 seconds for reduced B1. Isolated measurement attributes most of that tail to
 worker contention: reducing only the manufactured modal grid lowered its
 weighted path to 23.5--26.1 seconds, and the unchanged reduced-B2 restart and

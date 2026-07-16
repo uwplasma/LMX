@@ -214,6 +214,7 @@ def test_external_literature_verifier_reports_drift(tmp_path: Path) -> None:
 
 def test_tracked_release_asset_manifest_matches_sources() -> None:
     tracked = json.loads(Path("docs/release-assets.json").read_text())
+    assert tracked["schema_version"] == 2
     assert tracked["release"]["status"] == "uploaded"
     assert len(tracked["release"]["archive_sha256"]) == 64
     assert tracked["release"]["download_url"].startswith("https://github.com/")
@@ -222,6 +223,8 @@ def test_tracked_release_asset_manifest_matches_sources() -> None:
         tracked["summary"]["unique_content_count"]
         <= tracked["summary"]["logical_file_count"]
     )
+    assert tracked["showcase"]["bytes"] == 168237
+    assert len(tracked["showcase"]["files"]) == 5
     assert check_manifest() == tracked
 
 
@@ -230,7 +233,14 @@ def test_release_asset_archive_is_deterministic_and_verified(tmp_path: Path) -> 
     generated = root / "docs" / "_static" / "generated"
     generated.mkdir(parents=True)
     (generated / "large.bin").write_bytes(b"a" * (128 * 1024 + 1))
+    poster = root / "docs" / "_static" / "poster.webp"
+    poster.write_bytes(b"poster")
     manifest = write_manifest(tmp_path / "manifest.json", root)
+    assert check_manifest(tmp_path / "manifest.json", root) == manifest
+    poster.write_bytes(b"changed")
+    with pytest.raises(ValueError, match="Tracked showcase media"):
+        check_manifest(tmp_path / "manifest.json", root)
+    poster.write_bytes(b"poster")
     first = tmp_path / "first.tar.gz"
     second = tmp_path / "second.tar.gz"
     assert build_archive(first, root) == build_archive(second, root)
