@@ -130,7 +130,7 @@ symmetry, sharding, and compact-flux wrappers:
 | maintained-core lines | 7,931 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,868 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,340,212 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,327,567 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -222,122 +222,30 @@ speedups, with modest gain beyond two devices. This is a two-update scaling cali
 production-speed claim. The compact record is
 `benchmarks/results/b2-cpu-strong-scaling-20260715.json`.
 
-The pre-terminal-fix `128 x 67 x 67` default-XLA rung passes validation, placement,
-restart, and device equivalence on one and two RTX A4000 GPUs. Diagonal momentum
-preconditioning reduced its initial warm medians from 21.14 to 3.09 seconds on
-one GPU and from 11.98 to 3.19 seconds on two: 6.84x and 3.75x absolute
-improvements. The initial fixed-grid ratio is 0.968x, and seven-repeat
-one-device confirmations on both physical cards have 6.0--12.5% CV because
-unrelated workloads share the host. No current GPU strong-scaling speedup is
-therefore promoted.
-The stricter deterministic probe isolated `4.40e-6` relative reduction noise
-to corrected face flux; a direct-three versus restart-one-plus-two trajectory
-preserved every primary field exactly and reduced that difference to
-`6.25e-7`. The calibration therefore requires nonflux state within `1e-12`
-and flux within `1e-6` absolute and `1e-5` relative. The exact tiny harness
-keeps its stricter all-field gate. The compact record is
-`benchmarks/results/b2-gpu-scaling-calibration-20260715.json`; two updates and
-the shared host preclude a publishable or production-speed claim.
+The current GPU contract and decision are compact:
 
-Earlier complete traces showed first that eager sharded current-flux diagnostics
-and then momentum line solves dominated. JIT fusion and diagonal momentum
-scaling remove both bottlenecks. Dense-reference, implicit-gradient, restart,
-placement, and equivalence gates pass, while the implementation deletes ten net
-source lines. On the new complete `128 x 67 x 67` trace, mixed pressure
-projection occupies 66.0% of named solver wall time, electric potential 28.5%,
-and momentum 5.5%. Projection and electric device activity are each about 60%
-tridiagonal/PCR work; momentum has no tridiagonal events. Device-activity shares
-sum overlapping devices and streams and are not wall-time shares.
+| Evidence | Result | Decision |
+|---|---|---|
+| `8 x 7 x 7`, 1/2 RTX A4000 | repeat, exact restart, conservation, placement, and equivalence pass within `1.02e-14` | production sharding is correct; the fixed-relaxation scalar stays compile-time |
+| `128 x 67 x 67`, 1/2 RTX A4000 | 2.780/2.400 s, CV below 1.2%, 1.159x end-to-end and 1.510x core-phase speedup | misses the 1.2x promotion gate; retain the smaller validation fusion and stop |
+| historical `256 x 67 x 67` | 8.474/7.534 s, CV below 3.7%, 1.125x | diagnostic only; no larger rung |
 
-The single trace-justified `256 x 67 x 67` calibration is complete. It passes
-validation, exact restart, placement, and device equivalence; warm medians are
-8.474 and 7.534 seconds with CV below 3.7%, a stable but sub-threshold 1.125x
-speedup. Stop larger blind rungs. Bounded `64 x 15 x 15` probes rejected one
-transverse line plus axial mean (40% slower), SOLVAX Jacobi plus axial mean
-(22% slower), and a relaxed internal projection tolerance (only 1.0% faster
-and outside the frozen `1e-12` contract). An exact mixed-boundary DCT-IV coarse
-correction passed dense, symmetry, gradient, manufactured-flow, and sharding
-gates, but gained only 0.47% and missed the strict restart-state tolerance;
-it is also rejected. Do not drop the accepted line blocks, weaken tolerance,
-or revive additive coarse corrections. A single released-SOLVAX
-batch for both equal-length transverse systems is also exact, symmetry-safe,
-gradient-safe, and restart-exact, but is 1.0% slower than its paired control;
-do not revive launch-only batching. Pressure-PCG residuals, relative residuals,
-iterations, convergence, and status remain retained without another solve or
-synchronization phase.
+The current calibration fails closed on physical repeat signatures, linear
+status/history, placement, restart, conservation, and device equivalence.
+Nonflux restart state must agree within `1e-12`; corrected flux uses `1e-6`
+absolute and `1e-5` relative tolerances, while the tiny harness remains exact.
+The compiler trace attributes the remaining cost to transverse PCR work and
+post-map host transfers, not collectives; communication tuning therefore stops.
 
-The bounded `8 x 4 x 3` current-source CPU probe is green on one and two forced
-devices: both converge in 24 PCG iterations, their maximum relative residuals
-agree to `6.2e-19`, and the full signatures differ by at most `5.33e-15`. For
-`k=24`, the source-level model is 26 global-reduction stages, 25 preconditioner
-applications, 50 transverse line solves, 25 axial-mean line solves, and 26
-pressure halo pairs per projection. These are algorithmic counts, not device
-kernel counts. The frozen `64 x 15 x 15` GPU phase records 33 and 35 iterations
-on both one and two GPUs: 72 reduction stages, 70 preconditioner applications,
-140 transverse line invocations, 70 axial-mean invocations, and 72 halo pairs
-over two updates. ABBA diagnostic/control ratios are 0.902 and 1.039 with up to
-27% shared-host CV, so retention is within noise and no speedup is claimed. The
-two-GPU tiny rung is correctly collective-dominated.
-
-The isolated `128 x 67 x 67` compiler trace is complete on two RTX A4000s.
-Warm and traced pressure histories agree within `9.2e-18`; both converge in
-204/207 iterations, both GPU tracks have identical named kernel counts, and
-only 228,296 of four million permitted events are used. Projection takes
-0.554/0.567 seconds: fixed-coefficient tridiagonal kernels occupy 74.8--75.4%
-of normalized device activity, while all collectives occupy only 8.8--9.2%.
-The same trace closes electric attribution without another simulation. Its
-95/82-iteration solves take 0.291/0.247 seconds, with 66.8--67.5%
-tridiagonal and 5.6--6.6% collective activity. Communication tuning therefore
-stops for both phases.
-
-Removing only the replicated axial-mean correction retains validation but
-raises pressure work from 33--35 to 180 iterations and is 6.1% slower; reject
-it before a full trace. Both transverse SOLVAX line systems are the measured
-cost and the required convergence mechanism. Released SOLVAX 0.8.3 exposes no
-reusable scalar factor/apply path for its fused GPU tridiagonal solve, so stop
-B2 preconditioner microprobes rather than replace the vendor kernel with an
-unevidenced sequential implementation. The next physics work is Priority 3,
-not another small solver variant.
-
-The current `8 x 7 x 7` refresh passes validation and exact restart on one RTX
-A4000. On two RTX A4000s it places every production field on two real shards
-and every pressure solve converges, but interface-current balance rises to
-`55.28` and restart state/flux errors reach `2.44e-6`/`8.75e-5`. Four identical
-same-process solves alternate A/B/A/B; the first difference is a `1.55e-9`
-step-one axial-velocity perturbation confined to the second shard, which the
-high-Ha second update amplifies. The failure persists on an idle host, with
-standard electric PCG, without the electric coarse correction, and after full
-output synchronization. The root cause was LMX passing a default-device JAX
-scalar into fixed relaxation of sharded state; commit `8b6f97d` keeps the known
-factor as a compile-time scalar and skips the identity first update. Four
-two-GPU repeats, restart, conservation, placement, and 1/2-device equivalence
-then pass exactly or within `1.02e-14`. This was not a SOLVAX defect. The
-scaling worker now fails closed on a compact, gauge-invariant, axial-station
-signature across every cold and warm repeat; it
-passes exactly on the repaired CPU and GPU paths. The frozen failing record
-retains the pre-fix `3183.12` signature for regression provenance.
-
-The isolated current-source `128 x 67 x 67` rung passes physical-repeat,
-restart-state/flux, placement, convergence, and device-equivalence gates. The
-corrected end-to-end public-solve medians at `e3923a2` are 2.797 and 2.690
-seconds with CV below 0.4%, only 1.040x speedup. The external repeat signature
-is outside timing, while public station history and validation remain inside.
-The matched trace passes physical signature and convergence/status gates, with
-iteration drift at most one. Its 1/2-GPU spans are 2.925/2.790 seconds, but the
-three core phases total 2.647/1.771 seconds, a 1.495x speedup. Two-GPU post-map
-work is 0.685 seconds versus 0.040 on one GPU; repeated validation transfers
-account for about 0.520 seconds. The 1.2x end-to-end gate requires at most
-2.330 seconds, so the actionable recovery budget is 0.360 seconds.
-
-The single authorized validation-transfer optimization reuses the already
-materialized station history for host metrics and deletes 12 package lines.
-Its matched confirmation passes every fail-closed gate and reduces two-GPU
-time by 0.290 seconds, but 2.780/2.400-second medians yield only 1.159x. The
-two-GPU promotion limit is 2.317 seconds, missed by 0.083. Retain the smaller
-implementation and stop: no larger rung, further validation tweak, or kernel
-tuning is authorized without revising this plan. Core phases scale at 1.510x;
-the public end-to-end API remains post-map host-transfer limited. Schema-6
-Anderson is now the next bounded workstream after SOLVAX publication.
+Rejected variants remain rejected: weaker pressure tolerance, removing the
+axial-mean correction or line blocks, Jacobi substitutions, mixed-boundary
+coarse correction, additive correction, and launch-only SOLVAX batching. Each
+either violated the frozen numerical contract or missed its timing gate. Do
+not revive preconditioner microprobes or larger rungs without a new trace and a
+plan revision. Full data and rejection provenance are in
+`benchmarks/results/b2-gpu-scaling-calibration-20260715.json` and the performance
+documentation. Schema-6 Anderson is the next bounded workstream after SOLVAX
+publication.
 
 Separate compilation from repeated timings and report uncertainty, memory,
 placement, speedup, and parallel efficiency. Independent-case multiprocessing
@@ -385,128 +293,34 @@ Refresh README/docs B2 and scaling visuals only from compact accepted records.
 Every image states validation status and provenance; no superseded result is
 silently relabelled.
 
-The first fresh current-formulation coarse baseline at `102 x 77 x 77` runs on
-two RTX A4000 shards in 131.22 seconds. All 128 pressure solves converge with
-complete diagnostics; mass, divergence, charge, and boundary-current gates
-pass. The nonlinear residual falls monotonically from `0.9621` to `1.4302e-3`
-but does not reach `5e-5`, so the run correctly stops at the 128-update bound
-with no steady streak. Its last 16 updates are strictly decreasing with a
-log-linear fit of `R^2=0.9999998`; extrapolation suggests a first crossing near
-step 519 but is not acceptance evidence. The compact record is
-`benchmarks/results/b2-current-coarse-baseline-20260715.json`; the 45.7 MB
-restart remains outside Git.
+The current coarse result is diagnostic, not accepted. The `102 x 77 x 77`
+two-GPU run and its one authorized continuation keep every linear,
+conservation, placement, and restart gate green through 256 updates, but finish
+at `7.1081e-4`, 29.24% above the precommitted `5.5e-4` continuation gate. No
+further fixed-relaxation continuation is authorized; the 45.7 MiB restart stays
+outside Git. See `benchmarks/results/b2-current-coarse-baseline-20260715.json`.
 
-The one authorized exact continuation from restart hash `1d6491e3...` reaches
-step 256 in another 130.92 seconds. All 256 pressure and electric solves,
-two-shard placement, and conservation remain green; the residual remains
-strictly decreasing. It ends at `7.1081e-4`, however, 29.24% above the
-precommitted `5.5e-4` gate. Its tail log slope is only `0.5003` of the first
-chunk's, moving the non-authoritative crossing estimate from step 519 to about
-874. No further continuation is authorized.
+The accepted stopping/restart contract is:
 
-The solver-free ownership audit finds a slow velocity pseudo-time mode, not a
-physical time-to-steady claim: `u` controls 255 of 256 updates, the effective
-`dt=1.85185e-6` is 5,400 times below the requested value, and the stopping
-observable is the raw unrelaxed velocity update rather than an equation-error
-norm. Fixed relaxation and flux scaling do not change through the tail.
+- terminal updates receive the same acceleration as interior updates, and
+  direct versus serialized replay passes at `1e-12`;
+- the normalized B2 velocity-map rate is `max|delta u|/(N dt)` with
+  `L=U0=1`, `N=540`; it is project-owned, not a FreeMHD/NekRS tolerance;
+- predictor-preserving projection refreezes the `0.064/N` pseudo-time cap: the
+  warm 64x/32x/16x map rates span 0.0768% against the 0.5% gate;
+- schema 5 requires three sustained normalized-map passes and preserves every
+  linear, conservation, diagnostic, and exact-restart field;
+- the historical `iteration_momentum_defect_history` field is a post-map
+  nonlinear momentum residual, not the split-map defect or a stopping gate.
 
-The audit also found a separate chunk-boundary defect: terminal updates skipped
-Aitken and flux acceleration. The predeclared `7 x 7 x 7` probe failed in 17.77
-seconds, with state/history difference `1.0` and compact-flux relative L2
-`1.48e-5`. B2 now accelerates terminal updates too. Direct four versus
-serialized terminal-two plus resumed-two passes every state, history, and flux
-gate at `1e-12`; the exact current LMX/FreeMHD smoke also remains green with
-pressure RMS/Linf `0.004518/0.010917`.
-
-Pre-fix coarse restarts are diagnostic-only and cannot seed the corrected
-trajectory. The predeclared `dt` versus `dt/2` probe passes in 13.07 seconds.
-Müller and Bühler's electromagnetic scaling defines the B2 map defect as
-`max velocity update/(N dt)` because `L=U0=1` and `N=540`; FreeMHD/OpenFOAM and
-NekRS residual tolerances are linear-solver gates and cannot supply its steady
-threshold. The legacy raw `5e-5` threshold converts to a project-owned map
-defect of `0.05`, not a literature tolerance.
-
-A startup-state 1x/2x/4x/16x/64x ladder keeps the normalized map defect within
-0.192%, with every linear and conservation gate green. From a warm checkpoint,
-eight 64x updates decrease strictly from `0.3530` to `0.1637`, replay bitwise
-through a 4+4 restart, and keep CFL below `3.5e-5`. The magnetic pseudo-time cap
-is therefore raised from `0.001/N` to `0.064/N`; the existing reduced B2
-physics/restart test falls from the prior 45-second gate record to 14.8 seconds.
-This startup evidence was later superseded by the warm-state audit below.
-
-Schema 4 records the post-map nonlinear physical momentum residual
-`L max|C-D-E-JxB-f+Gp|/(rho U0^2 N)`, or `max|R|/540` for B2. It shares the
-projection pressure-face stencil and diffusion boundary assembly, uses the
-prescribed electromagnetic scale, and evaluates fresh mapped Lorentz force
-before coupling acceleration. The reduced history decreases from `0.9760` to
-`0.3103` in four updates and reaches `0.03870` at step 90. JIT/JVP, schema
-compatibility, and exact direct-four versus serialized-two-plus-two replay pass.
-
-The operator audit proves this is not the exact split-map fixed-point defect.
-Momentum acts on the predictor with old-state weights, Lorentz force, and
-relaxed flux; projection interpolates predictor cells to faces and back; the
-diagnostic re-evaluates nonlinear operators on the raw mapped state and includes
-only the pressure-face correction. At reduced step 4, the pressure-force
-contribution is `0.0664` and the omitted face-reconstruction contribution is
-`0.0880`; the projection identity closes exactly. The omitted term already
-exceeds the observed `~0.04` tail, so a coarse split/discretization floor is
-plausible. Retain the historical field name
-`iteration_momentum_defect_history` for schema compatibility, but call it the
-post-map nonlinear momentum residual in user-facing material. It is a validation
-diagnostic, not a stopping condition, and receives no `0.01` threshold. The
-failed 120-second outcome study remains runtime/floor evidence only.
-
-The larger-cap same-state probe keeps all solves green, balance below `4e-10`,
-and CFL below `1.4e-4`, but 128x/256x change normalized map rate by 6.78%.
-Reject 128x and 256x. The predictor momentum
-identity suggests a normalized unrelaxed velocity map rate, up to the gated
-linear residual, but the pressure-corrected cell map also contains projection
-reconstruction. Raising pseudo-time by 64x while retaining raw
-`coupling_tolerance=5e-5` accidentally tightened this normalized gate from
-`0.05` to `7.8125e-4`. Stopping must not depend on the pseudo-time cap.
-
-The manufactured predictor identity and mixed-boundary reconstruction gate
-now pass. A warm same-state `dt/dt2/dt4` decomposition closes the split identity
-below `4e-10` with every linear solve green, but its normalized map rates span
-8.30%, rejecting the predeclared 0.5% transient-invariance limit. The growing
-face-reconstruction contribution as `dt` falls confirms that this decomposition
-is an operator audit, not a tolerance calibration. A follow-up lower-cap ladder
-at safety `0.032` through `0.001` finds no passing three-level rung. Below
-`0.016`, the raw cell-velocity update approaches `3.69e-3` instead of scaling
-with `dt`, while `u` remains controlling, every linear solve passes, and balance
-stays below `3.6e-10`. Dividing that reconstruction contribution by `N dt`
-therefore makes the candidate cell-map rate diverge; lowering the cap cannot
-repair the observable.
-
-Commit `3e731fa` preserves predictor cells and reconstructs only the pressure
-correction, followed by the existing uniform fixed-flow adjustment. The
-conservative corrected face flux is unchanged. A regression proves that zero
-pressure correction preserves an arbitrary divergence-free predictor; mixed
-flow, JIT/autodiff, conservation, and exact 4-versus-2+2 restart gates pass.
-The corrected warm ladder gives map rates `0.265699`, `0.265773`, and `0.265903`
-at 64x/32x/16x: 0.0768% spread versus the frozen 0.5% limit, raw updates halve,
-`u` remains controlling, and balance stays below `3.4e-10`. Refreeze 64x. The
-current two-update native FreeMHD smoke also passes every schema-3 execution and
-comparison gate at `0ab33b2`, with pressure RMS/Linf `0.004518/0.010917`.
-
-Schema 5 now versions direct normalized velocity-map stopping with three
-sustained passes, leaving pressure/potential updates as diagnostics and retaining
-momentum, pressure, electric, and conservation gates. The bounded outcome study
-rejects `tau_map=0.05`: it converges at step 30, but versus the more-converged
-step-96 state its pressure Linf, velocity Linf, and pressure-gradient relative
-L2 differences are `1.676e-3`, `0.1714`, and `0.561%`, exceeding all frozen
-limits. The `0.005` branch remains monotone but reaches only `0.01502` at its
-96-update ceiling, so it is not calibrated. These are not two converged
-endpoints. A positive serialized schema-5 path reaches its third sustained pass
-on update five, closing convergence/restart semantics without promoting a
-physical threshold.
-
-Fixed-relaxation probes through 8 remain monotone, but improve only 9.33% over
-the relaxation-4 control, below the predeclared 15% promotion gate. Retain 2.
-Released SOLVAX 0.8.3 remains the supported floor. Before LMX uses coupled
-Anderson acceleration, reconcile and release SOLVAX 0.8.4's weight API, then
-apply identical weights and damping to fields and conservative compact flux.
-Do not store a production-scale full-state history without a measured benefit.
+The bounded outcome study rejects `tau_map=0.05`: pressure, velocity, and
+pressure-gradient differences exceed every frozen QoI limit. The `0.005` path
+reaches only `0.01502` at step 96, so no threshold is calibrated. Relaxation
+factors through eight miss the 15% promotion gate; retain fixed relaxation 2.
+Pre-fix restarts, 128x/256x pseudo-time caps, and extrapolated convergence steps
+are diagnostic only. Exact histories and operator audits are in
+`benchmarks/results/b2-pseudotime-map-rate-20260715.json` and
+`benchmarks/results/b2-momentum-defect-20260715.json`.
 
 The next bounded tranche is upstream-first. SOLVAX draft PR 21 now carries the
 clean 0.8.4 weight API and corrected release metadata; its supported
