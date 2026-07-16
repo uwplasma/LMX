@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "case_id": "B2-fringing-square",
   "acceptance_role": "canonical-coarse-current-formulation",
   "status": "continuation-residual-gate-failed",
@@ -101,12 +101,30 @@
     "restart_sha256": "1d6491e372db0deb1f1e2363caba4d07efc9105a379fea98aa95b0bc589612a1",
     "disposition": "untracked working checkpoint; incomplete evidence is not a release asset"
   },
+  "trajectory_diagnosis": {
+    "continued_history_prefix_bitwise_exact": true,
+    "persistent_slow_mode_owner": "velocity pseudo-time convergence",
+    "u_controlled_updates": 255,
+    "total_updates": 256,
+    "requested_dt": 0.01,
+    "effective_dt": 0.0000018518518518518519,
+    "stopping_observable": "raw unrelaxed max absolute velocity update",
+    "physical_time_interpretation_valid": false,
+    "terminal_chunk_invariant": false,
+    "terminal_issue": "fixed-point and flux acceleration are skipped when step + 1 equals stop_step",
+    "log_decrement_step_127_to_128": -0.00856155,
+    "log_decrement_step_128_to_129": -0.00426753,
+    "log_decrement_step_129_to_130": -0.00854887
+  },
   "decision": {
     "further_baseline_continuation_authorized": false,
     "independence_variants_authorized": false,
     "medium_or_fine_authorized": false,
     "freemhd_production_run_authorized": false,
-    "next_probe": "solver-free trajectory and convergence-ownership diagnosis before any new simulation",
-    "reason": "the exact continuation preserved every physics and linear-solver gate but its tail rate halved and missed the precommitted residual limit by 29.24 percent"
+    "next_probe": "reduced 7x7x7 direct four updates versus serialized terminal two plus resumed two updates",
+    "next_probe_state_and_history_absolute_tolerance": 1e-12,
+    "next_probe_flux_relative_l2_tolerance": 1e-12,
+    "next_probe_wall_seconds_max": 120,
+    "reason": "the slow velocity mode explains persistent convergence, while a separate terminal acceleration skip makes chunked continuation non-invariant and must be closed first"
   }
 }

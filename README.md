@@ -137,7 +137,7 @@ doubled-axial calibration reaches 1.125×; production scaling remains open.
 ## Quality and citation
 
 The portable gate records **817 passing tests**, **95.02% combined line/branch
-coverage**, and **147.8 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
+coverage**, and **149.0 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
 [Theory](docs/theory.md) · [Numerics](docs/numerics.md) ·
 [Contributing](CONTRIBUTING.md) · [Research assets](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
 

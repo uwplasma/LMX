@@ -1,7 +1,7 @@
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "date": "2026-07-15",
-  "commit": "90953e28bd744f23e5c0ce47e358399a0942d972",
+  "commit": "51f1d20adf3875df2cb4cee814d3a3a25ad90c63",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -20,11 +20,11 @@
   },
   "result": {
     "test_files": 30,
-    "test_lines": 20922,
+    "test_lines": 20751,
     "passed": 817,
     "skipped": 8,
-    "pytest_seconds": 145.62,
-    "gate_seconds": 147.8,
+    "pytest_seconds": 146.77,
+    "gate_seconds": 149.0,
     "covered_lines": 14238,
     "total_lines": 14688,
     "covered_branches": 2519,
@@ -33,28 +33,28 @@
     "passed_gate": true
   },
   "artifacts": {
-    "coverage_xml_sha256": "d7ad219d2e20f11f8aa68430c70f275bbfa702b0e8af7b5068ab35d89dc38c5d",
-    "junit_xml_sha256": "9d324f6c8fec1dceb3ad932318659078d658e4ea33ae567f0e4b9292bb2bc723"
+    "coverage_xml_sha256": "a602d7aaf1590bd5880a424e06d683ec222f7108d191271c39fc4bc2a73eb551",
+    "junit_xml_sha256": "68e489064b1c19eb67b26d38e98d06f1493bb45713cc445cc95646228bd29704"
   },
   "duration_note": "Durations come from the six-worker JUnit record; concurrent-node times identify CI pressure but are not isolated timings.",
   "slowest_tests": [
-    {"seconds": 52.149, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]"},
-    {"seconds": 40.184, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
-    {"seconds": 25.046, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
-    {"seconds": 20.299, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
-    {"seconds": 18.208, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
-    {"seconds": 16.159, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[base]"},
-    {"seconds": 15.572, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
-    {"seconds": 15.067, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"},
-    {"seconds": 14.788, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"},
-    {"seconds": 14.752, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_returns_finite_payload"}
+    {"seconds": 52.481, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]"},
+    {"seconds": 40.327, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
+    {"seconds": 25.193, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
+    {"seconds": 20.257, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
+    {"seconds": 17.658, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
+    {"seconds": 16.020, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
+    {"seconds": 15.939, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[base]"},
+    {"seconds": 15.383, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_returns_finite_payload"},
+    {"seconds": 15.092, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"},
+    {"seconds": 14.435, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"}
   ],
   "comparison": {
-    "previous_gate_seconds": 167.6,
-    "wall_time_change_percent": -11.81,
-    "budget_fraction": 0.246,
-    "engineering_target_fraction": 0.493,
-    "interpretation": "The diagnostic-schema tranche removes 98 maintained-core and 58 test lines while preserving every test and coverage gate. The faster wall time is observed, not attributed; weighted-modal remains the contention-sensitive critical path."
+    "previous_gate_seconds": 147.8,
+    "wall_time_change_percent": 0.81,
+    "budget_fraction": 0.248,
+    "engineering_target_fraction": 0.497,
+    "interpretation": "Shared manual-validation stubs remove another 171 test lines while preserving all four workflow tests and the exact combined coverage count. The 0.8% wall-time change is noise; weighted-modal remains the contention-sensitive critical path."
   },
   "scheduling_probe": {
     "source_commit": "f379f6bab2e25acd8c2785eebe1c88a10ed854a9",
@@ -71,7 +71,7 @@
     "package_lines": 34899,
     "maintained_core_lines": 7954,
     "maintenance_scripts": 13,
-    "tracked_checkout_bytes": 3509027,
+    "tracked_checkout_bytes": 3504115,
     "stable_root_exports": 30,
     "curated_examples": 11
   },

@@ -1,7 +1,7 @@
 # LMX authoritative development plan
 
 Status: 2026-07-15. The optimized B2 source and current CPU calibration are
-keyed to `413185a`; the latest complete portable gate is keyed to `90953e2`.
+keyed to `413185a`; the latest complete portable gate is keyed to `51f1d20`.
 The isolated compiler trace is keyed to `f379f6b`; GPU workers use the
 optimized source's matching fingerprint.
 The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence,
@@ -117,17 +117,17 @@ immutable evidence, richer projection, and target-driven paths remain):
 | maintained-core lines | 7,954 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,751 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,504,021 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,505,651 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The portable-gate artifact keyed to `90953e2` records 817 passes, 8 expected
-external-data skips, 95.0159% combined line/branch coverage, and 147.8 seconds on
+The portable-gate artifact keyed to `51f1d20` records 817 passes, 8 expected
+external-data skips, 95.0159% combined line/branch coverage, and 149.0 seconds on
 the reference Apple M4. It remains below the 300-second engineering target and
 600-second hard limit. Coverage remains above the enforced floor but below the
-95.5% engineering target. The six-worker record reports 52.1 seconds for the
-weighted-modal node and 40.2 seconds for reduced B2. Parallel JUnit durations
+95.5% engineering target. The six-worker record reports 52.5 seconds for the
+weighted-modal node and 40.3 seconds for reduced B2. Parallel JUnit durations
 are diagnostic rather than isolated timings, but weighted-modal now exceeds the
 45-second warning level and is the next CI critical-path target.
 
@@ -167,7 +167,7 @@ measurements themselves run alone.
 
 The modal pipe test reuses one physical projection and verifies direct
 mode-factor algebra without a second integration run. In the latest six-worker
-gate it reports 52.1 seconds, versus 40.2 seconds for reduced B2 and 25.0
+gate it reports 52.5 seconds, versus 40.3 seconds for reduced B2 and 25.2
 seconds for reduced B1. Isolated measurement attributes most of that tail to
 worker contention: reducing only the manufactured modal grid lowered its
 weighted path to 23.5--26.1 seconds, and the unchanged reduced-B2 restart and
@@ -350,13 +350,23 @@ precommitted `5.5e-4` gate. Its tail log slope is only `0.5003` of the first
 chunk's, moving the non-authoritative crossing estimate from step 519 to about
 874. No further continuation is authorized.
 
-Next, use the existing 256-step histories and source to identify whether the
-slowdown belongs to physical transient advancement, fixed-point scaling,
-constant Aitken relaxation, flux relaxation, or the stopping observable. This
-is a solver-free analysis first. Any later numerical probe must state one
-hypothesis and a sub-two-minute reduced-grid gate before touching the coarse
-restart. Tolerance, wall, medium, fine, and production-FreeMHD work remain
-blocked until the current coarse baseline converges for the correct reason.
+The solver-free ownership audit finds a slow velocity pseudo-time mode, not a
+physical time-to-steady claim: `u` controls 255 of 256 updates, the effective
+`dt=1.85185e-6` is 5,400 times below the requested value, and the stopping
+observable is the raw unrelaxed velocity update rather than an equation-error
+norm. Fixed relaxation and flux scaling do not change through the tail.
+
+The audit also finds a separate chunk-boundary defect. Stored histories are
+bitwise-exact prefixes, but the last requested update skips Aitken and flux
+acceleration because `step + 1 == stop_step`; the next invocation restores
+factor-two relaxation. This creates an isolated half-step kink and means a
+terminal restart is not trajectory invariant. Before any coarse continuation,
+run one `7 x 7 x 7`, four-update direct versus serialized terminal-two plus
+resumed-two probe. Require state and histories within `1e-12`, compact-flux
+relative L2 within `1e-12`, and wall time below 120 seconds. A failure authorizes
+only a terminal chunk-invariance fix and focused replay. Tolerance, wall,
+medium, fine, and production-FreeMHD work remain blocked until the current
+coarse baseline converges for the correct reason.
 
 Exit: B2 has a three-mesh ladder, exact-source FreeMHD evidence, literature and
 experimental comparison with uncertainty, reproducible environments, and a
