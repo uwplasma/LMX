@@ -91,8 +91,8 @@ observables pass the 1% finite-grid gate.
 
 ![B2 fringe field and pressure diagnostics](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-alex-b2-field-pressure.webp)
 
-B2 passes exact restart and 1/2/4-CPU plus 1/2-GPU equivalence. Its stopping
-threshold, production parity, and scaling promotion remain open.
+B2 passes exact restart and 1/2/4-CPU equivalence. One-GPU schema-6 topology is
+green; two-GPU replay, production parity, and scaling promotion remain open.
 [Fringing status →](https://lmx.readthedocs.io/en/latest/fringing.html)
 
 ## Follow curved pipes

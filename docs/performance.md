@@ -18,7 +18,7 @@ devices alone is not evidence of parallel execution.
 | B2 stopping study | Apple M4, schema 5, restart segments to step 96 | `0.05` converges at 30 but fails all QoI limits; `0.005` reaches only `0.01502` | fail closed; accelerate before tighter-reference calibration |
 | B2 relaxation probe | Apple M4, shared step-29 checkpoint, six updates | factors 5/6/8 gain at most 9.33% over factor 4 | below 15% gate; retain factor 2 |
 | B2 fixed relaxation | canonical `min=max=2` | exact trajectory/restart; prior residual omitted | saves 18.46 MiB at `102 x 77 x 77` and two global dot products/update |
-| B2 GPU smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | current repeats and restart are exact; pressure observable agrees within `1.02e-14`; closure and placement pass | production sharding correctness; too small for scaling claims |
+| B2 GPU smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7` | pre-schema-6 1/2-GPU equivalence passed; current schema 6 passes on one GPU | explicit flux-component placement awaits the focused two-GPU replay gate; too small for scaling claims |
 | B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.857/0.652/0.633 s; 1.31x/1.35x speedup; exact restart and device equivalence pass | historical pre-terminal-fix calibration; rerun before promotion |
 | B2 GPU calibration | 1/2 RTX A4000 GPUs, `128 x 67 x 67`, default XLA | current medians 2.780/2.400 s; repeat, trace, restart, placement, and equivalence pass | 1.159x misses the 1.2x promotion gate; no scaling claim |
 | B2 doubled-axial calibration | 1/2 RTX A4000 GPUs, `256 x 67 x 67`, default XLA | 8.47/7.53 s; 1.125x speedup; CV below 3.7% | historical pre-terminal-fix calibration below the 1.2x threshold |
@@ -131,6 +131,12 @@ speedup lower bounds are 1.209 and 1.319: two devices pass, but four devices
 miss the frozen 1.40 speedup and 35% efficiency gates. Correctness and the
 optimization are accepted; production strong scaling is not.
 
+A paired `128 x 35 x 35` probe rejected removing the separate axial-mean
+correction when the global modal basis is active: four-device time regressed
+7.4% with unchanged iterations and bitwise-identical outputs. The next profile
+targets the Neumann electric gauge reduction; no larger scaling rung is
+authorized from the rejected variant.
+
 The medium B2 tight solve converged across two restart-safe segments and ended
 at residual `2.500e-5`, divergence `1.829e-6`, and charge residual `1.149e-4`.
 The source-identical baseline, doubled-iteration, and confirmation-wall runs
@@ -178,7 +184,8 @@ and `0.10`. A directional comparison to the accepted medium curve changes by
 `0.0319`, above the `0.02` mesh gate; the records have different source
 fingerprints, so this is diagnosis rather than formal acceptance. The released
 SOLVAX Anderson-weight API and bounded schema-6 depth-two field/flux path now
-pass CPU topology and exact-replay gates. GPU topology is next. Production-mesh FreeMHD,
+pass CPU topology and exact-replay gates. One-GPU schema-6 topology passes;
+two-GPU replay remains open. Production-mesh FreeMHD,
 observable/model normalization, fine numerical independence, and experimental
 acceptance remain blocked until the current coarse formulation converges for
 the correct reason.
@@ -332,7 +339,7 @@ than silently reused.
 
 ## Next performance work
 
-1. Pass the `8 x 7 x 7` schema-6 topology/restart gate on one/two A4000s.
+1. Complete the `8 x 7 x 7` schema-6 two-GPU topology/restart gate; one GPU is green.
 2. Compare six tiny Anderson updates with the fixed-relaxation control.
 3. If that passes, run the bounded step-29 then strict step-96 outcome gates.
 4. Close canonical coarse/medium/fine and experimental-observable acceptance.

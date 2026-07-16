@@ -31,8 +31,9 @@ topology passes exact replay, conservation, Gram/weight equivalence, and
 placement. The isolated `256 x 67 x 67` calibration also passes correctness and
 timing-stability gates, but 1.132x/1.178x point speedups miss their frozen
 promotion bounds. It is a rejected two-update forced-device calibration, not a
-physical-core or production strong-scaling claim. Schema-6 GPU topology is
-still pending. This
+physical-core or production strong-scaling claim. Schema-6 topology passes on
+one GPU; two-GPU confirmation of the explicit component-layout transition is
+pending. This
 single active plan records accepted baselines, active gates, and
 stop/go criteria—not campaign history. Completed campaign details belong in
 checksummed result records and the validation or performance documentation.
@@ -180,8 +181,9 @@ but source and tests both changed, so the shared-host delta is not a speed claim
 Do not promote a suite-speed claim from wall-time variance. The gate stays below
 47% of the 300-second engineering target and 24% of the 600-second hard limit.
 The 95.5%
-engineering target is now met; retain the 95% enforced floor until a second
-Python endpoint or hosted run independently confirms the margin. The
+engineering target is not yet met; retain the 95% enforced floor while closing
+the remaining 0.1722-point gap and awaiting a second Python endpoint or hosted
+run. The
 six-worker record reports 51.9 seconds for reduced B2 and 48.4 seconds for
 weighted modal; these concurrent durations still identify contention rather
 than isolated regressions, so no scheduling change is promoted from this run.
@@ -315,6 +317,19 @@ blind 8/10-device or larger rung. The next performance experiment must profile
 the remaining halo, Krylov/gauge reduction, and replicated axial-mean costs on
 an accepted longer workload; do not infer its priority from this two-step run.
 
+A paired `128 x 35 x 35` four-device probe tested removing the separate
+axial-mean correction when the global transverse modal basis is active. Fields
+and iteration counts stayed identical, but the warm median regressed from
+0.8138 to 0.8740 seconds (7.4%). Reject that deletion and do not launch the
+large rung from it; the first apparent gain was shared-worktree/cache-order
+noise. The next optimization requires an isolated profile, not another
+preconditioner hypothesis. Profile the Neumann electric matvec's rank-one gauge
+reduction first; prototype an anchored symmetric gauge only if that dependent
+collective exceeds 3% of wall time. Its fail-closed ladder is manufactured
+SPD/symmetry/JVP, tiny 1/2/4 topology, paired `128 x 35 x 35` one/four-device
+timing, provisional `256 x 67 x 67` one/two/four-device scaling, and only then
+the frozen six-repeat promotion gate.
+
 Compact CPU evidence is
 `benchmarks/results/b2-schema6-cpu-scaling-20260716.json`; raw worker JSON and
 plots remain ignored. The worker fingerprint must include package-owned frozen
@@ -324,7 +339,8 @@ The current GPU contract and decision are compact:
 
 | Evidence | Result | Decision |
 |---|---|---|
-| historical `8 x 7 x 7`, 1/2 RTX A4000 | pre-schema-6 repeat, restart, conservation, placement, and equivalence pass | schema-6 GPU topology remains pending; no current Anderson GPU claim |
+| historical `8 x 7 x 7`, 1/2 RTX A4000 | pre-schema-6 repeat, restart, conservation, placement, and equivalence pass | historical only; no current Anderson GPU claim |
+| schema-6 `8 x 7 x 7`, 1/2 RTX A4000 | one GPU passes; the first two-GPU run isolates a `5.097353e-5` second-step CFL replay mismatch while flux, Anderson, derived fields, and solver histories remain equivalent | explicitly normalize stacked-flux component placement, then rerun only the tiny topology gate on an idle host |
 | `128 x 67 x 67`, 1/2 RTX A4000 | 2.780/2.400 s, CV below 1.2%, 1.159x end-to-end and 1.510x core-phase speedup | misses the 1.2x promotion gate; retain the smaller validation fusion and stop |
 | historical `256 x 67 x 67` | 8.474/7.534 s, CV below 3.7%, 1.125x | diagnostic only; no larger rung |
 
@@ -359,8 +375,10 @@ Exit: the post-schema-6 portable suite remains below ten minutes with no
 critical-path surprise, CPU and GPU topology/restart correctness are current,
 and one accepted fixed global workload shows uncertainty-aware useful speedup
 on its target hardware. CPU correctness is green but CPU performance promotion
-is not; schema-6 GPU correctness is pending, and the old GPU ladder remains
-stopped.
+is not; schema-6 two-GPU correctness is pending, and the old GPU ladder remains
+stopped. The current explicit flux-unpack change preserves exact 1/2/4-CPU
+topology and awaits the focused two-GPU gate; it is not yet accepted GPU
+evidence.
 
 ## Priority 3: canonical B2 validation
 
@@ -431,9 +449,10 @@ history.
 
 The next validation sequence is fail-closed:
 
-1. run the `8 x 7 x 7` schema-6 topology gate on one/two A4000s; require exact
-   replay, equivalent Gram/weights/observables, sharded field/flux/state, and a
-   replicated inlet plane; make no timing claim;
+1. complete the `8 x 7 x 7` schema-6 topology gate on one/two A4000s; one GPU
+   passes, while two-GPU confirmation of explicit stacked-flux component
+   placement remains. Require exact replay, equivalent Gram/weights/observables,
+   sharded field/flux/state, and a replicated inlet plane; make no timing claim;
 2. compare six `7 x 7 x 7` updates from one cold state with Anderson depth two
    versus fixed-relaxation two; require no residual growth, finite stable
    weights, every linear/conservation/replay gate, and a predeclared meaningful

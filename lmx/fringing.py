@@ -7486,6 +7486,9 @@ def _solve_extruded_projection(
         def pack_flux(x, y, z):
             return jnp.stack((x, y, z))
 
+        def unpack_flux(flux):
+            return tuple(flux)
+
         def pack_vector(x, y, z):
             return jnp.stack((x, y, z), axis=-1)
 
@@ -7534,6 +7537,10 @@ def _solve_extruded_projection(
             pack_flux = jax.jit(pack_flux,
                 in_shardings=(field_sharding,) * 3, out_shardings=flux_sharding)
             pack_flux = _reuse_fringing_jit(("pack_flux", *kernel_key), pack_flux)
+            unpack_flux = jax.jit(unpack_flux, in_shardings=flux_sharding,
+                out_shardings=(field_sharding,) * 3)
+            unpack_flux = _reuse_fringing_jit(
+                ("unpack_flux", *kernel_key), unpack_flux)
             pack_vector = jax.jit(pack_vector,
                 in_shardings=(field_sharding,) * 3, out_shardings=vector_sharding)
             pack_vector = _reuse_fringing_jit(("pack_vector", *kernel_key), pack_vector)
@@ -8211,7 +8218,8 @@ def _solve_extruded_projection(
             if case.solver.coupling_acceleration == "anderson":
                 current_rho_phi_plus = (pack_flux(*mapped_flux_components)
                     if converged else accelerated_flux)
-                current_flux_components = tuple(current_rho_phi_plus)
+                # Preserve component placement across older GPU JAX releases.
+                current_flux_components = unpack_flux(current_rho_phi_plus)
                 current_rho_phi_inlet = (mapped_rho_phi_inlet
                     if converged else accelerated_inlet)
             else:
