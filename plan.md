@@ -130,10 +130,14 @@ shared without removing cases or assertions.
 | test files / lines | 30 / 20,484 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 173 | delete only superseded or duplicate ownership | 180 |
-| tracked checkout | 3,321,846 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,322,149 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
+The latest ownership audit removed one unreferenced superseded GPU record.
+The remaining result records, 13 scripts, and distinct Python/TOML examples
+retain current provenance, CI, or runnable-workflow ownership; do not merge
+them unless the replacement deletes code without weakening those contracts.
 
 The portable-gate artifact keyed to `a50b868` records 815 passes, 8 expected
 external-data skips, 95.0622% combined line/branch coverage, and 150.7 seconds on
