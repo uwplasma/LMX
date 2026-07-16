@@ -455,10 +455,10 @@ def generate_multilayer_duct_mesh(
         y_faces = _clustered_segment(-0.5 * width, 0.5 * width, ny, beta=2.0)
         z_faces = _clustered_segment(-0.5 * height, 0.5 * height, nz, beta=2.0)
 
-    left_faces = _negative_wall_faces(-0.5 * width, layers_by_side["left"])
-    right_faces = _positive_wall_faces(0.5 * width, layers_by_side["right"])
-    bottom_faces = _negative_wall_faces(-0.5 * height, layers_by_side["bottom"])
-    top_faces = _positive_wall_faces(0.5 * height, layers_by_side["top"])
+    left_faces = _wall_faces(-0.5 * width, layers_by_side["left"], positive=False)
+    right_faces = _wall_faces(0.5 * width, layers_by_side["right"], positive=True)
+    bottom_faces = _wall_faces(-0.5 * height, layers_by_side["bottom"], positive=False)
+    top_faces = _wall_faces(0.5 * height, layers_by_side["top"], positive=True)
     if left_faces.size:
         y_faces = jnp.concatenate([left_faces[:-1], y_faces])
     if right_faces.size:
@@ -523,30 +523,21 @@ def _normalized_wall_layers(
     return normalized
 
 
-def _negative_wall_faces(
-    inner_boundary: float, layers: Sequence[WallLayer]
-) -> jnp.ndarray:
-    if not layers:
-        return jnp.asarray([], dtype=float)
-    total = sum(float(layer.thickness) for layer in layers)
-    cursor = float(inner_boundary) - total
-    segments = []
-    for layer in reversed(layers):
-        stop = cursor + float(layer.thickness)
-        segment = jnp.linspace(cursor, stop, int(layer.cells) + 1)
-        segments.append(segment if not segments else segment[1:])
-        cursor = stop
-    return jnp.concatenate(segments)
-
-
-def _positive_wall_faces(
-    inner_boundary: float, layers: Sequence[WallLayer]
+def _wall_faces(
+    inner_boundary: float,
+    layers: Sequence[WallLayer],
+    *,
+    positive: bool,
 ) -> jnp.ndarray:
     if not layers:
         return jnp.asarray([], dtype=float)
     cursor = float(inner_boundary)
+    ordered_layers = layers
+    if not positive:
+        cursor -= sum(float(layer.thickness) for layer in layers)
+        ordered_layers = tuple(reversed(layers))
     segments = []
-    for layer in layers:
+    for layer in ordered_layers:
         stop = cursor + float(layer.thickness)
         segment = jnp.linspace(cursor, stop, int(layer.cells) + 1)
         segments.append(segment if not segments else segment[1:])
