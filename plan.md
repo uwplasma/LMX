@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-16. Current LMX source through `2c489be` consumes released SOLVAX 0.8.4;
+Status: 2026-07-16. Current LMX source through `c1ca34f` consumes released SOLVAX 0.8.4;
 `aaa41b1` made the
 frozen B2 path Anderson depth two with one shared weight vector for mapped
 scaled fields and conservative compact flux. Restart schema 6 stores one raw
@@ -67,10 +67,11 @@ real-solver numerics, placement, peak memory, and explicit affinity/idle-host
 evidence. Incomplete candidates remain visible without a sustained speedup or
 plot title. The accepted CPU rerun is complete. A post-slimming rerun was
 aborted without a timing record after unrelated local simulations raised host
-load above 135 following a clean preflight. Require continuous and postflight
-host admission before retrying. Retry the 96-update GPU campaign only
-after both office A4000s pass their clean-environment gates; they remained at
-100% foreign utilization during this tranche.
+load above 135 following a clean preflight. A later check still found load 83,
+active SFINCS/Python work, and severe swapouts. Require continuous and
+postflight host admission before retrying. Retry the 96-update GPU campaign
+only after both office A4000s pass their clean-environment gates; idle-looking
+instantaneous utilization is insufficient while foreign contexts remain.
 This single active plan records accepted baselines, active gates, and stop/go
 criteria—not campaign history. Completed campaign details belong in
 checksummed result records and the validation or performance documentation.
@@ -174,12 +175,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,719 | reclaim below 34,700 after the scaling record is sealed | 35,100 |
+| package lines | 34,699 | stay below 34,700 | 35,100 |
 | maintained-core lines | 7,880 | stay below 7,890 | 8,000 |
-| test files / lines | 30 / 21,090 | no new file; reclaim below 21,075 | 31 / 21,100 |
+| test files / lines | 30 / 21,038 | no new file; stay below 21,075 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,548,359 bytes | direct visual evidence only; keep below 4,550,000 | 4,718,592 bytes |
+| tracked checkout | 4,552,276 bytes | reclaim below 4,550,000 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -249,7 +250,10 @@ indices; a preflight record cannot be attached to another allocation. Commit
 `2c489be` closes the downstream duration loophole: the summary now re-derives
 the multi-minute contract, and generated plots use neutral fixed-work wording.
 Synthetic metadata checks stay instant; performance evidence still requires
-every warm trajectory to last at least 120 seconds. Commit `6629660` then
+every warm trajectory to last at least 120 seconds. Commit `c1ca34f` gives
+field norms and synthetic solver bundles one owner each and consolidates the
+two safe numeric converters, deleting 20 package and 52 test lines while all
+36 scaling tests and the architecture gate pass. Commit `6629660` then
 replaces eight directional transverse-stencil helpers with four
 axis-parameterized owners, deleting 21 package lines and four private symbols.
 All solver tests and focused Hartmann differentiation checks pass. Commit
