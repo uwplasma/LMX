@@ -238,6 +238,13 @@ operator baseline `(12, 24, 48)` took 3.96 seconds; `(8, 16, 32)` and
 gate (`gradient_z > 1.8`). Retain both original grids; their longer concurrent
 JUnit times are contention, not an isolated size bottleneck.
 
+Commit `d720d1e` removes redundant optimizer iterations from two high-level
+inverse-design wrapper-contract tests. Their isolated pair falls from 18.56 to
+15.01 seconds (19.1%), clearing the precommitted 15% promotion gate. The direct
+projection and fringing-surrogate convergence owners retain four steps and
+their loss-reduction assertions. The complete autodiff module passes in 78.46
+seconds after the change; no source path, test node, or assertion was removed.
+
 Centralizing figure persistence permits one real PNG/PDF signature test and
 lightweight persistence stubs for the remaining plotting writers. Replacing
 two redundant bent-pipe solves with synthetic writer fields then reduces that
