@@ -7409,8 +7409,6 @@ def _solve_extruded_projection(
         courant_by_step = [[-1.0, -1.0, -1.0]] * completed_steps
     if len(courant_by_step) != completed_steps:
         raise ValueError("B2 restart CFL histories have inconsistent lengths")
-    fixed_point_iterates: list[jnp.ndarray] = []
-    fixed_point_residuals: list[jnp.ndarray] = []
     previous_fixed_point_residual: jnp.ndarray | None = None
     fixed_aitken_relaxation = (float(case.solver.coupling_min_relaxation)
         if use_alex_b2_finite_volume and case.solver.coupling_acceleration == "aitken"
@@ -8163,46 +8161,7 @@ def _solve_extruded_projection(
             current_state = scaled_state(u, v, w, phi_previous)
             mapped_state = scaled_state(u_next, v_next, w_next, phi)
             fixed_point_residual = state_difference(mapped_state, current_state)
-            if case.solver.coupling_acceleration == "anderson":
-                fixed_point_iterates.append(current_state)
-                fixed_point_residuals.append(fixed_point_residual)
-                del fixed_point_iterates[: -case.solver.coupling_history_depth]
-                del fixed_point_residuals[: -case.solver.coupling_history_depth]
-                if field_sharding is None:
-                    accelerated = _anderson_extruded_state(
-                        fixed_point_iterates,
-                        fixed_point_residuals,
-                        history_size=case.solver.coupling_history_depth,
-                        regularization=case.solver.coupling_regularization,
-                        damping=case.solver.coupling_damping,
-                    )
-                elif len(fixed_point_iterates) == 1:
-                    accelerated = mapped_state
-                else:
-                    iterates = tuple(
-                        fixed_point_iterates[-case.solver.coupling_history_depth :]
-                    )
-                    residuals = tuple(
-                        fixed_point_residuals[-case.solver.coupling_history_depth :]
-                    )
-                    mix_history = jax.jit(
-                        lambda xs, rs: anderson_mixing(
-                            jnp.stack(xs),
-                            jnp.stack(rs),
-                            regularization=case.solver.coupling_regularization,
-                            damping=case.solver.coupling_damping,
-                        ),
-                        in_shardings=(
-                            (state_sharding,) * len(iterates),
-                            (state_sharding,) * len(residuals),
-                        ),
-                        out_shardings=state_sharding,
-                    )
-                    mix_history = _reuse_fringing_jit(
-                        ("anderson", len(iterates), *kernel_key), mix_history
-                    )
-                    accelerated = mix_history(iterates, residuals)
-            elif case.solver.coupling_acceleration == "aitken":
+            if case.solver.coupling_acceleration == "aitken":
                 if fixed_aitken_relaxation is not None:
                     fixed_point_relaxation = jnp.asarray(
                         1.0 if step == 0 else fixed_aitken_relaxation, dtype=u.dtype)

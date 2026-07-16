@@ -374,6 +374,18 @@ def test_benchmark_b_problem_binds_frozen_nondimensional_contract(
     assert case.forcing == 0.0
     assert case.geometry.axial_origin == -15.0
     assert problem.profile.axis == "y"
+    if case_id == "B2-fringing-square":
+        unsupported = replace(
+            problem,
+            case=replace(
+                case,
+                solver=replace(case.solver, coupling_acceleration="anderson"),
+            ),
+        )
+        with pytest.raises(
+            NotImplementedError, match="B2 conservative Anderson mixing requires"
+        ):
+            solve_extruded_inductionless(unsupported)
     inlet, outlet = case.boundary_conditions[1:3]
     expected_flow = 3.141592653589793 if case_id == "B1-fringing-pipe" else 4.0
     assert (inlet.name, inlet.kind, inlet.axis, inlet.value) == (
