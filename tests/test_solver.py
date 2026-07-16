@@ -2314,23 +2314,8 @@ def test_velocity_update_limiters_cover_local_clip_and_validation_errors():
     assert float(clipped[0, 0]) == pytest.approx(0.5)
     assert float(clipped[0, 1]) == pytest.approx(-0.5)
 
-    peak, scale, limited_fraction = solvers._velocity_update_statistics(
-        current,
-        trial,
-        fluid_mask,
-        max_delta=0.5,
-        limiter="local_clip",
-    )
-    assert float(peak) == pytest.approx(2.0)
-    assert 0.0 < float(scale) <= 1.0
-    assert 0.0 < float(limited_fraction) <= 1.0
-
     with pytest.raises(ValueError, match="Unsupported velocity update limiter"):
         solvers._limited_velocity_update(current, trial, fluid_mask, limiter="bad")
-    with pytest.raises(ValueError, match="Unsupported velocity update limiter"):
-        solvers._velocity_update_statistics(
-            current, trial, fluid_mask, max_delta=0.5, limiter="bad"
-        )
 
 
 def test_target_mean_velocity_projection_preserves_area_weighted_flow_rate():

@@ -1193,26 +1193,6 @@ def _enforce_target_mean_velocity(
     return jnp.where(fluid_mask, scaled, 0.0)
 
 
-def _velocity_update_statistics(
-    current: jnp.ndarray,
-    trial: jnp.ndarray,
-    fluid_mask: jnp.ndarray,
-    *,
-    max_delta: float,
-    limiter: str,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    delta = jnp.where(fluid_mask, trial - current, 0.0)
-    peak_delta = jnp.max(jnp.abs(delta))
-    active_count = jnp.maximum(jnp.sum(fluid_mask.astype(delta.dtype)), 1.0)
-    limited_fraction = jnp.sum(
-        jnp.where(fluid_mask, (jnp.abs(delta) > max_delta).astype(delta.dtype), 0.0)
-    ) / active_count
-    if limiter not in {"global_scale", "local_clip"}:
-        raise ValueError(f"Unsupported velocity update limiter {limiter!r}")
-    scale = jnp.minimum(1.0, max_delta / jnp.maximum(peak_delta, 1e-12))
-    return peak_delta, scale, limited_fraction
-
-
 def _active_velocity_mask(fluid_mask: jnp.ndarray) -> jnp.ndarray:
     active = jnp.array(fluid_mask, copy=True)
     active = active.at[0, :].set(False)

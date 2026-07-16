@@ -12,8 +12,9 @@ Commit `3e731fa` removes the projection reconstruction floor and refreezes the
 The latest complete portable gate is keyed to `3065021` and exercised source
 `ef2d2b1`. CPU/GPU calibration at
 `413185a` remains historical; deterministic GPU equivalence at `3a22078` has
-been replaced by the current `8b6f97d` record. The isolated compiler trace
-is keyed to `f379f6b`.
+been replaced by the current `8b6f97d` result and the refreshed calibration
+record committed at `3311d6d`. The isolated compiler trace keyed to `f379f6b`
+is historical and cannot attribute the current accepted path.
 The first fresh canonical-mesh coarse trajectory using the current formulation
 passes conservation and all linear-solver gates but reaches its 128-update
 bound before steady convergence. Its single authorized continuation preserves
@@ -118,16 +119,17 @@ folding Benchmark-A evidence freezing into its ladder analyzer, and folding the
 single-owner Samper freezer into its campaign runner, and making `Diagnostics`
 the single owner of standard NPZ/restart diagnostic fields, and consolidating
 four manual-validation workflow stubs into one behavior-preserving fixture (the
-immutable evidence, richer projection, and target-driven paths remain):
+immutable evidence, richer projection, and target-driven paths remain), and
+deleting the stale test-only velocity-update statistics helper:
 
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 35,060 | return below 35,000 while preserving the physical residual | 35,100 |
-| maintained-core lines | 7,957 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,904 | no new file; stay below 21,000 | 31 / 21,100 |
+| package lines | 35,040 | return below 35,000 while preserving the physical residual | 35,100 |
+| maintained-core lines | 7,937 | stay below 8,000 | 8,000 |
+| test files / lines | 30 / 20,919 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,550,112 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,559,320 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -318,8 +320,17 @@ restart-state/flux, placement, convergence, and device-equivalence gates. Warm
 medians are 2.787 and 2.761 seconds with CV below 0.6%, only 1.009x speedup and
 50.5% parallel efficiency. Stop this fixed-grid ladder: communication and
 per-device work are not yet balanced enough to justify larger blind rungs.
-Schema-6 Anderson and a profile of the accepted current path are the next
-bounded workstreams; a new scaling rung requires a trace-backed hypothesis.
+Schema-6 Anderson and one matched profile of the accepted current path are the
+next bounded workstreams. For each device count, run one untraced accepted
+two-update solve and one traced solve, then compare momentum, projection,
+electric, post-map/other critical-path time, line work, communication, launch
+gaps, and iteration counts. The 1.2x gate requires two-GPU wall time at or
+below 2.3225 seconds, a 0.4387-second recovery. Continue only if one bounded,
+actionable category contributes at least 0.439 seconds of excess
+`T2_phase - T1_phase / 2`; tune communication only if it is at least 15% of
+the two-GPU critical path. Reject a perturbing or internally inconsistent trace
+and stop if no category can recover the promotion budget. A new scaling rung
+requires that trace-backed hypothesis.
 
 Separate compilation from repeated timings and report uncertainty, memory,
 placement, speedup, and parallel efficiency. Independent-case multiprocessing
@@ -492,11 +503,16 @@ Do not store a production-scale full-state history without a measured benefit.
 
 The next bounded tranche is upstream-first. SOLVAX draft PR 21 now carries the
 clean 0.8.4 weight API and corrected release metadata; its supported
-Python/JAX, lint, and docs matrix is green, while review, merge, tag, and
-publication remain open. Then
+Python/JAX, lint, and docs matrix is green. It is mergeable with no reviews,
+comments, or technical blocker; review, ready-for-review, merge, rebuild from
+the merged SHA, tag, and publication remain procedural and require explicit
+authorization. Then
 replace B2's arbitrary-depth lists and duplicated CPU/sharded mixing paths with
-one prior depth-two record, one weight calculation shared by scaled mapped
-fields and compact plus/inlet flux, and restart schema 6. This retains about
+exact depth two, one prior raw mapped record, one weight calculation shared by
+scaled mapped fields and compact plus/inlet flux, and restart schema 6. Keep
+schema 6 separate from the Aitken-only diagnostic loader; require all restart
+arrays together and prove the distributed residual Gram reduction on every
+target device topology. This retains about
 35.8 MiB of prior state on the coarse grid instead of about 416.7 MiB for a
 depth-16 iterate/residual history. Prove direct versus serialized 1+1 replay and
 sharding before testing the shared step-29 and strict step-96 checkpoints.
