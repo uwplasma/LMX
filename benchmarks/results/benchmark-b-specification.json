@@ -69,8 +69,8 @@
         "fine"
       ],
       "numerical_independence": {
-        "coupling_acceleration": "aitken",
-        "coupling_history_depth": 16,
+        "coupling_acceleration": "anderson",
+        "coupling_history_depth": 2,
         "electric_iterations_min": 600,
         "electric_tolerance_max": 1e-12,
         "iteration_factor": 2.0,
@@ -95,7 +95,7 @@
         "alex-results-1987"
       ],
       "spec_path": "lmx/data/benchmarks/specs/alex-b2-square.toml",
-      "spec_sha256": "29b5b1af2c3eea535cb1f8c24366192e4d6ea97a219977a5b47f9eae824dcb79",
+      "spec_sha256": "d2bdb3ecfe37222d6450ad02f525f13779591af174ea8a17b6829cfa0eb5d14a",
       "tolerances_frozen_before_production": true
     }
   ],
