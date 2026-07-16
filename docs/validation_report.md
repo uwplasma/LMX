@@ -27,8 +27,8 @@ in `benchmarks/results/benchmark-a-acceptance.json`.
 - SOLVAX integration, including symmetric additive-line composition,
   passes primal, implicit-gradient, independent transpose, CPU/GPU, and bounded
   end-to-end gates.
-- The portable package gate passes 846 tests with 8 expected external-data
-  skips and 95.33% combined line/branch coverage in 140.7 seconds on the
+- The portable package gate passes 849 tests with 8 expected external-data
+  skips and 95.33% combined line/branch coverage in 143.0 seconds on the
   reference Mac.
 - The B2 projection now preserves predictor cells and reconstructs only its
   pressure correction. The corrected warm 64x/32x/16x map-rate ladder spans

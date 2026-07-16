@@ -147,8 +147,8 @@ the promotion gate, and schema-6 GPU topology remains pending.
 
 ## Quality and citation
 
-The portable gate records **846 passing tests**, **95.33% combined line/branch
-coverage**, and **140.7 s** on six Apple-Silicon workers.
+The portable gate records **849 passing tests**, **95.33% combined line/branch
+coverage**, and **143.0 s** on six Apple-Silicon workers.
 [Testing](https://lmx.readthedocs.io/en/latest/testing.html) ·
 [Theory](https://lmx.readthedocs.io/en/latest/theory.html) ·
 [Numerics](https://lmx.readthedocs.io/en/latest/numerics.html) ·

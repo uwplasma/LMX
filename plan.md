@@ -131,12 +131,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,764 | stay below 35,000 while preserving the physical residual | 35,100 |
-| maintained-core lines | 7,908 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,730 | no new file; stay below 21,000 | 31 / 21,100 |
+| package lines | 34,772 | stay below 35,000 while preserving the physical residual | 35,100 |
+| maintained-core lines | 7,916 | stay below 8,000 | 8,000 |
+| test files / lines | 30 / 20,776 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 179 | no new file without retiring another owner | 180 |
-| tracked checkout | 3,761,468 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,777,300 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -174,8 +174,8 @@ lines. These readable contracts remain inside every architecture ceiling, but
 they require an ownership-slimming pass after the parallel algorithm settles;
 do not hide the increase through dense formatting.
 
-The portable-gate artifact keyed to `05a6f41` records 846 passes, 8 expected
-external-data skips, 95.3278% combined line/branch coverage, and 140.7 seconds on
+The portable-gate artifact keyed to `4eb1f63` records 849 passes, 8 expected
+external-data skips, 95.3283% combined line/branch coverage, and 143.0 seconds on
 the reference Apple M4. It is 7.9% faster than the prior 152.8-second record,
 but source and tests both changed, so the shared-host delta is not a speed claim.
 Do not promote a suite-speed claim from wall-time variance. The gate stays below
