@@ -4,7 +4,7 @@ LMX uses JAX to differentiate selected liquid-metal flow observables through
 case construction and linear solves. A successful `jax.grad` call is only the
 first gate: gradients must also be accurate, converged, and affordable.
 
-![Checked sensitivities and a bounded inverse-design trace](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-autodiff.webp)
+![Checked sensitivities and a bounded inverse-design trace](_static/readme-autodiff.webp)
 
 ## Run the bounded example
 

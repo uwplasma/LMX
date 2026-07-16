@@ -251,8 +251,8 @@ def test_tracked_release_asset_manifest_matches_sources() -> None:
         tracked["summary"]["unique_content_count"]
         <= tracked["summary"]["logical_file_count"]
     )
-    assert tracked["showcase"]["bytes"] == 168237
-    assert len(tracked["showcase"]["files"]) == 5
+    assert tracked["showcase"]["bytes"] == 576945
+    assert len(tracked["showcase"]["files"]) == 12
     assert check_manifest() == tracked
 
 

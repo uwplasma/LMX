@@ -129,8 +129,8 @@ shared without removing cases or assertions.
 | maintained-core lines | 7,854 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,555 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked files | 173 | delete only superseded or duplicate ownership | 180 |
-| tracked checkout | 3,325,944 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked files | 180 | no new file without retiring another owner | 180 |
+| tracked checkout | 3,736,259 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -534,15 +534,15 @@ with Dean-vortex physics staged. No solver was rerun and no tracked media was
 added. Do not create a B2 movie from the bounded smoke or rejected coarse
 trajectories.
 
-The public documentation delivery path is not current: Read the Docs still
-serves the 2026-05-01 build at `6be8622`, and recent builds fail before acquiring
-a commit. Eight current feature visuals are release-hosted and therefore
-unavailable to anonymous readers of a build from this private repository. The
-next bounded docs tranche should mirror only those already-compressed
-derivatives into `docs/_static/` (435,050 bytes; 603,287 tracked media bytes in
-total), switch docs links locally, verify hashes and a strict build, then repair
-the Read the Docs integration. Do not regenerate simulations or add another
-movie until an accepted physical trajectory exists.
+The documentation source is now self-contained: seven already-compressed
+release derivatives are mirrored into `docs/_static/`, and the blanket page
+embeds its 7-second MP4 directly instead of tracking a redundant poster. The
+tracked set is 576,945 bytes across 12 files, below the 1 MiB media cap; no
+simulation or recompression was performed. Read the Docs still serves the
+2026-05-01 build at `6be8622`, and recent builds fail before acquiring a commit,
+so repairing that integration and publishing the current self-contained build
+is the remaining delivery step. Do not add another movie until an accepted
+physical trajectory exists.
 
 ## Release gate
 

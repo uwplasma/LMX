@@ -52,7 +52,7 @@ These workflows are research-stage. Begin with the rectangular case, then add
 layers, mapped geometry, or tabulated fields one change at a time.
 
 <p align="center">
-  <a href="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow-7s.mp4"><img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-blanket-flow-poster.webp" alt="Seven-second reduced blanket-flow research workflow" width="62%"></a>
+  <video src="_static/readme-blanket-flow-7s.mp4" controls muted loop preload="metadata" width="62%">Seven-second reduced blanket-flow research workflow</video>
 </p>
 
 ## Restart

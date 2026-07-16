@@ -11,7 +11,7 @@ other raw intermediates remain outside Git. The package wheel contains no media.
 
 ## Tracked web set
 
-Five files in `docs/_static/` total 168,237 bytes. The `showcase` section of
+Twelve files in `docs/_static/` total 576,945 bytes. The `showcase` section of
 [`release-assets.json`](release-assets.json) records every byte count and
 SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 
@@ -22,6 +22,13 @@ SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 | B2 scaling evidence | 27,360 | 1,400 × 661 WebP | CPU/GPU records `cf9fafb8...` / `5f032be4...`; generated at `72f2049` |
 | Hunt startup | 35,171 | 640 × 416 H.264, 7 s | existing 24.08-second transient; no solver rerun |
 | Hunt poster | 13,000 | 640 × 416 WebP | released poster PNG `cac2125e...` |
+| checked sensitivities | 32,612 | compressed WebP | released derivative `f2add9fe...` |
+| geometry gallery | 61,600 | compressed WebP | released derivative `e844f069...` |
+| variable-field response | 41,648 | compressed WebP | released derivative `5d4b593c...` |
+| magnetic obstacle | 48,630 | compressed WebP | released derivative `6e351e80...` |
+| blanket-flow loop | 86,808 | 1,000 × 462 H.264, 7 s | released derivative `ca7d72ce...` |
+| B2 field and pressure | 43,174 | compressed WebP | released derivative `f186f109...` |
+| curved-pipe validation | 94,236 | compressed WebP | released derivative `d32d666a...` |
 
 The 35,171-byte Hunt H.264 loop (SHA-256
 `ad1095279f4af84ebdb5c2b1d4677aed322c8b54a11107cdc7ceda40268563b7`)
@@ -31,7 +38,12 @@ compresses the complete 24.08-second tracked transient into 7.00 seconds at
 The 10,635,673-byte source GIF (`12f30a38...`) remains outside Git and the
 release; no solver was rerun.
 
-## Release-hosted showcase set
+## Release-hosted README set
+
+The README retains release URLs so GitHub readers can inspect the versioned
+asset collection. The eight derivatives used by the standalone documentation
+are mirrored locally above so a public docs build does not depend on private
+release authentication.
 
 | Derivative | SHA-256 |
 |---|---|

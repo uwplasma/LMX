@@ -572,7 +572,7 @@
   },
   "schema_version": 2,
   "showcase": {
-    "bytes": 168237,
+    "bytes": 576945,
     "files": [
       {
         "bytes": 71620,
@@ -583,6 +583,41 @@
         "bytes": 21086,
         "path": "docs/_static/freemhd_closed_channel_observable_parity.webp",
         "sha256": "99f99b4b725860feaba8fc652ea5615ecc035bc8c6a7d3dcff5146358f01d2c7"
+      },
+      {
+        "bytes": 43174,
+        "path": "docs/_static/readme-alex-b2-field-pressure.webp",
+        "sha256": "f186f109ed9f0dc25134baaee22069e521140134ff984be94a60fe1bc825bf2f"
+      },
+      {
+        "bytes": 32612,
+        "path": "docs/_static/readme-autodiff.webp",
+        "sha256": "f2add9fe96a044a082a3b0ca28a3de50b71a0961399ac362caf2ebcaa049aa28"
+      },
+      {
+        "bytes": 86808,
+        "path": "docs/_static/readme-blanket-flow-7s.mp4",
+        "sha256": "ca7d72cebb564a28bc6f91b395824cd1a9417ad271dc8ba3c0cbf2c365f18c51"
+      },
+      {
+        "bytes": 94236,
+        "path": "docs/_static/readme-curved-pipes.webp",
+        "sha256": "d32d666a3bb34b2845c549ff303a3865b06b543e00e3364a0c705fddc831ebb6"
+      },
+      {
+        "bytes": 61600,
+        "path": "docs/_static/readme-geometries.webp",
+        "sha256": "e844f069475fa625279e229a3e8499ae816308b88c8d1d33afb4fb14077bf700"
+      },
+      {
+        "bytes": 48630,
+        "path": "docs/_static/readme-magnetic-obstacle.webp",
+        "sha256": "6e351e80531742b1aed6f951d6155cc55d3f5fd4f3e9b556a15336f76a74bc84"
+      },
+      {
+        "bytes": 41648,
+        "path": "docs/_static/readme-variable-field.webp",
+        "sha256": "5d4b593c26a55cb031678988133ba2f6ddeae5e0cbee16a0e166282584bce569"
       },
       {
         "bytes": 35171,

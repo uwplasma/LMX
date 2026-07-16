@@ -105,7 +105,7 @@ Files live in `lmx/data/benchmarks/specs/` and
 `lmx/data/benchmarks/references/`. Construction and
 observable extraction are implemented in `lmx/benchmarks.py`.
 
-![B2 Maxwell-consistent fringe field and ALEX pressure diagnostics](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-alex-b2-field-pressure.webp)
+![B2 Maxwell-consistent fringe field and ALEX pressure diagnostics](_static/readme-alex-b2-field-pressure.webp)
 
 The panel uses only frozen, checksummed evidence. Both LMX curves are
 diagnostics; B2 experimental, three-mesh, and production-mesh matched-FreeMHD

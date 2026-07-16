@@ -4,8 +4,8 @@ LMX keeps geometry construction separate from physics and field sampling. A
 case should be inspectable before an expensive solve begins.
 
 <p align="center">
-  <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-geometries.webp" alt="Rectangular, layered, and mapped-pipe geometries" width="48%">
-  <img src="https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-variable-field.webp" alt="Nonuniform imposed field and charge-conservation diagnostics" width="48%">
+  <img src="_static/readme-geometries.webp" alt="Rectangular, layered, and mapped-pipe geometries" width="48%">
+  <img src="_static/readme-variable-field.webp" alt="Nonuniform imposed field and charge-conservation diagnostics" width="48%">
 </p>
 
 ## Supported geometry
@@ -30,7 +30,7 @@ boilerplate.
 
 ### Curved-pipe status
 
-![Bent-pipe baseline and Dean-vortex literature gate](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-curved-pipes.webp)
+![Bent-pipe baseline and Dean-vortex literature gate](_static/readme-curved-pipes.webp)
 
 The mapped-pipe workflow currently provides a low-De inductionless baseline
 with geometry, charge-balance, and straight-pipe-limit checks. The lower panel
@@ -85,4 +85,4 @@ WHAM-specific blanket geometry and field adapters remain available through
 research APIs rather than first-run examples. Their promotion requires an
 independent geometry/field reference and a closed physics benchmark.
 
-![Magnetic-obstacle research workflow](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-magnetic-obstacle.webp)
+![Magnetic-obstacle research workflow](_static/readme-magnetic-obstacle.webp)
