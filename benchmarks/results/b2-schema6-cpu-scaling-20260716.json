@@ -1,0 +1,125 @@
+{
+  "schema_version": 3,
+  "date": "2026-07-16",
+  "baseline_commit": "aaa41b19c2e22f16b7bdbf1029f6c2c4b5b24e49",
+  "optimized_commit": "14376199f84bb1fc0116e2928809a67da2f09c17",
+  "recorded_source_fingerprint": "e6feb1c7f0ece39ba42c67673c4193bacf86e654b6498328a6c401b7a557b090",
+  "fingerprint_scope_warning": "The generating worker predates the package-resource fingerprint fix and omitted lmx/data/benchmarks. Commit, input, evaluator, summary, and worker hashes retain provenance; future records use the corrected scope.",
+  "optimized_source_fingerprint": "e1c37f795205db1d3b488bdc179da446d8fe2deb31be696205ad82c6c9459bbe",
+  "case_id": "B2-fringing-square",
+  "role": "schema6-topology-and-scaling-calibration",
+  "environment": {
+    "hardware": "Apple M4 (4 performance + 6 efficiency cores)",
+    "python": "3.12.13",
+    "jax": "0.10.2",
+    "jaxlib": "0.10.2",
+    "solvax": "0.8.4",
+    "precision": "float64",
+    "forced_cpu_devices": [1, 2, 4],
+    "thread_contract": "one host thread per forced XLA CPU device"
+  },
+  "protocol": {
+    "updates": 2,
+    "restart": "direct 2 versus serialized NPZ 1+1",
+    "coupling_acceleration": "anderson",
+    "coupling_history_depth": 2,
+    "restart_schema": "b2_diagnostics_v6",
+    "worker_timeout_seconds": {"topology": 45, "scaling": 180},
+    "bootstrap": {
+      "statistic": "ratio of independently resampled warm medians",
+      "seed": 0,
+      "resamples": 10000,
+      "interval": 0.95
+    }
+  },
+  "topology_gate": {
+    "shape": [8, 7, 7],
+    "repeats": 4,
+    "runs": {
+      "1": {"cold_seconds": 3.383106915978715, "warm_samples_seconds": [0.00974879099521786, 0.008872792008332908, 0.008535708067938685], "warm_median_seconds": 0.008872792008332908, "warm_cv": 0.056478717960817444, "peak_host_rss_bytes": 716881920},
+      "2": {"cold_seconds": 3.9191549589158967, "warm_samples_seconds": [0.020889375009573996, 0.019008541014045477, 0.018718125065788627], "warm_median_seconds": 0.019008541014045477, "warm_cv": 0.049256969740256104, "peak_host_rss_bytes": 751943680},
+      "4": {"cold_seconds": 4.004889165982604, "warm_samples_seconds": [0.03254304197616875, 0.03138691606000066, 0.031734874937683344], "warm_median_seconds": 0.031734874937683344, "warm_cv": 0.015187104373560393, "peak_host_rss_bytes": 763150336}
+    },
+    "equivalence": {
+      "field_norm_max_relative": 5.12e-16,
+      "pressure_observable_max_abs": 5.922345946984819e-15,
+      "anderson_gram_max_abs": 5.684341886080802e-14,
+      "anderson_weights_max_abs": 5.860112742284151e-17,
+      "serialized_max_abs": 0.0,
+      "replay_max_abs": 0.0
+    },
+    "gates": {
+      "schema6": true,
+      "validation": true,
+      "placement": true,
+      "conservation": true,
+      "linear_solves": true,
+      "repeat": true,
+      "serialization": true,
+      "restart_replay": true,
+      "device_equivalence": true
+    },
+    "classification": "pass-topology-correctness-only"
+  },
+  "scaling_calibration": {
+    "shape": [256, 67, 67],
+    "total_cells": 1149184,
+    "repeats": 6,
+    "runs": {
+      "1": {"cold_seconds": 19.47753074998036, "warm_samples_seconds": [15.40108295797836, 15.181085541960783, 15.159333083895035, 15.042095000040717, 14.97278275003191], "warm_median_seconds": 15.159333083895035, "warm_cv": 0.00966131602264583, "speedup": 1.0, "parallel_efficiency": 1.0, "speedup_ci95": [0.9843030600677279, 1.0159472631642454], "peak_host_rss_bytes": 4790059008, "electric_iterations": [109, 89]},
+      "2": {"cold_seconds": 17.773784833028913, "warm_samples_seconds": [12.34942070802208, 12.3367009999929, 12.236920333001763, 12.243653125013225, 12.536746249999851], "warm_median_seconds": 12.3367009999929, "warm_cv": 0.008781086588918437, "speedup": 1.2287995862024832, "parallel_efficiency": 0.6143997931012416, "speedup_ci95": [1.2091919850332151, 1.2483955765797699], "peak_host_rss_bytes": 5834555392, "electric_iterations": [109, 87]},
+      "4": {"cold_seconds": 16.626048207981512, "warm_samples_seconds": [11.137056374922395, 11.145869042025879, 11.494740042020567, 11.21348662499804, 11.1293429590296], "warm_median_seconds": 11.145869042025879, "warm_cv": 0.012347430194777746, "speedup": 1.3600853398453052, "parallel_efficiency": 0.3400213349613263, "speedup_ci95": [1.3188060824758157, 1.3817749786856504], "peak_host_rss_bytes": 6179307520, "electric_iterations": [109, 87]}
+    },
+    "partition_local_control": {
+      "2": {"warm_median_seconds": 13.387530125095509, "electric_iterations": [159, 129]},
+      "4": {"warm_median_seconds": 12.8666728339158, "electric_iterations": [193, 157]}
+    },
+    "promotion_thresholds": {
+      "warm_cv_max": 0.05,
+      "speedup_ci95_lower_min": {"2": 1.2, "4": 1.4},
+      "parallel_efficiency_min": {"2": 0.6, "4": 0.35},
+      "monotonic_warm_time": true
+    },
+    "equivalence": {
+      "field_norm_max_relative": 2.23e-14,
+      "pressure_observable_max_abs": 3.1328820830969772e-12,
+      "anderson_gram_max_abs": 1.8044374883174896e-9,
+      "anderson_weights_max_abs": 1.2986438096759811e-15,
+      "serialized_max_abs": 0.0,
+      "replay_max_abs": 0.0
+    },
+    "gates": {
+      "schema6": true,
+      "validation": true,
+      "placement": true,
+      "conservation": true,
+      "linear_solves": true,
+      "repeat": true,
+      "serialization": true,
+      "restart_replay": true,
+      "device_equivalence": true,
+      "timing_stability": true,
+      "monotonic_warm_time": true,
+      "performance_promotion": false
+    },
+    "classification": "accepted-calibration-rejected-performance-promotion"
+  },
+  "claim_limits": {
+    "production_sharding_correctness": true,
+    "strong_scaling_claim": false,
+    "steady_state_evidence": false,
+    "physical_core_scaling": false,
+    "reason": "The global coarse correction removes partition-dependent electric iteration growth and improves two/four-device time by 7.8%/13.4%. Forced-device sharding is correct and stable, but the four-device speedup lower bound and efficiency still miss the frozen promotion thresholds."
+  },
+  "raw_assets": {
+    "location": "ignored artifacts/{schema6,global-coarse}-{topology,scaling}-20260716; publish only as a checksummed release asset if needed",
+    "input_sha256": {"topology": "5382c1d68d9fb3508a408bb20befe6675ade77b852e6a80204781debab3aab2a", "scaling": "4721eb114966e55e08928098f944abbd0b07ed94a6c7fed0de82f707ccdd5978"},
+    "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa",
+    "summary_sha256": {"baseline_topology": "dccd2bf1d8b5ad375daa32189c3affeb1850b699846588983381608b2b39c1ef", "baseline_scaling": "9fa2c4e4654a40e3f8f604d018467c5ebdc47fbd9d066f5fddcb39a1571635d5", "optimized_topology": "f85ec4b55f147e2285be66bcb6fc099345f69e4abba797f5d0ee9ae9e987bc57", "optimized_scaling": "ad70bdb17c06120a154c2cffb2a8521e1c929a0345af4307713bc62580990818"},
+    "worker_sha256": {
+      "topology": {"1": "cb1580f152bdb0c6f8448c10e4eebc0908dcd3148d382755fc12df86d0be21bd", "2": "cf2da78eaf68d2d5542fe568e54d855532e46290822532244cc8b5baf163fcb0", "4": "709b18acbcf7343129e72dfef6fc6954d340ffc3eeaf39457cbaff3338819bf4"},
+      "baseline_scaling": {"1": "9d1f6aafd10e973f63e43b437fdfbfdc6055490272a3a34a433368edd29c5e80", "2": "7108e2f9056d07de4aac4b403a0bb083dbc91088a4ae7d1c00bc1467b26f6c19", "4": "b3f823d8d3ac2a4722cb3659f28b8e003ea54081d07997ec2264154d03a1e4e5"},
+      "optimized_scaling": {"2": "27739fe29a35d18261fd8e3e5f351a37e5e14017c7fa86a1ce5a710c0209528f", "4": "d5d89d23fecd4816d54b06949143561a93172c8e1967d4db01d719060f9fd1f4"}
+    }
+  }
+}

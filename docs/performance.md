@@ -109,8 +109,8 @@ matched JAX 0.8.0 replay measured warm-time ratios of 1.155 for an immediate
 0.8.1 control and 1.184 for 0.8.2, so both miss the one-shot 1.10 threshold
 despite passing every forward, gradient, transpose, residual, memory, device,
 and Hartmann gate. SOLVAX PCG is unchanged between those releases; this is not
-evidence of a 0.8.2 regression, and no refresh is planned. The next upstream
-work is the published Anderson-weight API required by B2 restart schema 6.
+evidence of a 0.8.2 regression, and no refresh is planned. SOLVAX 0.8.4 now
+owns the Anderson-weight API used by B2 restart schema 6.
 The raw [0.8.1 control](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/solvax-pcg-0.8.1-control-gpu.json)
 (`ab54c5aa4a4787e1024d72d29ac5cd1c465c951bcaed82f179539cf75544fc7b`)
 and [0.8.2 probe](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/solvax-pcg-0.8.2-equivalence-gpu.json)
@@ -122,17 +122,27 @@ the placement gate now rejects that invalid point. The divisible `516`-station
 diagnostic verifies 2/4/6 real shards and shows that four CPU devices are best
 for this small operator workload. It is not a production-solver speedup claim.
 
+The current schema-6 CPU gate uses the real two-update B2 path on a fixed
+`256 x 67 x 67` grid. A global correction on the restricted coarse grid removes
+artificial Neumann interfaces at shard boundaries and restores electric PCG
+counts from `159/129` and `193/157` to `109/87`. Warm medians are 15.159,
+12.337, and 11.146 seconds on one/two/four forced JAX CPU devices. The 95%
+speedup lower bounds are 1.209 and 1.319: two devices pass, but four devices
+miss the frozen 1.40 speedup and 35% efficiency gates. Correctness and the
+optimization are accepted; production strong scaling is not.
+
 The medium B2 tight solve converged across two restart-safe segments and ended
 at residual `2.500e-5`, divergence `1.829e-6`, and charge residual `1.149e-4`.
 The source-identical baseline, doubled-iteration, and confirmation-wall runs
 then passed in 57.64, 34.94, and 57.10 seconds. Their tolerance and iteration
 deltas are below `5.79e-4` of the frozen uncertainty; this closes medium-grid
 numerical independence, not the experimental or three-mesh acceptance gate.
-The fine-grid baseline remains outside acceptance. A region-preserving
+The fine-grid baseline remains outside acceptance. In that historical run, a region-preserving
 transverse Galerkin correction is now added to the accepted line and axial-mean
 preconditioners. Each shard diagonalizes its local Neumann axial block with a
 DCT; one generalized transverse eigendecomposition serves every axial mode, so
-the correction introduces no cross-shard FFT. On the identical `202 x 149 x
+the correction introduced no cross-shard FFT. The current schema-6 CPU path
+instead uses the global restricted-grid correction described above. On the historical identical `202 x 149 x
 149` checkpoint, electric PCG fell from 1,200/1,200 to 232/231 iterations and
 matched warm time fell from 183.37 to 98.12 seconds (1.87x). It also beats the
 previously accepted 109.18-second control. Residual histories agree within
@@ -166,9 +176,9 @@ The fine curve has weighted RMS `1.389`, weighted maximum `4.218`, and
 integrated pressure error `0.251`, missing the frozen ALEX limits `1.0`, `2.0`,
 and `0.10`. A directional comparison to the accepted medium curve changes by
 `0.0319`, above the `0.02` mesh gate; the records have different source
-fingerprints, so this is diagnosis rather than formal acceptance. Publishing
-the already-green SOLVAX Anderson-weight API and proving the bounded schema-6
-depth-two field/flux path now take priority. Production-mesh FreeMHD,
+fingerprints, so this is diagnosis rather than formal acceptance. The released
+SOLVAX Anderson-weight API and bounded schema-6 depth-two field/flux path now
+pass CPU topology and exact-replay gates. GPU topology is next. Production-mesh FreeMHD,
 observable/model normalization, fine numerical independence, and experimental
 acceptance remain blocked until the current coarse formulation converges for
 the correct reason.
@@ -231,10 +241,10 @@ starting another expensive solve.
 
 Authoritative records:
 
-- `benchmarks/results/b2-cpu-strong-scaling-20260715.json`
+- `benchmarks/results/b2-schema6-cpu-scaling-20260716.json`
 - `benchmarks/results/b2-gpu-scaling-calibration-20260715.json`
 - `benchmarks/results/b2-gpu-profile-20260715.json`
-- `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json`
+- `benchmarks/results/b2-gpu-device-equivalence-20260715.json`
 - `benchmarks/results/b1-retained-modal-blocks-20260713.json`
 - `benchmarks/results/portable-gate-20260715.json`
 
@@ -322,10 +332,11 @@ than silently reused.
 
 ## Next performance work
 
-1. Publish SOLVAX 0.8.4 from a reviewed merged SHA after explicit authorization.
-2. Gate one sharding-aware depth-two B2 Anderson path with restart schema 6.
-3. Close the canonical B2 mesh and experimental-observable acceptance ladder.
-4. Revisit production scaling and four-GPU points only after that acceptance.
+1. Pass the `8 x 7 x 7` schema-6 topology/restart gate on one/two A4000s.
+2. Compare six tiny Anderson updates with the fixed-relaxation control.
+3. If that passes, run the bounded step-29 then strict step-96 outcome gates.
+4. Close canonical coarse/medium/fine and experimental-observable acceptance.
+5. Revisit accepted-workload CPU/GPU strong scaling only after that acceptance.
 
 See [Testing](testing.md) for the portable gate and [Benchmark matrix](benchmark_matrix.md)
 for physics promotion criteria.
