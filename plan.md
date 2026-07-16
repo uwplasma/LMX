@@ -106,7 +106,8 @@ deleting the superseded SOLVAX acceptance freezer and its sole test, and
 replacing the single-owner Benchmark-B freeze generator with direct hash gates,
 folding Benchmark-A evidence freezing into its ladder analyzer, and folding the
 single-owner Samper freezer into its campaign runner, and making `Diagnostics`
-the single owner of standard NPZ/restart diagnostic fields (the
+the single owner of standard NPZ/restart diagnostic fields, and consolidating
+four manual-validation workflow stubs into one behavior-preserving fixture (the
 immutable evidence, richer projection, and target-driven paths remain):
 
 | Surface | Current | Active ratchet | CI hard ceiling |
@@ -114,9 +115,9 @@ immutable evidence, richer projection, and target-driven paths remain):
 | package modules | 35 | no new module | 35 |
 | package lines | 34,899 | stay below 35,000 through the scaling tranche | 35,100 |
 | maintained-core lines | 7,954 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,922 | no new file; stay below 21,000 | 31 / 21,100 |
+| test files / lines | 30 / 20,751 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,509,083 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,504,021 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
