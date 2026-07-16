@@ -128,6 +128,7 @@ def test_write_closed_channel_startup_movies_dispatches_to_movie_writer(
     def fake_solve_case_snapshots(case, frame_count=1):
         captured["solver_mode"] = case.solver.mode
         captured["current_reconstruction"] = case.time_stepper.current_reconstruction
+        captured["frame_count"] = frame_count
         return [
             {
                 "time": 0.0,
@@ -146,9 +147,13 @@ def test_write_closed_channel_startup_movies_dispatches_to_movie_writer(
         case_title: str,
         output_stem: str,
         fps: int,
+        include_3d: bool,
         symmetry_average_axes=(),
     ):
-        outputs = [out_dir / f"{output_stem}_2d.gif", out_dir / f"{output_stem}_3d.gif"]
+        captured["include_3d"] = include_3d
+        outputs = [out_dir / f"{output_stem}_2d.gif"]
+        if include_3d:
+            outputs.append(out_dir / f"{output_stem}_3d.gif")
         for path in outputs:
             path.write_bytes(b"gif")
         return outputs
@@ -156,14 +161,16 @@ def test_write_closed_channel_startup_movies_dispatches_to_movie_writer(
     monkeypatch.setattr(showcase, "write_transient_movies", fake_write_transient_movies)
 
     outputs = showcase.write_closed_channel_startup_movies(
-        "shercliff", tmp_path, ny=8, nz=8, dt=1.0e-4, t_final=2.0e-4
+        "shercliff", tmp_path, ny=8, nz=8, dt=1.0e-4, t_final=2.0e-4,
+        include_3d=False,
     )
 
     assert captured["solver_mode"] == "transient"
     assert captured["current_reconstruction"] == "face_averaged"
+    assert (captured["frame_count"], captured["include_3d"]) == (2, False)
     assert (tmp_path / "shercliff_startup_2d.gif") in outputs
     assert (tmp_path / "shercliff_startup_2d.gif").exists()
-    assert (tmp_path / "shercliff_startup_3d.gif").exists()
+    assert not (tmp_path / "shercliff_startup_3d.gif").exists()
 
 
 def test_write_closed_channel_startup_movies_rejects_unsupported_case(tmp_path: Path):

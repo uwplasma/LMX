@@ -621,8 +621,12 @@ def write_closed_channel_startup_movies(
     t_final: float = 2.0e-3,
     coupling_iterations: int = 6,
     potential_iterations: int = 48,
-    fps: int = 12,
+    frame_count: int = 42,
+    fps: int = 6,
+    include_3d: bool = True,
 ) -> list[Path]:
+    """Solve every startup step and render a bounded sample of physical states."""
+
     if case_kind == "shercliff":
         case = make_shercliff_case(
             ha=ha,
@@ -668,12 +672,15 @@ def write_closed_channel_startup_movies(
         ),
         initial_velocity=1.0,
     )
-    frames = solve_case_snapshots(case, frame_count=steps)
+    frames = solve_case_snapshots(
+        case, frame_count=min(steps, max(int(frame_count), 1))
+    )
     return write_transient_movies(
         frames,
         out_dir,
         case_title=f"LMX {case_kind.capitalize()} startup",
         output_stem=f"{case_kind}_startup",
         fps=fps,
+        include_3d=include_3d,
         symmetry_average_axes=("y", "z"),
     )
