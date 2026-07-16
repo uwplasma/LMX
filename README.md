@@ -130,9 +130,9 @@ Q2D-MHDfoam parity and blanket validation remain open.
 
 ![Historical B2 two-update CPU and GPU scaling calibration](docs/_static/strong_scaling.webp)
 
-The current B2 smoke agrees on 1/2/4 CPU devices. Pre-fix calibrations reached
-1.35× on four CPU devices and 1.125× on two GPUs; they remain useful historical
-optimization evidence, not current production-scaling claims.
+The current B2 smoke agrees on 1/2/4 CPU and 1/2 GPU devices. A fresh
+`128 × 67 × 67` GPU calibration reaches only 1.009× on two GPUs, so no
+production-scaling speedup is claimed.
 [Protocol and results →](docs/performance.md)
 
 ## Quality and citation

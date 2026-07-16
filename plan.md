@@ -19,9 +19,10 @@ passes conservation and all linear-solver gates but reaches its 128-update
 bound before steady convergence. Its single authorized continuation preserves
 those gates but misses its precommitted residual target; it is not promoted.
 The smoke closes bounded orchestration and comparison, not production B2
-acceptance. Current-source 1/2-GPU correctness passes. The historical
-`128/256 x 67 x 67` GPU rungs close only bounded two-update calibration, so no
-larger GPU scaling result is current. This
+acceptance. Current-source 1/2-GPU correctness and the `128 x 67 x 67`
+calibration pass. Its 1.009x speedup misses the 1.2x promotion gate; the
+`256 x 67 x 67` rung remains historical, so no production scaling speedup is
+claimed. This
 single active plan records accepted baselines, active gates, and
 stop/go criteria—not campaign history. Completed campaign details belong in
 checksummed result records and the validation or performance documentation.
@@ -103,7 +104,7 @@ large reusable artifacts go in checksummed releases.
 | Developed ducts | Hartmann, Shercliff, Hunt, and eight high-Ha rows pass analytical, conservation, and regression gates | preserve; do not generalize to arbitrary 3D flow |
 | FreeMHD closed channels | bounded Shercliff/Hunt observables pass the frozen 1% finite-grid gate | this is not full FreeMHD parity |
 | B1 ALEX pipe | retained-modal numerical evidence exists | exact-formulation parity remains open |
-| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, post-map physical residual, strict schema-5 replay, refrozen 64x cap, and current CPU device equivalence have bounded gates | tighter-reference stopping calibration, current GPU refresh, production parity, and steady-production scaling remain open |
+| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, post-map physical residual, strict schema-5 replay, refrozen 64x cap, and current CPU/GPU device equivalence have bounded gates | tighter-reference stopping calibration, production parity, and steady-production scaling remain open |
 | Matched B2 harness | deterministic inputs, pinned sources, independent observers, and native two-update LMX/FreeMHD execution pass every frozen schema-3 smoke gate | production acceptance and mesh convergence remain open |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
 | README/docs | concise feature-led README, sourced comparison table, feature-specific visuals, seven-second Hunt/Q2D loops, and Li/AlN convergence | refresh B2/scaling panels only from accepted canonical records |
@@ -312,9 +313,13 @@ signature across every cold and warm repeat; it
 passes exactly on the repaired CPU and GPU paths. The frozen failing record
 retains the pre-fix `3183.12` signature for regression provenance.
 
-With that gate passing, re-measure accepted rungs in an isolated GPU window
-before any publishable scaling claim. Schema-6 Anderson work and larger GPU
-calibration remain the next bounded workstreams.
+The isolated current-source `128 x 67 x 67` rung passes physical-repeat,
+restart-state/flux, placement, convergence, and device-equivalence gates. Warm
+medians are 2.787 and 2.761 seconds with CV below 0.6%, only 1.009x speedup and
+50.5% parallel efficiency. Stop this fixed-grid ladder: communication and
+per-device work are not yet balanced enough to justify larger blind rungs.
+Schema-6 Anderson and a profile of the accepted current path are the next
+bounded workstreams; a new scaling rung requires a trace-backed hypothesis.
 
 Separate compilation from repeated timings and report uncertainty, memory,
 placement, speedup, and parallel efficiency. Independent-case multiprocessing
@@ -329,9 +334,9 @@ the physics-valid path.
 Exit: the full portable suite remains below ten minutes with no critical-path
 surprise, and the accepted B2 path retains equivalent observables plus useful,
 uncertainty-aware speedup on its target hardware. CPU correctness and bounded
-CPU/GPU calibration methods are complete and current CPU/GPU correctness is
-green. Refresh the bounded larger GPU calibration in an isolated window before
-any scaling promotion.
+CPU/GPU calibration methods and current CPU/GPU correctness are green. Current
+fixed-grid GPU scaling misses its promotion threshold, so profile before
+another rung.
 
 ## Priority 3: canonical B2 validation
 

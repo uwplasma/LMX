@@ -52,10 +52,9 @@ are authoritative when prose and results differ.
   observables on 1/2/4 CPU devices. The prior 1/2 deterministic-GPU ladder
   predates the terminal-restart fix. Its current replacement passes exact
   repeat/restart and 1/2-GPU equivalence, so the tiny CPU and GPU ladders
-  establish sharding correctness. A historical `128 x 67 x 67`
-  calibration has equivalent observables and bounded face-flux replay; diagonal
-  momentum preconditioning cuts its GPU runtime by 3.75–6.84x, but shared-host
-  variance leaves that fixed-grid ratio open. A stable doubled-axial rung
+  establish sharding correctness. The current `128 x 67 x 67` calibration has
+  equivalent observables and exact state/flux replay, but its low-variance
+  1.009x speedup fails the promotion gate. A historical doubled-axial rung
   reaches only 1.125x, below the scaling-promotion threshold. A three-update
   trajectory preserves all primary fields exactly. This is not production
   parity or steady scaling. The first fresh current-formulation coarse

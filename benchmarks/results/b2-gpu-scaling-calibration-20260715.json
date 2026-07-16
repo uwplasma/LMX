@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "date": "2026-07-15",
   "acceptance_commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
   "execution_commit": "413185ad41847c1c84fda7c5ecb8fd62645f7cee",
@@ -141,6 +141,72 @@
     "correctness_pass": true,
     "timing_cv_pass": false,
     "timing_claim": false
+  },
+  "current_refresh": {
+    "commit": "57e50616ff16110bd6a0ff306fcd4e957e326d88",
+    "source_fingerprint": "d630731498502f38efbbd788b885965081ff80b6b5bddc255beaa9c337619bb0",
+    "environment": {
+      "hardware": "1/2 NVIDIA RTX A4000, isolated idle host without NVLink",
+      "python": "3.13.12",
+      "jax": "0.10.2",
+      "jaxlib": "0.10.2",
+      "solvax": "0.8.3",
+      "precision": "float64",
+      "xla_flags": "default"
+    },
+    "runs": {
+      "1": {
+        "cold_seconds": 25.81367143499665,
+        "warm_samples_seconds": [2.819427223992534, 2.7870364009868354, 2.785769735928625],
+        "warm_median_seconds": 2.7870364009868354,
+        "warm_cv": 0.005568120547141923,
+        "repeat_signature_max_abs": 1.0523945093154907e-7,
+        "restart_state_max_abs": 0.0,
+        "restart_flux_max_abs": 0.0
+      },
+      "2": {
+        "cold_seconds": 29.53999393095728,
+        "warm_samples_seconds": [2.761250711977482, 2.769358483958058, 2.754703219048679],
+        "warm_median_seconds": 2.761250711977482,
+        "warm_cv": 0.002170447643792375,
+        "repeat_signature_max_abs": 5.376932676881552e-9,
+        "restart_state_max_abs": 0.0,
+        "restart_flux_max_abs": 0.0
+      }
+    },
+    "speedup": 1.0093384091844695,
+    "parallel_efficiency": 0.5046692045922347,
+    "equivalence": {
+      "pressure_observable_max_abs": 2.5759597363159137e-13,
+      "courant_mean_max_abs": 2.371692252312041e-20,
+      "courant_max_abs": 2.875058521876854e-15,
+      "velocity_l2_relative": 0.0,
+      "potential_l2_relative": 4.614736064920569e-15,
+      "current_l2_relative": 5.2810311628297866e-14,
+      "rtol": 2e-8,
+      "atol": 2e-9,
+      "pass": true
+    },
+    "gates": {
+      "validation": true,
+      "placement": true,
+      "restart_state": true,
+      "restart_flux": true,
+      "physical_repeat": true,
+      "device_equivalence": true,
+      "pressure_solves_converged": true,
+      "warm_cv_below_0.05": true,
+      "speedup_at_least_1.2": false
+    },
+    "interpretation": {
+      "bounded_fast_scaling_calibration": false,
+      "production_speedup_claim": false,
+      "reason": "Current correctness and repeat gates pass with low timing variance, but 1.009x fixed-grid speedup misses the 1.2x promotion threshold."
+    },
+    "raw_sha256": {
+      "one_gpu_worker": "3c48c40cfd775212eb55c5487004a55a384e6a586c3653470ee8304eb1701f72",
+      "two_gpu_worker": "a86ba5606cfb87f348b29d1368b6d649dfd7f1e4e68382e8e735fafe0d6cf490"
+    }
   },
   "gates": {
     "validation": true,

@@ -121,13 +121,10 @@ small factor parity, medium and large field/pressure-observable parity, and a
 large solve/restart gate passed. No B1 environment switch is required.
 
 B2 supports named axial sharding. The current canonical tiny path has equivalent
-observables and exact restart on one, two, and four CPU devices. The last GPU
-equivalence and `128 x 67 x 67` two-update calibration predate the terminal
-restart fix. The current replacement passes exact 1/2-GPU repeat/restart,
-conservation, placement, and equivalence gates. Diagonal
-momentum preconditioning reduced the historical calibration's warm
-runtime from 21.14 to 3.09 seconds on one GPU and from 11.98 to 3.19 seconds on
-two; shared-host variance prevents a stable scaling claim.
+observables and exact restart on one, two, and four CPU devices. Its current
+replacement passes exact 1/2-GPU repeat/restart, conservation, placement, and
+equivalence gates. The current `128 x 67 x 67` calibration has low-variance warm medians of 2.787
+and 2.761 seconds. Its 1.009x speedup misses the 1.2x promotion gate.
 The doubled-axial `256 x 67 x 67` rung is stable but reaches only 1.125x, below
 the promotion threshold. Production scaling remains open. A superseded
 formulation's fixed-size timing improved from 36.96 s to 22.23 s; this is not a
