@@ -76,8 +76,8 @@ observables pass the 1% finite-grid gate.
 ![Accepted eight-row Samper Benchmark A validation](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/samper_benchmark_a.webp)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/freemhd_closed_channel_observable_parity.webp" alt="LMX and FreeMHD closed-channel observable parity" width="58%">
-  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-hunt-startup.webp" alt="Seven-second Hunt-flow startup loop" width="38%">
+  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/freemhd_closed_channel_observable_parity.webp" alt="LMX and FreeMHD closed-channel observable parity" width="48%">
+  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-hunt-startup.webp" alt="Seven-second Hunt and Shercliff startup comparison" width="48%">
 </p>
 
 [Validation evidence →](https://lmx.readthedocs.io/en/latest/validation_report.html)
@@ -152,7 +152,7 @@ runs in the top panel are correctness calibration only.
 ## Quality and citation
 
 The portable gate records **857 passing tests**, **95.31% combined line/branch
-coverage**, and **154.9 s** on six Apple-Silicon workers.
+coverage**, and **146.1 s** on six Apple-Silicon workers.
 [Testing](https://lmx.readthedocs.io/en/latest/testing.html) ·
 [Theory](https://lmx.readthedocs.io/en/latest/theory.html) ·
 [Numerics](https://lmx.readthedocs.io/en/latest/numerics.html) ·

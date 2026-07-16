@@ -20,7 +20,7 @@ or command, observable, and acceptance limit or uncertainty.
 
 | Workflow or claim | Documentation visual | Coverage |
 |---|---|---|
-| Hartmann CLI/Python and Shercliff/Hunt cases | analytical profiles and Hunt startup | complete |
+| Hartmann CLI/Python and Shercliff/Hunt cases | analytical profiles and side-by-side startup dynamics | complete |
 | manufactured operators | observed-order convergence | complete |
 | FreeMHD closed-channel parity | accepted observable comparison | complete; add validation-ladder composite |
 | portable fringing workflow | bounded solver-family response and B2 panel | complete; research-stage |
@@ -39,7 +39,7 @@ serve one claim family.
 
 ## Tracked web set
 
-Twenty files in `docs/_static/` total 1,249,112 bytes. The `showcase` section of
+Twenty files in `docs/_static/` total 1,210,244 bytes. The `showcase` section of
 [`release-assets.json`](release-assets.json) records every byte count and
 SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 
@@ -55,7 +55,7 @@ SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 | manufactured operators | 41,120 | 1,600 × 624 WebP | bounded example; orders 2.00/1.94/1.91; `test_example_runner.py` / `test_plotting.py` |
 | Samper Benchmark A | 74,438 | 1,405 × 913 WebP | accepted aggregate `9f94ea15...`; eight rows; JSON-only writer/test |
 | B2 schema-6 scaling evidence | 85,752 | 1,400 × 1,860 WebP | forced-device CPU calibration, sustained Docker CPU-allocation scaling, and sustained shared-host GPU calibration; exact host-core and GPU idle-host claims remain open |
-| Hunt startup | 114,866 | 440 × 287 animated WebP, 7 s | Python/Pillow derivative of source GIF `12f30a38...`; 42 frames |
+| Hunt/Shercliff startup | 75,998 | 800 × 260 animated WebP, 7 s | 35 physical samples from current-source Hunt `934c9aea...` and Shercliff `3188bd21...` GIFs; no interpolation |
 | checked sensitivities | 32,612 | compressed WebP | released derivative `f2add9fe...` |
 | geometry gallery | 61,600 | compressed WebP | released derivative `e844f069...` |
 | variable-field response | 41,648 | compressed WebP | released derivative `5d4b593c...` |
@@ -70,11 +70,13 @@ Regenerate the Samper derivative from tracked evidence only with
 `python scripts/manage_release_assets.py --write-benchmark-a-plot docs/_static/samper_benchmark_a.webp`.
 The plot path is covered by `test_acceptance_plot_uses_only_frozen_json`.
 
-The three directly embedded motion derivatives are regenerated with
+The blanket and Q2D motion derivatives are regenerated with
 `python scripts/manage_release_assets.py --write-animated-webp SOURCE OUTPUT`.
 They sample existing physical frames to 42 frames over 7 seconds and use lossy
 animated WebP compression; no solver or motion interpolation is involved. The
-full-quality MP4s and source GIFs remain in the release or ignored artifacts.
+Hunt/Shercliff comparison likewise samples 35 paired physical frames at 5 fps;
+its frozen 200-step inputs and source hashes are recorded above. Full-quality
+MP4s and source GIFs remain in the release or ignored artifacts.
 
 ## Release-hosted README set
 

@@ -20,7 +20,7 @@ aggregate only. It shows the analytical-flow, refinement, observed-order,
 current-closure, and power-closure gates; no solver was rerun for presentation.
 
 <p align="center">
-  <img src="_static/readme-hunt-startup.webp" alt="Seven-second Hunt startup loop" width="55%">
+  <img src="_static/readme-hunt-startup.webp" alt="Seven-second Hunt and Shercliff startup comparison" width="82%">
 </p>
 
 ## Accepted
@@ -36,7 +36,7 @@ current-closure, and power-closure gates; no solver was rerun for presentation.
   passes primal, implicit-gradient, independent transpose, CPU/GPU, and bounded
   end-to-end gates.
 - The portable package gate passes 857 tests with 8 expected external-data
-  skips and 95.31% combined line/branch coverage in 154.9 seconds on the
+  skips and 95.31% combined line/branch coverage in 146.1 seconds on the
   reference Mac.
 - The B2 projection now preserves predictor cells and reconstructs only its
   pressure correction. The corrected warm 64x/32x/16x map-rate ladder spans

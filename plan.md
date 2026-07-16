@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-16. Current LMX `ca7535e` consumes released SOLVAX 0.8.4;
+Status: 2026-07-16. Current LMX source through `5ad03ec` consumes released SOLVAX 0.8.4;
 `aaa41b1` made the
 frozen B2 path Anderson depth two with one shared weight vector for mapped
 scaled fields and conservative compact flux. Restart schema 6 stores one raw
@@ -23,7 +23,7 @@ stopping. Its fixed-relaxation memory reduction
 is keyed to `791e496`, and its exact operator contract is keyed to `2d0fb50`.
 Commit `3e731fa` removes the projection reconstruction floor and refreezes the
 64x pseudo-time cap on a warm same-state ladder.
-The latest complete portable gate exercised source `ca7535e`.
+The latest complete portable gate exercised source `5ad03ec`.
 CPU/GPU calibration at
 `413185a` remains historical; deterministic GPU equivalence at `3a22078` has
 been replaced by the current `8b6f97d` result and the refreshed calibration
@@ -153,12 +153,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,763 | stay below 34,800 while preserving the physical residual | 35,100 |
+| package lines | 34,739 | stay below 34,775 while preserving the physical residual | 35,100 |
 | maintained-core lines | 7,908 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 21,003 | no new file; stay below 21,025 | 31 / 21,100 |
+| test files / lines | 30 / 21,018 | no new file; stay below 21,025 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,519,012 bytes | direct visual evidence only; keep below 4,550,000 | 4,718,592 bytes |
+| tracked checkout | 4,480,612 bytes | direct visual evidence only; keep below 4,510,000 | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -197,19 +197,30 @@ rectangular projection one private MHD trajectory owner, deleting 56 package
 lines with no file, module, export, dependency, or public-result change. It
 retains `fori_loop` for memory-efficient final objectives and uses `scan` only
 when history is requested; terminal station fields agree within `7.3e-12`.
+Commit `5eb8d7c` gives six validation JSON writers one persistence owner and
+two profile writers one payload owner, deleting 30 more package lines without
+changing a public signature or serialized key. Commit `a98590f` returns
+GMRES's existing residual and convergence diagnostics through released
+`linear_solve(has_aux=True)`, removing one redundant full momentum matvec per
+solve. Dense reference, JVP, gradient, and reduced-B2 restart gates pass; a
+medium warm probe is timing-neutral at 18.115 versus 18.075 ms. Commit
+`2508487` selects one animation backend instead of rendering and overwriting
+each GIF twice; the 12-frame writer probe falls from 6.08 to 2.49 seconds.
+Commit `5ad03ec` keeps all 200 startup steps but stores a bounded presentation
+sample, defaulting to 42 frames at 6 fps, and makes 3-D rendering optional.
 
-The portable-gate artifact keyed to `ca7535e` records 857 passes, 8 expected
-external-data skips, 95.3142% combined line/branch coverage, and 154.9 seconds on
-the reference Apple M4. It is 14.4% below the prior 181.0-second record, but
+The portable-gate artifact keyed to `5ad03ec` records 857 passes, 8 expected
+external-data skips, 95.3099% combined line/branch coverage, and 146.1 seconds on
+the reference Apple M4. It is 5.7% below the prior 154.9-second record, but
 source and tests both changed, so the shared-host delta is not a speed claim.
 Do not promote a suite-speed claim from wall-time variance. The gate stays below
-52% of the 300-second engineering target and 26% of the 600-second hard limit.
+49% of the 300-second engineering target and 25% of the 600-second hard limit.
 The 95.5%
 engineering target is not yet met; retain the 95% enforced floor while closing
-the remaining 0.1858-point gap and awaiting a second Python endpoint or hosted
+the remaining 0.1901-point gap and awaiting a second Python endpoint or hosted
 run. The
-six-worker record reports 51.9 seconds for reduced B2 and 48.4 seconds for
-weighted modal; these concurrent durations still identify contention rather
+six-worker record reports 53.6 seconds for weighted modal and 51.5 seconds for
+reduced B2; these concurrent durations still identify contention rather
 than isolated regressions, so no scheduling change is promoted from this run.
 
 The clean distribution audit at `ca7535e` produces a 315,709-byte wheel with
@@ -654,9 +665,10 @@ lines could perturb parity trajectories and waits until B2 convergence closes.
 Momentum's single diagonal division remains clearer and smaller than wrapping
 `solvax.jacobi`; ownership movement without code deletion is not a performance
 win. LMX now uses one `anderson_weights` result for scaled fields and
-compact-flux histories. `linear_solve(has_aux=True)` remains a separate bounded
-deletion/timing decision for retaining momentum diagnostics without a final
-extra matvec; it is not part of schema 6.
+compact-flux histories. The bounded `linear_solve(has_aux=True)` momentum probe
+is accepted at `a98590f`: it preserves the dense reference, JVP, gradient, and
+B2 restart gates, is timing-neutral within noise, and deletes the final
+diagnostic matvec. It does not alter schema 6.
 The complex-tridiagonal candidate is now closed as an LMX no-go under its
 precommitted performance gate. SOLVAX draft PR 22 at `b059e18` provides the
 transparent complex API, current/minimum-JAX differentiation, and genuinely
@@ -731,11 +743,12 @@ test-owned budget. Host source frames, full-quality media, meshes, and raw
 outputs stay in checksummed releases. Put provenance and acceptance status
 beside every asset.
 
-The README now displays three 7-second dynamics loops directly: accepted Hunt
-startup plus research-stage blanket and Q2D flows. Reproducible Python/Pillow
-compression samples existing physical frames to 42-frame animated WebPs; no
-solver or synthetic motion interpolation is involved. Full-quality MP4s remain
-release assets.
+The README now displays three 7-second dynamics loops directly: an accepted
+side-by-side Hunt/Shercliff startup comparison plus research-stage blanket and
+Q2D flows. The duct comparison samples 35 paired physical frames at 5 fps from
+current 200-step sources (`934c9aea...` Hunt and `3188bd21...` Shercliff); the
+other loops use 42 physical frames. No solver-state interpolation or synthetic
+motion is involved. Full-quality sources remain outside Git.
 
 The solver-free curved-pipe documentation tranche is complete: a 94,236-byte
 release-hosted WebP derives from the accepted bent-pipe overview and Dean
@@ -744,10 +757,10 @@ with Dean-vortex physics staged. No solver was rerun and no tracked media was
 added. Do not create a B2 movie from the bounded smoke or rejected coarse
 trajectories.
 
-The documentation source is now self-contained. The Hunt, blanket, and Q2D
-animations replace link-only posters and redundant tracked MP4s; all 20 tracked
-derivatives, including the detailed Q2D and blanket composites, total 1,189,156
-bytes, below the 1.25 MiB media cap. Read the Docs still serves the
+The documentation source is now self-contained. The Hunt/Shercliff, blanket,
+and Q2D animations replace link-only posters and redundant tracked MP4s; all
+20 tracked derivatives, including the detailed Q2D and blanket composites,
+total 1,210,244 bytes, below the 1.25 MiB media cap. Read the Docs still serves the
 2026-05-01 build at `6be8622`. Build `33554636` failed with `commit: None` and
 Git exit 128 because the builder had no credentials to clone the private GitHub
 repository; the active repository webhook's latest response is HTTP 406. An

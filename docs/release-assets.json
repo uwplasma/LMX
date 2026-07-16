@@ -572,7 +572,7 @@
   },
   "schema_version": 2,
   "showcase": {
-    "bytes": 1249112,
+    "bytes": 1210244,
     "files": [
       {
         "bytes": 71620,
@@ -640,9 +640,9 @@
         "sha256": "e844f069475fa625279e229a3e8499ae816308b88c8d1d33afb4fb14077bf700"
       },
       {
-        "bytes": 114866,
+        "bytes": 75998,
         "path": "docs/_static/readme-hunt-startup.webp",
-        "sha256": "d5d7af48435106ea12dd4604e5701bc6e707920c0b4e148ed1a2901ed220a4f6"
+        "sha256": "72320c0ced13cf7d722ceb6293d8d5c4a2a0db773670be0eb97a443c52357bd9"
       },
       {
         "bytes": 48630,
