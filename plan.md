@@ -11,17 +11,17 @@ Commit `3e731fa` removes the projection reconstruction floor and refreezes the
 64x pseudo-time cap on a warm same-state ladder.
 The latest complete portable gate is keyed to `3065021` and exercised source
 `ef2d2b1`. CPU/GPU calibration at
-`413185a` and deterministic GPU equivalence at `3a22078` predate the terminal
-restart fix and remain historical until refreshed. The isolated compiler trace
+`413185a` remains historical; deterministic GPU equivalence at `3a22078` has
+been replaced by the current `8b6f97d` record. The isolated compiler trace
 is keyed to `f379f6b`.
 The first fresh canonical-mesh coarse trajectory using the current formulation
 passes conservation and all linear-solver gates but reaches its 128-update
 bound before steady convergence. Its single authorized continuation preserves
 those gates but misses its precommitted residual target; it is not promoted.
 The smoke closes bounded orchestration and comparison, not production B2
-acceptance. The historical `128/256 x 67 x 67` GPU rungs close only bounded
-two-update calibration. Current-source two-GPU correctness is blocked by a
-reproducible shard-boundary defect, so no GPU scaling result is current. This
+acceptance. Current-source 1/2-GPU correctness passes. The historical
+`128/256 x 67 x 67` GPU rungs close only bounded two-update calibration, so no
+larger GPU scaling result is current. This
 single active plan records accepted baselines, active gates, and
 stop/go criteria—not campaign history. Completed campaign details belong in
 checksummed result records and the validation or performance documentation.
@@ -122,7 +122,7 @@ immutable evidence, richer projection, and target-driven paths remain):
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 35,059 | return below 35,000 while preserving the physical residual | 35,100 |
+| package lines | 35,060 | return below 35,000 while preserving the physical residual | 35,100 |
 | maintained-core lines | 7,957 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,904 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
@@ -200,12 +200,13 @@ another test file merely to move lines.
 Current accepted-smoke observables agree on one, two, and four forced Mac CPU
 devices within `5.93e-15`, with exact restart and all pressure solves green. The
 one-/two-GPU equivalence predates the terminal fix and is historical. Its
-current-source refresh fails on two GPUs. The repair makes flux,
+current-source replacement passes repeat, restart, conservation, and
+equivalence gates. The repair makes flux,
 vector, embedding, initialization, CFL, and relaxation layouts explicit and
 keeps compact flux components separate until explicit packing. The CPU ladder
 has exact restart replay. Deterministic GPU probes use
 `--xla_gpu_exclude_nondeterministic_ops`; default GPU mode remains a separate
-timing lane, but neither lane may be promoted until correctness passes. Compact
+timing lane and needs a fresh isolated calibration before promotion. Compact
 records are `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json`.
 
 An explicit one-device request uses the same named-sharding kernels as the
@@ -301,17 +302,19 @@ same-process solves alternate A/B/A/B; the first difference is a `1.55e-9`
 step-one axial-velocity perturbation confined to the second shard, which the
 high-Ha second update amplifies. The failure persists on an idle host, with
 standard electric PCG, without the electric coarse correction, and after full
-output synchronization. Treat this as an LMX-owned shard-boundary/layout
-defect, not a SOLVAX defect. The scaling worker now fails closed on a compact,
-gauge-invariant, axial-station signature across every cold and warm repeat; it
-passes exactly on CPU and detects the two-GPU defect at `3183.12`. The phase
-probe shows both repeats remain identical through step-one momentum,
-projection, and electric reconstruction and first diverge in fixed relaxation.
-Isolate that JAX sharded update before changing solver tolerances.
+output synchronization. The root cause was LMX passing a default-device JAX
+scalar into fixed relaxation of sharded state; commit `8b6f97d` keeps the known
+factor as a compile-time scalar and skips the identity first update. Four
+two-GPU repeats, restart, conservation, placement, and 1/2-device equivalence
+then pass exactly or within `1.02e-14`. This was not a SOLVAX defect. The
+scaling worker now fails closed on a compact, gauge-invariant, axial-station
+signature across every cold and warm repeat; it
+passes exactly on the repaired CPU and GPU paths. The frozen failing record
+retains the pre-fix `3183.12` signature for regression provenance.
 
-Only after that gate passes, re-measure accepted rungs in an isolated GPU
-window before any publishable scaling claim. Schema-6 Anderson work and larger
-GPU calibration are sequenced behind this correctness repair.
+With that gate passing, re-measure accepted rungs in an isolated GPU window
+before any publishable scaling claim. Schema-6 Anderson work and larger GPU
+calibration remain the next bounded workstreams.
 
 Separate compilation from repeated timings and report uncertainty, memory,
 placement, speedup, and parallel efficiency. Independent-case multiprocessing
@@ -326,9 +329,9 @@ the physics-valid path.
 Exit: the full portable suite remains below ten minutes with no critical-path
 surprise, and the accepted B2 path retains equivalent observables plus useful,
 uncertainty-aware speedup on its target hardware. CPU correctness and bounded
-CPU/GPU calibration methods are complete; current CPU correctness is green,
-while current-source multi-GPU equivalence is the blocking gate for every GPU
-calibration refresh.
+CPU/GPU calibration methods are complete and current CPU/GPU correctness is
+green. Refresh the bounded larger GPU calibration in an isolated window before
+any scaling promotion.
 
 ## Priority 3: canonical B2 validation
 

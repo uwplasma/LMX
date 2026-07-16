@@ -18,7 +18,7 @@ devices alone is not evidence of parallel execution.
 | B2 stopping study | Apple M4, schema 5, restart segments to step 96 | `0.05` converges at 30 but fails all QoI limits; `0.005` reaches only `0.01502` | fail closed; accelerate before tighter-reference calibration |
 | B2 relaxation probe | Apple M4, shared step-29 checkpoint, six updates | factors 5/6/8 gain at most 9.33% over factor 4 | below 15% gate; retain factor 2 |
 | B2 fixed relaxation | canonical `min=max=2` | exact trajectory/restart; prior residual omitted | saves 18.46 MiB at `102 x 77 x 77` and two global dot products/update |
-| exact B2 smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | historical pressure observable agreed within `1.1e-14`; current one-GPU refresh passes | current two-GPU refresh fails repeat, interface-current, and restart gates; no current scaling claim |
+| exact B2 smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | current repeats and restart are exact; pressure observable agrees within `1.02e-14`; closure and placement pass | production sharding correctness; too small for scaling claims |
 | B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.857/0.652/0.633 s; 1.31x/1.35x speedup; exact restart and device equivalence pass | historical pre-terminal-fix calibration; rerun before promotion |
 | B2 GPU calibration | 1/2 RTX A4000 GPUs, `128 x 67 x 67`, default XLA | initial medians 3.09/3.19 s; restart and device equivalence pass | historical pre-terminal-fix calibration; shared-host scaling remains open |
 | B2 doubled-axial calibration | 1/2 RTX A4000 GPUs, `256 x 67 x 67`, default XLA | 8.47/7.53 s; 1.125x speedup; CV below 3.7% | historical pre-terminal-fix calibration below the 1.2x threshold |
@@ -31,7 +31,7 @@ devices alone is not evidence of parallel execution.
 | B1 large solve | RTX A4000, `21 x 24 x 64` | 270.42 s for two updates | pressure projection is 91.2% of runtime |
 | B1 physical-pilot gate | RTX A4000, `21 x 24 x 64` | 669 iterations for solve plus restart vs 768 fixed ceiling | all four physical projections pass; shared-host wall time is not a speedup claim |
 
-The current CPU result, failed current GPU refresh, and historical GPU/fixed-size calibrations are recorded in
+The current CPU/GPU correctness results and historical fixed-size calibrations are recorded in
 `benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json` and
 `benchmarks/results/b2-{cpu-strong-scaling,gpu-scaling-calibration}-20260715.json`.
 The large deterministic probe isolated restart variation to corrected face

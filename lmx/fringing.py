@@ -8163,17 +8163,10 @@ def _solve_extruded_projection(
             fixed_point_residual = state_difference(mapped_state, current_state)
             if case.solver.coupling_acceleration == "aitken":
                 if fixed_aitken_relaxation is not None:
-                    relaxation_value = (
-                        1.0 if step == 0 else fixed_aitken_relaxation
-                    )
-                    fixed_point_relaxation = jnp.asarray(
-                        relaxation_value, dtype=u.dtype
-                    )
-                    accelerated = (
-                        mapped_state
-                        if step == 0
-                        else current_state + relaxation_value * fixed_point_residual
-                    )
+                    relaxation_value = 1.0 if step == 0 else fixed_aitken_relaxation
+                    fixed_point_relaxation = jnp.asarray(relaxation_value, dtype=u.dtype)
+                    accelerated = (mapped_state if step == 0 else
+                        current_state + relaxation_value * fixed_point_residual)
                     flux_relaxation = relaxation_value
                 elif accepted_state_converged:
                     # Avoid reduction noise after settling while retaining a

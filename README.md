@@ -91,8 +91,8 @@ observables pass the 1% finite-grid gate.
 The current B2 smoke has exact schema-5 restart, a post-map physical momentum
 diagnostic, and 1/2/4-CPU equivalence. Its projection-consistent stopping rule
 is versioned but its threshold remains open; its 64x pseudo-time cap is
-refrozen. The current two-GPU refresh exposes an alternating shard-boundary
-defect, so the earlier GPU ladder remains historical.
+refrozen. Current 1/2-GPU repeat, restart, conservation, and equivalence gates
+pass; the larger GPU scaling ladder remains historical.
 [Fringing status →](docs/fringing.md)
 
 ## Model conducting multilayer walls

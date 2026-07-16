@@ -1,10 +1,10 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "date": "2026-07-15",
   "commit": "3a2207804781f7b3f6383becdc82039480729cac",
   "source_fingerprint": "87a35608a2aec145e5094aea8df4a3517f530519cd4fab4eac2b9c852f60e639",
   "case_id": "B2-fringing-square",
-  "role": "historical-smoke-device-equivalence",
+  "role": "accepted-smoke-device-equivalence",
   "inputs": {
     "lmx_input_sha256": "b5cc1d5457d554bf5a32f7db09637799f901e8fee03e83bb51c75a32dbfaaa3e",
     "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa"
@@ -47,9 +47,9 @@
     "device_equivalence": true
   },
   "interpretation": {
-    "production_sharding_correctness": false,
+    "production_sharding_correctness": true,
     "strong_scaling_claim": false,
-    "reason": "This accepted result predates the terminal restart fix. Current-source refresh exposes a deterministic two-GPU repeat defect, so it is historical evidence only."
+    "reason": "The historical result is retained below; the current resolution passes repeat, restart, conservation, placement, and 1/2-GPU equivalence gates."
   },
   "raw_assets": "external workspace; compact worker JSON only",
   "current_refresh": {
@@ -101,6 +101,50 @@
       "one_gpu_worker": "82e4eb1555b9d7e293aa267418da44c0496996b40870e49f9e6db9b96d71506e",
       "two_gpu_worker": "3adf657496c7e9c92adbb0681846419708a53c29fbc99e2b1cdc9ddb588606e6",
       "two_gpu_repeat_gate_worker": "94b48cf016075d3588252680da360db48101296402cc38315c37b7e728bebbd6"
+    }
+  },
+  "resolution": {
+    "commit": "8b6f97d3069f1ee6184c9e2bcadf2783faa762f8",
+    "source_fingerprint": "d8b3bb57874e05ede92900cc1d6810593b07868e26630a1a158cd6f7959852e6",
+    "fix": "keep the known fixed-relaxation value as a compile-time scalar instead of implicitly resharding a default-device JAX scalar",
+    "runs": {
+      "1": {"cold_seconds": 17.055216976092197, "warm_median_seconds": 0.12304898200090975, "warm_cv": 0.028832551685186624, "restart_max_abs": 0.0, "repeat_signature_max_abs": 0.0},
+      "2": {"cold_seconds": 19.83362326293718, "warm_median_seconds": 0.9716115539195016, "warm_cv": 0.008433486847315238, "restart_max_abs": 0.0, "repeat_signature_max_abs": 0.0}
+    },
+    "equivalence": {
+      "pressure_observable_max_abs": 1.0101294800612948e-14,
+      "courant_mean_max_abs": 0.0,
+      "courant_max_abs": 2.117582368135751e-22,
+      "velocity_l2_max_abs": 0.0,
+      "potential_l2_max_abs": 2.842170943040401e-14,
+      "current_l2_max_abs": 5.684341886080802e-14,
+      "rtol": 2e-8,
+      "atol": 2e-9,
+      "pass": true
+    },
+    "gates": {
+      "validation": true,
+      "placement": true,
+      "conservation": true,
+      "restart_exact": true,
+      "repeat_exact": true,
+      "device_equivalence": true,
+      "pressure_solves_converged": true,
+      "pressure_linear_diagnostics_complete": true
+    },
+    "balances": {
+      "mass_max": 6.661338147750939e-16,
+      "current_max": 7.797600972511446e-14,
+      "interface_current_max": 1.6711965145077556e-10
+    },
+    "interpretation": {
+      "production_sharding_correctness": true,
+      "strong_scaling_claim": false,
+      "reason": "The 8x7x7 smoke is a correctness gate; its timings are too small for scaling claims."
+    },
+    "raw_sha256": {
+      "one_gpu_worker": "0b8c6983e70074ad9fef8b09cb5460258c98d7ba992b86996d68370268444537",
+      "two_gpu_worker": "4f2c6121c228698a9d65e70fcaf109c7d073adc9380346036438463b9c3932a5"
     }
   }
 }
