@@ -659,6 +659,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--num-devices", type=int, required=True)
     parser.add_argument("--platform", type=str, default="cpu")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--source-commit", type=str, default=None)
     parser.add_argument("--profile-dir", type=Path, default=None)
     parser.add_argument("--matched-input", type=Path, default=None)
     parser.add_argument("--evaluator", type=Path, default=None)
@@ -721,7 +722,9 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.benchmark_kind not in {"duct_step_gate", "matched_b2_smoke"}:
         payload = {**record.__dict__}
-    payload.update(platform=args.platform, source_fingerprint=_source_fingerprint(),
+    payload.update(platform=args.platform, source_commit=args.source_commit,
+        source_fingerprint=_source_fingerprint(),
+        precision="float64" if jax.config.jax_enable_x64 else "float32",
         python_version=platform.python_version(), jax_version=jax.__version__,
         jaxlib_version=version("jaxlib"), solvax_version=version("solvax"))
     if args.matched_input is not None and args.evaluator is not None:

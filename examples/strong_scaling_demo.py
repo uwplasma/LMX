@@ -3,6 +3,7 @@ from __future__ import annotations
 # ruff: noqa: E402 -- repository-root bootstrap must precede project imports.
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -24,6 +25,46 @@ from lmx.scaling import (
 )
 
 
+def _resource_environment(
+    path: Path | None, *, backend: str, num_devices: int, required: bool
+) -> dict[str, object]:
+    """Validate a 60-second admission record before an expensive worker starts."""
+
+    if path is None:
+        if required:
+            raise ValueError(f"Sustained {backend} scaling requires environment evidence")
+        return {"resource_environment_verified": False}
+    payload = json.loads(path.read_text())
+    rung = payload.get("rungs", {}).get(str(num_devices), {})
+    verified = bool(
+        payload.get("backend") == backend
+        and float(payload.get("sample_seconds", 0.0)) >= 60.0
+        and rung.get("num_devices") == num_devices
+        and rung.get("verified") is True
+    )
+    if backend == "cpu":
+        affinity = rung.get("affinity_cpus", [])
+        verified &= bool(
+            len(set(affinity)) == len(affinity) == 2 * num_devices
+            and rung.get("allocated_cpu_count") == len(affinity)
+        )
+    else:
+        devices, identities = rung.get("visible_devices", []), rung.get("gpu_identities", [])
+        physical = {(item.get("uuid"), item.get("pci_bus_id")) for item in identities}
+        verified &= bool(
+            len(devices) == len(identities) == len(physical) == num_devices
+            and rung.get("foreign_compute_process_count") == 0
+            and float(rung.get("max_gpu_utilization_percent", 100.0)) <= 5.0
+        )
+    if not verified:
+        raise ValueError(f"Invalid {backend} environment evidence for {num_devices} device(s)")
+    return {
+        "resource_environment_verified": True,
+        "resource_environment_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "resource_environment": rung,
+    }
+
+
 def _run_worker(
     *,
     python_executable: str,
@@ -41,6 +82,7 @@ def _run_worker(
     restart_path: Path | None = None,
     matched_input: Path | None = None,
     evaluator: Path | None = None,
+    source_commit: str | None = None,
     env: dict[str, str] | None = None,
     timeout_seconds: float | None = None,
     minimum_warm_seconds: float = 0.0,
@@ -67,6 +109,7 @@ def _run_worker(
         str(minimum_warm_seconds),
         "--output",
         str(output_path),
+        *(["--source-commit", source_commit] if source_commit is not None else []),
         *(["--profile-dir", str(profile_dir)] if profile_dir is not None else []),
         *(["--restart", str(restart_path)] if restart_path is not None else []),
         *(["--matched-input", str(matched_input)] if matched_input is not None else []),
@@ -157,11 +200,17 @@ def run_local_cpu_scaling(
     restart_path: Path | None = None,
     matched_input: Path | None = None,
     evaluator: Path | None = None,
+    source_commit: str | None = None,
+    environment_evidence: Path | None = None,
     timeout_seconds: float | None = None,
     minimum_warm_seconds: float = 0.0,
 ) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
     for count in device_counts:
+        environment = _resource_environment(
+            environment_evidence, backend="cpu", num_devices=count,
+            required=minimum_warm_seconds >= 120.0,
+        )
         env = _forced_cpu_environment(count)
         output_path = out_dir / f"cpu_{count}.json"
         record = _run_worker(
@@ -183,9 +232,12 @@ def run_local_cpu_scaling(
             restart_path=restart_path,
             matched_input=matched_input,
             evaluator=evaluator,
+            source_commit=source_commit,
             timeout_seconds=timeout_seconds,
             minimum_warm_seconds=minimum_warm_seconds,
         )
+        record.update(environment)
+        output_path.write_text(json.dumps(record, indent=2))
         records.append(record)
         if benchmark_kind == "matched_b2_smoke" and not record["validation_passed"]:
             raise RuntimeError(f"Matched B2 CPU gate failed; evidence: {output_path}")
@@ -293,7 +345,9 @@ def run_remote_gpu_scaling(
     restart_path: Path | None = None,
     matched_input: Path | None = None,
     evaluator: Path | None = None,
-    timeout_seconds: float = 600.0,
+    source_commit: str | None = None,
+    environment_evidence: Path | None = None,
+    timeout_seconds: float = 1800.0,
     minimum_warm_seconds: float = 0.0,
 ) -> list[dict[str, object]]:
     _sync_repo_to_remote(
@@ -319,6 +373,10 @@ def run_remote_gpu_scaling(
         )
     local_records: list[dict[str, object]] = []
     for count in device_counts:
+        environment = _resource_environment(
+            environment_evidence, backend="gpu", num_devices=count,
+            required=minimum_warm_seconds >= 120.0,
+        )
         visible_devices = _default_visible_devices(remote_host, count)
         remote_json = f"{remote_dir}/artifacts/strong_scaling/gpu_{count}.json"
         profile_arg = ""
@@ -339,6 +397,7 @@ def run_remote_gpu_scaling(
             f"{'' if nx is None else f'--nx {nx} '}--ny {ny} --nz {nz} "
             f"--iterations {iterations} --repeats {repeats} --output {shlex.quote(remote_json)}"
             f" --minimum-warm-seconds {minimum_warm_seconds}"
+            f"{'' if source_commit is None else f' --source-commit {shlex.quote(source_commit)}'}"
             f"{profile_arg}"
             f"{'' if remote_restart is None else f' --restart {shlex.quote(remote_restart)}'}"
             f"{'' if remote_matched is None else f' --matched-input {shlex.quote(remote_matched)} --evaluator {shlex.quote(remote_evaluator)}'}"
@@ -368,6 +427,8 @@ def run_remote_gpu_scaling(
                 f"Remote GPU worker failed for {count} device(s) during {phase}: "
                 f"{message}; evidence: {local_output}"
             ) from worker_error
+        record.update(environment)
+        local_output.write_text(json.dumps(record, indent=2))
         local_records.append(record)
         if benchmark_kind == "matched_b2_smoke" and not record["validation_passed"]:
             raise RuntimeError(f"Matched B2 GPU gate failed; evidence: {local_output}")
@@ -395,8 +456,14 @@ def run_strong_scaling_demo(
     gpu_restart_path: Path | None = None,
     timeout_seconds: float | None = None,
     minimum_warm_seconds: float = 0.0,
+    cpu_environment_evidence: Path | None = None,
+    gpu_environment_evidence: Path | None = None,
 ) -> dict[str, object]:
     repo_root = Path(__file__).resolve().parents[1]
+    source_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo_root, check=True,
+        capture_output=True, text=True,
+    ).stdout.strip()
     out_dir.mkdir(parents=True, exist_ok=True)
     matched_input = gpu_matched_input = evaluator = None
     if benchmark_kind == "matched_b2_smoke":
@@ -420,19 +487,17 @@ def run_strong_scaling_demo(
             out_dir / f"matched_b2_cpu_{shape_label}_{cpu_iterations}steps.json",
             out_dir / "matched_b2_evaluator.json",
         )
-        if not matched_input.exists():
-            materialize_matched_b2_lmx_input(
-                matched_input,
-                solver_shape=cpu_problem,
-                executed_steps=cpu_iterations,
-            )
-        if not evaluator.exists():
-            materialize_matched_b2_evaluator(evaluator)
+        materialize_matched_b2_lmx_input(
+            matched_input,
+            solver_shape=cpu_problem,
+            executed_steps=cpu_iterations,
+        )
+        materialize_matched_b2_evaluator(evaluator)
         gpu_label = "x".join(map(str, gpu_problem))
         gpu_matched_input = (
             out_dir / f"matched_b2_gpu_{gpu_label}_{gpu_iterations}steps.json"
         )
-        if remote_host is not None and not gpu_matched_input.exists():
+        if remote_host is not None:
             materialize_matched_b2_lmx_input(
                 gpu_matched_input,
                 solver_shape=gpu_problem,
@@ -453,6 +518,8 @@ def run_strong_scaling_demo(
         restart_path=cpu_restart_path,
         matched_input=matched_input,
         evaluator=evaluator,
+        source_commit=source_commit,
+        environment_evidence=cpu_environment_evidence,
         timeout_seconds=timeout_seconds,
         minimum_warm_seconds=minimum_warm_seconds,
     )
@@ -475,7 +542,9 @@ def run_strong_scaling_demo(
                 restart_path=gpu_restart_path,
                 matched_input=gpu_matched_input,
                 evaluator=evaluator,
-                timeout_seconds=(600.0 if timeout_seconds is None else timeout_seconds),
+                source_commit=source_commit,
+                environment_evidence=gpu_environment_evidence,
+                timeout_seconds=(1800.0 if timeout_seconds is None else timeout_seconds),
                 minimum_warm_seconds=minimum_warm_seconds,
             )
         )
@@ -539,6 +608,8 @@ def main(argv: list[str] | None = None) -> int:
         default=0.0,
         help="Require every warm fixed-work trajectory to meet this duration.",
     )
+    parser.add_argument("--cpu-environment-evidence", type=Path)
+    parser.add_argument("--gpu-environment-evidence", type=Path)
     parser.add_argument(
         "--cpu-restart",
         type=Path,
@@ -617,6 +688,8 @@ def main(argv: list[str] | None = None) -> int:
         gpu_restart_path=args.gpu_restart,
         timeout_seconds=args.worker_timeout,
         minimum_warm_seconds=args.minimum_warm_seconds,
+        cpu_environment_evidence=args.cpu_environment_evidence,
+        gpu_environment_evidence=args.gpu_environment_evidence,
     )
     return 0
 

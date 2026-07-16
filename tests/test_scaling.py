@@ -180,11 +180,21 @@ def test_remote_scaling_archive_has_one_package_resource_owner(
     assert not any(arcname.startswith("benchmarks/") for _, arcname in added)
 
 
-def test_matched_scaling_allows_a_gpu_only_run(tmp_path: Path):
-    assert strong_scaling_demo.run_local_cpu_scaling(
-        repo_root=tmp_path, out_dir=tmp_path, device_counts=(),
-        benchmark_kind="matched_b2_smoke", nx=None, ny=7, nz=7,
-        iterations=2, repeats=4, python_executable=sys.executable) == []
+def test_sustained_environment_evidence_is_physical_and_fail_closed(tmp_path: Path):
+    for backend, extra in (
+        ("cpu", {"affinity_cpus": [2, 3, 4, 5], "allocated_cpu_count": 4}),
+        ("gpu", {"visible_devices": ["0", "1"], "foreign_compute_process_count": 0,
+            "max_gpu_utilization_percent": 4.0, "gpu_identities": [{"uuid": v, "pci_bus_id": v} for v in "ab"]}),
+    ):
+        rung = {"num_devices": 2, "verified": True, **extra}
+        path = tmp_path / f"{backend}.json"
+        path.write_text(json.dumps({"backend": backend, "sample_seconds": 60, "rungs": {"2": rung}}))
+        strong_scaling_demo._resource_environment(
+            path, backend=backend, num_devices=2, required=True)
+    rung["verified"] = False
+    path.write_text(json.dumps({"backend": backend, "sample_seconds": 60, "rungs": {"2": rung}}))
+    with pytest.raises(ValueError, match="Invalid"):
+        strong_scaling_demo._resource_environment(path, backend=backend, num_devices=2, required=True)
 
 
 @pytest.mark.parametrize(
@@ -259,14 +269,15 @@ def _sustained_ladder(counts, backend="cpu"):
             device_kind="cpu" if backend == "cpu" else "NVIDIA RTX",
             num_devices=count, repeats=4, cold_seconds=20.0 / count,
             warm_seconds=12.0 / count, mean_seconds=14.0 / count,
-            operator_path="solve_extruded_inductionless",
+            benchmark_kind="matched_b2_smoke", operator_path="solve_extruded_inductionless",
             memory_bytes_estimate=2 * 1024 * 1024,
             spatially_sharded=count > 1, global_shard_count=count,
             velocity_l2=3.0, potential_l2=2.0, current_l2=1.0,
             validation_passed=True)
-        records.append({**record.__dict__, "source_fingerprint": "source",
+        records.append({**record.__dict__, "source_fingerprint": "source", "source_commit": "commit",
             "input_sha256": "input", "evaluator_sha256": "evaluator",
-            "precision": "float64", "peak_host_rss_bytes": 4 * 1024 * 1024,
+            "precision": "float64", "jaxlib_version": "0.x", "solvax_version": "0.x",
+            "peak_host_rss_bytes": 4 * 1024 * 1024,
             "device_memory": ([{"peak_bytes_in_use": 1024} for _ in range(count)]
                 if backend == "gpu" else []),
             "resource_environment_verified": True,
@@ -459,19 +470,17 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
 
 def test_sustained_claim_fails_closed_on_incomplete_evidence():
     bad = [_sustained_ladder((1, 2)), _sustained_ladder((1, 2, 4, 8))]
-    for field in ("input_sha256", "memory_bytes_estimate",
-            "resource_environment_verified"):
+    for field in (*scaling._sustained_identity_fields(_sustained_ladder((1,))[0]),
+            "memory_bytes_estimate", "resource_environment_verified"):
         records = _sustained_ladder((1, 2, 4))
         records[-1].pop(field)
         bad.append(records)
     mismatched = _sustained_ladder((1, 2, 4))
     mismatched[-1]["input_sha256"] = "other"
     bad.append(mismatched)
-    no_provenance = _sustained_ladder((1, 2, 4))
-    for record in no_provenance:
-        for field in ("source_fingerprint", "input_sha256", "evaluator_sha256"):
-            record.pop(field)
-    bad.append(no_provenance)
+    nonpositive_memory = _sustained_ladder((1, 2, 4))
+    nonpositive_memory[-1]["peak_host_rss_bytes"] = 0
+    bad.append(nonpositive_memory)
     gpu_memory = _sustained_ladder((1, 2), "gpu")
     gpu_memory[-1]["device_memory"][0].pop("peak_bytes_in_use")
     bad.append(gpu_memory)
@@ -857,15 +866,15 @@ def test_scaling_worker_writes_expected_json(
     rc = run_strong_scaling_worker.main(
         ["--benchmark-kind", "extruded3d", "--nx", "48", "--ny", "64",
          "--nz", "32", "--iterations", "5", "--repeats", "2",
-         "--num-devices", "1", "--platform", "CPU", "--output", str(output_path)]
+         "--num-devices", "1", "--platform", "CPU", "--source-commit", "deadbeef",
+         "--output", str(output_path)]
     )
-
     assert rc == 0
     payload = json.loads(output_path.read_text())
     assert payload["platform"] == "CPU"
     assert payload["warm_seconds"] == 0.1
     assert payload["benchmark_kind"] == "extruded3d"
-    assert len(payload["source_fingerprint"]) == 64
+    assert (payload["source_commit"], len(payload["source_fingerprint"])) == ("deadbeef", 64)
     assert json.loads(capsys.readouterr().out)["num_devices"] == 1
 
 

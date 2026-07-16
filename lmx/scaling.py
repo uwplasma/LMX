@@ -183,10 +183,20 @@ def _scaling_group_key(record: Mapping[str, object]) -> tuple[object, ...]:
     )
 
 
-_SUSTAINED_PROVENANCE = ("source_commit", "source_fingerprint", "input_sha256",
-    "evaluator_sha256", "restart_sha256")
-_SUSTAINED_IDENTITY = (*_SUSTAINED_PROVENANCE, "precision", "python_version",
-    "jax_version")
+_SUSTAINED_RUNTIME_IDENTITY = (
+    "source_commit", "source_fingerprint", "precision", "python_version",
+    "jax_version", "jaxlib_version", "solvax_version",
+)
+
+
+def _sustained_identity_fields(record: Mapping[str, object]) -> tuple[str, ...]:
+    kind = str(record.get("benchmark_kind", ""))
+    problem = (
+        ("input_sha256", "evaluator_sha256")
+        if kind == "matched_b2_smoke"
+        else (("restart_sha256",) if kind == "extruded_solve" else ())
+    )
+    return (*_SUSTAINED_RUNTIME_IDENTITY, *problem)
 
 
 def _sustained_group(records: Sequence[Mapping[str, object]],
@@ -199,19 +209,22 @@ def _sustained_group(records: Sequence[Mapping[str, object]],
         name in kind for name in ("gpu", "nvidia", "amd"))
     required = (1, 2, 4) if backend == "cpu" or kind == "cpu" else ((1, 2) if gpu else ())
     observed = sorted(int(row["num_devices"]) for row in rows)
+    identity_fields = _sustained_identity_fields(records[0])
     values = {name: [record.get(name) for record in records]
-        for name in _SUSTAINED_IDENTITY}
-    identity = (any(all(value not in (None, "") for value in values[name])
-        for name in _SUSTAINED_PROVENANCE) and all(
-            not any(value not in (None, "") for value in field)
-            or all(value == field[0] and value not in (None, "") for value in field)
-            for field in values.values()))
-    memory = all(record.get("memory_bytes_estimate") is not None
-        and record.get("peak_host_rss_bytes") is not None for record in records)
+        for name in identity_fields}
+    identity = all(
+        all(value == field[0] and value not in (None, "") for value in field)
+        for field in values.values())
+    memory = all(
+        (_float_or_none(record.get("peak_host_rss_bytes")) or 0.0)
+        > (_float_or_none(record.get("memory_bytes_estimate")) or 0.0) > 0.0
+        for record in records
+    )
     if gpu:
         memory = memory and all(len(devices := record.get("device_memory", ()))
             == int(row["num_devices"]) and all(
-                device.get("peak_bytes_in_use") is not None for device in devices)
+                (_float_or_none(device.get("peak_bytes_in_use")) or 0.0) > 0.0
+                for device in devices)
             for record, row in zip(records, rows, strict=True))
     gates = {
         "complete_topology": bool(required) and tuple(observed) == required,
