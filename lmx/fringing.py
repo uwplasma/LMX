@@ -2133,23 +2133,6 @@ def _safe_correlation(x: jnp.ndarray, y: jnp.ndarray) -> float:
     return float(jnp.where(denom > 0.0, jnp.sum(centered_x * centered_y) / denom, 0.0))
 
 
-def _mirror_residual(values: jnp.ndarray, *, odd: bool) -> float:
-    if values.size == 0:
-        return 0.0
-    mirrored = values[::-1]
-    residual = values + mirrored if odd else values - mirrored
-    return float(jnp.max(jnp.abs(residual)))
-
-
-def _center_station_value(values: jnp.ndarray) -> float:
-    if values.size == 0:
-        return 0.0
-    n = int(values.shape[0])
-    if n % 2 == 1:
-        return float(values[n // 2])
-    return float(0.5 * (values[n // 2 - 1] + values[n // 2]))
-
-
 def _clip_state(field: jnp.ndarray, limit: float) -> jnp.ndarray:
     return jnp.clip(jnp.nan_to_num(field), -limit, limit)
 
