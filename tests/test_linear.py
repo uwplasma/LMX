@@ -66,7 +66,8 @@ def test_anchored_poisson_operator_is_spd():
 
 
 
-def test_solvax_pcg_recovers_manufactured_five_point_solution():
+@pytest.mark.parametrize("preconditioner", ("jacobi", "block_jacobi", "none"))
+def test_solvax_pcg_recovers_manufactured_five_point_solution(preconditioner):
     scale = 1.0e-8
     diagonal = scale * jnp.full((3, 3), 6.0)
     west = scale * jnp.ones((3, 3))
@@ -86,6 +87,7 @@ def test_solvax_pcg_recovers_manufactured_five_point_solution():
         rhs,
         iterations=40,
         tolerance=tolerance,
+        preconditioner=preconditioner,
     )
 
     assert float(residual) <= tolerance

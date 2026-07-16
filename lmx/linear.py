@@ -6,7 +6,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from solvax import pcg_linear_solve as _solvax_pcg_linear_solve
+from solvax import jacobi, pcg_linear_solve as _solvax_pcg_linear_solve
 
 
 def apply_five_point_operator(
@@ -167,21 +167,13 @@ def solve_five_point_solvax_pcg_state(
     """Solve a five-point SPD system with the released SOLVAX PCG backend."""
 
     tiny = jnp.asarray(jnp.finfo(rhs.dtype).tiny, dtype=rhs.dtype)
-    inverse_diagonal = 1.0 / jnp.maximum(diagonal, tiny)
-
     def matvec(field: jnp.ndarray) -> jnp.ndarray:
         return apply_five_point_operator(diagonal, west, east, south, north, field)
 
     if preconditioner in {"jacobi", "block_jacobi"}:
-
-        def apply_preconditioner(residual: jnp.ndarray) -> jnp.ndarray:
-            return inverse_diagonal * residual
-
+        apply_preconditioner = jacobi(jnp.maximum(diagonal, tiny))
     elif preconditioner == "none":
-
-        def apply_preconditioner(residual: jnp.ndarray) -> jnp.ndarray:
-            return residual
-
+        apply_preconditioner = None
     else:
         raise ValueError(f"Unsupported preconditioner {preconditioner!r}")
 
