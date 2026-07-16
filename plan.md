@@ -141,7 +141,7 @@ the reference Apple M4. The 1.9% change from the previous 154.5-second record is
 within run-to-run noise; the gate remains below the 300-second engineering
 target and 600-second hard limit. Coverage
 remains above the enforced floor but below the 95.5% engineering target. The
-six-worker record reports 49.5 seconds for reduced B2 and 53.4 seconds for
+six-worker record reports 49.4 seconds for reduced B2 and 53.3 seconds for
 weighted modal; these concurrent durations identify contention rather than
 isolated regressions, so no scheduling change is promoted from this run.
 
