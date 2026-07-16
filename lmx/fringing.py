@@ -1526,33 +1526,19 @@ def _duct_diffusion_data(
 
     _, dy_widths, dz_widths = widths
     dynamic_viscosity = density * viscosity
-    coefficients = _variable_diffusion_coefficients_3d(
-        dynamic_viscosity,
-        dx=dx,
-        dy=dy_widths,
-        dz=dz_widths,
-        validated_spacing=True,
-    )
+    coefficients = _variable_diffusion_coefficients_3d(dynamic_viscosity,
+        dx=dx, dy=dy_widths, dz=dz_widths, validated_spacing=True)
     wall_sink = jnp.zeros_like(density)
-    wall_sink = wall_sink.at[:, 0, :].add(
-        dynamic_viscosity[:, 0, :] / (0.5 * dy_widths[0] ** 2)
-    )
-    wall_sink = wall_sink.at[:, -1, :].add(
-        dynamic_viscosity[:, -1, :] / (0.5 * dy_widths[-1] ** 2)
-    )
-    wall_sink = wall_sink.at[:, :, 0].add(
-        dynamic_viscosity[:, :, 0] / (0.5 * dz_widths[0] ** 2)
-    )
-    wall_sink = wall_sink.at[:, :, -1].add(
-        dynamic_viscosity[:, :, -1] / (0.5 * dz_widths[-1] ** 2)
-    )
+    for axis, width in ((1, dy_widths), (2, dz_widths)):
+        for index in (0, -1):
+            cells = [slice(None)] * 3
+            cells[axis] = index
+            cells = tuple(cells)
+            wall_sink = wall_sink.at[cells].add(
+                dynamic_viscosity[cells] / (0.5 * width[index] ** 2))
     inlet_cells = jnp.arange(density.shape[0])[:, None, None] == 0
     inlet_sink = (
-        jnp.where(
-            inlet_cells,
-            2.0 * dynamic_viscosity[0] / dx**2,
-            0.0,
-        )
+        jnp.where(inlet_cells, 2.0 * dynamic_viscosity[0] / dx**2, 0.0)
         if prescribed_inlet
         else jnp.zeros_like(density)
     )
@@ -1883,62 +1869,38 @@ def _flow_rate_inlet_profile(axial_velocity, face_area, target):
 
 
 def _duct_pressure_face_corrections(
-    pressure,
-    mobility,
-    *,
-    dx,
-    dy,
-    dz,
-    mixed_axial_pressure,
-    field_sharding=None,
+    pressure, mobility, *, dx, dy, dz, mixed_axial_pressure, field_sharding=None,
 ):
     """Return the projection's three oriented pressure-velocity corrections."""
 
     def axial_neighbors(value):
-        return _neighbor_fields(
-            value,
-            mode_x="neumann",
-            mode_y="neumann",
-            mode_z="neumann",
-            sharding=field_sharding,
-        )[:2]
+        return _neighbor_fields(value, mode_x="neumann", mode_y="neumann",
+            mode_z="neumann", sharding=field_sharding)[:2]
 
     pressure_east, mobility_east = (
         axial_neighbors(value)[1] for value in (pressure, mobility)
     )
-    correction_x = -_harmonic_mean(mobility_east, mobility) * (
-        pressure_east - pressure
-    ) / max(dx, 1.0e-12)
+    correction_x = (-_harmonic_mean(mobility_east, mobility)
+        * (pressure_east - pressure) / max(dx, 1.0e-12))
     if mixed_axial_pressure:
-        outlet_correction = -mobility[-1] * (0.0 - pressure[-1]) / max(
-            0.5 * dx, 1.0e-12
-        )
-        outlet_cells = jnp.arange(pressure.shape[0])[:, None, None] == pressure.shape[0] - 1
+        outlet_correction = mobility[-1] * pressure[-1] / max(0.5 * dx, 1.0e-12)
+        outlet_cells = (jnp.arange(pressure.shape[0])[:, None, None]
+            == pressure.shape[0] - 1)
         correction_x = jnp.where(outlet_cells, outlet_correction, correction_x)
 
-    correction_y = jnp.zeros(
-        (pressure.shape[0], pressure.shape[1] + 1, pressure.shape[2]),
-        dtype=pressure.dtype,
-    )
-    mobility_y = _harmonic_mean(mobility[:, 1:, :], mobility[:, :-1, :])
-    y_distance = 0.5 * (dy[:-1] + dy[1:])
-    correction_y = correction_y.at[:, 1:-1, :].set(
-        -mobility_y
-        * (pressure[:, 1:, :] - pressure[:, :-1, :])
-        / y_distance[None, :, None]
-    )
-    correction_z = jnp.zeros(
-        (pressure.shape[0], pressure.shape[1], pressure.shape[2] + 1),
-        dtype=pressure.dtype,
-    )
-    mobility_z = _harmonic_mean(mobility[:, :, 1:], mobility[:, :, :-1])
-    z_distance = 0.5 * (dz[:-1] + dz[1:])
-    correction_z = correction_z.at[:, :, 1:-1].set(
-        -mobility_z
-        * (pressure[:, :, 1:] - pressure[:, :, :-1])
-        / z_distance[None, None, :]
-    )
-    return correction_x, correction_y, correction_z
+    transverse = []
+    for axis, width in ((1, dy), (2, dz)):
+        values, coefficient = (jnp.moveaxis(field, axis, 0)
+            for field in (pressure, mobility))
+        face_coefficient = _harmonic_mean(coefficient[1:], coefficient[:-1])
+        distance = 0.5 * (width[:-1] + width[1:])
+        correction = jnp.zeros(
+            (values.shape[0] + 1, *values.shape[1:]), dtype=pressure.dtype)
+        correction = correction.at[1:-1].set(
+            -face_coefficient * (values[1:] - values[:-1])
+            / distance.reshape((-1,) + (1,) * (values.ndim - 1)))
+        transverse.append(jnp.moveaxis(correction, 0, axis))
+    return correction_x, *transverse
 
 
 def _face_flux_pressure_projection_duct(
@@ -2115,18 +2077,10 @@ def _duct_momentum_defect(
     widths = (dx_widths, dy, dz)
     face_area = dy[:, None] * dz[None, :]
     inlet_patch = velocity[0].at[..., 0].set(
-        rho_phi_inlet / (density[0] * face_area)
-    )
-    zero_y = jnp.zeros_like(velocity[:, 0])
-    zero_z = jnp.zeros_like(velocity[:, :, 0])
-    boundary_velocity = (
-        inlet_patch,
-        velocity[-1],
-        zero_y,
-        zero_y,
-        zero_z,
-        zero_z,
-    )
+        rho_phi_inlet / (density[0] * face_area))
+    zero_y, zero_z = (jnp.zeros_like(velocity[:, 0]),
+        jnp.zeros_like(velocity[:, :, 0]))
+    boundary_velocity = (inlet_patch, velocity[-1], zero_y, zero_y, zero_z, zero_z)
     rho_phi = _unpack_duct_mass_flux(rho_phi_plus, rho_phi_inlet)
     weights = _limited_linear_vector_face_weights_duct(
         velocity, rho_phi, boundary_velocity, widths
@@ -2134,16 +2088,11 @@ def _duct_momentum_defect(
     convection = _limited_linear_convection_matrix_action_duct(
         velocity, rho_phi, weights, boundary_velocity, widths
     )
-    dynamic_viscosity, coefficients, wall_sink, inlet_sink = _duct_diffusion_data(
-        density,
-        viscosity,
-        widths,
-        dx=dx,
-        prescribed_inlet=True,
-    )
-    neighbours = _neighbor_fields(
-        velocity, mode_x="neumann", mode_y="neumann", mode_z="neumann"
-    )
+    dynamic_viscosity, coefficients, wall_sink, inlet_sink = (
+        _duct_diffusion_data(density, viscosity, widths, dx=dx,
+            prescribed_inlet=True))
+    neighbours = _neighbor_fields(velocity, mode_x="neumann", mode_y="neumann",
+        mode_z="neumann")
     inlet_cells = jnp.arange(shape[0])[:, None, None] == 0
     inlet_velocity = jnp.where(inlet_cells[..., None], inlet_patch, 0.0)
     diffusion = sum(
@@ -2152,26 +2101,14 @@ def _duct_momentum_defect(
     ) - (wall_sink + inlet_sink)[..., None] * velocity
     diffusion += inlet_sink[..., None] * inlet_velocity
     deviatoric_stress = _explicit_deviatoric_stress_duct(
-        velocity, dynamic_viscosity, boundary_velocity, widths
-    )
+        velocity, dynamic_viscosity, boundary_velocity, widths)
 
     mobility = dt / jnp.maximum(density, 1.0e-20)
     correction_x, correction_y, correction_z = _duct_pressure_face_corrections(
-        pressure,
-        mobility,
-        dx=dx,
-        dy=dy,
-        dz=dz,
-        mixed_axial_pressure=True,
-        field_sharding=field_sharding,
-    )
-    correction_x_west = _neighbor_fields(
-        correction_x,
-        mode_x="neumann",
-        mode_y="neumann",
-        mode_z="neumann",
-        sharding=field_sharding,
-    )[0]
+        pressure, mobility, dx=dx, dy=dy, dz=dz, mixed_axial_pressure=True,
+        field_sharding=field_sharding)
+    correction_x_west = _neighbor_fields(correction_x, mode_x="neumann",
+        mode_y="neumann", mode_z="neumann", sharding=field_sharding)[0]
     correction_x_west = jnp.where(inlet_cells, 0.0, correction_x_west)
     pressure_velocity = jnp.stack(
         (
@@ -2181,14 +2118,9 @@ def _duct_momentum_defect(
         ),
         axis=-1,
     )
-    body_force = lorentz_force.at[..., 0].add(forcing)
-    residual = (
-        convection
-        - diffusion
-        - deviatoric_stress
-        - body_force
-        - density[..., None] * pressure_velocity / dt
-    )
+    residual = (convection - diffusion - deviatoric_stress
+        - lorentz_force.at[..., 0].add(forcing)
+        - density[..., None] * pressure_velocity / dt)
     component_maxima = jnp.max(jnp.abs(residual), axis=(0, 1, 2)) / force_scale
     return jnp.concatenate((component_maxima, jnp.max(component_maxima)[None]))
 
@@ -7464,9 +7396,8 @@ def _solve_extruded_projection(
     (residual_by_step, component_residual_by_step, pressure_residual_by_step,
         electric_linear_by_step, potential_residual_by_step) = histories
     completed_steps = len(residual_by_step)
-    momentum_defect_by_step = ([] if initial_bundle is None else np.asarray(
-        getattr(initial_bundle, "iteration_momentum_defect_history", jnp.zeros((0,)))
-    ).tolist())
+    momentum_defect_by_step = ([] if initial_bundle is None else
+        np.asarray(initial_bundle.iteration_momentum_defect_history).tolist())
     if use_alex_b2_finite_volume and len(momentum_defect_by_step) != completed_steps:
         raise ValueError(
             "B2 restart predates the electromagnetic momentum-defect contract"
@@ -7550,11 +7481,8 @@ def _solve_extruded_projection(
         fluid = next(region for region in case.regions if region.kind == "fluid")
         prescribed_field = case.magnetic_field.value or (0.0, 0.0, 0.0)
         reference_speed = target_flow_rate / float(jnp.sum(face_area))
-        electromagnetic_force_scale = (
-            fluid.conductivity
-            * sum(float(component) ** 2 for component in prescribed_field)
-            * reference_speed
-        )
+        electromagnetic_force_scale = (fluid.conductivity * reference_speed
+            * sum(float(component) ** 2 for component in prescribed_field))
         if electromagnetic_force_scale <= 0.0:
             raise ValueError("ALEX B2 requires a positive electromagnetic force scale")
         kernel_key = (*kernel_key, electromagnetic_force_scale)
@@ -7592,31 +7520,17 @@ def _solve_extruded_projection(
                 iterations=momentum_iterations, tolerance=momentum_tolerance,
             )
 
-        def momentum_defect(
-            velocity,
-            lorentz_force,
-            density,
-            viscosity,
-            rho_phi_plus,
-            rho_phi_inlet,
-            pressure,
-        ):
+        def momentum_defect(velocity, lorentz_force, density, viscosity,
+                            rho_phi_plus, rho_phi_inlet, pressure):
             return _duct_momentum_defect(
                 velocity[:, y0:y1, z0:z1],
                 lorentz_force[:, y0:y1, z0:z1],
                 density[:, y0:y1, z0:z1],
                 viscosity[:, y0:y1, z0:z1],
-                rho_phi_plus,
-                rho_phi_inlet,
-                pressure[:, y0:y1, z0:z1],
-                forcing=forcing,
-                force_scale=electromagnetic_force_scale,
-                dt=dt,
-                dx=dx,
-                dy=local_dy,
-                dz=local_dz,
-                field_sharding=field_sharding,
-            )
+                rho_phi_plus, rho_phi_inlet, pressure[:, y0:y1, z0:z1],
+                forcing=forcing, force_scale=electromagnetic_force_scale,
+                dt=dt, dx=dx, dy=local_dy, dz=local_dz,
+                field_sharding=field_sharding)
 
         def embed_velocity(local_velocity, mask):
             embedded = jnp.pad(local_velocity,
@@ -7658,13 +7572,11 @@ def _solve_extruded_projection(
             momentum_solve = _reuse_fringing_jit(
                 ("momentum", *kernel_key), momentum_solve
             )
-            momentum_defect = jax.jit(
-                momentum_defect,
+            momentum_defect = jax.jit(momentum_defect,
                 in_shardings=(vector_sharding,) * 2
                 + (field_sharding,) * 2
                 + (flux_sharding, replicated_sharding, field_sharding),
-                out_shardings=replicated_sharding,
-            )
+                out_shardings=replicated_sharding)
             momentum_defect = _reuse_fringing_jit(
                 ("momentum_defect", *kernel_key), momentum_defect
             )
@@ -8122,14 +8034,9 @@ def _solve_extruded_projection(
                 phi, sigma, uxb_x, uxb_y, uxb_z, bx, by, bz, fluid_mask
             )
             momentum_defect_components = momentum_defect(
-                pack_vector(u_next, v_next, w_next),
-                pack_vector(lorentz_x, lorentz_y, lorentz_z),
-                rho,
-                nu,
-                pack_flux(*mapped_flux_components),
-                mapped_rho_phi_inlet,
-                p_corr,
-            )
+                pack_vector(u_next, v_next, w_next), pack_vector(
+                    lorentz_x, lorentz_y, lorentz_z), rho, nu,
+                pack_flux(*mapped_flux_components), mapped_rho_phi_inlet, p_corr)
         else:
             dphi_dx, dphi_dy, dphi_dz = _gradient_3d(phi, dx=dx, dy=dy, dz=dz)
             jx = _clip_state(sigma * (-dphi_dx + uxb_x), scalar_limit)
@@ -8381,14 +8288,13 @@ def _solve_extruded_projection(
             break
 
     if use_alex_b2_finite_volume:
-        # Coupling acceleration changes the accepted state after the mapped
-        # current was reconstructed; refresh all derived electromagnetic fields.
+        # Acceleration changes the accepted state after current reconstruction.
         uxb_x = v * bz - w * by
         uxb_y = w * bx - u * bz
         uxb_z = u * by - v * bx
-        jx, jy, jz, div_j, lorentz_x, lorentz_y, lorentz_z = reconstruct_electric(
-            phi, sigma, uxb_x, uxb_y, uxb_z, bx, by, bz, fluid_mask
-        )
+        jx, jy, jz, div_j, lorentz_x, lorentz_y, lorentz_z = (
+            reconstruct_electric(phi, sigma, uxb_x, uxb_y, uxb_z,
+                bx, by, bz, fluid_mask))
 
     final_step_residual = residual_by_step[-1] if residual_by_step else 0.0
     residual = jnp.full((nx,), final_step_residual, dtype=float)

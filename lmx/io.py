@@ -20,6 +20,7 @@ _EXTRUDED_HISTORY_WIDTHS = (
     ("iteration_electric_linear_history", 6),
     ("iteration_potential_residual_history", 0), ("iteration_courant_history", 3),
 )
+_B2_DIAGNOSTIC_SCHEMAS = tuple(f"b2_diagnostics_v{version}" for version in (2, 3, 4))
 _EXTRUDED_ARRAY_FIELDS = """x y z field_scale u v w p phi jx jy jz lorentz_x lorentz_y lorentz_z
 residual volumetric_flow_rate mean_velocity axial_current wall_current_leakage current_scaled_pressure_proxy
 charge_balance_residual boundary_current_residual""".split()
@@ -421,21 +422,17 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
         has_plus = "rho_phi_plus" in data and data["rho_phi_plus"].size > 0
         has_inlet = "rho_phi_inlet" in data and data["rho_phi_inlet"].size > 0
         schema = metadata.get("restart_schema")
-        has_aitken = schema in {
-            "b2_aitken_v1", "b2_diagnostics_v2", "b2_diagnostics_v3", "b2_diagnostics_v4"
-        }
+        has_aitken = schema in ("b2_aitken_v1", *_B2_DIAGNOSTIC_SCHEMAS)
         if has_aitken and not {"aitken_residual", "aitken_relaxation", "steady_streak"} <= set(data.files):
             raise ValueError("B2 Aitken restart is missing accelerator state")
-        if schema in {"b2_diagnostics_v2", "b2_diagnostics_v3", "b2_diagnostics_v4"} and not {
-            "iteration_courant_history"
-        } <= set(data.files):
-            raise ValueError("B2 diagnostic restart is missing CFL history")
-        if schema in {"b2_diagnostics_v3", "b2_diagnostics_v4"} and not {
-            "iteration_pressure_linear_history"
-        } <= set(data.files):
-            raise ValueError("B2 diagnostic restart is missing pressure linear history")
-        if schema == "b2_diagnostics_v4" and "iteration_momentum_defect_history" not in data:
-            raise ValueError("B2 diagnostic restart is missing momentum defect history")
+        required = (
+            (_B2_DIAGNOSTIC_SCHEMAS, "iteration_courant_history", "CFL"),
+            (_B2_DIAGNOSTIC_SCHEMAS[1:], "iteration_pressure_linear_history", "pressure linear"),
+            (_B2_DIAGNOSTIC_SCHEMAS[2:], "iteration_momentum_defect_history", "momentum defect"),
+        )
+        for schemas, field, label in required:
+            if schema in schemas and field not in data:
+                raise ValueError(f"B2 diagnostic restart is missing {label} history")
         metadata["restart_schema"] = (schema if has_plus and has_inlet and has_aitken
                                       else "compact_flux_v1" if has_plus and has_inlet else "legacy_nonexact")
         station_history = (
@@ -475,17 +472,11 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
             ),
             **histories,
         )
-        if schema in {"b2_diagnostics_v2", "b2_diagnostics_v3", "b2_diagnostics_v4"} and (
-            bundle.iteration_courant_history.shape[0] != completed_steps
-        ):
-            raise ValueError("B2 diagnostic restart histories have inconsistent lengths")
-        if schema in {"b2_diagnostics_v3", "b2_diagnostics_v4"} and (
-            bundle.iteration_pressure_linear_history.shape[0] != completed_steps
-        ):
-            raise ValueError("B2 diagnostic restart histories have inconsistent lengths")
-        if schema == "b2_diagnostics_v4" and (
-            bundle.iteration_momentum_defect_history.shape != (completed_steps,)
-        ):
+        for schemas, field, _ in required:
+            history = getattr(bundle, field)
+            if schema in schemas and history.shape[0] != completed_steps:
+                raise ValueError("B2 diagnostic restart histories have inconsistent lengths")
+        if schema == _B2_DIAGNOSTIC_SCHEMAS[-1] and history.ndim != 1:
             raise ValueError("B2 diagnostic restart histories have inconsistent lengths")
         return ExtrudedRestartBundle(
             path=path,
