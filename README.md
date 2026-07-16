@@ -89,8 +89,9 @@ observables pass the 1% finite-grid gate.
 ![B2 fringe field and pressure diagnostics](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-alex-b2-field-pressure.webp)
 
 The current B2 smoke has exact schema-4 restart, a post-map physical momentum
-diagnostic, and 1/2/4-CPU equivalence.
-The last 1/2-GPU ladder predates the terminal-restart fix and is being refreshed.
+diagnostic, and 1/2/4-CPU equivalence. Its projection-consistent stopping rule
+and pseudo-time cap remain open; the last 1/2-GPU ladder predates the terminal-
+restart fix and is being refreshed.
 [Fringing status →](docs/fringing.md)
 
 ## Model conducting multilayer walls
@@ -135,8 +136,8 @@ optimization evidence, not current production-scaling claims.
 
 ## Quality and citation
 
-The portable gate records **817 passing tests**, **95.02% combined line/branch
-coverage**, and **188.4 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
+The portable gate records **817 passing tests**, **95.03% combined line/branch
+coverage**, and **166.5 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
 [Theory](docs/theory.md) · [Numerics](docs/numerics.md) ·
 [Contributing](CONTRIBUTING.md) · [Research assets](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
 

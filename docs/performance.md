@@ -12,10 +12,11 @@ devices alone is not evidence of parallel execution.
 |---|---|---|---|
 | portable test gate | Apple M4, six workers | 817 pass, 8 skip, 95.03% combined line/branch coverage, 166.5 s | 11.6% faster; below five-minute target |
 | exact B2 smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.8e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
-| B2 pseudo-time gate | Apple M4, `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x cap: map rate falls 2.16x; post-map physical residual falls 0.976→0.310; exact restart | retain 64x; normalized stopping threshold open |
+| B2 pseudo-time diagnostic | Apple M4, `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | provisional 64x path is stable, 2.16x monotone over eight updates, and exact on restart | cap and stopping contract remain open |
 | B2 physical-residual probe | Apple M4, `7 x 7 x 7` | residual 0.03870 at step 90; omitted reconstruction force is 0.0880 at step 4 | diagnostic has a plausible coarse split floor; never a stopping gate |
-| B2 larger-cap probe | Apple M4, same-state one-update `7 x 7 x 7` | 128x/256x stay finite but change normalized map rate by 6.78% | rejected; retain accepted 64x cap |
+| B2 larger-cap probe | Apple M4, same-state one-update `7 x 7 x 7` | 128x/256x stay finite but change normalized map rate by 6.78% | rejected; 64x remains provisional |
 | B2 split-map audit | Apple M4, warm same-state `dt/dt2/dt4`, `7 x 7 x 7` | operator balance below `4e-10`; transient map-rate spread 8.30% | exact identity passes; calibrate stopping by outcome, not transient invariance |
+| B2 lower-cap ladder | Apple M4, warm same-state safety 0.032→0.001, `7 x 7 x 7` | raw cell update tends to `3.69e-3`; no three-level 0.5% rung passes | resolve projection reconstruction before cap or threshold studies |
 | B2 fixed relaxation | canonical `min=max=2` | exact trajectory/restart; prior residual omitted | saves 18.46 MiB at `102 x 77 x 77` and two global dot products/update |
 | exact B2 smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7`, deterministic XLA | pressure observable agrees within `1.1e-14`; fields, closure, and exact restart pass | historical pre-terminal-fix evidence; current-source refresh pending |
 | B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.857/0.652/0.633 s; 1.31x/1.35x speedup; exact restart and device equivalence pass | historical pre-terminal-fix calibration; rerun before promotion |

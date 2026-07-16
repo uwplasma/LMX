@@ -1,11 +1,12 @@
 # LMX authoritative development plan
 
 Status: 2026-07-15. The corrected two-update B2 smoke is keyed to `45bff84`;
-the current one-/two-/four-CPU-device equivalence and 64x pseudo-time cap are
-keyed to `c47ba09` and `2346d7f`. The post-map nonlinear momentum residual and
+the current one-/two-/four-CPU-device equivalence and provisional 64x
+pseudo-time implementation are keyed to `c47ba09` and `2346d7f`. The post-map nonlinear momentum residual and
 restart schema 4 are keyed to `e6834ee`; its fixed-relaxation memory reduction
-is keyed to `791e496`. The latest complete
-portable gate on the current source is keyed to `2ec7eb6`. CPU/GPU calibration at
+is keyed to `791e496`, and its exact operator contract is keyed to `2d0fb50`.
+The latest complete portable gate is keyed to `e87df4c` and exercised source
+`2ec7eb6`; a current-source refresh is pending. CPU/GPU calibration at
 `413185a` and deterministic GPU equivalence at `3a22078` predate the terminal
 restart fix and remain historical until refreshed. The isolated compiler trace
 is keyed to `f379f6b`.
@@ -97,7 +98,7 @@ large reusable artifacts go in checksummed releases.
 | Developed ducts | Hartmann, Shercliff, Hunt, and eight high-Ha rows pass analytical, conservation, and regression gates | preserve; do not generalize to arbitrary 3D flow |
 | FreeMHD closed channels | bounded Shercliff/Hunt observables pass the frozen 1% finite-grid gate | this is not full FreeMHD parity |
 | B1 ALEX pipe | retained-modal numerical evidence exists | exact-formulation parity remains open |
-| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, post-map physical residual, strict schema-4 replay, and current CPU device equivalence have bounded gates | normalized map-rate threshold, current GPU refresh, production parity, and steady-production scaling remain open |
+| B2 ALEX square duct | conservative momentum, mixed axial boundaries, explicit stress, compact corrected flux, post-map physical residual, strict schema-4 replay, and current CPU device equivalence have bounded gates | projection-consistent fixed-point observable and pseudo-time cap, current GPU refresh, production parity, and steady-production scaling remain open |
 | Matched B2 harness | deterministic inputs, pinned sources, independent observers, and native two-update LMX/FreeMHD execution pass every frozen schema-3 smoke gate | production acceptance and mesh convergence remain open |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
 | README/docs | concise feature-led README, sourced comparison table, feature-specific visuals, seven-second Hunt/Q2D loops, and Li/AlN convergence | refresh B2/scaling panels only from accepted canonical records |
@@ -120,7 +121,7 @@ immutable evidence, richer projection, and target-driven paths remain):
 | maintained-core lines | 7,957 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,824 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,535,873 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,537,995 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -382,8 +383,8 @@ eight 64x updates decrease strictly from `0.3530` to `0.1637`, replay bitwise
 through a 4+4 restart, and keep CFL below `3.5e-5`. The magnetic pseudo-time cap
 is therefore raised from `0.001/N` to `0.064/N`; the existing reduced B2
 physics/restart test falls from the prior 45-second gate record to 14.8 seconds.
-This is a stability and runtime result, not a claim that transient map rates are
-pseudo-time invariant.
+The 64x value remains implemented for bounded tests, but it is provisional: this
+is a stability and runtime result, not a frozen pseudo-time or convergence gate.
 
 Schema 4 records the post-map nonlinear physical momentum residual
 `L max|C-D-E-JxB-f+Gp|/(rho U0^2 N)`, or `max|R|/540` for B2. It shares the
@@ -409,22 +410,32 @@ failed 120-second outcome study remains runtime/floor evidence only.
 
 The larger-cap same-state probe keeps all solves green, balance below `4e-10`,
 and CFL below `1.4e-4`, but 128x/256x change normalized map rate by 6.78%.
-Reject them and retain the 64x cap. The exact split fixed-point metric is the
-normalized unrelaxed velocity map rate, up to the gated momentum linear
-residual. Raising pseudo-time by 64x while retaining raw
+Reject 128x and 256x. The 64x value remains provisional. The predictor momentum
+identity suggests a normalized unrelaxed velocity map rate, up to the gated
+linear residual, but the pressure-corrected cell map also contains projection
+reconstruction. Raising pseudo-time by 64x while retaining raw
 `coupling_tolerance=5e-5` accidentally tightened this normalized gate from
 `0.05` to `7.8125e-4`. Stopping must not depend on the pseudo-time cap.
 
-The manufactured split-operator identity and mixed-boundary reconstruction gate
+The manufactured predictor identity and mixed-boundary reconstruction gate
 now pass. A warm same-state `dt/dt2/dt4` decomposition closes the split identity
 below `4e-10` with every linear solve green, but its normalized map rates span
 8.30%, rejecting the predeclared 0.5% transient-invariance limit. The growing
 face-reconstruction contribution as `dt` falls confirms that this decomposition
-is an operator audit, not a tolerance calibration.
+is an operator audit, not a tolerance calibration. A follow-up lower-cap ladder
+at safety `0.032` through `0.001` finds no passing three-level rung. Below
+`0.016`, the raw cell-velocity update approaches `3.69e-3` instead of scaling
+with `dt`, while `u` remains controlling, every linear solve passes, and balance
+stays below `3.6e-10`. Dividing that reconstruction contribution by `N dt`
+therefore makes the candidate cell-map rate diverge; lowering the cap cannot
+repair the observable.
 
-Next freeze a normalized map-rate threshold through sustained candidate `0.05`
-versus decade-tighter `0.005` outcome
-insensitivity, requiring pressure Linf at most `2e-4`, velocity at most
+Next isolate the predictor, face-flux projection, and cell-reconstruction maps;
+either remove the inconsistent reconstruction contribution or define an exact,
+face-consistent fixed-point observable with JIT/JVP, restart, and manufactured
+identity gates. Then refreeze the pseudo-time cap at early and warm states.
+Only after those gates pass, compare sustained `0.05` versus decade-tighter
+`0.005` outcome insensitivity, requiring pressure Linf at most `2e-4`, velocity at most
 `1e-3 U0`, pressure-gradient relative L2 at most `0.5%`, and every
 linear/conservation/restart gate green. Implement the frozen comparison directly
 in normalized units, or derive raw update tolerance as `tau_map N dt`, and

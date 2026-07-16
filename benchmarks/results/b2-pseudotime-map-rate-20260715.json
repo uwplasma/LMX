@@ -5,7 +5,7 @@
   "implementation_commit": "2346d7f48f1925fcd2f3aa5237825c89e278b38d",
   "case_id": "B2-fringing-square",
   "acceptance_role": "reduced-stopping-and-pseudotime-diagnostic",
-  "status": "map-rate-dt-invariance-and-64x-cap-passed",
+  "status": "startup-state-pass-superseded-by-warm-state-cell-map-failure",
   "problem": {
     "shape": [7, 7, 7],
     "physical_hartmann_number": 2900.0,
@@ -58,7 +58,8 @@
     "passed": true
   },
   "implementation": {
-    "magnetic_stability_safety": 0.064,
+    "implemented_magnetic_stability_safety": 0.064,
+    "pseudotime_safety_frozen": false,
     "previous_safety": 0.001,
     "speedup_in_effective_pseudotime_per_update": 64.0,
     "matched_smoke_dt_unchanged": true,
@@ -66,7 +67,7 @@
   },
   "decision": {
     "coarse_rerun_authorized": false,
-    "next_step": "implement and cross-check a direct electromagnetic-scale discrete momentum defect, then freeze its threshold by outcome insensitivity",
-    "reason": "the map defect and larger pseudo-time cap are gated, but no paper or comparison code supplies a transferable steady threshold"
+    "next_step": "resolve the warm-state projection-reconstruction contribution before defining a fixed-point observable or running outcome insensitivity",
+    "reason": "the startup state passed, but the later same-state lower-cap ladder found a dt-independent pressure-corrected cell update and no passing three-level cap"
   }
 }

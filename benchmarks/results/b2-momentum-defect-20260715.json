@@ -2,10 +2,11 @@
   "schema_version": 2,
   "date": "2026-07-15",
   "implementation_commit": "e6834ee2a3c36bca936c558dcd0b935d92832a21",
+  "operator_audit_commit": "2d0fb5044217b9848b7e13666f8865a4eb05f466",
   "case_id": "B2-fringing-square",
   "optimization_commit": "791e496",
   "acceptance_role": "reduced-post-map-nonlinear-physical-residual-diagnostic",
-  "status": "operator-audit-proves-diagnostic-only-not-fixed-point-stopping",
+  "status": "operator-audits-pass-cell-map-rate-contract-rejected",
   "normalization": {
     "formula": "L max_fluid,component |C-D-E-JxB-f+Gp|/(rho U0^2 N)",
     "canonical_reduction": "max |discrete momentum residual|/540",
@@ -96,6 +97,34 @@
     "total_wall_seconds": 18.3519519160036,
     "status": "operator-balance-passed-transient-dt-invariance-rejected"
   },
+  "lower_cap_same_state_ladder": {
+    "warm_checkpoint_updates": 4,
+    "safety_factors": [0.032, 0.016, 0.008, 0.004, 0.002, 0.001],
+    "normalized_cell_velocity_map_rate": [
+      0.2299115760020197,
+      0.24204068571605925,
+      0.4684709650611546,
+      0.9286136080136342,
+      1.8488990084518098,
+      3.68946986659735
+    ],
+    "raw_cell_velocity_update": [
+      0.00735717043206463,
+      0.003872650971456948,
+      0.003747767720489237,
+      0.003714454432054537,
+      0.0036977980169036195,
+      0.00368946986659735
+    ],
+    "controlling_component": "u",
+    "all_linear_solves_green": true,
+    "max_balance": 3.5220182326156646e-10,
+    "total_wall_seconds": 21.844505041022785,
+    "predeclared_three_level_relative_limit": 0.005,
+    "passing_three_level_ladders": 0,
+    "interpretation": "Below safety 0.016 the raw pressure-corrected cell update approaches a dt-independent reconstruction contribution, so division by N*dt diverges.",
+    "status": "failed-closed-no-pseudotime-cap-frozen"
+  },
   "operator_consistency_audit": {
     "conclusion": "The recorded nonlinear residual is not the exact predictor-projection fixed-point residual.",
     "exact_split_identity": "R_split = momentum_linear_residual - rho*(U_map-U_old)/dt",
@@ -143,10 +172,11 @@
       "interrupted_phase": "electric solve at 120-second deadline",
       "crossings_or_outcomes_promoted": false
     },
-    "accepted_pseudotime_safety": 0.064,
+    "implemented_pseudotime_safety": 0.064,
+    "pseudotime_safety_frozen": false,
     "raw_tolerance_normalized_map_rate_at_64x": 0.00078125,
     "legacy_normalized_map_rate_candidate": 0.05,
-    "next_gate": "compare sustained normalized map-rate crossings at 0.05 and 0.005 on one shared trajectory",
+    "next_gate": "remove or exactly account for the dt-independent projection-reconstruction cell-map contribution, then define and gate a face-consistent fixed-point observable before any threshold study",
     "outcome_limits": {
       "normalized_transverse_pressure_linf": 0.0002,
       "velocity_max_absolute_over_U0": 0.001,
