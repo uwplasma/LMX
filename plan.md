@@ -117,19 +117,19 @@ immutable evidence, richer projection, and target-driven paths remain):
 | maintained-core lines | 7,954 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,757 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,512,642 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,512,633 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The portable-gate artifact keyed to `45bff84` records 817 passes, 8 expected
-external-data skips, 95.0159% combined line/branch coverage, and 149.3 seconds on
+The portable-gate artifact keyed to `13221ef` records 817 passes, 8 expected
+external-data skips, 95.0162% combined line/branch coverage, and 188.4 seconds on
 the reference Apple M4. It remains below the 300-second engineering target and
 600-second hard limit. Coverage remains above the enforced floor but below the
-95.5% engineering target. The six-worker record reports 52.9 seconds for the
-weighted-modal node and 45.3 seconds for reduced B2. Parallel JUnit durations
-are diagnostic rather than isolated timings, but weighted-modal now exceeds the
-45-second warning level and is the next CI critical-path target.
+95.5% engineering target. The six-worker record reports 48.3 seconds for
+reduced B2 and 37.4 seconds for weighted modal. The B2 node takes 14.8 seconds
+alone, so the concurrent duration identifies contention rather than a code
+regression; no scheduling change is promoted from this run.
 
 ## Priority 0: solver-free matched B2 harness — complete
 
@@ -167,11 +167,11 @@ measurements themselves run alone.
 
 The modal pipe test reuses one physical projection and verifies direct
 mode-factor algebra without a second integration run. In the latest six-worker
-gate it reports 52.9 seconds, versus 45.3 seconds for reduced B2 and 24.7
+gate it reports 37.4 seconds, versus 48.3 seconds for reduced B2 and 29.6
 seconds for reduced B1. Isolated measurement attributes most of that tail to
 worker contention: reducing only the manufactured modal grid lowered its
 weighted path to 23.5--26.1 seconds, and the unchanged reduced-B2 restart and
-physics node now measures 15.1 seconds alone. Preserve those coverage-rich
+physics node now measures 14.8 seconds alone. Preserve those coverage-rich
 tests. A fresh-process A/B of the same six expensive JAX nodes takes 37.69
 seconds with six workers and 36.41 with four. The 3.4% change misses the frozen
 10% promotion threshold, so retain six-worker work stealing; module grouping
