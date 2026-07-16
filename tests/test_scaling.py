@@ -282,6 +282,7 @@ def _sustained_ladder(counts, backend="cpu"):
     records = []
     for count in counts:
         warm = 488.0 / count
+        samples = [warm - 1.0 / count, warm, warm + 1.0 / count]
         record = _worker_record(backend=backend,
             device_kind="cpu" if backend == "cpu" else "NVIDIA RTX",
             num_devices=count, repeats=4, cold_seconds=20.0 / count,
@@ -301,7 +302,13 @@ def _sustained_ladder(counts, backend="cpu"):
             "acceptance_role": "sustained-candidate",
             "minimum_warm_seconds": 120.0,
             "sustained_minimum_warm_seconds": 120.0,
-            "warm_samples_seconds": [warm - 1.0 / count, warm, warm + 1.0 / count],
+            "warm_samples_seconds": samples,
+            "resource_monitoring": {"schema_version": 1,
+                "scope": "continuous-and-postflight", "backend": backend,
+                "num_devices": count, "verified": True, "raw_sha256": "a" * 64,
+                "sample_period_seconds": 2.0, "max_sample_gap_seconds": 2.0,
+                "monitored_worker_seconds": record.cold_seconds + sum(samples),
+                "postflight_seconds": 15.0, "violation_count": 0},
             "requested_duration_passed": True, "sustained_duration_passed": True,
             "sustained_timing_eligible": True, "timed_signature_excluded": True})
     return records
@@ -507,10 +514,29 @@ def test_sustained_claim_fails_closed_on_incomplete_evidence():
     gpu_memory = _sustained_ladder((1, 2), "gpu")
     gpu_memory[-1]["device_memory"][0].pop("peak_bytes_in_use")
     bad.append(gpu_memory)
+    for field, value in (("schema_version", 0), ("scope", "preflight"),
+            ("backend", "gpu"), ("num_devices", 8), ("verified", False),
+            ("raw_sha256", "A" * 64), ("sample_period_seconds", 0.0),
+            ("max_sample_gap_seconds", 5.001),
+            ("monitored_worker_seconds", "invalid"),
+            ("monitored_worker_seconds", 1.0),
+            ("postflight_seconds", 14.999), ("violation_count", 1)):
+        records = _sustained_ladder((1, 2, 4))
+        records[-1]["resource_monitoring"][field] = value
+        bad.append(records)
 
     summaries = [summarize_strong_scaling_records(records) for records in bad]
     assert all(not summary["sustained_claim_eligible"] for summary in summaries)
     assert all(summary["best_sustained_speedup"] == 0.0 for summary in summaries)
+
+    static = _sustained_ladder((1, 2, 4))
+    for record in static:
+        record.pop("resource_monitoring")
+    summary = summarize_strong_scaling_records(static)
+    assert summary["sustained_timing_record_count"] == 3
+    assert summary["sustained_groups"][0]["environment_verified"]
+    assert not summary["sustained_groups"][0]["continuous_environment_verified"]
+    assert not summary["sustained_claim_eligible"]
 
 
 def test_sustained_claim_rederives_multiminute_worker_evidence():
@@ -537,7 +563,7 @@ def test_complete_sustained_ladder_passes_group_gate(backend, counts):
     assert summary["best_sustained_speedup"] == pytest.approx(float(counts[-1]))
     assert all(summary["sustained_groups"][0][gate] for gate in (
         "complete_topology", "fixed_work_identity", "memory_complete",
-        "environment_verified", "placement"))
+        "environment_verified", "continuous_environment_verified", "placement"))
 
 
 def test_shard_placement_reports_partitioning_and_rejects_replication():

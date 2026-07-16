@@ -217,6 +217,36 @@ def _sustained_identity_fields(record: Mapping[str, object]) -> tuple[str, ...]:
     return (*_SUSTAINED_RUNTIME_IDENTITY, *problem)
 
 
+def _continuous_environment_evidence(record: Mapping[str, object]) -> bool:
+    """Validate compact evidence that monitoring covered the timed worker."""
+
+    monitor = record.get("resource_monitoring")
+    if not isinstance(monitor, Mapping):
+        return False
+    try:
+        digest = str(monitor["raw_sha256"])
+        period, gap = map(float, (
+            monitor["sample_period_seconds"], monitor["max_sample_gap_seconds"]))
+        monitored = float(monitor["monitored_worker_seconds"])
+        postflight = float(monitor["postflight_seconds"])
+        required = float(record.get("cold_seconds", 0.0)) + float(np.sum(
+            np.asarray(record.get("warm_samples_seconds", ()), dtype=float)))
+    except (KeyError, TypeError, ValueError):
+        return False
+    return bool(
+        monitor.get("schema_version") == 1
+        and monitor.get("scope") == "continuous-and-postflight"
+        and monitor.get("backend") == str(record.get("backend", "")).lower()
+        and monitor.get("num_devices") == record.get("num_devices")
+        and monitor.get("verified") is True
+        and len(digest) == 64 and set(digest) <= set("0123456789abcdef")
+        and 0.0 < period <= gap <= 5.0
+        and monitored >= required > 0.0
+        and postflight >= 15.0
+        and monitor.get("violation_count") == 0
+    )
+
+
 def _sustained_group(records: Sequence[Mapping[str, object]],
     rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
     """Fail closed unless fixed work forms one publishable device ladder."""
@@ -257,6 +287,8 @@ def _sustained_group(records: Sequence[Mapping[str, object]],
         "memory_complete": memory,
         "environment_verified": all(bool(record.get("resource_environment_verified"))
             for record in records),
+        "continuous_environment_verified": all(
+            _continuous_environment_evidence(record) for record in records),
     }
     return {"backend": backend, "required_device_counts": list(required),
         "observed_device_counts": observed, **gates, "eligible": all(gates.values())}
