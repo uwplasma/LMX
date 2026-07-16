@@ -38,8 +38,8 @@ current-closure, and power-closure gates; no solver was rerun for presentation.
 - SOLVAX integration, including symmetric additive-line composition,
   passes primal, implicit-gradient, independent transpose, CPU/GPU, and bounded
   end-to-end gates.
-- The portable package gate passes 860 tests with 8 expected external-data
-  skips and 95.33% combined line/branch coverage in 144.4 seconds on the
+- The portable package gate passes 859 tests with 8 expected external-data
+  skips and 95.32% combined line/branch coverage in 143.5 seconds on the
   reference Mac.
 - The B2 projection now preserves predictor cells and reconstructs only its
   pressure correction. The corrected warm 64x/32x/16x map-rate ladder spans
