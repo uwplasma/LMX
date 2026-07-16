@@ -423,6 +423,7 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
         charge_balance_residual=jnp.asarray([1.0e-7, 2.0e-7, 1.0e-7]),
         boundary_current_residual=jnp.asarray([3.0e-8, 3.0e-8, 3.0e-8]),
         iteration_residual_history=jnp.asarray([1.0e-3]),
+        iteration_momentum_defect_history=jnp.asarray([4.0e-5]),
         iteration_component_residual_history=jnp.asarray(
             [[1.0e-3, 2.0e-4, 3.0e-5, 1.0e-6, 2.0e-6, 3.0e-6]]),
         iteration_pressure_residual_history=jnp.asarray([2.0e-4]),
@@ -448,32 +449,40 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
     layout = prepare_extruded_output_layout(tmp_path / "run")
     assert restart_path.exists()
     assert restart_bundle.bundle.u.shape == (3, 2, 2)
-    assert restart_bundle.metadata["restart_schema"] == "b2_diagnostics_v3"
+    assert restart_bundle.metadata["restart_schema"] == "b2_diagnostics_v4"
     for name in ("rho_phi_plus", "rho_phi_inlet", "axial_pressure_loss_gradient",
                  "transverse_pressure_difference", "iteration_pressure_linear_history",
-                 "iteration_electric_linear_history",
-                 "iteration_potential_residual_history", "iteration_courant_history"):
+                 "iteration_electric_linear_history", "iteration_potential_residual_history",
+                 "iteration_courant_history", "iteration_momentum_defect_history"):
         assert getattr(restart_bundle.bundle, name) == pytest.approx(getattr(bundle, name))
     assert restart_bundle.bundle.stopping_state == (1, 1, "in_progress")
     assert all(path.exists() for path in vars(layout).values())
     bundle.iteration_pressure_linear_history = jnp.zeros((2, 5))
     with pytest.raises(ValueError, match="inconsistent shape"):
-        write_extruded_restart_npz(
-            solution, case, tmp_path / "malformed.npz"
-        )
+        write_extruded_restart_npz(solution, case, tmp_path / "malformed.npz")
+    bundle.iteration_pressure_linear_history = jnp.zeros((1, 5))
+    bundle.iteration_momentum_defect_history = jnp.zeros(2)
+    with pytest.raises(ValueError, match="Momentum defect history"):
+        write_extruded_restart_npz(solution, case, tmp_path / "malformed_defect.npz")
+    bundle.iteration_momentum_defect_history = jnp.asarray([4.0e-5])
 
     with np.load(restart_path, allow_pickle=False) as data:
-        missing_v3 = [(message, {key: data[key] for key in data.files if key != field})
+        missing_v4 = [(message, {key: data[key] for key in data.files if key != field})
                       for field, message in (
                           ("steady_streak", "missing accelerator state"),
                           ("iteration_courant_history", "missing CFL history"),
                           ("iteration_pressure_linear_history", "missing pressure linear history"),
+                          ("iteration_momentum_defect_history", "missing momentum defect history"),
                       )]
-        v3_short = {key: data[key] for key in data.files}
-        v3_short["iteration_pressure_linear_history"] = np.zeros((0, 5))
-        v2_metadata = json.loads(str(data["metadata_json"]))
-        v2_metadata["restart_schema"] = "b2_diagnostics_v2"
-        v2_payload = {key: data[key] for key in data.files
+        v4_short = {key: data[key] for key in data.files}
+        v4_short["iteration_momentum_defect_history"] = np.zeros(0)
+        v3_metadata = json.loads(str(data["metadata_json"]))
+        v3_metadata["restart_schema"] = "b2_diagnostics_v3"
+        v3_payload = {key: data[key] for key in data.files
+                      if key != "iteration_momentum_defect_history"}
+        v3_payload["metadata_json"] = json.dumps(v3_metadata)
+        v2_metadata = {**v3_metadata, "restart_schema": "b2_diagnostics_v2"}
+        v2_payload = {key: value for key, value in v3_payload.items()
                       if key != "iteration_pressure_linear_history"}
         v2_payload["metadata_json"] = json.dumps(v2_metadata)
         v1_metadata = {**v2_metadata, "restart_schema": "b2_aitken_v1"}
@@ -482,15 +491,21 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
         v1_payload["metadata_json"] = json.dumps(v1_metadata)
         legacy_payload = {key: data[key] for key in data.files if key not in {
             "metadata_json", "rho_phi_plus", "rho_phi_inlet", "iteration_courant_history"}}
-    for index, (message, payload) in enumerate(missing_v3):
-        missing_path = tmp_path / "restart" / f"diagnostics_v3_missing_{index}.npz"
+    for index, (message, payload) in enumerate(missing_v4):
+        missing_path = tmp_path / "restart" / f"diagnostics_v4_missing_{index}.npz"
         np.savez_compressed(missing_path, **payload)
         with pytest.raises(ValueError, match=message):
             load_extruded_restart_bundle(missing_path)
-    short_path = tmp_path / "restart" / "diagnostics_v3_short.npz"
-    np.savez_compressed(short_path, **v3_short)
+    short_path = tmp_path / "restart" / "diagnostics_v4_short.npz"
+    np.savez_compressed(short_path, **v4_short)
     with pytest.raises(ValueError, match="inconsistent lengths"):
         load_extruded_restart_bundle(short_path)
+
+    v3_path = tmp_path / "restart" / "diagnostics_v3.npz"
+    np.savez_compressed(v3_path, **v3_payload)
+    v3 = load_extruded_restart_bundle(v3_path)
+    assert v3.metadata["restart_schema"] == "b2_diagnostics_v3"
+    assert not v3.bundle.iteration_momentum_defect_history.size
 
     v2_path = tmp_path / "restart" / "diagnostics_v2.npz"
     np.savez_compressed(v2_path, **v2_payload)

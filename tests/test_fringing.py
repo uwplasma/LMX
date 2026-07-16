@@ -617,6 +617,18 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
         coefficients, neighbours, strict=True)) - wall[..., None] * diffused
     assert diffused - dt * diffusion == pytest.approx(velocity, abs=2e-7)
 
+    zero_velocity = jnp.zeros_like(velocity)
+    compact_flux = jnp.zeros((3, *shape))
+    lorentz = jnp.broadcast_to(jnp.asarray([1.0, 2.0, 3.0]), velocity.shape)
+    def defect(scale):
+        return fringing_impl._duct_momentum_defect(
+            zero_velocity, scale * lorentz, jnp.ones(shape), jnp.zeros(shape),
+            compact_flux, jnp.zeros(shape[1:]), jnp.zeros(shape), forcing=0.0,
+            force_scale=2.0, dt=dt, dx=dx, dy=dy, dz=dz)
+    expected_defect = jnp.asarray([0.5, 1.0, 1.5, 1.5])
+    assert jax.jit(defect)(1.0) == pytest.approx(expected_defect)
+    assert jax.jvp(defect, (1.0,), (1.0,))[1] == pytest.approx(expected_defect)
+
 
 def test_limited_linear_vector_convection_matches_manufactured_conservation_and_autodiff():
     nx, ny, nz = 7, 7, 3

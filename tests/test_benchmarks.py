@@ -543,6 +543,10 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     assert benchmarks.jnp.all(pressure_linear[:, 2] > 0.0)
     assert benchmarks.jnp.all(pressure_linear[:, 3] == 1.0)
     assert benchmarks.jnp.all(pressure_linear[:, 4] > 0.0)
+    momentum_defect = solution.bundle.iteration_momentum_defect_history
+    assert momentum_defect.shape == history.shape
+    assert benchmarks.jnp.all(benchmarks.jnp.isfinite(momentum_defect))
+    assert benchmarks.jnp.all(momentum_defect >= 0.0)
     assert solution.bundle.stopping_state[0] == history.size
 
     fx, fy, fz = _unpack_duct_mass_flux(
@@ -573,11 +577,19 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
         solve_extruded_inductionless(
             continuation_problem,
             initial_bundle=replace(restart.bundle, rho_phi_inlet=None))
+    with pytest.raises(ValueError, match="momentum-defect contract"):
+        solve_extruded_inductionless(
+            continuation_problem,
+            initial_bundle=replace(
+                restart.bundle,
+                iteration_momentum_defect_history=benchmarks.jnp.zeros((0,)),
+            ),
+        )
     resumed = solve_extruded_inductionless(
         continuation_problem,
         initial_bundle=restart.bundle,
     )
-    assert restart.metadata["restart_schema"] == "b2_diagnostics_v3"
+    assert restart.metadata["restart_schema"] == "b2_diagnostics_v4"
     assert restart.bundle.aitken_state[1] == pytest.approx(2.0)
     for name in (
         "u",
@@ -588,6 +600,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
         "rho_phi_plus",
         "rho_phi_inlet",
         "iteration_residual_history",
+        "iteration_momentum_defect_history",
         "iteration_component_residual_history",
         "iteration_pressure_residual_history",
         "iteration_pressure_linear_history",

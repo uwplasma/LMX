@@ -56,6 +56,7 @@ class ExtrudedFieldBundle:
     axial_pressure_loss_gradient: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     transverse_pressure_difference: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     iteration_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
+    iteration_momentum_defect_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     iteration_component_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0, 6)))
     iteration_pressure_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     iteration_pressure_linear_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0, 5)))
