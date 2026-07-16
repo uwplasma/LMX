@@ -44,6 +44,9 @@ _B2_RESTART_FLUX_RTOL = 1.0e-5
 _B2_REPEAT_ATOL = 2.0e-9
 _B2_REPEAT_RTOL = 2.0e-8
 _B2_PROFILE_ITERATION_ATOL = 3
+_B2_FIELD_NAMES = (
+    "u", "v", "w", "p", "phi", "jx", "jy", "jz", "rho_phi_plus", "rho_phi_inlet"
+)
 
 if ROOT not in Path(lmx.__file__).resolve().parents:
     raise RuntimeError(
@@ -262,8 +265,9 @@ def _matched_b2_smoke_benchmark(
         checkpoint, direct = _run_matched_b2_lmx_direct(
             problem, num_devices=num_devices
         )
-        signatures.append(_b2_repeat_signature(direct))
+        jax.block_until_ready(tuple(getattr(direct, name) for name in _B2_FIELD_NAMES))
         timings.append(time.perf_counter() - started)
+        signatures.append(_b2_repeat_signature(direct))
     profiled = profile_signature = None
     if profile_dir is not None:
         profile_dir.mkdir(parents=True, exist_ok=True)
@@ -276,9 +280,11 @@ def _matched_b2_smoke_benchmark(
         )
         try:
             _, profiled = _run_matched_b2_lmx_direct(problem, num_devices=num_devices)
-            profile_signature = _b2_repeat_signature(profiled)
+            jax.block_until_ready(tuple(
+                getattr(profiled, name) for name in _B2_FIELD_NAMES))
         finally:
             jax.profiler.stop_trace()
+        profile_signature = _b2_repeat_signature(profiled)
     profile_signature_max_abs = (None if profile_signature is None else
         float(np.max(np.abs(profile_signature - signatures[0]))))
     profile_signature_passed = (None if profile_signature is None else bool(np.allclose(
@@ -328,9 +334,7 @@ def _matched_b2_smoke_benchmark(
         )
         observed = observe_lmx_b2_output(evidence, input_path, evaluator)
 
-    arrays = {name: getattr(direct, name) for name in (
-        "u", "v", "w", "p", "phi", "jx", "jy", "jz", "rho_phi_plus",
-        "rho_phi_inlet")}
+    arrays = {name: getattr(direct, name) for name in _B2_FIELD_NAMES}
     placement = {name: _placement(value) for name, value in arrays.items()}
     for name, value in placement.items():
         expected_replicated = name == "rho_phi_inlet"
@@ -383,6 +387,7 @@ def _matched_b2_smoke_benchmark(
         "num_devices": num_devices, "nx": direct.u.shape[0],
         "ny": direct.u.shape[1], "nz": direct.u.shape[2],
         "iterations": observed["steps"], "repeats": repeats,
+        "timed_signature_excluded": True,
         "cold_seconds": timings[0],
         "warm_seconds": float(np.median(warm)), "mean_seconds": float(np.mean(timings)),
         "warm_samples_seconds": warm.tolist(), "warm_std_seconds": float(np.std(warm)),

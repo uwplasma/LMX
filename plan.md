@@ -129,7 +129,7 @@ deleting stale test-only velocity-statistics and solver-mask wrappers:
 | maintained-core lines | 7,931 | stay below 8,000 | 8,000 |
 | test files / lines | 30 / 20,890 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,562,646 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,563,141 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -318,8 +318,11 @@ retains the pre-fix `3183.12` signature for regression provenance.
 The isolated current-source `128 x 67 x 67` rung passes physical-repeat,
 restart-state/flux, placement, convergence, and device-equivalence gates. Warm
 medians are 2.787 and 2.761 seconds with CV below 0.6%, only 1.009x speedup and
-50.5% parallel efficiency. Stop this fixed-grid ladder: communication and
-per-device work are not yet balanced enough to justify larger blind rungs.
+50.5% parallel efficiency. The matched trace later showed that those medians
+included a host-side repeat-signature gather whose two-GPU overhead masked the
+solver path; retain them only as superseded calibration evidence and retime
+with validation outside the synchronized solver interval. Stop larger blind
+rungs until that corrected contract and its trace attribution are accepted.
 Schema-6 Anderson and one matched profile of the accepted current path are the
 next bounded workstreams. For each device count, run one untraced accepted
 two-update solve and one traced solve, then compare momentum, projection,
