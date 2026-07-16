@@ -510,7 +510,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
         ),
         time_stepper=replace(
             problem.case.time_stepper,
-            max_steps=3,
+            max_steps=4,
             potential_iterations=160,
         ),
         solver=replace(
@@ -522,11 +522,8 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     profile = build_benchmark_b_field_profile(
         "B2-fringing-square", axial_stations=case.geometry.nx
     )
-    progress = []
     solution = solve_extruded_inductionless(
         replace(problem, case=case, profile=profile),
-        progress_callback=progress.append,
-        checkpoint_interval=1,
     )
 
     assert float(benchmarks.jnp.mean(solution.bundle.mean_velocity)) == pytest.approx(
@@ -557,22 +554,27 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     assert outlet_flux == pytest.approx(inlet_flux, abs=1.0e-10)
     assert float(benchmarks.jnp.max(benchmarks.jnp.abs(flux_divergence))) < 1.0e-8
 
-    path = write_extruded_bundle_restart_npz(
-        progress[0].checkpoint, case, tmp_path / "b2.npz"
-    )
-    restart = load_extruded_restart_bundle(path)
     continuation_case = replace(
         case, time_stepper=replace(case.time_stepper, max_steps=2)
     )
+    continuation_problem = replace(
+        problem, case=continuation_case, profile=profile
+    )
+    terminal = solve_extruded_inductionless(continuation_problem)
+    path = write_extruded_bundle_restart_npz(
+        terminal.bundle, continuation_case, tmp_path / "b2.npz"
+    )
+    restart = load_extruded_restart_bundle(path)
     with pytest.raises(ValueError, match="both compact flux arrays"):
         solve_extruded_inductionless(
-            replace(problem, case=continuation_case, profile=profile),
+            continuation_problem,
             initial_bundle=replace(restart.bundle, rho_phi_inlet=None))
     resumed = solve_extruded_inductionless(
-        replace(problem, case=continuation_case, profile=profile),
+        continuation_problem,
         initial_bundle=restart.bundle,
     )
     assert restart.metadata["restart_schema"] == "b2_diagnostics_v3"
+    assert restart.bundle.aitken_state[1] == pytest.approx(2.0)
     for name in (
         "u",
         "v",

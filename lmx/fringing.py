@@ -7989,7 +7989,7 @@ def _solve_extruded_projection(
             )
         else:
             converged = instantaneous_convergence
-        if use_alex_b2_finite_volume and not converged and step + 1 < stop_step:
+        if use_alex_b2_finite_volume and not converged:
             current_state = scaled_state(u, v, w, phi_previous)
             mapped_state = scaled_state(u_next, v_next, w_next, phi)
             fixed_point_residual = state_difference(mapped_state, current_state)
