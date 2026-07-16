@@ -39,7 +39,6 @@ from lmx.field_models import write_tabulated_field_npz
 from lmx.fringing import (
     build_bent_pipe_extruded_problem,
     build_magnetic_obstacle_rect_extruded_problem,
-    build_pipe_ogrid_extruded_problem,
     solve_extruded_inductionless,
 )
 from lmx.solvers import _build_mesh
@@ -605,16 +604,27 @@ def test_write_bent_pipe_overview_plots_writes_png_and_pdf(tmp_path: Path):
     bent_problem = build_bent_pipe_extruded_problem(
         ha_peak=4.0, bend_radius=4.0, bend_angle=1.0, nx_stations=4, nr=4, ntheta=12
     )
-    straight_problem = build_pipe_ogrid_extruded_problem(
-        ha_peak=4.0,
-        radius=float(bent_problem.case.geometry.radius),
-        length=float(bent_problem.case.geometry.length),
-        nx_stations=4,
-        nr=4,
-        ntheta=12,
+    geometry = bent_problem.case.geometry
+    radius = float(geometry.radius)
+    r = radius * (np.arange(geometry.nr) + 0.5) / geometry.nr
+    theta = 2.0 * np.pi * (np.arange(geometry.ntheta) + 0.5) / geometry.ntheta
+    x = np.linspace(0.0, float(geometry.length), geometry.nx)
+    base = 1.0 - (r[:, None] / radius) ** 2
+    shape = (geometry.nx, geometry.nr, geometry.ntheta)
+    bent_u = np.broadcast_to(base * (1.0 + 0.05 * np.cos(theta)), shape)
+    bundle = SimpleNamespace(
+        u=bent_u,
+        x=x,
+        y=r,
+        z=theta,
+        field_scale=np.linspace(0.2, 1.0, geometry.nx),
+        mean_velocity=np.mean(bent_u, axis=(1, 2)),
+        charge_balance_residual=np.geomspace(1.0e-4, 1.0e-7, geometry.nx),
     )
-    bent_solution = solve_extruded_inductionless(bent_problem)
-    straight_solution = solve_extruded_inductionless(straight_problem)
+    bent_solution = SimpleNamespace(problem=bent_problem, bundle=bundle)
+    straight_solution = SimpleNamespace(
+        bundle=SimpleNamespace(**{**vars(bundle), "u": np.broadcast_to(base, bent_u.shape)})
+    )
 
     outputs = write_bent_pipe_overview_plots(
         bent_solution, tmp_path, straight_solution=straight_solution
