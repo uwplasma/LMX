@@ -149,7 +149,10 @@ ends 4.61 times above fixed relaxation two and its largest coefficient is
 24.39. A separately predeclared newest-map fallback bounds all applied
 coefficients and preserves linear, conservation, and exact-replay gates, but
 ends 0.22% slower than the control. It is rejected without adding a SOLVAX or
-LMX option.
+LMX option. Zero of five adjacent residual pairs then passes the frozen
+gain/stability/conditioning rationale gate; potential contributes
+98.254--99.887% of the minimized energy. Shared-norm Anderson is therefore
+closed as physically misaligned with velocity-map acceptance.
 
 The ALEX normalization and pressure-orientation audit passes: B2 compares the
 side and top walls at the same axial station using the sourced 4.39 cm

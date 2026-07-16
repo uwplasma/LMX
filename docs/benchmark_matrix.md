@@ -110,7 +110,8 @@ The tiny matched-FreeMHD smoke is complete. The schema-6 depth-two Anderson
 field/flux path passes topology and replay but fails its cold outcome gate:
 final map rate regresses 361% versus fixed relaxation two. A predeclared bounded
 fallback is stable but ends 0.22% worse than the control, so it is also rejected
-without an API addition. Step 29,
+without an API addition. A residual-spectrum audit shows 98.254--99.887%
+potential-energy dominance and closes shared-norm tuning. Step 29,
 production-mesh FreeMHD, and observable/model normalization remain blocked.
 
 After all three source-identical mesh campaigns finish, assemble (without

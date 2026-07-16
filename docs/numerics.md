@@ -92,7 +92,11 @@ single dominant slow mode. Bounded-memory Anderson mixing is available, but
 the current depth-two B2 configuration fails its six-update cold outcome gate
 and is not a promoted production choice. A bounded newest-map fallback also
 fails the required acceleration gain despite stable coefficients and exact
-replay, so it is not exposed as an unused option. LMX checks the
+replay, so it is not exposed as an unused option. A six-update spectrum audit
+shows why: 98.254--99.887% of the shared Euclidean residual energy is electric
+potential, although B2 promotion measures velocity-map convergence. No
+conditioning threshold repairs that objective mismatch, so generic shared-norm
+Anderson tuning is closed. LMX checks the
 **unaccelerated** residual `max(abs(G(u)-u))` and the change across outer steady
 states, so neither relaxation nor a converged inner subsystem can manufacture
 a false steady pass. Tolerance-controlled potential CG reuses the previous

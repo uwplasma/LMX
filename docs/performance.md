@@ -4,7 +4,7 @@ LMX runs through JAX on CPUs and GPUs. Performance claims are accepted only for
 the real solver path with identical numerical results; visibility of multiple
 devices alone is not evidence of parallel execution.
 
-![Current B2 schema-6 calibration and sustained CPU/GPU scaling](_static/strong_scaling.webp)
+![B2 seconds-scale correctness calibration, sustained CPU scaling, and non-idle-host GPU calibration](_static/strong_scaling.webp)
 
 This composite is generated from the compact schema-6 CPU and GPU records. The upper
 panel is forced-device calibration; the middle panel is accepted sustained
@@ -16,7 +16,7 @@ the timing claim remains open because foreign contexts fail the idle gate.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 856 pass, 8 skip, 95.33% combined line/branch coverage, 181.0 s | below five-minute target and one third of the ten-minute budget |
+| portable test gate | Apple M4, six workers | 857 pass, 8 skip, 95.31% combined line/branch coverage, 154.9 s | below five-minute target and 26% of the ten-minute budget |
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | B2 schema-6 CPU calibration | Apple M4, `256 x 67 x 67`, 1/2/4 forced CPU devices | 15.159/12.337/11.146 s; 1.229x/1.360x speedup; exact restart and device equivalence pass | accepted correctness/calibration; four-device promotion gate not met |
 | B2 CPU-allocation confirmation | ARM64 Docker on Apple M4, `256 x 67 x 67`, 2/4/8 affinity-controlled guest CPUs for 1/2/4 devices | 22.894/15.953/14.252 s; 1.435x/1.606x; 95% lower bounds 1.364x/1.548x; efficiency 71.8%/40.2% | repeated two-update calibration; host P/E-core mapping unverified |
@@ -27,7 +27,7 @@ the timing claim remains open because foreign contexts fail the idle gate.
 | CPU-allocation restart audit | existing `101 x 77 x 77` coarse checkpoints | geometry/shape load, but sampled files normalize to `legacy_nonexact` with no source fingerprint or schema-6 Anderson/compact-flux state | unsuitable for exact or promoted current-source scaling evidence |
 | B2 projection audit/fix | Apple M4, warm same-state `7 x 7 x 7` | pre-fix raw cell-update floor `3.69e-3`; corrected predictor-preserving projection removes axial floor | pre-fix trajectories invalid; focused physics/autodiff/restart gates pass |
 | B2 stopping study | Apple M4, schema 5, restart segments to step 96 | `0.05` converges at 30 but fails all QoI limits; `0.005` reaches only `0.01502` | fail closed; accelerate before tighter-reference calibration |
-| B2 acceleration gates | Apple M4, cold `7 x 7 x 7`, six updates | raw Anderson ends at `0.5281` with `max|weight|=24.39`; bounded fallback ends at `0.114718` vs `0.114466` control; linear, conservation, and replay pass | both rejected before step 29; no unused fallback API added |
+| B2 acceleration gates | Apple M4, cold `7 x 7 x 7`, six updates | raw Anderson ends at `0.5281`; bounded fallback ends at `0.114718` vs `0.114466` control; 98.254--99.887% of shared residual energy is potential | both rejected; shared-norm objective is misaligned with velocity convergence |
 | B2 fixed relaxation | canonical `min=max=2` | exact trajectory/restart; prior residual omitted | saves 18.46 MiB at `102 x 77 x 77` and two global dot products/update |
 | B2 GPU smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7` | current schema-6 placement, replay, conservation, linear, and repeat gates pass; two-GPU state error `2.22e-16`, flux exact | topology correctness only; shared-host timing excluded |
 | B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.857/0.652/0.633 s; 1.31x/1.35x speedup; exact restart and device equivalence pass | historical pre-terminal-fix calibration; rerun before promotion |
@@ -46,10 +46,15 @@ the timing claim remains open because foreign contexts fail the idle gate.
 
 The six-update gate is intentionally small: it rejects the accelerator before
 the step-29 trajectory while preserving exact restart and physics diagnostics.
+Zero of five adjacent residual pairs passes the predeclared predicted-gain,
+conditioning, and coefficient-bound rationale gate. This closes generic
+shared-Euclidean Anderson tuning; it does not authorize another long run.
 
-The current CPU/GPU correctness and `128 x 67 x 67` calibration, plus historical larger results, are recorded in
-`benchmarks/results/b2-{cpu,gpu}-device-equivalence-20260715.json` and
-`benchmarks/results/b2-{cpu-strong-scaling,gpu-scaling-calibration}-20260715.json`.
+The CPU/GPU correctness calibrations and larger results are recorded in
+`benchmarks/results/b2-cpu-device-equivalence-20260715.json`,
+`benchmarks/results/b2-gpu-device-equivalence-20260715.json`,
+`benchmarks/results/b2-schema6-cpu-scaling-20260716.json`, and
+`benchmarks/results/b2-gpu-scaling-calibration-20260715.json`.
 The current trace measures 1.510x scaling across momentum, projection, and
 electric phases. Reusing the existing host station payload for validation cuts
 the two-GPU end-to-end median by 0.290 s and removes 12 source lines, but the
@@ -247,6 +252,9 @@ SOLVAX Anderson-weight API and bounded schema-6 depth-two field/flux path pass
 CPU and 1/2-GPU topology and exact-replay gates, but the current cold outcome
 gate rejects it for B2 acceleration. The bounded fallback passes safety but
 ends 0.22% worse than fixed relaxation two, so no unused API is added.
+The residual-spectrum audit attributes the failure to objective mismatch, not
+an untried conditioning threshold: electric potential contributes at least
+98.254% of the shared norm while acceptance measures velocity convergence.
 Production-mesh FreeMHD,
 observable/model normalization, fine numerical independence, and experimental
 acceptance remain blocked until the current coarse formulation converges for
@@ -423,10 +431,11 @@ than silently reused.
 ## Next performance work
 
 1. Repeat the passing 96-update one/two-GPU lane after the host passes the idle gate.
-2. Audit the B2 residual spectrum before proposing another accelerator; do not
-   tune either rejected depth-two mechanism.
-3. Predeclare one globalization rule and reapply the six-update cold gate; only
-   a pass can authorize step 29 and 96.
+2. Keep fixed relaxation two; do not tune the rejected shared-norm Anderson
+   mechanisms or add a SOLVAX coefficient option.
+3. Reopen acceleration only after a solver-free block-balanced,
+   physics-aligned inner-product rationale and predeclared globalization rule;
+   the unchanged cold gate must pass before steps 29 and 96.
 4. Close canonical coarse/medium/fine and experimental-observable acceptance.
 
 See [Testing](testing.md) for the portable gate and [Benchmark matrix](benchmark_matrix.md)

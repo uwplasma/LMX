@@ -35,8 +35,8 @@ current-closure, and power-closure gates; no solver was rerun for presentation.
 - SOLVAX integration, including symmetric additive-line composition,
   passes primal, implicit-gradient, independent transpose, CPU/GPU, and bounded
   end-to-end gates.
-- The portable package gate passes 849 tests with 8 expected external-data
-  skips and 95.33% combined line/branch coverage in 143.0 seconds on the
+- The portable package gate passes 857 tests with 8 expected external-data
+  skips and 95.31% combined line/branch coverage in 154.9 seconds on the
   reference Mac.
 - The B2 projection now preserves predictor cells and reconstructs only its
   pressure correction. The corrected warm 64x/32x/16x map-rate ladder spans
@@ -75,7 +75,9 @@ current-closure, and power-closure gates; no solver was rerun for presentation.
   map rate; `max|weight|=24.39`), despite exact replay and green linear and
   conservation gates. Its predeclared bounded newest-map fallback is stable
   but ends 0.22% worse than the control, so that API is also rejected. Step 29
-  is therefore blocked. The first fresh current-formulation coarse
+  is therefore blocked. The residual audit closes further shared-norm tuning:
+  zero of five pairs passes its rationale gate and potential owns at least
+  98.254% of the norm despite velocity-based acceptance. The first fresh current-formulation coarse
   trajectory and one exact continuation pass conservation and all 256 pressure
   solves, but stop at step 256 with residual `7.1081e-4`, above both its
   precommitted continuation gate and the `5e-5` steady criterion. It is not

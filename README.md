@@ -92,7 +92,8 @@ observables pass the 1% finite-grid gate.
 ![B2 fringe field, pressure, and acceleration diagnostics](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-alex-b2-field-pressure.webp)
 
 B2 passes exact restart plus 1/2/4-CPU and 1/2-GPU schema-6 topology gates.
-Acceleration outcome, production parity, and scaling promotion remain open.
+Shared-norm acceleration is rejected; production parity and scaling promotion
+remain open.
 [Fringing status →](https://lmx.readthedocs.io/en/latest/fringing.html)
 
 ## Follow curved pipes
@@ -135,23 +136,23 @@ Q2D-MHDfoam parity and blanket validation remain open.
 
 ## Scale on CPUs and GPUs
 
-![Current B2 schema-6 calibration and sustained CPU/GPU scaling](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/strong_scaling.webp)
+![B2 seconds-scale correctness calibration, sustained CPU scaling, and non-idle-host GPU calibration](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/strong_scaling.webp)
 
-Schema-6 B2 agrees on 1/2/4 forced CPU devices with exact restart replay. At
-`256 × 67 × 67`, two/four devices reach 1.229×/1.360×; four devices still miss
-the promotion gate. With affinity-controlled Docker CPU allocations, 32-update
+Actual scaling evidence uses matched multi-minute trajectories. With
+affinity-controlled Docker CPU allocations, fixed `256 × 67 × 67`, 32-update
 warm trajectories last 147–246 s and reach 1.396×/1.658× on four/eight versus
 two CPUs; confidence, efficiency, restart, and physics gates pass. This is
 fixed-work CPU-allocation strong scaling; Docker does not expose the M4 host's
 exact P/E-core mapping. A 96-update shared-host
 GPU calibration reaches 1.626× on two A4000s with 159–259 s warm trajectories;
-foreign GPU contexts keep the authoritative timing claim open.
+foreign GPU contexts keep the authoritative timing claim open. Seconds-scale
+runs in the top panel are correctness calibration only.
 [Protocol and results →](https://lmx.readthedocs.io/en/latest/performance.html)
 
 ## Quality and citation
 
-The portable gate records **856 passing tests**, **95.33% combined line/branch
-coverage**, and **181.0 s** on six Apple-Silicon workers.
+The portable gate records **857 passing tests**, **95.31% combined line/branch
+coverage**, and **154.9 s** on six Apple-Silicon workers.
 [Testing](https://lmx.readthedocs.io/en/latest/testing.html) ·
 [Theory](https://lmx.readthedocs.io/en/latest/theory.html) ·
 [Numerics](https://lmx.readthedocs.io/en/latest/numerics.html) ·

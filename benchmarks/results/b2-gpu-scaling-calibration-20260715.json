@@ -159,7 +159,7 @@
       "authoritative_idle_host": false,
       "timing_claim": false
     },
-    "classification": "accepted multi-minute shared-idle-host calibration; authoritative GPU strong scaling remains open"
+    "classification": "accepted multi-minute non-idle shared-host calibration; authoritative GPU strong scaling remains open"
   },
   "restart_gate": {
     "deterministic_evidence_commit": "f45982159c67fab91f04101f44f3f7acbb4fdf97",
@@ -393,7 +393,7 @@
     "bounded_fast_scaling_calibration": false,
     "initial_two_update_speedup": 0.9677731284771768,
     "production_speedup_claim": false,
-    "reason": "The current trace-authorized short calibration remains below 1.2x. A 96-update multi-minute shared-idle-host calibration reaches 1.626x with all numerical gates green, but four persistent foreign GPU contexts fail the authoritative idle-host gate, so no production timing claim is made."
+    "reason": "The current trace-authorized short calibration remains below 1.2x. A 96-update multi-minute non-idle shared-host calibration reaches 1.626x with all numerical gates green, but four persistent foreign GPU contexts fail the authoritative idle-host gate, so no production timing claim is made."
   },
   "raw_assets": {
     "location": "/Users/rogerio/local/tests/lmx_b2_gpu_scaling_413185a and office GPU host",

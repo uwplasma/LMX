@@ -1,6 +1,7 @@
 # LMX authoritative development plan
 
-Status: 2026-07-16. LMX `aaa41b1` consumes released SOLVAX 0.8.4 and makes the
+Status: 2026-07-16. Current LMX `ca7535e` consumes released SOLVAX 0.8.4;
+`aaa41b1` made the
 frozen B2 path Anderson depth two with one shared weight vector for mapped
 scaled fields and conservative compact flux. Restart schema 6 stores one raw
 mapped field, residual, plus flux, and inlet flux all-or-none; direct two-update
@@ -9,8 +10,10 @@ gate is now rejected, so schema 6 is correctness evidence rather than a
 promoted B2 acceleration choice. A separately predeclared `max|weight| <= 4`
 newest-map fallback is also rejected: it is stable and exact but ends 0.22%
 worse than fixed relaxation two, so no SOLVAX or LMX API was added. Schemas
-1--5 remain readable.
-The installable-distribution contract is keyed to `a207bf9`: frozen benchmark
+1--5 remain readable. A six-update spectrum audit then closes generic
+shared-Euclidean Anderson tuning: 98.254--99.887% of its objective energy is
+electric potential, while B2 acceptance uses velocity-map convergence.
+The installable-distribution contract is refreshed at `ca7535e`: frozen benchmark
 resources are package-owned, the wheel smoke runs outside the checkout,
 wheel/source membership and size are fail-closed, and the numerical core no
 longer installs or eagerly imports Matplotlib and Pillow.
@@ -20,7 +23,7 @@ stopping. Its fixed-relaxation memory reduction
 is keyed to `791e496`, and its exact operator contract is keyed to `2d0fb50`.
 Commit `3e731fa` removes the projection reconstruction floor and refreezes the
 64x pseudo-time cap on a warm same-state ladder.
-The latest complete portable gate exercised replay-audit source `78858f5`.
+The latest complete portable gate exercised source `ca7535e`.
 CPU/GPU calibration at
 `413185a` remains historical; deterministic GPU equivalence at `3a22078` has
 been replaced by the current `8b6f97d` result and the refreshed calibration
@@ -150,12 +153,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,772 | stay below 35,000 while preserving the physical residual | 35,100 |
-| maintained-core lines | 7,916 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,776 | no new file; stay below 21,000 | 31 / 21,100 |
+| package lines | 34,763 | stay below 34,800 while preserving the physical residual | 35,100 |
+| maintained-core lines | 7,908 | stay below 8,000 | 8,000 |
+| test files / lines | 30 / 21,003 | no new file; stay below 21,025 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked files | 179 | no new file without retiring another owner | 180 |
-| tracked checkout | 3,777,300 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked files | 186 | no new file without retiring another owner | 187 |
+| tracked checkout | 4,519,012 bytes | direct visual evidence only; keep below 4,550,000 | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -189,32 +192,33 @@ deduplicates the two three-station extruded I/O fixtures, removing four package
 and 26 test lines while preserving every node, assertion, and output contract.
 Commit `aaa41b1` adds schema-6 B2 Anderson correctness and its scaling harness
 without adding a file: net +183 package, +128 test, and +205 script/example
-lines. These readable contracts remain inside every architecture ceiling, but
-they require an ownership-slimming pass after the parallel algorithm settles;
-do not hide the increase through dense formatting.
+lines. Commit `ca7535e` then gives final-only and recorded differentiable
+rectangular projection one private MHD trajectory owner, deleting 56 package
+lines with no file, module, export, dependency, or public-result change. It
+retains `fori_loop` for memory-efficient final objectives and uses `scan` only
+when history is requested; terminal station fields agree within `7.3e-12`.
 
-The portable-gate artifact keyed to `78858f5` records 856 passes, 8 expected
-external-data skips, 95.3337% combined line/branch coverage, and 181.0 seconds on
-the reference Apple M4. It is 7.9% faster than the prior 152.8-second record,
-but source and tests both changed, so the shared-host delta is not a speed claim.
+The portable-gate artifact keyed to `ca7535e` records 857 passes, 8 expected
+external-data skips, 95.3142% combined line/branch coverage, and 154.9 seconds on
+the reference Apple M4. It is 14.4% below the prior 181.0-second record, but
+source and tests both changed, so the shared-host delta is not a speed claim.
 Do not promote a suite-speed claim from wall-time variance. The gate stays below
-47% of the 300-second engineering target and 24% of the 600-second hard limit.
+52% of the 300-second engineering target and 26% of the 600-second hard limit.
 The 95.5%
 engineering target is not yet met; retain the 95% enforced floor while closing
-the remaining 0.1722-point gap and awaiting a second Python endpoint or hosted
+the remaining 0.1858-point gap and awaiting a second Python endpoint or hosted
 run. The
 six-worker record reports 51.9 seconds for reduced B2 and 48.4 seconds for
 weighted modal; these concurrent durations still identify contention rather
 than isolated regressions, so no scheduling change is promoted from this run.
 
-The clean distribution audit at `a207bf9` produces a 313,854-byte wheel with
-48 members and a 296,630-byte source archive with 54 members. Both pass Twine;
+The clean distribution audit at `ca7535e` produces a 315,709-byte wheel with
+48 members and a 298,648-byte source archive with 54 members. Both pass Twine;
 the wheel is limited to package source, seven frozen data files, and metadata,
 while the source archive adds only build metadata, README, license, and
-manifest. A Python 3.12 clean install resolves JAX 0.10.2 and SOLVAX 0.8.3,
+manifest. A Python 3.12 clean install resolves JAX 0.10.2 and SOLVAX 0.8.4,
 loads every packaged Benchmark A/B and Samper reference outside the checkout,
-and reaches a `9.95e-9` residual on a tiny Hartmann solve. It predates the
-SOLVAX 0.8.4 minimum and must be repeated before LMX release. Matplotlib and Pillow
+and reaches a `9.9505e-9` residual on a tiny Hartmann solve. Matplotlib and Pillow
 are absent from the core environment, and importing the CLI, plotting facade,
 Q2D, blanket, field, showcase, and solver modules loads neither package. The
 `visualization` extra retains all tested plots and movies. The prior local
@@ -417,7 +421,7 @@ The current GPU contract and decision are compact:
 | schema-6 `8 x 7 x 7`, 1/2 RTX A4000 | current placement, exact flux replay, state replay to `2.22e-16`, conservation, linear, repeat, Gram, and Anderson gates pass | topology correctness accepted; discard shared-host timing and make no scaling claim |
 | `128 x 67 x 67`, 1/2 RTX A4000 | 2.780/2.400 s, CV below 1.2%, 1.159x end-to-end and 1.510x core-phase speedup | misses the 1.2x promotion gate; retain the smaller validation fusion and stop |
 | historical `256 x 67 x 67` | 8.474/7.534 s, CV below 3.7%, 1.125x | diagnostic only; no larger rung |
-| current `256 x 67 x 67`, 96 updates, 1/2 RTX A4000 | 258.913/159.234 s, 1.626x, 81.3% efficiency, every warm sample above 120 s; numerical/topology gates pass | accepted shared-idle-host sustained calibration; four foreign contexts block authoritative timing |
+| current `256 x 67 x 67`, 96 updates, 1/2 RTX A4000 | 258.913/159.234 s, 1.626x, 81.3% efficiency, every warm sample above 120 s; numerical/topology gates pass | accepted non-idle shared-host sustained calibration; four foreign contexts block authoritative timing |
 
 Every current calibration fails closed on physical repeat signatures, linear
 status/history, placement, restart, conservation, and device equivalence.
@@ -522,6 +526,13 @@ every applied weight and preserves the same linear, conservation, first-update,
 and exact-replay gates. It ends at `0.114718` versus `0.114466` for fixed
 relaxation two: 0.22% worse instead of the required 15% gain. Reject the API
 addition and do not substitute coefficient safety for acceleration evidence.
+The follow-up residual-spectrum audit reproduces all six map rates and rejects
+all five adjacent pairs under its predeclared 15% predicted-gain, `max|w| <= 4`,
+and condition-number `<= 1e6` rationale gate. Electric potential holds
+98.254--99.887% of the shared scaled residual energy, so the Euclidean
+accelerator is structurally misaligned with velocity-map acceptance. Close
+generic shared-norm Anderson tuning; a conditioning threshold cannot repair an
+objective mismatch.
 Pre-fix restarts, 128x/256x pseudo-time caps, and extrapolated convergence steps
 are diagnostic only. Exact histories and operator audits are in
 `benchmarks/results/b2-pseudotime-map-rate-20260715.json` and
@@ -543,15 +554,19 @@ The validation sequence is fail-closed:
    improvement and stable-weight gates fail;
 3. the one authorized bounded-weight fallback is also rejected: stability and
    replay pass, but its final rate is 0.22% worse than the control. Do not add
-   that SOLVAX/LMX API or tune either failed configuration. Any future candidate
-   requires a residual-spectrum rationale and predeclared globalization rule,
-   then must pass this same cold gate before regenerating both current-source
-   trajectories to the shared step-29 point; do not reinterpret a schema-5
-   restart;
-4. only if step 29 passes, continue to strict step 96. Promotion requires three
+   that SOLVAX/LMX API or tune either failed configuration;
+4. the residual-spectrum rationale gate is complete: zero of five pairs pass,
+   and potential dominates the norm. Do not pursue another shared-Euclidean
+   Anderson configuration;
+5. any future accelerator first requires a solver-free, predeclared
+   block-balanced physics-aligned inner-product rationale and globalization
+   rule, then must pass this same cold gate before regenerating both
+   current-source trajectories to the shared step-29 point; do not reinterpret
+   a schema-5 restart;
+6. only if step 29 passes, continue to strict step 96. Promotion requires three
    sustained `tau_map=0.005` passes plus exact replay and the frozen pressure,
    velocity, pressure-gradient, linear, conservation, and sharding limits;
-5. only then authorize a fresh canonical coarse schema-6 run. Medium/fine,
+7. only then authorize a fresh canonical coarse schema-6 run. Medium/fine,
    production FreeMHD, authoritative idle-host GPU timing, and steady-production
    scaling remain blocked.
 

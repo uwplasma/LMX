@@ -279,6 +279,49 @@
     },
     "status": "rejected-no-solvax-or-lmx-api-change"
   },
+  "residual_spectrum_audit": {
+    "execution_commit": "a734a88434652ce094b620c3de7ddea8ace45b55",
+    "shape": [7, 7, 7],
+    "updates": 6,
+    "wall_seconds": 6.7,
+    "adjacent_update": [2, 3, 4, 5, 6],
+    "gram_condition_number": [
+      4650000000.0,
+      19960.0,
+      172.0,
+      1223.5,
+      24.98
+    ],
+    "weight_max_abs": [
+      1.0000187486645689,
+      24.387202044130937,
+      2.573307853725101,
+      8.023598887156247,
+      1.3467401063056263
+    ],
+    "predicted_affine_residual_gain": [
+      0.384,
+      0.0656,
+      0.0347,
+      0.1173,
+      0.0128
+    ],
+    "potential_residual_energy_fraction": [
+      0.99887,
+      0.99887,
+      0.99852,
+      0.99814,
+      0.98254
+    ],
+    "rationale_thresholds": {
+      "predicted_affine_residual_gain_min": 0.15,
+      "weight_max_abs": 4.0,
+      "gram_condition_number_max": 1000000.0
+    },
+    "rationale_pass": [false, false, false, false, false],
+    "interpretation": "The shared Euclidean residual is 98.254%-99.887% electric-potential energy while B2 promotion uses velocity-map convergence; conditioning safeguards cannot correct this objective mismatch.",
+    "decision": "close generic shared-norm Anderson tuning; retain fixed relaxation 2; require a block-balanced physics-aligned rationale before any new accelerator"
+  },
   "normalized_map_outcome_study": {
     "shape": [7, 7, 7],
     "sustained_passes": 3,

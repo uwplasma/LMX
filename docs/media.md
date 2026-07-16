@@ -39,7 +39,7 @@ serve one claim family.
 
 ## Tracked web set
 
-Twenty files in `docs/_static/` total 1,246,806 bytes. The `showcase` section of
+Twenty files in `docs/_static/` total 1,249,112 bytes. The `showcase` section of
 [`release-assets.json`](release-assets.json) records every byte count and
 SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 
@@ -62,7 +62,7 @@ SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 | magnetic obstacle | 48,630 | compressed WebP | released derivative `6e351e80...` |
 | blanket-flow loop | 61,776 | 480 × 222 animated WebP, 7 s | Python/Pillow derivative of released GIF `1a23d23...`; 42 frames |
 | Q2D loop | 117,102 | 440 × 381 animated WebP, 7 s | Python/Pillow derivative of released GIF `feb9e145...`; 42 frames |
-| B2 field, pressure, and acceleration | 46,688 | 1,000 × 895 WebP | released field/pressure source plus raw and bounded cold gates; both rejected before step 29 |
+| B2 field, pressure, and acceleration | 48,994 | 1,000 × 895 WebP | released field/pressure source plus raw, bounded, and residual-spectrum gates; shared-norm acceleration rejected |
 | curved-pipe validation | 94,236 | compressed WebP | released derivative `d32d666a...` |
 | blanket current and pressure | 89,356 | 1,476 × 1,573 WebP | released sources `48f4ba58...` and `4be86176...`; research-stage |
 
@@ -90,7 +90,7 @@ does not depend on release authentication.
 | `readme-magnetic-obstacle.webp` | `6e351e80531742b1aed6f951d6155cc55d3f5fd4f3e9b556a15336f76a74bc84` |
 | `readme-blanket-flow-poster.webp` | `f40dff36a41bdfc1fa9df7371cf9c4907a367d70c5603a4658a18d27f708260d` |
 | `readme-blanket-flow-7s.mp4` | `ca7d72cebb564a28bc6f91b395824cd1a9417ad271dc8ba3c0cbf2c365f18c51` |
-| `readme-alex-b2-field-pressure.webp` | `19055b139d881990eebcbf7a97b6139af02d5863b3514f56fb00a81a4b1d8e82` |
+| `readme-alex-b2-field-pressure.webp` | `531579865b5c3bfc3b0c87172a92fcc93dacb6c2a78702ac79abf6a9a04927dd` |
 | `readme-q2d-turbulence-poster.webp` | `97a9e5c418012f1591344ea131a846933a2c60fc2ba47eaf9f93f86e79e1bfb5` |
 | `readme-q2d-turbulence.mp4` | `fd6e60bfdeb99f1c0123a8dc68f2198cfde91904b09cfdcde7caa34667492a62` |
 | `readme-li-aln-multilayer-convergence.webp` | `e3c8bc3c143cca9c0e1a30c2892005b2be6e0d3c46efda4c00704d81f57e66e6` |
