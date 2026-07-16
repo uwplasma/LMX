@@ -6,6 +6,7 @@ import argparse
 import hashlib
 from importlib.metadata import version
 import json
+import os
 from pathlib import Path
 import platform
 import resource
@@ -725,6 +726,8 @@ def main(argv: list[str] | None = None) -> int:
     payload.update(platform=args.platform, source_commit=args.source_commit,
         source_fingerprint=_source_fingerprint(),
         precision="float64" if jax.config.jax_enable_x64 else "float32",
+        cpu_affinity=(sorted(os.sched_getaffinity(0))
+            if hasattr(os, "sched_getaffinity") else None),
         python_version=platform.python_version(), jax_version=jax.__version__,
         jaxlib_version=version("jaxlib"), solvax_version=version("solvax"))
     if args.matched_input is not None and args.evaluator is not None:

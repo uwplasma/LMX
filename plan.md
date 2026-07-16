@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-16. Current LMX source through `497af1b` consumes released SOLVAX 0.8.4;
+Status: 2026-07-16. Current LMX source through `de49a29` consumes released SOLVAX 0.8.4;
 `aaa41b1` made the
 frozen B2 path Anderson depth two with one shared weight vector for mapped
 scaled fields and conservative compact flux. Restart schema 6 stores one raw
@@ -62,7 +62,7 @@ evidence. Incomplete candidates remain visible without a sustained speedup or
 plot title. A current-source rerun was not launched on July 16 because macOS
 indexing and security services occupied multiple local cores and both office
 A4000s were at 100% foreign utilization. Retry the 32-update CPU campaign and
-88-update GPU campaign only after their clean-environment gates pass.
+96-update GPU campaign only after their clean-environment gates pass.
 This single active plan records accepted baselines, active gates, and stop/go
 criteria—not campaign history. Completed campaign details belong in
 checksummed result records and the validation or performance documentation.
@@ -164,9 +164,9 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,790 | stay below 34,810 while preserving the scaling and Q2D gates | 35,100 |
+| package lines | 34,799 | stay below 34,810 while preserving the scaling and Q2D gates | 35,100 |
 | maintained-core lines | 7,908 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 21,084 | no new file; stay below 21,090 | 31 / 21,100 |
+| test files / lines | 30 / 21,100 | no new file; return below 21,090 through ownership consolidation | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
 | tracked checkout | 4,490,848 bytes | direct visual evidence only; keep below 4,510,000 | 4,718,592 bytes |
@@ -223,6 +223,16 @@ Commit `497af1b` makes Q2D wall-driven frame sampling append-only, deleting 12
 package lines and removing 47 redundant Poisson solves from the 100-step,
 48-frame case. Final streamfunction, vorticity, and velocity are exact for two
 versus 48 requested frames; all 14 Q2D tests pass.
+Commit `6090cda` then reuses each nonlinear Q2D turbulence velocity state for
+turnover and sampled diagnostics. The portable 500-step case removes 1,007
+forward and 514 inverse FFTs while every returned array, spectrum, and turnover
+count remains bitwise identical; all 14 Q2D tests pass.
+Commit `de49a29` makes sustained scaling admission machine-readable and
+fail-closed before a long worker starts. Every rung now requires checksummed
+60-second affinity or idle-GPU evidence, exact source/runtime/input identity,
+positive memory measurements, and physical GPU UUID/PCI identity. Matched
+inputs are regenerated deterministically, and the default remote ceiling is
+1,800 seconds. All 35 scaling tests pass in 7.3 seconds.
 
 The portable-gate artifact keyed to `497af1b` records 860 passes, 8 expected
 external-data skips, 95.3273% combined line/branch coverage, and 144.4 seconds on

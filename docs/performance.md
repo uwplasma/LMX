@@ -350,15 +350,25 @@ uses 32 CPU updates and 96 GPU updates:
 python examples/strong_scaling_demo.py --benchmark-kind matched_b2_smoke \
   --cpu-nx 256 --cpu-ny 67 --cpu-nz 67 --cpu-iterations 32 \
   --gpu-nx 256 --gpu-ny 67 --gpu-nz 67 --gpu-iterations 96 \
-  --repeats 4 --minimum-warm-seconds 120 --worker-timeout 1800
+  --repeats 4 --minimum-warm-seconds 120 --worker-timeout 1800 \
+  --cpu-environment-evidence artifacts/cpu-admission.json \
+  --gpu-environment-evidence artifacts/gpu-admission.json --remote-host office
 ```
 
-Run CPU topologies with controlled affinity and GPU topologies only on an idle
-host. The command above generates the sustained workload but does not reproduce
-the accepted CPU allocation by itself. That record used nested Docker `cpuset`
-masks for 2/4/8 guest CPUs and 1/2/4 JAX shards; the masks verify guest
-allocations, not M4 P/E-core placement. This manual lane stays outside portable
-tests.
+Sustained mode validates a checksummed 60-second admission JSON before each
+worker starts. Its `backend`, `sample_seconds`, and `rungs` map must identify
+each device count. CPU rungs require `verified`, `num_devices`, the exact
+2/4/8-entry `affinity_cpus`, and matching `allocated_cpu_count`. GPU rungs
+require unique `visible_devices` and `gpu_identities` (`uuid` plus
+`pci_bus_id`), `foreign_compute_process_count = 0`, and
+`max_gpu_utilization_percent <= 5`. Missing or inconsistent evidence stops
+before the multi-minute solve.
+
+The CPU lane still runs inside the affinity-controlled Docker allocation; the
+example does not create that container. Its nested `cpuset` masks provide
+2/4/8 guest CPUs for 1/2/4 JAX shards and establish CPU-allocation scaling, not
+exact M4 P/E-core placement. GPU admission must be repeated between rungs and
+after the campaign. This manual lane stays outside portable tests.
 
 The solver-faithful example requires a validated restart matching each timed
 grid; it fails before launching workers when one is missing:

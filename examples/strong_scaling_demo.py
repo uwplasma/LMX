@@ -237,6 +237,9 @@ def run_local_cpu_scaling(
             minimum_warm_seconds=minimum_warm_seconds,
         )
         record.update(environment)
+        if environment["resource_environment_verified"] and record.get(
+            "cpu_affinity") != environment["resource_environment"]["affinity_cpus"]:
+            raise RuntimeError("Scaling worker escaped its verified CPU affinity")
         output_path.write_text(json.dumps(record, indent=2))
         records.append(record)
         if benchmark_kind == "matched_b2_smoke" and not record["validation_passed"]:
@@ -373,11 +376,14 @@ def run_remote_gpu_scaling(
         )
     local_records: list[dict[str, object]] = []
     for count in device_counts:
+        visible_devices = _default_visible_devices(remote_host, count)
         environment = _resource_environment(
             environment_evidence, backend="gpu", num_devices=count,
             required=minimum_warm_seconds >= 120.0,
         )
-        visible_devices = _default_visible_devices(remote_host, count)
+        if environment["resource_environment_verified"] and environment[
+            "resource_environment"]["visible_devices"] != visible_devices.split(","):
+            raise RuntimeError("GPU admission evidence does not match selected devices")
         remote_json = f"{remote_dir}/artifacts/strong_scaling/gpu_{count}.json"
         profile_arg = ""
         if profile_dir is not None:
