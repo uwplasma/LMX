@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "case_id": "B2-fringing-square",
   "acceptance_role": "canonical-coarse-current-formulation",
   "status": "continuation-residual-gate-failed",
@@ -110,21 +110,28 @@
     "effective_dt": 0.0000018518518518518519,
     "stopping_observable": "raw unrelaxed max absolute velocity update",
     "physical_time_interpretation_valid": false,
-    "terminal_chunk_invariant": false,
+    "pre_fix_terminal_chunk_invariant": false,
     "terminal_issue": "fixed-point and flux acceleration are skipped when step + 1 equals stop_step",
     "log_decrement_step_127_to_128": -0.00856155,
     "log_decrement_step_128_to_129": -0.00426753,
     "log_decrement_step_129_to_130": -0.00854887
+  },
+  "terminal_fix": {
+    "reduced_probe_seconds": 17.77,
+    "pre_fix_state_or_history_max_absolute_difference": 1.0,
+    "pre_fix_flux_relative_l2_difference": 0.00001475397042,
+    "fix_commit": "45bff84f4eb02feae24b373ce1d4ddbed7104ad6",
+    "reduced_direct_four_vs_terminal_two_plus_two_pass": true,
+    "post_fix_state_history_and_flux_absolute_tolerance": 1e-12,
+    "matched_lmx_freemhd_smoke_pass": true,
+    "pre_fix_coarse_restarts_continuation_authorized": false
   },
   "decision": {
     "further_baseline_continuation_authorized": false,
     "independence_variants_authorized": false,
     "medium_or_fine_authorized": false,
     "freemhd_production_run_authorized": false,
-    "next_probe": "reduced 7x7x7 direct four updates versus serialized terminal two plus resumed two updates",
-    "next_probe_state_and_history_absolute_tolerance": 1e-12,
-    "next_probe_flux_relative_l2_tolerance": 1e-12,
-    "next_probe_wall_seconds_max": 120,
-    "reason": "the slow velocity mode explains persistent convergence, while a separate terminal acceleration skip makes chunked continuation non-invariant and must be closed first"
+    "next_probe": "reduced-grid pseudo-time and stopping-observable diagnosis before rerunning the corrected coarse baseline",
+    "reason": "terminal chunk invariance is fixed, while the slow velocity pseudo-time mode still makes the pre-fix coarse trajectory non-acceptable and its restarts are not reusable"
   }
 }

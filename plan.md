@@ -1,7 +1,7 @@
 # LMX authoritative development plan
 
 Status: 2026-07-15. The optimized B2 source and current CPU calibration are
-keyed to `413185a`; the latest complete portable gate is keyed to `51f1d20`.
+keyed to `413185a`; the latest complete portable gate is keyed to `45bff84`.
 The isolated compiler trace is keyed to `f379f6b`; GPU workers use the
 optimized source's matching fingerprint.
 The exact two-update LMX/FreeMHD B2 smoke, one-/two-/four-CPU-device equivalence,
@@ -115,19 +115,19 @@ immutable evidence, richer projection, and target-driven paths remain):
 | package modules | 35 | no new module | 35 |
 | package lines | 34,899 | stay below 35,000 through the scaling tranche | 35,100 |
 | maintained-core lines | 7,954 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,751 | no new file; stay below 21,000 | 31 / 21,100 |
+| test files / lines | 30 / 20,753 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,505,651 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,506,106 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The portable-gate artifact keyed to `51f1d20` records 817 passes, 8 expected
-external-data skips, 95.0159% combined line/branch coverage, and 149.0 seconds on
+The portable-gate artifact keyed to `45bff84` records 817 passes, 8 expected
+external-data skips, 95.0159% combined line/branch coverage, and 149.3 seconds on
 the reference Apple M4. It remains below the 300-second engineering target and
 600-second hard limit. Coverage remains above the enforced floor but below the
-95.5% engineering target. The six-worker record reports 52.5 seconds for the
-weighted-modal node and 40.3 seconds for reduced B2. Parallel JUnit durations
+95.5% engineering target. The six-worker record reports 52.9 seconds for the
+weighted-modal node and 45.3 seconds for reduced B2. Parallel JUnit durations
 are diagnostic rather than isolated timings, but weighted-modal now exceeds the
 45-second warning level and is the next CI critical-path target.
 
@@ -167,7 +167,7 @@ measurements themselves run alone.
 
 The modal pipe test reuses one physical projection and verifies direct
 mode-factor algebra without a second integration run. In the latest six-worker
-gate it reports 52.5 seconds, versus 40.3 seconds for reduced B2 and 25.2
+gate it reports 52.9 seconds, versus 45.3 seconds for reduced B2 and 24.7
 seconds for reduced B1. Isolated measurement attributes most of that tail to
 worker contention: reducing only the manufactured modal grid lowered its
 weighted path to 23.5--26.1 seconds, and the unchanged reduced-B2 restart and
@@ -356,16 +356,19 @@ physical time-to-steady claim: `u` controls 255 of 256 updates, the effective
 observable is the raw unrelaxed velocity update rather than an equation-error
 norm. Fixed relaxation and flux scaling do not change through the tail.
 
-The audit also finds a separate chunk-boundary defect. Stored histories are
-bitwise-exact prefixes, but the last requested update skips Aitken and flux
-acceleration because `step + 1 == stop_step`; the next invocation restores
-factor-two relaxation. This creates an isolated half-step kink and means a
-terminal restart is not trajectory invariant. Before any coarse continuation,
-run one `7 x 7 x 7`, four-update direct versus serialized terminal-two plus
-resumed-two probe. Require state and histories within `1e-12`, compact-flux
-relative L2 within `1e-12`, and wall time below 120 seconds. A failure authorizes
-only a terminal chunk-invariance fix and focused replay. Tolerance, wall,
-medium, fine, and production-FreeMHD work remain blocked until the current
+The audit also found a separate chunk-boundary defect: terminal updates skipped
+Aitken and flux acceleration. The predeclared `7 x 7 x 7` probe failed in 17.77
+seconds, with state/history difference `1.0` and compact-flux relative L2
+`1.48e-5`. B2 now accelerates terminal updates too. Direct four versus
+serialized terminal-two plus resumed-two passes every state, history, and flux
+gate at `1e-12`; the exact current LMX/FreeMHD smoke also remains green with
+pressure RMS/Linf `0.004518/0.010917`.
+
+Pre-fix coarse restarts are diagnostic-only and cannot seed the corrected
+trajectory. Before rerunning coarse, use a sub-two-minute reduced grid to
+separate the effective pseudo-time clip from the timestep-dependent stopping
+observable and define an equation-error convergence gate. Tolerance, wall,
+medium, fine, and production-FreeMHD work remain blocked until the corrected
 coarse baseline converges for the correct reason.
 
 Exit: B2 has a three-mesh ladder, exact-source FreeMHD evidence, literature and
