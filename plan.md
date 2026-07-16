@@ -463,13 +463,19 @@ Anderson acceleration, reconcile and release SOLVAX 0.8.4's weight API, then
 apply identical weights and damping to fields and conservative compact flux.
 Do not store a production-scale full-state history without a measured benefit.
 
-The next bounded tranche is upstream-first: prepare the clean SOLVAX 0.8.4
-weight API for review, then test restart-exact depth-two coupled Anderson from
-the shared step-29 and strict step-96 checkpoints. Promote it only if both paths
-cross `tau_map=0.005`, preserve every linear, conservation, restart, and
-sharding gate, and agree within the frozen pressure, velocity, and
-pressure-gradient outcome limits. Otherwise retain fixed relaxation and stop
-before a coarse run.
+The next bounded tranche is upstream-first. SOLVAX draft PR 21 now carries the
+clean 0.8.4 weight API and corrected release metadata; merge, tag, and publish
+only after its supported Python/JAX matrix is green and review closes. Then
+replace B2's arbitrary-depth lists and duplicated CPU/sharded mixing paths with
+one prior depth-two record, one weight calculation shared by scaled mapped
+fields and compact plus/inlet flux, and restart schema 6. This retains about
+35.8 MiB of prior state on the coarse grid instead of about 416.7 MiB for a
+depth-16 iterate/residual history. Prove direct versus serialized 1+1 replay and
+sharding before testing the shared step-29 and strict step-96 checkpoints.
+Promote only if both paths cross `tau_map=0.005`, preserve every linear,
+conservation, restart, and sharding gate, and agree within the frozen pressure,
+velocity, and pressure-gradient outcome limits. Otherwise retain fixed
+relaxation and stop before a coarse run.
 
 The production spec's `5e-5` is now an explicitly provisional, fail-closed
 normalized-map bound, not an accepted threshold. Do not authorize a corrected
@@ -512,12 +518,14 @@ self-promote unrelated features.
 
 ## SOLVAX ownership
 
-Keep `solvax>=0.8.3,<1`. PyPI and the latest GitHub tag are 0.8.3, and CI tests
-both that minimum and the newest compatible release. SOLVAX `origin/main` is
-prepared for 0.8.4 at `255d280`, while the untagged `release/0.8.4` worktree at
-`4808695` contains the Anderson-weight API. Reconcile and publish those changes
-through SOLVAX's separate release process before LMX consumes a 0.8.4-only API.
-No tag or publication is authorized here.
+Keep `solvax>=0.8.3,<1` until the new API is released. PyPI and the latest
+GitHub tag are 0.8.3, and CI tests both that minimum and the newest compatible
+release. SOLVAX draft PR 21 proposes `release/0.8.4` at `a8603dc` into
+`origin/main` at `255d280`; the reusable Anderson-weight implementation is
+commit `4808695`, followed only by corrected citation/changelog metadata. Local
+gates report 264 passes, 98.10% combined coverage, warning-free docs, lint, and
+artifact import checks. Do not tag or publish until the final hosted matrix and
+review are green; rebuild artifacts from the merged SHA.
 
 The device-cut audit compared released 0.8.3 with the pending 0.8.4 PCG and
 found identical Krylov code; generic two-device standard and single-reduction
