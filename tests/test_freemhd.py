@@ -184,7 +184,7 @@ def _write_lmx_b2_output(root: Path, input_path: Path, evaluator: Path) -> None:
             u=zeros, v=zeros, w=zeros, p=zeros, phi=zeros,
             geometry_kind="layered_duct", solver_kind="extruded_inductionless",
             rho_phi_plus=benchmarks.jnp.zeros((3, 8, 5, 5)), rho_phi_inlet=benchmarks.jnp.zeros((5, 5)),
-            aitken_state=(benchmarks.jnp.zeros((4, *shape)), 1.0, 0),
+            aitken_state=(None, 1.0, 0),
             stopping_state=(steps, 0, "step_limit" if steps == 2 else "in_progress"),
             jx=benchmarks.jnp.ones(shape), jz=benchmarks.jnp.ones(shape),
             volumetric_flow_rate=benchmarks.jnp.full(8, 4.0),

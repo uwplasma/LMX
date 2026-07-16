@@ -706,7 +706,7 @@ def observe_lmx_b2_output(
                     scale = max(np.linalg.norm(left), np.linalg.norm(right), 1.0e-30)
                     flux_relative.append(float(np.linalg.norm(left - right) / scale))
     for left, right in zip(direct.bundle.aitken_state, resumed.bundle.aitken_state, strict=True):
-        left, right = np.asarray(left), np.asarray(right)
+        left, right = (np.asarray(()) if value is None else np.asarray(value) for value in (left, right))
         if left.shape != right.shape or not np.all(np.isfinite(left)) or not np.all(np.isfinite(right)):
             raise ValueError("LMX B2 output Aitken state is invalid")
         if left.size:
