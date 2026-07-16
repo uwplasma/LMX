@@ -139,8 +139,8 @@ The current B2 smoke agrees on 1/2/4 CPU and 1/2 GPU devices. At
 
 ## Quality and citation
 
-The portable gate records **818 passing tests**, **95.03% combined line/branch
-coverage**, and **157.4 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
+The portable gate records **816 passing tests**, **95.11% combined line/branch
+coverage**, and **149.5 s** on six Apple-Silicon workers. [Testing](docs/testing.md) ·
 [Theory](docs/theory.md) · [Numerics](docs/numerics.md) ·
 [Contributing](CONTRIBUTING.md) · [Research assets](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
 
