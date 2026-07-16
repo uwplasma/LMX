@@ -13,7 +13,7 @@ stopping. Its fixed-relaxation memory reduction
 is keyed to `791e496`, and its exact operator contract is keyed to `2d0fb50`.
 Commit `3e731fa` removes the projection reconstruction floor and refreezes the
 64x pseudo-time cap on a warm same-state ladder.
-The latest complete portable gate exercised source `9d6e9fa`. CPU/GPU calibration at
+The latest complete portable gate exercised source `f070445`. CPU/GPU calibration at
 `413185a` remains historical; deterministic GPU equivalence at `3a22078` has
 been replaced by the current `8b6f97d` result and the refreshed calibration
 record committed at `3311d6d`. The isolated compiler trace keyed to `f379f6b`
@@ -125,12 +125,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,675 | stay below 35,000 while preserving the physical residual | 35,100 |
+| package lines | 34,657 | stay below 35,000 while preserving the physical residual | 35,100 |
 | maintained-core lines | 7,854 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,590 | no new file; stay below 21,000 | 31 / 21,100 |
+| test files / lines | 30 / 20,555 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 173 | delete only superseded or duplicate ownership | 180 |
-| tracked checkout | 3,325,046 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,325,944 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -148,19 +148,23 @@ cases to the existing mesh and FreeMHD modules, with no new test file.
 Commit `26a6207` gives both scaling benchmarks one documented device-validation
 owner and removes two package lines. Commit `9d6e9fa` removes a single-owner B2
 table-parser symbol plus six package lines and deletes a behaviorally duplicate
-28-line Crank–Nicolson rejection test. The current portable gate covers both.
+28-line Crank–Nicolson rejection test. Commit `f070445` inlines the sole B1
+Anderson wrapper into its released-SOLVAX call, deletes 18 package lines and one
+private symbol, and reuses an identical logging fixture to delete 35 test lines
+without removing a node or assertion. The current portable gate covers all of
+these ownership changes.
 
-The portable-gate artifact keyed to `9d6e9fa` records 837 passes, 8 expected
-external-data skips, 95.5822% combined line/branch coverage, and 169.6 seconds on
-the reference Apple M4. It is 14.3% slower than the prior 148.4-second record,
-but every leading concurrent JAX node rose together while this tranche removed
-work. The audited isolated reduced-B2 time remains 14.8 seconds; retain the
-result as honest host-contention variance and do not rerun for a favorable
-number. The gate stays below 57% of the 300-second engineering target and 29%
-of the 600-second hard limit. The 95.5%
+The portable-gate artifact keyed to `f070445` records 837 passes, 8 expected
+external-data skips, 95.5819% combined line/branch coverage, and 159.4 seconds on
+the reference Apple M4. It is 6.0% faster than the prior 169.6-second record,
+but the ownership deletion is too small to attribute that shared-host delta to
+the code change. The audited isolated reduced-B2 time remains 14.8 seconds; do
+not promote a suite-speed claim from wall-time variance. The gate stays below
+54% of the 300-second engineering target and 27% of the 600-second hard limit.
+The 95.5%
 engineering target is now met; retain the 95% enforced floor until a second
 Python endpoint or hosted run independently confirms the margin. The
-six-worker record reports 56.3 seconds for reduced B2 and 52.8 seconds for
+six-worker record reports 52.5 seconds for reduced B2 and 49.5 seconds for
 weighted modal; these concurrent durations still identify contention rather
 than isolated regressions, so no scheduling change is promoted from this run.
 
@@ -215,7 +219,7 @@ measurements run alone.
 
 The modal pipe test reuses one physical projection and verifies direct
 mode-factor algebra without a second integration run. In the latest six-worker
-gate it reports 52.8 seconds, versus 56.3 seconds for reduced B2 and 27.2
+gate it reports 49.5 seconds, versus 52.5 seconds for reduced B2 and 26.3
 seconds for reduced B1. Isolated measurement attributes most of that tail to
 worker contention: reducing only the manufactured modal grid lowered its
 weighted path to 23.5--26.1 seconds, and the unchanged reduced-B2 restart and
@@ -240,10 +244,9 @@ two redundant bent-pipe solves with synthetic writer fields then reduces that
 node from 6.39 to a 1.24-second median and the isolated plotting module from
 9.84 to 5.43 seconds. Bent-pipe physics remains owned by its fringing tests.
 That plotting-focused gate reached 147.3 seconds; the current ownership-slimming
-gate is 169.6 seconds. All leading JAX nodes rose together, the changed tests
-remove work, and the prior isolated B2 measurement remains 14.8 seconds, so the
-15.1% wall variation does not justify a scheduling change or a favorable-number
-rerun.
+gate is 159.4 seconds. The changed tests remove work, and the prior isolated B2
+measurement remains 14.8 seconds, so the 8.2% shared-host variation does not
+justify a scheduling change or a speedup claim.
 
 Keep the top ten concurrent node durations in the portable-gate record and
 treat any node above 45 seconds as a critical-path review trigger. The suite
@@ -530,6 +533,16 @@ comparison stills, and the README labels it a low-De inductionless baseline
 with Dean-vortex physics staged. No solver was rerun and no tracked media was
 added. Do not create a B2 movie from the bounded smoke or rejected coarse
 trajectories.
+
+The public documentation delivery path is not current: Read the Docs still
+serves the 2026-05-01 build at `6be8622`, and recent builds fail before acquiring
+a commit. Eight current feature visuals are release-hosted and therefore
+unavailable to anonymous readers of a build from this private repository. The
+next bounded docs tranche should mirror only those already-compressed
+derivatives into `docs/_static/` (435,050 bytes; 603,287 tracked media bytes in
+total), switch docs links locally, verify hashes and a strict build, then repair
+the Read the Docs integration. Do not regenerate simulations or add another
+movie until an accepted physical trajectory exists.
 
 ## Release gate
 
