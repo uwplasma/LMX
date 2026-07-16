@@ -255,6 +255,21 @@ def _default_visible_devices(remote_host: str, count: int) -> str:
     return ",".join(chosen)
 
 
+def _remote_worker_failure(
+    record: dict[str, object], error: subprocess.CalledProcessError
+) -> tuple[str, str]:
+    """Summarize a failed remote worker without discarding its JSON evidence."""
+
+    failure = record.get("failure")
+    if isinstance(failure, dict):
+        phase = str(failure.get("phase", "worker"))
+        message = str(failure.get("message", "remote worker failed"))
+    else:
+        phase = "validation" if record.get("validation_passed") is False else "worker"
+        message = f"remote worker exited with status {error.returncode}"
+    return phase, message
+
+
 def run_remote_gpu_scaling(
     *,
     repo_root: Path,
@@ -321,13 +336,31 @@ def run_remote_gpu_scaling(
             f"{'' if remote_restart is None else f' --restart {shlex.quote(remote_restart)}'}"
             f"{'' if remote_matched is None else f' --matched-input {shlex.quote(remote_matched)} --evaluator {shlex.quote(remote_evaluator)}'}"
         )
-        subprocess.run(["ssh", remote_host, remote_command], check=True,
-            timeout=timeout_seconds)
+        worker_error = None
+        try:
+            subprocess.run(["ssh", remote_host, remote_command], check=True,
+                timeout=timeout_seconds)
+        except subprocess.CalledProcessError as error:
+            worker_error = error
         local_output = out_dir / f"gpu_{count}.json"
-        subprocess.run(
-            ["scp", f"{remote_host}:{remote_json}", str(local_output)], check=True
-        )
+        try:
+            subprocess.run(
+                ["scp", f"{remote_host}:{remote_json}", str(local_output)], check=True
+            )
+        except subprocess.CalledProcessError as evidence_error:
+            if worker_error is None:
+                raise
+            raise RuntimeError(
+                f"Remote GPU worker failed for {count} device(s), and its JSON "
+                f"evidence could not be retrieved: {evidence_error}"
+            ) from worker_error
         record = json.loads(local_output.read_text())
+        if worker_error is not None:
+            phase, message = _remote_worker_failure(record, worker_error)
+            raise RuntimeError(
+                f"Remote GPU worker failed for {count} device(s) during {phase}: "
+                f"{message}; evidence: {local_output}"
+            ) from worker_error
         local_records.append(record)
         if benchmark_kind == "matched_b2_smoke" and not record["validation_passed"]:
             raise RuntimeError(f"Matched B2 GPU gate failed; evidence: {local_output}")

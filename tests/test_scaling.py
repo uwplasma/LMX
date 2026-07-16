@@ -167,6 +167,45 @@ def test_remote_scaling_archive_has_one_package_resource_owner(
     assert not any(arcname.startswith("benchmarks/") for _, arcname in added)
 
 
+@pytest.mark.parametrize(
+    ("record", "expected"),
+    [
+        ({"validation_passed": False}, "during validation: remote worker exited with status 1"),
+        ({"validation_passed": False, "failure": {
+            "phase": "restart", "message": "schema mismatch",
+        }}, "during restart: schema mismatch"),
+    ],
+)
+def test_remote_scaling_retrieves_failed_worker_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    record: dict[str, object], expected: str,
+):
+    commands = []
+    monkeypatch.setattr(strong_scaling_demo, "_sync_repo_to_remote", lambda **kwargs: None)
+    monkeypatch.setattr(strong_scaling_demo, "_default_visible_devices", lambda *args: "0")
+
+    def fake_run(command, **kwargs):
+        commands.append(command)
+        if command[0] == "ssh":
+            raise subprocess.CalledProcessError(1, command)
+        Path(command[-1]).write_text(json.dumps(record))
+
+    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", fake_run)
+
+    with pytest.raises(RuntimeError, match=expected) as caught:
+        strong_scaling_demo.run_remote_gpu_scaling(
+            repo_root=tmp_path, out_dir=tmp_path, remote_host="office",
+            remote_dir="/tmp/lmx", device_counts=(1,),
+            benchmark_kind="matched_b2_smoke", nx=None, ny=7, nz=7,
+            iterations=2, repeats=1,
+        )
+
+    evidence = tmp_path / "gpu_1.json"
+    assert json.loads(evidence.read_text()) == record
+    assert commands[-1] == ["scp", "office:/tmp/lmx/artifacts/strong_scaling/gpu_1.json", str(evidence)]
+    assert isinstance(caught.value.__cause__, subprocess.CalledProcessError)
+
+
 def test_strong_scaling_demo_supports_direct_help(tmp_path: Path):
     script = Path(strong_scaling_demo.__file__).resolve()
     environment = strong_scaling_demo.os.environ.copy()
