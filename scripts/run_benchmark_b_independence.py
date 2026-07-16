@@ -56,7 +56,7 @@ def _source_fingerprint(root: Path = ROOT) -> str:
     digest = hashlib.sha256()
     paths = (
         sorted((root / "lmx").glob("*.py"))
-        + sorted((root / "benchmarks" / "specs").glob("alex-b*.toml"))
+        + sorted((root / "lmx/data/benchmarks/specs").glob("alex-b*.toml"))
         + [root / "scripts" / "run_benchmark_b_independence.py"]
     )
     for path in paths:
@@ -1069,7 +1069,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--plot-reference-csv",
         type=Path,
-        default=ROOT / "benchmarks" / "references" / "alex-b2-square.csv",
+        default=ROOT / "lmx/data/benchmarks/references/alex-b2-square.csv",
         help=argparse.SUPPRESS,
     )
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
