@@ -13,7 +13,7 @@ stopping. Its fixed-relaxation memory reduction
 is keyed to `791e496`, and its exact operator contract is keyed to `2d0fb50`.
 Commit `3e731fa` removes the projection reconstruction floor and refreezes the
 64x pseudo-time cap on a warm same-state ladder.
-The latest complete portable gate exercised source `664da3c`. CPU/GPU calibration at
+The latest complete portable gate exercised source `9d6e9fa`. CPU/GPU calibration at
 `413185a` remains historical; deterministic GPU equivalence at `3a22078` has
 been replaced by the current `8b6f97d` result and the refreshed calibration
 record committed at `3311d6d`. The isolated compiler trace keyed to `f379f6b`
@@ -125,12 +125,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,681 | stay below 35,000 while preserving the physical residual | 35,100 |
+| package lines | 34,675 | stay below 35,000 while preserving the physical residual | 35,100 |
 | maintained-core lines | 7,854 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,618 | no new file; stay below 21,000 | 31 / 21,100 |
+| test files / lines | 30 / 20,590 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 173 | delete only superseded or duplicate ownership | 180 |
-| tracked checkout | 3,323,782 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,325,046 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -146,17 +146,21 @@ unexported persistence/sampling wrappers and the duplicate direct-CLI guard;
 their generic owners remain. Commit `664da3c` adds 22 compact public-contract
 cases to the existing mesh and FreeMHD modules, with no new test file.
 Commit `26a6207` gives both scaling benchmarks one documented device-validation
-owner, removes two more package lines, and passes the five affected scaling
-tests; the next coherent code gate will fold it into the portable record.
+owner and removes two package lines. Commit `9d6e9fa` removes a single-owner B2
+table-parser symbol plus six package lines and deletes a behaviorally duplicate
+28-line Crank–Nicolson rejection test. The current portable gate covers both.
 
-The portable-gate artifact keyed to `664da3c` records 838 passes, 8 expected
-external-data skips, 95.5539% combined line/branch coverage, and 148.4 seconds on
-the reference Apple M4. It is 0.3% faster than the prior 148.9-second record
-despite the added validation cases. The gate stays below half of the 300-second
-engineering target and one quarter of the 600-second hard limit. The 95.5%
+The portable-gate artifact keyed to `9d6e9fa` records 837 passes, 8 expected
+external-data skips, 95.5822% combined line/branch coverage, and 169.6 seconds on
+the reference Apple M4. It is 14.3% slower than the prior 148.4-second record,
+but every leading concurrent JAX node rose together while this tranche removed
+work. The audited isolated reduced-B2 time remains 14.8 seconds; retain the
+result as honest host-contention variance and do not rerun for a favorable
+number. The gate stays below 57% of the 300-second engineering target and 29%
+of the 600-second hard limit. The 95.5%
 engineering target is now met; retain the 95% enforced floor until a second
 Python endpoint or hosted run independently confirms the margin. The
-six-worker record reports 50.8 seconds for reduced B2 and 47.2 seconds for
+six-worker record reports 56.3 seconds for reduced B2 and 52.8 seconds for
 weighted modal; these concurrent durations still identify contention rather
 than isolated regressions, so no scheduling change is promoted from this run.
 
@@ -211,7 +215,7 @@ measurements run alone.
 
 The modal pipe test reuses one physical projection and verifies direct
 mode-factor algebra without a second integration run. In the latest six-worker
-gate it reports 47.2 seconds, versus 50.8 seconds for reduced B2 and 25.2
+gate it reports 52.8 seconds, versus 56.3 seconds for reduced B2 and 27.2
 seconds for reduced B1. Isolated measurement attributes most of that tail to
 worker contention: reducing only the manufactured modal grid lowered its
 weighted path to 23.5--26.1 seconds, and the unchanged reduced-B2 restart and
@@ -235,9 +239,11 @@ lightweight persistence stubs for the remaining plotting writers. Replacing
 two redundant bent-pipe solves with synthetic writer fields then reduces that
 node from 6.39 to a 1.24-second median and the isolated plotting module from
 9.84 to 5.43 seconds. Bent-pipe physics remains owned by its fringing tests.
-That plotting-focused gate reached 147.3 seconds; the current validation-margin
-gate is 148.4 seconds, a 0.7% concurrent variation that does not justify a
-scheduling change.
+That plotting-focused gate reached 147.3 seconds; the current ownership-slimming
+gate is 169.6 seconds. All leading JAX nodes rose together, the changed tests
+remove work, and the prior isolated B2 measurement remains 14.8 seconds, so the
+15.1% wall variation does not justify a scheduling change or a favorable-number
+rerun.
 
 Keep the top ten concurrent node durations in the portable-gate record and
 treat any node above 45 seconds as a critical-path review trigger. The suite
