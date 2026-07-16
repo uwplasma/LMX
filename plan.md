@@ -13,7 +13,7 @@ stopping. Its fixed-relaxation memory reduction
 is keyed to `791e496`, and its exact operator contract is keyed to `2d0fb50`.
 Commit `3e731fa` removes the projection reconstruction floor and refreezes the
 64x pseudo-time cap on a warm same-state ladder.
-The latest complete portable gate exercised source `045fa00`. CPU/GPU calibration at
+The latest complete portable gate exercised source `664da3c`. CPU/GPU calibration at
 `413185a` remains historical; deterministic GPU equivalence at `3a22078` has
 been replaced by the current `8b6f97d` result and the refreshed calibration
 record committed at `3311d6d`. The isolated compiler trace keyed to `f379f6b`
@@ -125,12 +125,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,749 | stay below 35,000 while preserving the physical residual | 35,100 |
-| maintained-core lines | 7,865 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,517 | no new file; stay below 21,000 | 31 / 21,100 |
+| package lines | 34,683 | stay below 35,000 while preserving the physical residual | 35,100 |
+| maintained-core lines | 7,854 | stay below 8,000 | 8,000 |
+| test files / lines | 30 / 20,618 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 173 | delete only superseded or duplicate ownership | 180 |
-| tracked checkout | 3,322,002 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,323,782 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -141,16 +141,21 @@ them unless the replacement deletes code without weakening those contracts.
 Three exact artifact/array consolidations remove 60 package lines and four
 private symbols: blanket numeric CSV persistence, mirrored multilayer wall
 faces, and ordered 2-D/3-D tabulated-field interpolation.
+Commit `a735cd7` removes another 66 lines by deleting three undocumented,
+unexported persistence/sampling wrappers and the duplicate direct-CLI guard;
+their generic owners remain. Commit `664da3c` adds 22 compact public-contract
+cases to the existing mesh and FreeMHD modules, with no new test file.
 
-The portable-gate artifact keyed to `045fa00` records 816 passes, 8 expected
-external-data skips, 95.0517% combined line/branch coverage, and 148.9 seconds on
-the reference Apple M4. It is 1.1% slower than the prior 147.3-second record;
-the gate remains below the 300-second engineering
-target and 600-second hard limit. Coverage
-remains above the enforced floor but below the 95.5% engineering target. The
-six-worker record reports 50.2 seconds for reduced B2 and 48.6 seconds for
-weighted modal; these concurrent durations identify contention rather than
-isolated regressions, so no scheduling change is promoted from this run.
+The portable-gate artifact keyed to `664da3c` records 838 passes, 8 expected
+external-data skips, 95.5539% combined line/branch coverage, and 148.4 seconds on
+the reference Apple M4. It is 0.3% faster than the prior 148.9-second record
+despite the added validation cases. The gate stays below half of the 300-second
+engineering target and one quarter of the 600-second hard limit. The 95.5%
+engineering target is now met; retain the 95% enforced floor until a second
+Python endpoint or hosted run independently confirms the margin. The
+six-worker record reports 50.8 seconds for reduced B2 and 47.2 seconds for
+weighted modal; these concurrent durations still identify contention rather
+than isolated regressions, so no scheduling change is promoted from this run.
 
 The clean distribution audit at `a207bf9` produces a 313,854-byte wheel with
 48 members and a 296,630-byte source archive with 54 members. Both pass Twine;
@@ -203,7 +208,7 @@ measurements run alone.
 
 The modal pipe test reuses one physical projection and verifies direct
 mode-factor algebra without a second integration run. In the latest six-worker
-gate it reports 48.6 seconds, versus 50.2 seconds for reduced B2 and 24.6
+gate it reports 47.2 seconds, versus 50.8 seconds for reduced B2 and 25.2
 seconds for reduced B1. Isolated measurement attributes most of that tail to
 worker contention: reducing only the manufactured modal grid lowered its
 weighted path to 23.5--26.1 seconds, and the unchanged reduced-B2 restart and
@@ -227,8 +232,8 @@ lightweight persistence stubs for the remaining plotting writers. Replacing
 two redundant bent-pipe solves with synthetic writer fields then reduces that
 node from 6.39 to a 1.24-second median and the isolated plotting module from
 9.84 to 5.43 seconds. Bent-pipe physics remains owned by its fringing tests.
-That plotting-focused gate reached 147.3 seconds; the current source-slimming
-gate is 148.9 seconds, a 1.1% concurrent variation that does not justify a
+That plotting-focused gate reached 147.3 seconds; the current validation-margin
+gate is 148.4 seconds, a 0.7% concurrent variation that does not justify a
 scheduling change.
 
 Keep the top ten concurrent node durations in the portable-gate record and
@@ -496,6 +501,13 @@ The README now links three dynamics loops at exactly 7.00 seconds: accepted
 Hunt startup plus research-stage blanket and Q2D flows. The 86,808-byte blanket
 derivative retimes its existing 5.75-second H.264 with motion interpolation;
 physical frames are unchanged and no solver rerun or tracked media was added.
+
+The next documentation tranche is solver-free: derive one sub-100-KiB,
+release-hosted WebP from the already accepted bent-pipe overview and Dean
+comparison stills, then add a short “Curved pipes” feature block. Label it a
+low-De inductionless baseline with Dean-vortex physics staged; do not imply
+production validation and do not rerun the solver. Do not create a B2 movie
+from the bounded smoke or rejected coarse trajectories.
 
 ## Release gate
 
