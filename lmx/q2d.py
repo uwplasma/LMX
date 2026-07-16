@@ -774,7 +774,7 @@ def solve_q2d_wall_driven_cavity(case: Q2DWallDrivenCavityCase) -> Q2DWallDriven
     max_courant: list[float] = []
     divergence_linf: list[float] = []
 
-    def _record(step: int) -> tuple[np.ndarray, np.ndarray]:
+    def _state() -> tuple[np.ndarray, np.ndarray]:
         nonlocal psi
         _q2d_wall_driven_apply_vorticity_boundary(
             omega,
@@ -790,6 +790,9 @@ def solve_q2d_wall_driven_cavity(case: Q2DWallDrivenCavityCase) -> Q2DWallDriven
             dy=dy,
             right_wall_velocity=case.right_wall_velocity,
         )
+        return ux, uy
+
+    def _record(step: int, ux: np.ndarray, uy: np.ndarray) -> None:
         speed_squared = ux**2 + uy**2
         frame_times.append(step * case.dt)
         psi_frames.append(psi.copy())
@@ -801,24 +804,10 @@ def solve_q2d_wall_driven_cavity(case: Q2DWallDrivenCavityCase) -> Q2DWallDriven
         max_speed = float(np.max(np.sqrt(speed_squared))) if speed_squared.size else 0.0
         max_courant.append(max_speed * case.dt / max(min(dx, dy), 1.0e-12))
         divergence_linf.append(_q2d_wall_driven_divergence(ux, uy, dx=dx, dy=dy))
-        return ux, uy
 
-    _record(0)
+    ux, uy = _state()
+    _record(0, ux, uy)
     for step in range(1, steps + 1):
-        _q2d_wall_driven_apply_vorticity_boundary(
-            omega,
-            psi,
-            dx=dx,
-            dy=dy,
-            right_wall_velocity=case.right_wall_velocity,
-        )
-        psi = _q2d_wall_driven_streamfunction(omega, dx=dx, dy=dy)
-        ux, uy = _q2d_wall_driven_velocity(
-            psi,
-            dx=dx,
-            dy=dy,
-            right_wall_velocity=case.right_wall_velocity,
-        )
         interior = omega[1:-1, 1:-1]
         omega_x = np.where(
             ux[1:-1, 1:-1] >= 0.0,
@@ -840,11 +829,10 @@ def solve_q2d_wall_driven_cavity(case: Q2DWallDrivenCavityCase) -> Q2DWallDriven
             + case.viscosity * laplacian
             - case.hartmann_friction * interior
         )
+        ux, uy = _state()
         if step in frame_indices:
-            _record(step)
+            _record(step, ux, uy)
 
-    if steps not in frame_indices:
-        _record(steps)
     return Q2DWallDrivenCavitySolution(
         x=x,
         y=y,

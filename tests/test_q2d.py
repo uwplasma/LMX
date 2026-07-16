@@ -155,6 +155,10 @@ def test_q2d_wall_driven_cavity_comparison_gate_and_plot(tmp_path: Path):
         nx=25, ny=17, dt=1.0e-3, t_final=0.02, frame_count=5
     )
     solution = solve_q2d_wall_driven_cavity(case)
+    sparse = solve_q2d_wall_driven_cavity(build_q2d_wall_driven_cavity_case(
+        nx=25, ny=17, dt=1.0e-3, t_final=0.02, frame_count=2))
+    for name in ("streamfunction_frames", "vorticity_frames", "ux_frames", "uy_frames"):
+        np.testing.assert_array_equal(getattr(solution, name)[-1], getattr(sparse, name)[-1])
     observables = q2d_wall_driven_cavity_observables(case, solution)
     reference = {
         "speed_mean": observables["speed_mean"] * 1.01,
