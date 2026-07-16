@@ -13,10 +13,11 @@ worse than fixed relaxation two, so no SOLVAX or LMX API was added. Schemas
 1--5 remain readable. A six-update spectrum audit then closes generic
 shared-Euclidean Anderson tuning: 98.254--99.887% of its objective energy is
 electric potential, while B2 acceptance uses velocity-map convergence.
-A current-source velocity-block minimax audit then closes the full bounded
-depth-two affine family: updates three and four can improve by at most 0.0377%
-and 0.213%, so no residual metric can meet the frozen 15% per-pair gate. Fixed
-relaxation two remains the control and no accelerator API is added.
+A current-source velocity-block minimax audit then closes the bounded
+depth-two and depth-three affine families: depth-two updates three and four can
+improve by at most 0.0377% and 0.213%, while depth-three update four reaches
+only 0.555%, so neither family can meet the frozen 15% gate. Fixed relaxation
+two remains the control and no accelerator API is added.
 The installable-distribution contract is refreshed at `ca7535e`: frozen benchmark
 resources are package-owned, the wheel smoke runs outside the checkout,
 wheel/source membership and size are fail-closed, and the numerical core no
@@ -179,10 +180,10 @@ shared without removing cases or assertions.
 | package modules | 35 | no new module | 35 |
 | package lines | 34,692 | stay below 34,700 | 35,100 |
 | maintained-core lines | 7,880 | stay below 7,890 | 8,000 |
-| test files / lines | 30 / 21,064 | no new file; stay below 21,075 | 31 / 21,100 |
+| test files / lines | 30 / 21,074 | no new file; stay below 21,075 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,546,817 bytes | stay below 4,550,000 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,549,272 bytes | stay below 4,550,000 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -513,6 +514,10 @@ map rate and hashes all five residual pairs. The best possible bounded affine
 velocity gains are 99.998%, 0.0377%, 0.213%, 16.36%, and 78.38%. Because
 updates three and four cannot meet 15% under any depth-two residual metric,
 close the entire bounded depth-two affine family without a cold solve.
+The depth-three extension independently agrees under dual-simplex and
+interior-point linear programming. Its update-three through update-six gain
+ceilings are 99.998%, 0.555%, 19.85%, and 78.85%; update four therefore closes
+the bounded depth-three family without a cold solve as well.
 Pre-fix restarts, 128x/256x pseudo-time caps, and extrapolated convergence steps
 are diagnostic only. Exact histories and operator audits are in
 `benchmarks/results/b2-pseudotime-map-rate-20260715.json` and
@@ -538,9 +543,9 @@ The validation sequence is fail-closed:
 4. the residual-spectrum rationale gate is complete: zero of five pairs pass,
    and potential dominates the norm. Do not pursue another shared-Euclidean
    Anderson configuration;
-5. the velocity-block minimax gate is complete: two pairs cannot reach 15%
-   under any bounded depth-two affine metric. Do not implement or tune that
-   family;
+5. the velocity-block minimax gate is complete: depth-two has two failing
+   updates and depth-three update four cannot exceed 0.555%. Do not implement
+   or tune either bounded affine family;
 6. a materially different accelerator first requires a predeclared solver-free
    rationale and independent holdout, then must pass this same cold gate before
    regenerating both current-source trajectories to the shared step-29 point;

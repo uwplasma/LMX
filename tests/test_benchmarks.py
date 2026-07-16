@@ -801,3 +801,13 @@ def test_benchmark_b_pressure_observable_has_coordinate_free_fallback():
     assert benchmark_b_pressure_observable(
         solution, "B1-fringing-pipe"
     ).tolist() == pytest.approx([1.0 / 10700.0, 0.0, -1.0 / 10700.0])
+
+
+def test_b2_bounded_affine_rationale_fails_closed():
+    path = Path("benchmarks/results/b2-momentum-defect-20260715.json")
+    audit = json.loads(path.read_text())["residual_spectrum_audit"]
+    depth3 = audit["bounded_depth3_velocity_minimax"]
+    assert not audit["block_balanced_velocity_minimax"]["every_pair_pass"]
+    assert not depth3["every_update_pass"]
+    assert min(depth3["maximum_predicted_velocity_gain"]) < depth3["gain_min"]
+    assert all(sum(weights) == pytest.approx(1.0) for weights in depth3["optimal_weights"])

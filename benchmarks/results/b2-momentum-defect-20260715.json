@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "date": "2026-07-15",
   "implementation_commit": "e6834ee2a3c36bca936c558dcd0b935d92832a21",
   "operator_audit_commit": "2d0fb5044217b9848b7e13666f8865a4eb05f466",
@@ -342,8 +342,33 @@
       "every_pair_pass": false,
       "interpretation": "Updates 3 and 4 cannot reach the frozen 15% velocity-map gain under any bounded depth-two affine residual metric."
     },
+    "bounded_depth3_velocity_minimax": {
+      "reconstruction_commit": "2c489be082be5bbe4777577de1ac84b949e01314",
+      "raw_pairs_sha256": "3a7390a84b96a9b4e289339b3742ff5a1713ddd218e065701ace42c48be7c02f",
+      "residual_sequence": "six residuals reconstructed from exact overlap of the five adjacent depth-two pairs",
+      "objective": "minimize ||sum_i w_i r_i,U||_inf / ||r_current,U||_inf over three adjacent residuals, sum(w)=1, each w in [-4,4]",
+      "updates": [3, 4, 5, 6],
+      "optimal_weights": [
+        [1.0000256122788713, -0.00008616380984534296, 0.00006055153097403617],
+        [3.7156207583707417, -4.0, 1.2843792416292583],
+        [1.0938392623545083, -2.36694472283343, 2.273105460478922],
+        [4.0, -3.6112612733589504, 0.6112612733589504]
+      ],
+      "maximum_predicted_velocity_gain": [
+        0.9999844696890615,
+        0.0055504454140054,
+        0.1985055411705491,
+        0.7884869700259824
+      ],
+      "gain_min": 0.15,
+      "weight_max_abs": 4.0,
+      "independent_solvers": ["HiGHS dual simplex", "HiGHS interior point"],
+      "every_update_pass": false,
+      "failing_updates": [4],
+      "interpretation": "Update 4 can improve by at most 0.555%, so no bounded depth-three affine residual metric can meet the frozen per-update gain gate."
+    },
     "interpretation": "The shared Euclidean residual is 98.254%-99.887% electric-potential energy while B2 promotion uses velocity-map convergence; conditioning safeguards cannot correct this objective mismatch.",
-    "decision": "close the bounded depth-two affine accelerator family; retain fixed relaxation 2; require an independent holdout rationale before testing a materially different accelerator"
+    "decision": "close the bounded depth-two and depth-three affine accelerator families; retain fixed relaxation 2; require an independent holdout rationale before testing a materially different accelerator"
   },
   "normalized_map_outcome_study": {
     "shape": [7, 7, 7],
@@ -409,7 +434,7 @@
     "pseudotime_safety_frozen": true,
     "raw_tolerance_normalized_map_rate_at_64x": 0.00078125,
     "legacy_normalized_map_rate_candidate": 0.05,
-    "next_gate": "retain fixed relaxation 2; do not add or tune another bounded depth-two affine accelerator or proceed to step 29; a materially different accelerator requires an independent holdout rationale",
+    "next_gate": "retain fixed relaxation 2; do not add or tune another bounded depth-two or depth-three affine accelerator or proceed to step 29; a materially different accelerator requires an independent holdout rationale",
     "outcome_limits": {
       "normalized_transverse_pressure_linf": 0.0002,
       "velocity_max_absolute_over_U0": 0.001,
