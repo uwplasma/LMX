@@ -738,15 +738,6 @@ def _laplacian_3d_benchmark(field: jnp.ndarray) -> jnp.ndarray:
     )
 
 
-def _gradient_3d_benchmark(
-    field: jnp.ndarray,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    d_dx = 0.5 * (jnp.roll(field, -1, axis=0) - jnp.roll(field, 1, axis=0))
-    d_dy = 0.5 * (jnp.roll(field, -1, axis=1) - jnp.roll(field, 1, axis=1))
-    d_dz = 0.5 * (jnp.roll(field, -1, axis=2) - jnp.roll(field, 1, axis=2))
-    return d_dx, d_dy, d_dz
-
-
 def _benchmark_extruded_operator_iterations(
     u0: jnp.ndarray,
     v0: jnp.ndarray,
@@ -767,7 +758,9 @@ def _benchmark_extruded_operator_iterations(
         lap_v = _laplacian_3d_benchmark(v)
         lap_w = _laplacian_3d_benchmark(w)
         lap_phi = _laplacian_3d_benchmark(phi)
-        dphi_dx, dphi_dy, dphi_dz = _gradient_3d_benchmark(phi)
+        dphi_dx = 0.5 * (jnp.roll(phi, -1, axis=0) - jnp.roll(phi, 1, axis=0))
+        dphi_dy = 0.5 * (jnp.roll(phi, -1, axis=1) - jnp.roll(phi, 1, axis=1))
+        dphi_dz = 0.5 * (jnp.roll(phi, -1, axis=2) - jnp.roll(phi, 1, axis=2))
         uxb_x = v * bz - w * by
         uxb_y = w * bx - u * bz
         uxb_z = u * by - v * bx
