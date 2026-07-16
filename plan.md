@@ -45,8 +45,8 @@ timing-stability gates. Its 1.229x/1.360x point speedups promote the two-device
 optimization but miss the four-device bound. It is a two-update forced-device
 calibration, not a physical-core or production strong-scaling claim. Schema-6
 topology, explicit component placement, and exact serialized replay pass on
-one and two GPUs; shared-host timing is excluded. The latest accepted
-affinity-controlled Docker CPU-allocation path, keyed to `a92b4e6`, passes
+one and two GPUs; shared-host timing is excluded. The latest multi-minute,
+static-preflight Docker CPU-allocation path, keyed to `a92b4e6`, passes
 32-update sustained scaling:
 every warm trajectory lasts 147--269 s, speedup is 1.317x/1.684x on two/four
 versus one JAX device, and all confidence, efficiency, restart, physics,
@@ -65,7 +65,8 @@ boolean. It fails closed unless one exact 1/2/4-shard CPU or
 1/2-GPU group shares provenance and fixed work and passes sustained duration,
 real-solver numerics, placement, peak memory, and explicit affinity/idle-host
 evidence. Incomplete candidates remain visible without a sustained speedup or
-plot title. The accepted CPU rerun is complete. A post-slimming rerun was
+plot title. The earlier multi-minute CPU record passed its static preflight but
+is not promotable under the new continuous-monitor gate. Its confirmation was
 aborted without a timing record after unrelated local simulations raised host
 load above 135 following a clean preflight. A later check still found load 83,
 active SFINCS/Python work, and severe swapouts. Require continuous and
@@ -364,10 +365,11 @@ the current `a92b4e6` 1/2/4-device ladder uses 2/4/8 CPU allocations and reports
 246.702/187.307/146.524-second warm medians. Speedups are 1.317x/1.684x,
 empirical 95% lower bounds are 1.301x/1.661x, and efficiencies are 65.9%/42.1%.
 Every warm sample lasts at least 146 s, CVs are below 4.45%, midpoint replay is
-exact, and every placement, linear, conservation, Anderson, provenance,
-admission, and cross-topology gate passes. Accept this as current-source
-sustained fixed-work Docker CPU-allocation strong scaling, not exact M4
-host-core, steady-state, or B2 solution evidence. Peak process RSS is
+exact, and every placement, linear, conservation, Anderson, provenance, static
+admission, and cross-topology gate passes. Retain this as multi-minute
+fixed-work calibration; current promotion additionally requires a clean
+continuous/postflight trace. It is not exact M4 host-core, steady-state, or B2
+solution evidence. Peak process RSS is
 4.65/5.22/5.43 GB and the solution-bundle estimate is 101.1 MB at every rung;
 CPU allocator bytes per device are unavailable. Apply the same protocol to
 GPUs only after the shared host passes the 60-second idle/no-foreign-work gate.

@@ -7,10 +7,11 @@ devices alone is not evidence of parallel execution.
 ![B2 seconds-scale correctness calibration, sustained CPU scaling, and non-idle-host GPU calibration](_static/strong_scaling.webp)
 
 This composite is generated from the compact schema-6 CPU and GPU records. The upper
-panel is forced-device calibration; the middle panel is current-source sustained
-fixed-work scaling on affinity-controlled 2/4/8 CPUs; the lower panel is a
+panel is forced-device calibration; the middle panel is multi-minute fixed-work
+calibration on affinity-controlled 2/4/8 CPUs; the lower panel is a
 multi-minute one/two-GPU shared-host calibration. GPU correctness is green, but
-the timing claim remains open because foreign contexts fail the idle gate.
+the timing claim remains open because foreign contexts fail the idle gate. The
+CPU timing now also awaits confirmation under continuous host monitoring.
 
 ## Current evidence
 
@@ -20,7 +21,7 @@ the timing claim remains open because foreign contexts fail the idle gate.
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | B2 schema-6 CPU calibration | Apple M4, `256 x 67 x 67`, 1/2/4 forced CPU devices | 15.159/12.337/11.146 s; 1.229x/1.360x speedup; exact restart and device equivalence pass | accepted correctness/calibration; four-device promotion gate not met |
 | B2 CPU-allocation confirmation | ARM64 Docker on Apple M4, `256 x 67 x 67`, 2/4/8 affinity-controlled guest CPUs for 1/2/4 devices | 22.894/15.953/14.252 s; 1.435x/1.606x; 95% lower bounds 1.364x/1.548x; efficiency 71.8%/40.2% | repeated two-update calibration; host P/E-core mapping unverified |
-| B2 sustained CPU scaling | same grid/masks, 32 updates, three warm trajectories per topology | 246.702/187.307/146.524 s; 1.317x/1.684x; peak process RSS 4.65/5.22/5.43 GB; CV below 4.45% | accepted source-keyed record at `a92b4e6`; later ownership refactors pass the bounded B2 smoke, while exact host-core and steady-state evidence remain open |
+| B2 sustained CPU calibration | same grid/masks, 32 updates, three warm trajectories per topology | 246.702/187.307/146.524 s; 1.317x/1.684x; peak process RSS 4.65/5.22/5.43 GB; CV below 4.45% | source-keyed `a92b4e6` result passed the former static-preflight gate; current continuous/postflight promotion remains open |
 | B2 sustained GPU calibration | 1/2 RTX A4000, same grid, 96 updates, three warm trajectories per topology | 258.913/159.234 s; 1.626x; peak device memory 2.50 GB vs 1.41/1.31 GB; CV below 0.29% | numerical/duration gates pass; persistent foreign contexts block an authoritative timing claim |
 | B2 pseudo-time gate | Apple M4, corrected warm `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x/32x/16x map-rate spread 0.0768%; raw updates halve; exact restart | 64x refrozen; versioned stopping threshold open |
 | B2 physical-residual probe | Apple M4, `7 x 7 x 7` | residual 0.03870 at step 90; omitted reconstruction force is 0.0880 at step 4 | diagnostic has a plausible coarse split floor; never a stopping gate |
@@ -193,15 +194,15 @@ The six-repeat `256 x 67 x 67` calibration reports 22.894, 15.953, and 14.252
 second warm medians. Its 1.435x/1.606x speedups, 1.364x/1.548x 95% lower bounds,
 and 71.8%/40.2% efficiencies pass the frozen calibration gates, but the runs
 are short. A 20-update duration pilot then failed closed at 95.63–97.51 s.
-The accepted `a92b4e6` 32-update workload measures 246.702, 187.307, and 146.524 s
+The preflight-admitted `a92b4e6` 32-update workload measures 246.702, 187.307, and 146.524 s
 on one/two/four JAX devices allocated 2/4/8 CPUs, with every warm sample above
 120 s. Speedups are 1.317x/1.684x, their empirical 95% lower bounds are
 1.301x/1.661x, and efficiencies are 65.9%/42.1%. CVs remain below 4.45%;
 midpoint restart is exact and all schema-6, physics,
-placement, and cross-topology gates pass. This accepts sustained fixed-work CPU
-allocation scaling, not exact M4 host-core scaling, steady convergence, or B2
-solution acceptance. Linux affinity is verified inside the Docker VM; Docker
-Desktop does not expose how those vCPUs map onto the heterogeneous host cores.
+placement, and cross-topology gates pass. It remains useful multi-minute
+calibration, but the current gate requires a fresh continuous/postflight host
+trace before promotion. Linux affinity is verified inside the Docker VM;
+Docker Desktop does not expose how those vCPUs map onto heterogeneous cores.
 
 The medium B2 tight solve converged across two restart-safe segments and ended
 at residual `2.500e-5`, divergence `1.829e-6`, and charge residual `1.149e-4`.
@@ -373,7 +374,12 @@ exact M4 P/E-core placement. GPU admission must be repeated between rungs and
 after the campaign. New timing evidence also needs a checksummed host-side
 continuous monitor through every rung and a clean postflight; the static
 preflight alone cannot detect work that starts later. Keep its raw trace as an
-ignored or release artifact. This manual lane stays outside portable tests.
+ignored or release artifact. Each worker record must carry compact schema-1
+`resource_monitoring` evidence: matching backend/device count, a raw SHA-256,
+sample period and maximum gap at most five seconds, full cold-plus-warm worker
+coverage, at least 15 postflight seconds, and zero violations. Missing or
+malformed monitoring leaves timings visible as candidates but blocks promotion.
+This manual lane stays outside portable tests.
 
 The solver-faithful example requires a validated restart matching each timed
 grid; it fails before launching workers when one is missing:

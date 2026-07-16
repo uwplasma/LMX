@@ -302,10 +302,12 @@
       "timing_stability": true,
       "confidence_bounds": true,
       "parallel_efficiency": true,
-      "sustained_strong_scaling": true
+      "static_preflight_verified": true,
+      "continuous_environment_verified": false,
+      "sustained_strong_scaling": false
     },
     "memory_note": "Peak RSS is the worker process high-water mark; the CPU backend exposes no per-device allocator bytes.",
-    "classification": "sustained fixed-work Docker CPU-allocation strong scaling at afd17d6; exact host-core mapping, current-source timing, and steady-state evidence remain open"
+    "classification": "preflight-admitted multi-minute Docker CPU-allocation calibration at afd17d6; continuous host monitoring, exact host-core mapping, current-source timing, and steady-state evidence remain open"
   },
   "current_source_sustained_cpu_allocation": {
     "source_commit": "a92b4e684b8a3e269e5ac74de7270b184ff0be3b",
@@ -390,12 +392,14 @@
       "cross_topology": true,
       "placement": true,
       "memory_recorded": true,
-      "environment_verified": true,
-      "sustained_strong_scaling": true
+      "static_preflight_verified": true,
+      "continuous_environment_verified": false,
+      "environment_verified": false,
+      "sustained_strong_scaling": false
     },
     "input_sha256": "bf61afda96beb7e1feeec4cbb7406ed35047329a19ec31c0a93d819cfbb2108e",
     "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa",
-    "classification": "current-source sustained fixed-work Docker CPU-allocation strong scaling; exact M4 host-core placement, steady convergence, and B2 solution acceptance remain open"
+    "classification": "current-source preflight-admitted multi-minute Docker CPU-allocation calibration; continuous host monitoring, exact M4 host-core placement, steady convergence, and B2 solution acceptance remain open"
   },
   "post_profile_decisions": {
     "axial_mean_omission": {
@@ -440,11 +444,11 @@
   },
   "claim_limits": {
     "production_sharding_correctness": true,
-    "strong_scaling_claim": true,
+    "strong_scaling_claim": false,
     "steady_state_evidence": false,
     "physical_core_scaling": false,
-    "docker_cpu_allocation_scaling": "sustained fixed-work 2/4/8-guest-CPU strong scaling",
-    "reason": "The current-source 256 x 67 x 67, 32-update trajectories pass the 120-second-per-warm-sample, correctness, guest-affinity, stability, confidence, provenance, memory, and efficiency gates. They establish fixed-work Docker CPU-allocation scaling, not exact M4 host-core placement, steady-state convergence, or solution acceptance."
+    "docker_cpu_allocation_scaling": "preflight-admitted multi-minute 2/4/8-guest-CPU calibration",
+    "reason": "The current-source 256 x 67 x 67, 32-update trajectories pass the duration, correctness, guest-affinity, stability, confidence, provenance, memory, and efficiency gates. The former protocol recorded only a static preflight, so current promotion requires a fresh continuous/postflight trace; exact M4 host-core placement, steady-state convergence, and solution acceptance also remain open."
   },
   "raw_assets": {
     "location": "ignored artifacts/{schema6,global-coarse}-{topology,scaling}-20260716, artifacts/docker-physical-core-schema6-{128,sustained-256}, and artifacts/current-source-sustained-cpu-20260716; publish only as checksummed release assets if needed",
