@@ -95,7 +95,7 @@
         "alex-results-1987"
       ],
       "spec_path": "benchmarks/specs/alex-b2-square.toml",
-      "spec_sha256": "ff25b098e656671e605485ff771a89fe787a70c1c32cb67a5ea97461337f557c",
+      "spec_sha256": "29b5b1af2c3eea535cb1f8c24366192e4d6ea97a219977a5b47f9eae824dcb79",
       "tolerances_frozen_before_production": true
     }
   ],
