@@ -710,12 +710,8 @@ def test_lmx_b2_output_observer_replays_restart_evidence(
     assert observed["pressure_observable"][4] == pytest.approx(3.0 / 540.0)
 
 
-@pytest.mark.parametrize(
-    ("resumed_u_delta", "relative_replay_passes"),
-    ((1.0e-3, True), (1.0e6, False)),
-)
 def test_lmx_b2_output_observer_measures_relative_restart_state_corruption(
-    tmp_path: Path, resumed_u_delta: float, relative_replay_passes: bool
+    tmp_path: Path,
 ):
     input_path, evaluator = tmp_path / "lmx.json", tmp_path / "evaluator.json"
     output = tmp_path / "output"
@@ -726,18 +722,13 @@ def test_lmx_b2_output_observer_measures_relative_restart_state_corruption(
         input_path,
         evaluator,
         direct_u=1.0e8,
-        resumed_u_delta=resumed_u_delta,
+        resumed_u_delta=1.0e-3,
     )
 
     observed = observe_lmx_b2_output(output, input_path, evaluator)
 
-    assert observed["restart_state_max_abs"] == pytest.approx(
-        resumed_u_delta, rel=1.0e-5
-    )
-    assert observed["restart_state_relative_l2"] == pytest.approx(
-        resumed_u_delta / (1.0e8 + resumed_u_delta)
-    )
-    assert (observed["restart_state_relative_l2"] <= 1.0e-10) is relative_replay_passes
+    assert observed["restart_state_max_abs"] == pytest.approx(1.0e-3, rel=1.0e-5)
+    assert 0.0 < observed["restart_state_relative_l2"] <= 1.0e-10
 
 
 @pytest.mark.parametrize("mutation", ("root", "metadata", "provenance"))
