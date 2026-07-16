@@ -449,7 +449,7 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
     layout = prepare_extruded_output_layout(tmp_path / "run")
     assert restart_path.exists()
     assert restart_bundle.bundle.u.shape == (3, 2, 2)
-    assert restart_bundle.metadata["restart_schema"] == "b2_diagnostics_v4"
+    assert restart_bundle.metadata["restart_schema"] == "b2_diagnostics_v5"
     for name in ("rho_phi_plus", "rho_phi_inlet", "axial_pressure_loss_gradient",
                  "transverse_pressure_difference", "iteration_pressure_linear_history",
                  "iteration_electric_linear_history", "iteration_potential_residual_history",
@@ -476,8 +476,11 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
                       )]
         v4_short = {key: data[key] for key in data.files}
         v4_short["iteration_momentum_defect_history"] = np.zeros(0)
-        v3_metadata = json.loads(str(data["metadata_json"]))
-        v3_metadata["restart_schema"] = "b2_diagnostics_v3"
+        v4_metadata = json.loads(str(data["metadata_json"]))
+        v4_metadata["restart_schema"] = "b2_diagnostics_v4"
+        v4_payload = {key: data[key] for key in data.files}
+        v4_payload["metadata_json"] = json.dumps(v4_metadata)
+        v3_metadata = {**v4_metadata, "restart_schema": "b2_diagnostics_v3"}
         v3_payload = {key: data[key] for key in data.files
                       if key != "iteration_momentum_defect_history"}
         v3_payload["metadata_json"] = json.dumps(v3_metadata)
@@ -500,6 +503,12 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
     np.savez_compressed(short_path, **v4_short)
     with pytest.raises(ValueError, match="inconsistent lengths"):
         load_extruded_restart_bundle(short_path)
+
+    v4_path = tmp_path / "restart" / "diagnostics_v4.npz"
+    np.savez_compressed(v4_path, **v4_payload)
+    v4 = load_extruded_restart_bundle(v4_path)
+    assert v4.metadata["restart_schema"] == "b2_diagnostics_v4"
+    assert not v4.bundle.iteration_momentum_defect_history.size
 
     v3_path = tmp_path / "restart" / "diagnostics_v3.npz"
     np.savez_compressed(v3_path, **v3_payload)

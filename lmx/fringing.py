@@ -7858,6 +7858,7 @@ def _solve_extruded_projection(
         pressure_linear_iterations = jnp.asarray(0)
         pressure_linear_converged = jnp.asarray(False)
         pressure_linear_status = jnp.asarray(-1)
+        momentum_linear_converged = jnp.asarray(True)
         if use_alex_b2_finite_volume:
             jx, jy, jz, lorentz_x, lorentz_y, lorentz_z = lorentz_operator(
                 phi, sigma, uxb_x, uxb_y, uxb_z, bx, by, bz
@@ -7880,7 +7881,7 @@ def _solve_extruded_projection(
             velocity = pack_vector(u, v, w)
             momentum_force = pack_vector(
                 lorentz_x + forcing, lorentz_y, lorentz_z)
-            velocity_fluid, _, _ = momentum_solve(
+            velocity_fluid, _, momentum_linear_converged = momentum_solve(
                 velocity, momentum_force, rho, nu,
                 current_rho_phi_plus, current_rho_phi_inlet)
             u_star, v_star, w_star = embed_velocity(velocity_fluid, fluid_mask)
@@ -8121,13 +8122,10 @@ def _solve_extruded_projection(
         electric_linear_by_step.append(tuple(electric_diagnostics))
         courant_by_step.append((dt if use_alex_b2_finite_volume else -1.0,
                                 *map(float, step_courant)))
-        update_residual = max(
-            u_update,
-            v_update,
-            w_update,
-            pressure_update,
-            potential_update,
-        )
+        update_residual = max(u_update, v_update, w_update, pressure_update, potential_update)
+        stopping_residual = (max(u_update, v_update, w_update)
+            / (inverse_electromagnetic_scale * dt)
+            if use_alex_b2_finite_volume else update_residual)
         residual_by_step.append(update_residual)
         pressure_residual_by_step.append(pressure_update)
         potential_residual_by_step.append(potential_update)
@@ -8144,10 +8142,12 @@ def _solve_extruded_projection(
             )
         )
         instantaneous_convergence = (
-            update_residual <= case.solver.coupling_tolerance
+            stopping_residual <= case.solver.coupling_tolerance
             and projected_divergence_max <= ALEX_BALANCE_TOLERANCE
             and flow_error_value <= ALEX_BALANCE_TOLERANCE
             and charge_balance <= ALEX_BALANCE_TOLERANCE
+            and (not use_alex_b2_finite_volume or all(map(bool, (momentum_linear_converged,
+                pressure_linear_converged, electric_converged))))
         )
         accepted_state_converged = (
             max(u_update, v_update, w_update, potential_update)

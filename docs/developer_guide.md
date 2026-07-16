@@ -66,7 +66,7 @@ the structural commit from numerical changes. Docstrings should state array
 shape, units, solver assumptions, and literature anchors where these are not
 obvious from the type signature.
 
-Exact B2 restarts use schema `b2_diagnostics_v4`; the pressure-linear history
+Exact B2 restarts use schema `b2_diagnostics_v5`; the pressure-linear history
 has shape `(completed_steps, 5)`. The loader remains compatible with v2, and a
 continued v2 run marks its unknown earlier rows `[NaN, NaN, 0, 0, -1]`.
 

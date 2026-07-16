@@ -16,13 +16,13 @@
     "exact_split_fixed_point_defect": false
   },
   "implementation": {
-    "restart_schema": "b2_diagnostics_v4",
+    "restart_schema": "b2_diagnostics_v5",
     "history": "iteration_momentum_defect_history",
     "user_facing_name": "post-map nonlinear momentum residual",
     "pressure_operator": "exact face correction shared with the projection",
     "momentum_operator": "limited-linear convection, implicit variable-viscosity diffusion, explicit deviatoric stress, fresh mapped Lorentz force",
-    "legacy_v3_policy": "readable for diagnostics; not resumable under the v4 diagnostic contract",
-    "stopping_rule_changed": false
+    "legacy_v4_policy": "readable for diagnostics; not resumable under the normalized-map stopping contract",
+    "stopping_rule_changed": true
   },
   "reduced_four_update_probe": {
     "shape": [7, 7, 7],

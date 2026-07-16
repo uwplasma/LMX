@@ -14,7 +14,7 @@ from .mesh import StructuredMesh
 
 
 _DIAGNOSTIC_FIELDS = tuple(item.name for item in fields(Diagnostics))
-_B2_DIAGNOSTIC_SCHEMAS = tuple(f"b2_diagnostics_v{version}" for version in (2, 3, 4))
+_B2_DIAGNOSTIC_SCHEMAS = tuple(f"b2_diagnostics_v{version}" for version in (2, 3, 4, 5))
 _EXTRUDED_ARRAY_FIELDS = """x y z field_scale u v w p phi jx jy jz lorentz_x lorentz_y lorentz_z
 residual volumetric_flow_rate mean_velocity axial_current wall_current_leakage current_scaled_pressure_proxy
 charge_balance_residual boundary_current_residual""".split()
@@ -300,7 +300,7 @@ def write_extruded_bundle_restart_npz(
         "geometry_kind": case.geometry.kind,
         "solver_kind": case.solver.kind,
         "station_count": int(bundle.x.shape[0]),
-        "restart_schema": ("b2_diagnostics_v4" if has_compact_flux and has_diagnostics
+        "restart_schema": ("b2_diagnostics_v5" if has_compact_flux and has_diagnostics
                            and has_pressure_diagnostics and has_momentum_diagnostics
                            else "b2_diagnostics_v3" if has_compact_flux and has_diagnostics
                            and has_pressure_diagnostics
@@ -420,7 +420,7 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
         required = (
             (_B2_DIAGNOSTIC_SCHEMAS, "iteration_courant_history", "CFL"),
             (_B2_DIAGNOSTIC_SCHEMAS[1:], "iteration_pressure_linear_history", "pressure linear"),
-            (_B2_DIAGNOSTIC_SCHEMAS[2:], "iteration_momentum_defect_history", "momentum defect"),
+            (_B2_DIAGNOSTIC_SCHEMAS[3:], "iteration_momentum_defect_history", "momentum defect"),
         )
         for schemas, field, label in required:
             if schema in schemas and field not in data:
@@ -445,7 +445,7 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
             else jnp.asarray(_load_optional_array(data, name))
             for name, width in EXTRUDED_HISTORY_WIDTHS
         }
-        if schema != "b2_diagnostics_v4":
+        if schema != "b2_diagnostics_v5":
             histories["iteration_momentum_defect_history"] = jnp.zeros((0,))
         bundle = ExtrudedFieldBundle(
             **{name: jnp.asarray(data[name]) for name in _EXTRUDED_ARRAY_FIELDS},

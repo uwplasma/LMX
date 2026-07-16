@@ -517,7 +517,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
         solver=replace(
             problem.case.solver,
             coupling_iterations=2,
-            coupling_tolerance=1.0e-9,
+            coupling_tolerance=0.33,
         ),
     )
     profile = build_benchmark_b_field_profile(
@@ -548,6 +548,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     assert benchmarks.jnp.all(benchmarks.jnp.isfinite(momentum_defect))
     assert benchmarks.jnp.all(momentum_defect >= 0.0)
     assert solution.bundle.stopping_state[0] == history.size
+    assert solution.bundle.stopping_state == (4, 2, "step_limit")
 
     fx, fy, fz = _unpack_duct_mass_flux(
         solution.bundle.rho_phi_plus, solution.bundle.rho_phi_inlet
@@ -591,7 +592,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
         continuation_problem,
         initial_bundle=restart.bundle,
     )
-    assert restart.metadata["restart_schema"] == "b2_diagnostics_v4"
+    assert restart.metadata["restart_schema"] == "b2_diagnostics_v5"
     assert restart.bundle.aitken_state[1] == pytest.approx(2.0)
     for name in (
         "u",

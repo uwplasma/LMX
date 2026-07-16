@@ -88,7 +88,7 @@ observables pass the 1% finite-grid gate.
 
 ![B2 fringe field and pressure diagnostics](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-alex-b2-field-pressure.webp)
 
-The current B2 smoke has exact schema-4 restart, a post-map physical momentum
+The current B2 smoke has exact schema-5 restart, a post-map physical momentum
 diagnostic, and 1/2/4-CPU equivalence. Its projection-consistent stopping rule
 remains open; its 64x pseudo-time cap is refrozen, while the last 1/2-GPU ladder predates the terminal-
 restart fix and is being refreshed.
