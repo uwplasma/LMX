@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-16. Current LMX source through `c1ca34f` consumes released SOLVAX 0.8.4;
+Status: 2026-07-16. Current LMX source through `2c4d8cd` consumes released SOLVAX 0.8.4;
 `aaa41b1` made the
 frozen B2 path Anderson depth two with one shared weight vector for mapped
 scaled fields and conservative compact flux. Restart schema 6 stores one raw
@@ -63,9 +63,10 @@ summary re-derives duration from finite warm samples, repeat count, the declared
 threshold, median, role, and worker assertions; it never trusts a candidate
 boolean. It fails closed unless one exact 1/2/4-shard CPU or
 1/2-GPU group shares provenance and fixed work and passes sustained duration,
-real-solver numerics, placement, peak memory, and explicit affinity/idle-host
-evidence. Incomplete candidates remain visible without a sustained speedup or
-plot title. The earlier multi-minute CPU record passed its static preflight but
+real-solver numerics, placement, peak memory, explicit affinity/idle-host
+preflight, and checksummed continuous/postflight monitoring. Incomplete
+candidates remain visible without a sustained speedup or plot title. The
+earlier multi-minute CPU record passed its static preflight but
 is not promotable under the new continuous-monitor gate. Its confirmation was
 aborted without a timing record after unrelated local simulations raised host
 load above 135 following a clean preflight. A later check still found load 83,
@@ -176,12 +177,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,699 | stay below 34,700 | 35,100 |
+| package lines | 34,692 | stay below 34,700 | 35,100 |
 | maintained-core lines | 7,880 | stay below 7,890 | 8,000 |
-| test files / lines | 30 / 21,038 | no new file; stay below 21,075 | 31 / 21,100 |
+| test files / lines | 30 / 21,064 | no new file; stay below 21,075 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,544,163 bytes | stay below 4,550,000 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,546,817 bytes | stay below 4,550,000 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
