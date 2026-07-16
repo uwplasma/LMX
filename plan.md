@@ -302,8 +302,12 @@ step-one axial-velocity perturbation confined to the second shard, which the
 high-Ha second update amplifies. The failure persists on an idle host, with
 standard electric PCG, without the electric coarse correction, and after full
 output synchronization. Treat this as an LMX-owned shard-boundary/layout
-defect, not a SOLVAX defect. Add a warm-repeat signature gate and isolate the
-first momentum/projection map at the cut before changing solver tolerances.
+defect, not a SOLVAX defect. The scaling worker now fails closed on a compact,
+gauge-invariant, axial-station signature across every cold and warm repeat; it
+passes exactly on CPU and detects the two-GPU defect at `3183.12`. The phase
+probe shows both repeats remain identical through step-one momentum,
+projection, and electric reconstruction and first diverge in fixed relaxation.
+Isolate that JAX sharded update before changing solver tolerances.
 
 Only after that gate passes, re-measure accepted rungs in an isolated GPU
 window before any publishable scaling claim. Schema-6 Anderson work and larger

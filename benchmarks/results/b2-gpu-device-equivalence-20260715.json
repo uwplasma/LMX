@@ -86,6 +86,9 @@
       "checkpoint_velocity_max_abs": 1.5475279946386422e-9,
       "direct_pressure_max_abs": 643.4117750222716,
       "direct_potential_max_abs": 11.925913229109918,
+      "worker_signature_max_abs": 3183.1210297645484,
+      "worker_signature_passed": false,
+      "worker_source_fingerprint": "fc047c795e779e68bebac9cae6630cb12a741d7b9ef2816499d29c618206de66",
       "conclusion": "current multi-GPU correctness and timing promotion are blocked pending a shard-boundary/layout fix"
     },
     "diagnostics_rejected": [
@@ -96,7 +99,8 @@
     ],
     "raw_sha256": {
       "one_gpu_worker": "82e4eb1555b9d7e293aa267418da44c0496996b40870e49f9e6db9b96d71506e",
-      "two_gpu_worker": "3adf657496c7e9c92adbb0681846419708a53c29fbc99e2b1cdc9ddb588606e6"
+      "two_gpu_worker": "3adf657496c7e9c92adbb0681846419708a53c29fbc99e2b1cdc9ddb588606e6",
+      "two_gpu_repeat_gate_worker": "94b48cf016075d3588252680da360db48101296402cc38315c37b7e728bebbd6"
     }
   }
 }

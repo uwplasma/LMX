@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import lmx
+from lmx._fringing_types import EXTRUDED_HISTORY_WIDTHS
 from lmx.fringing import (
     _axial_field_sharding,
     _explicit_deviatoric_stress_duct,
@@ -41,6 +42,8 @@ from lmx.scaling import (
 
 _B2_RESTART_FLUX_ATOL = 1.0e-6
 _B2_RESTART_FLUX_RTOL = 1.0e-5
+_B2_REPEAT_ATOL = 2.0e-9
+_B2_REPEAT_RTOL = 2.0e-8
 
 if ROOT not in Path(lmx.__file__).resolve().parents:
     raise RuntimeError(
@@ -72,6 +75,24 @@ def _placement(array) -> dict[str, int | bool]:
     return {"addressable_shards": len(array.addressable_shards),
         "global_shards": len(array.global_shards),
         "replicated": bool(array.sharding.is_fully_replicated)}
+
+
+def _b2_repeat_signature(bundle) -> np.ndarray:
+    """Compress every sharded B2 field by axial station for repeat gates."""
+
+    values = []
+    for name in ("u", "v", "w", "p", "phi", "jx", "jy", "jz", "rho_phi_plus"):
+        array = np.asarray(getattr(bundle, name), dtype=float)
+        if name == "phi":
+            array = array - np.mean(array)
+        axial_axis = 1 if name == "rho_phi_plus" else 0
+        stations = np.moveaxis(array, axial_axis, 0).reshape(array.shape[axial_axis], -1)
+        values.append(np.stack((np.min(stations, axis=1), np.max(stations, axis=1),
+            np.mean(stations, axis=1), np.linalg.norm(stations, axis=1))).reshape(-1))
+    values.append(np.asarray(bundle.rho_phi_inlet, dtype=float).reshape(-1))
+    values.extend(np.asarray(getattr(bundle, name), dtype=float).reshape(-1)
+        for name, _ in EXTRUDED_HISTORY_WIDTHS)
+    return np.concatenate(values)
 
 
 def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: int):
@@ -236,12 +257,13 @@ def _matched_b2_smoke_benchmark(
     )
 
     problem = load_matched_b2_lmx_input(input_path)
-    timings, checkpoint, direct = [], None, None
+    timings, signatures, checkpoint, direct = [], [], None, None
     for _ in range(repeats):
         started = time.perf_counter()
         checkpoint, direct = _run_matched_b2_lmx_direct(
             problem, num_devices=num_devices
         )
+        signatures.append(_b2_repeat_signature(direct))
         timings.append(time.perf_counter() - started)
     acceptance_role = (
         "harness-smoke" if direct.u.shape == (8, 7, 7) else "scaling-calibration"
@@ -287,6 +309,11 @@ def _matched_b2_smoke_benchmark(
     pressure_diagnostics = summarize_pressure_linear_history(
         pressure_history, expected_steps=observed["steps"])
     limits = load_benchmark_b_spec("B2-fringing-square")["harness_smoke_execution"]
+    repeat_signature_max_abs = max(float(np.max(np.abs(signature - signatures[0])))
+        for signature in signatures[1:])
+    repeat_signature_passed = all(np.allclose(
+        signature, signatures[0], rtol=_B2_REPEAT_RTOL, atol=_B2_REPEAT_ATOL)
+        for signature in signatures[1:])
     validation_passed = bool(
         observed["steps"] == 2 and observed["stop_reason"] == "step_limit"
         and max(observed["courant_max"]) <= limits["courant_max"]
@@ -300,6 +327,7 @@ def _matched_b2_smoke_benchmark(
         and observed["restart_flux_relative_l2"] <= _B2_RESTART_FLUX_RTOL
         and pressure_diagnostics["pressure_linear_diagnostics_complete"]
         and pressure_diagnostics["pressure_solves_converged"]
+        and repeat_signature_passed
     )
     warm = np.asarray(timings[1:])
     velocity_l2 = float(np.sqrt(sum(np.linalg.norm(np.asarray(getattr(direct, name))) ** 2
@@ -335,7 +363,10 @@ def _matched_b2_smoke_benchmark(
         "validation_passed": validation_passed, "steady_state_passed": False,
         **pressure_diagnostics,
         "pressure_linear_history": pressure_history.tolist(),
-        "signature_relative_tolerance": 2.0e-8, "observables": observed,
+        "signature_relative_tolerance": _B2_REPEAT_RTOL,
+        "repeat_signature_max_abs": repeat_signature_max_abs,
+        "repeat_signature_passed": repeat_signature_passed,
+        "observables": observed,
         "restart_flux_absolute_tolerance": _B2_RESTART_FLUX_ATOL,
         "restart_flux_relative_tolerance": _B2_RESTART_FLUX_RTOL,
     }

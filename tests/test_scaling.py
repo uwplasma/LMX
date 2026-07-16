@@ -33,6 +33,26 @@ from examples.strong_scaling_demo import _default_visible_devices
 from scripts import run_strong_scaling_worker
 
 
+def test_b2_repeat_signature_ignores_gauge_and_detects_shard_changes():
+    field = np.arange(24.0).reshape(4, 3, 2)
+    attributes = {name: field.copy() for name in ("u", "v", "w", "p", "jx", "jy", "jz")}
+    attributes.update(phi=field.copy(), rho_phi_plus=np.stack((field,) * 3),
+        rho_phi_inlet=np.zeros((3, 2)))
+    attributes.update({name: np.zeros((2, width)) if width else np.zeros(2)
+        for name, width in run_strong_scaling_worker.EXTRUDED_HISTORY_WIDTHS})
+    reference = run_strong_scaling_worker._b2_repeat_signature(SimpleNamespace(**attributes))
+    attributes["phi"] += 7.0
+    np.testing.assert_array_equal(
+        run_strong_scaling_worker._b2_repeat_signature(SimpleNamespace(**attributes)),
+        reference,
+    )
+    attributes["u"][2] += 1.0
+    assert not np.allclose(
+        run_strong_scaling_worker._b2_repeat_signature(SimpleNamespace(**attributes)),
+        reference,
+    )
+
+
 pytestmark = pytest.mark.unit
 
 

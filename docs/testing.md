@@ -62,6 +62,9 @@ Coverage is a floor, not a validation claim. Physics acceptance requires
 quantitative reference and conservation gates even when code coverage is 100%.
 Exact B2 replay compares the pressure-PCG history as well as physical state and
 compact flux; I/O tests retain explicit v2 compatibility coverage.
+The scaling worker also compares a compact gauge-invariant axial signature
+across every repeated B2 solve, so alternating shard-boundary results cannot be
+hidden by validating only the final timing repeat.
 
 ## Test design rules
 
