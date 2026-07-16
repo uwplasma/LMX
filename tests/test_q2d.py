@@ -135,8 +135,15 @@ def test_q2d_turbulence_decay_movie_and_observable_gate(tmp_path: Path):
         nx=24, ny=24, dt=2.0e-3, t_final=1.0, frame_count=8
     )
     solution = solve_q2d_turbulence_decay(case)
+    sparse = solve_q2d_turbulence_decay(
+        build_q2d_turbulence_decay_case(
+            nx=24, ny=24, dt=2.0e-3, t_final=1.0, frame_count=2
+        )
+    )
     validation = validate_q2d_turbulence_decay_observables(case, solution)
     assert solution.frames.shape[0] == 8
+    np.testing.assert_array_equal(solution.frames[-1], sparse.frames[-1])
+    assert solution.turnover_count == sparse.turnover_count
     assert validation["validation_pass"] is True
     assert validation["turnover_count"] > 0.02
     assert validation["max_courant"] < 0.45

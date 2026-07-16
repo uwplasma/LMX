@@ -498,15 +498,15 @@ def _q2d_rk4_step(
 
 def _q2d_record_vorticity_state(
     omega: np.ndarray,
+    u: np.ndarray,
+    v: np.ndarray,
     *,
     dt: float,
     dx: float,
     dy: float,
     kkx: np.ndarray,
     kky: np.ndarray,
-    inv_k2: np.ndarray,
 ) -> tuple[float, float, float, float, float]:
-    u, v, _ = _q2d_velocity_from_vorticity(omega, kkx=kkx, kky=kky, inv_k2=inv_k2)
     speed_squared = u**2 + v**2
     kinetic_energy = 0.5 * float(np.mean(speed_squared))
     enstrophy = 0.5 * float(np.mean(omega**2))
@@ -588,27 +588,29 @@ def solve_q2d_turbulence_decay(case: Q2DTurbulenceDecayCase) -> Q2DTurbulenceDec
     turnover_count = 0.0
     previous_rms = 0.0
 
-    def _record(step: int, values: np.ndarray) -> None:
+    def _record(step: int, values: np.ndarray, u: np.ndarray, v: np.ndarray) -> float:
         frames.append(values.copy())
         frame_times.append(step * case.dt)
         ke, enstrophy, rms, cfl, div_linf = _q2d_record_vorticity_state(
             values,
+            u,
+            v,
             dt=case.dt,
             dx=dx,
             dy=dy,
             kkx=kkx,
             kky=kky,
-            inv_k2=inv_k2,
         )
         kinetic_energy.append(ke)
         enstrophy_proxy.append(enstrophy)
         velocity_rms.append(rms)
         max_courant.append(cfl)
         divergence_linf.append(div_linf)
+        return rms
 
     frame_index_set = set(int(index) for index in frame_indices.tolist())
-    _record(0, field)
-    previous_rms = velocity_rms[-1]
+    u, v, _ = _q2d_velocity_from_vorticity(field, kkx=kkx, kky=kky, inv_k2=inv_k2)
+    previous_rms = _record(0, field, u, v)
     for step in range(1, steps + 1):
         field = _q2d_rk4_step(
             field,
@@ -622,20 +624,14 @@ def solve_q2d_turbulence_decay(case: Q2DTurbulenceDecayCase) -> Q2DTurbulenceDec
             viscosity=case.viscosity,
             hartmann_friction=case.hartmann_friction,
         )
-        ke, _, rms, _, _ = _q2d_record_vorticity_state(
-            field,
-            dt=case.dt,
-            dx=dx,
-            dy=dy,
-            kkx=kkx,
-            kky=kky,
-            inv_k2=inv_k2,
+        u, v, _ = _q2d_velocity_from_vorticity(field, kkx=kkx, kky=kky, inv_k2=inv_k2)
+        rms = (
+            _record(step, field, u, v)
+            if step in frame_index_set
+            else float(np.sqrt(max(float(np.mean(u**2 + v**2)), 0.0)))
         )
-        _ = ke
         turnover_count += 0.5 * (previous_rms + rms) * case.dt / max(min(case.lx, case.ly), 1.0e-12)
         previous_rms = rms
-        if step in frame_index_set:
-            _record(step, field)
 
     return Q2DTurbulenceDecaySolution(
         x=x,
