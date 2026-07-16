@@ -426,6 +426,20 @@ def _two_axis_mesh_and_sharding(
     )
 
 
+def _benchmark_devices(num_devices: int | None) -> tuple[list[jax.Device], int]:
+    """Return visible devices and a validated benchmark device count."""
+
+    devices = jax.devices()
+    if not devices:
+        raise RuntimeError("No JAX devices are available for scaling benchmark.")
+    selected = len(devices) if num_devices is None else num_devices
+    if selected < 1 or selected > len(devices):
+        raise ValueError(
+            f"Requested {selected} devices, but only {len(devices)} are visible."
+        )
+    return devices, selected
+
+
 def benchmark_sharded_extruded_operator(
     *,
     nx: int = 384,
@@ -435,15 +449,7 @@ def benchmark_sharded_extruded_operator(
     repeats: int = 3,
     num_devices: int | None = None,
 ) -> StrongScalingRecord:
-    devices = jax.devices()
-    if not devices:
-        raise RuntimeError("No JAX devices are available for scaling benchmark.")
-    if num_devices is None:
-        num_devices = len(devices)
-    if num_devices < 1 or num_devices > len(devices):
-        raise ValueError(
-            f"Requested {num_devices} devices, but only {len(devices)} are visible."
-        )
+    devices, num_devices = _benchmark_devices(num_devices)
     mesh, sharding = _two_axis_mesh_and_sharding(
         devices, num_devices=num_devices, shape=(nx, ny, nz)
     )
@@ -519,15 +525,7 @@ def benchmark_extruded_inductionless_solve(
     fields and verifies that the returned solution remains distributed.
     """
 
-    devices = jax.devices()
-    if not devices:
-        raise RuntimeError("No JAX devices are available for scaling benchmark.")
-    if num_devices is None:
-        num_devices = len(devices)
-    if num_devices < 1 or num_devices > len(devices):
-        raise ValueError(
-            f"Requested {num_devices} devices, but only {len(devices)} are visible."
-        )
+    devices, num_devices = _benchmark_devices(num_devices)
 
     problem = build_benchmark_b_problem("B2-fringing-square", mesh_level="coarse")
     geometry = replace(problem.case.geometry, nx=nx, ny=ny, nz=nz)
