@@ -4,9 +4,9 @@ LMX runs through JAX on CPUs and GPUs. Performance claims are accepted only for
 the real solver path with identical numerical results; visibility of multiple
 devices alone is not evidence of parallel execution.
 
-![Current B2 schema-6 calibration and sustained physical-CPU scaling](_static/strong_scaling.webp)
+![Current B2 schema-6 calibration and sustained CPU/GPU scaling](_static/strong_scaling.webp)
 
-This composite is generated from the accepted schema-6 CPU record. The upper
+This composite is generated from the compact schema-6 CPU and GPU records. The upper
 panel is forced-device calibration; the middle panel is accepted sustained
 fixed-work scaling on affinity-controlled 2/4/8 CPUs; the lower panel is a
 multi-minute one/two-GPU shared-host calibration. GPU correctness is green, but
@@ -19,12 +19,12 @@ the timing claim remains open because foreign contexts fail the idle gate.
 | portable test gate | Apple M4, six workers | 856 pass, 8 skip, 95.33% combined line/branch coverage, 181.0 s | below five-minute target and one third of the ten-minute budget |
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | B2 schema-6 CPU calibration | Apple M4, `256 x 67 x 67`, 1/2/4 forced CPU devices | 15.159/12.337/11.146 s; 1.229x/1.360x speedup; exact restart and device equivalence pass | accepted correctness/calibration; four-device promotion gate not met |
-| B2 physical-core confirmation | ARM64 Docker on Apple M4, `256 x 67 x 67`, 2/4/8 affinity-controlled CPUs for 1/2/4 devices | 22.894/15.953/14.252 s; 1.435x/1.606x; 95% lower bounds 1.364x/1.548x; efficiency 71.8%/40.2% | repeated two-update calibration; not sustained or steady-production scaling |
-| B2 sustained CPU scaling | same grid/masks, 32 updates, three warm trajectories per topology | 245.465/175.837/148.026 s; 1.396x/1.658x; 95% lower bounds 1.378x/1.655x; efficiency 69.8%/41.5%; CV below 0.71% | accepted fixed-work physical-CPU strong scaling; not steady-state evidence |
+| B2 CPU-allocation confirmation | ARM64 Docker on Apple M4, `256 x 67 x 67`, 2/4/8 affinity-controlled guest CPUs for 1/2/4 devices | 22.894/15.953/14.252 s; 1.435x/1.606x; 95% lower bounds 1.364x/1.548x; efficiency 71.8%/40.2% | repeated two-update calibration; host P/E-core mapping unverified |
+| B2 sustained CPU scaling | same grid/masks, 32 updates, three warm trajectories per topology | 245.465/175.837/148.026 s; 1.396x/1.658x; 95% lower bounds 1.378x/1.655x; efficiency 69.8%/41.5%; CV below 0.71% | fixed-work Docker CPU-allocation strong scaling; not host-core or steady-state evidence |
 | B2 sustained GPU calibration | 1/2 RTX A4000, same grid, 96 updates, three warm trajectories per topology | 258.913/159.234 s; 1.626x; 95% interval 1.626x–1.636x; efficiency 81.3%; CV below 0.29% | numerical/duration gates pass; persistent foreign contexts block an authoritative timing claim |
 | B2 pseudo-time gate | Apple M4, corrected warm `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x/32x/16x map-rate spread 0.0768%; raw updates halve; exact restart | 64x refrozen; versioned stopping threshold open |
 | B2 physical-residual probe | Apple M4, `7 x 7 x 7` | residual 0.03870 at step 90; omitted reconstruction force is 0.0880 at step 4 | diagnostic has a plausible coarse split floor; never a stopping gate |
-| physical-core restart audit | existing `101 x 77 x 77` coarse checkpoints | geometry/shape load, but sampled files normalize to `legacy_nonexact` with no source fingerprint or schema-6 Anderson/compact-flux state | unsuitable for exact or promoted current-source scaling evidence |
+| CPU-allocation restart audit | existing `101 x 77 x 77` coarse checkpoints | geometry/shape load, but sampled files normalize to `legacy_nonexact` with no source fingerprint or schema-6 Anderson/compact-flux state | unsuitable for exact or promoted current-source scaling evidence |
 | B2 projection audit/fix | Apple M4, warm same-state `7 x 7 x 7` | pre-fix raw cell-update floor `3.69e-3`; corrected predictor-preserving projection removes axial floor | pre-fix trajectories invalid; focused physics/autodiff/restart gates pass |
 | B2 stopping study | Apple M4, schema 5, restart segments to step 96 | `0.05` converges at 30 but fails all QoI limits; `0.005` reaches only `0.01502` | fail closed; accelerate before tighter-reference calibration |
 | B2 relaxation probe | Apple M4, shared step-29 checkpoint, six updates | factors 5/6/8 gain at most 9.33% over factor 4 | below 15% gate; retain factor 2 |
@@ -175,7 +175,7 @@ shards agree within `5.2e-14`, while warm time regresses from 0.530 s to
 timings remain rejected. A subsequent current-source `128 x 67 x 67` matched
 schema-6 pilot found that one CPU per JAX device starves the CPU collective
 runtime: two devices on two CPUs hit the 40-second all-reduce rendezvous abort.
-The preflight therefore fixed two physical CPUs per device and reran nested
+The preflight therefore fixed two guest CPUs per device and reran nested
 2/4/8-CPU masks. Warm medians fall from 7.351 to 5.546/4.574 seconds, giving
 1.325x/1.607x speedups and 66.3%/40.2% efficiency. All affinity, placement,
 restart, repeat, conservation, linear, Anderson, and cross-topology gates pass.
@@ -188,7 +188,9 @@ The promoted 32-update workload measures 245.465, 175.837, and 148.026 s on
 their 95% lower bounds are 1.378x/1.655x, and efficiencies are 69.8%/41.5%.
 CVs remain below 0.71%; midpoint restart is exact and all schema-6, physics,
 placement, and cross-topology gates pass. This accepts sustained fixed-work CPU
-strong scaling, not steady convergence or B2 solution acceptance.
+allocation scaling, not exact M4 host-core scaling, steady convergence, or B2
+solution acceptance. Linux affinity is verified inside the Docker VM; Docker
+Desktop does not expose how those vCPUs map onto the heterogeneous host cores.
 
 The medium B2 tight solve converged across two restart-safe segments and ended
 at residual `2.500e-5`, divergence `1.829e-6`, and charge residual `1.149e-4`.
@@ -321,18 +323,23 @@ For controlled workers and machine-readable records:
 python scripts/run_strong_scaling_worker.py --help
 ```
 
-The matched-B2 worker keeps two updates as its fast debug/CI default. Sustained
-scaling inputs use an explicit fixed workload and fail if any warm trajectory is
-too short; direct and midpoint-restart paths must still finish identically:
+The matched-B2 worker keeps two updates as its fast debug/CI default. Such runs
+can verify numerics but are never scaling evidence. A sustained record must
+predeclare a 120-second minimum and every warm trajectory must meet it; direct
+and midpoint-restart paths must still finish identically. The accepted workload
+uses 32 CPU updates and 96 GPU updates:
 
 ```bash
 python examples/strong_scaling_demo.py --benchmark-kind matched_b2_smoke \
-  --iterations 20 --repeats 4 --minimum-warm-seconds 120
+  --cpu-nx 256 --cpu-ny 67 --cpu-nz 67 --cpu-iterations 32 \
+  --gpu-nx 256 --gpu-ny 67 --gpu-nz 67 --gpu-iterations 96 \
+  --repeats 4 --minimum-warm-seconds 120 --worker-timeout 1800
 ```
 
-Run the CPU topologies with controlled physical-core affinity and the GPU
-topologies only on an idle host. This manual performance lane is intentionally
-outside the portable test battery.
+Run CPU topologies with controlled affinity and GPU topologies only on an idle
+host. The command above is a sustained-workload example; the accepted CPU
+record additionally used Docker `cpuset` masks, which verify guest allocations
+but not M4 P/E-core placement. This manual lane stays outside portable tests.
 
 The solver-faithful example requires a validated restart matching each timed
 grid; it fails before launching workers when one is missing:
@@ -363,6 +370,7 @@ pass the same gates.
 A publishable strong-scaling record contains:
 
 - fixed global grid, physics, tolerance, precision, and update count;
+- a predeclared 120-second minimum met by every warm trajectory;
 - backend, device model, device count, JAX version, and source fingerprint;
 - cold time, warm time, throughput, speedup, and parallel efficiency;
 - compilation separated from repeated execution;

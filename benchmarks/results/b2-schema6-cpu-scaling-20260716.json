@@ -115,7 +115,8 @@
       "jaxlib": "0.10.2",
       "solvax": "0.8.4",
       "precision": "float64",
-      "thread_contract": "two affinity-controlled physical CPUs per forced JAX CPU device"
+      "thread_contract": "two affinity-controlled Docker guest CPUs per forced JAX CPU device",
+      "host_core_mapping_verified": false
     },
     "protocol": {
       "updates": 2,
@@ -218,7 +219,8 @@
     "measured_warm_samples": 3,
     "minimum_warm_seconds": 120.0,
     "runtime": "native ARM64 Docker with nested Linux cpuset masks",
-    "thread_contract": "two physical CPUs per forced JAX CPU device",
+    "thread_contract": "two Docker guest CPUs per forced JAX CPU device",
+    "host_core_mapping_verified": false,
     "duration_pilot": {
       "updates": 20,
       "topology": "8 CPUs / 4 JAX devices",
@@ -259,7 +261,7 @@
       "parallel_efficiency": true,
       "sustained_strong_scaling": true
     },
-    "classification": "accepted sustained fixed-work physical-CPU strong scaling; not steady-state evidence"
+    "classification": "sustained fixed-work Docker CPU-allocation strong scaling; exact host-core mapping and steady-state evidence remain open"
   },
   "post_profile_decisions": {
     "axial_mean_omission": {
@@ -306,8 +308,9 @@
     "production_sharding_correctness": true,
     "strong_scaling_claim": true,
     "steady_state_evidence": false,
-    "physical_core_scaling": "accepted sustained fixed-work 2/4/8-CPU strong scaling",
-    "reason": "The 256 x 67 x 67, 32-update trajectories pass the 120-second-per-warm-sample, correctness, affinity, stability, confidence, and efficiency gates. They establish fixed-work strong scaling, not steady-state convergence or solution acceptance."
+    "physical_core_scaling": false,
+    "docker_cpu_allocation_scaling": "sustained fixed-work 2/4/8-guest-CPU strong scaling",
+    "reason": "The 256 x 67 x 67, 32-update trajectories pass the 120-second-per-warm-sample, correctness, guest-affinity, stability, confidence, and efficiency gates. They establish fixed-work Docker CPU-allocation scaling, not exact M4 host-core placement, steady-state convergence, or solution acceptance."
   },
   "raw_assets": {
     "location": "ignored artifacts/{schema6,global-coarse}-{topology,scaling}-20260716 and artifacts/docker-physical-core-schema6-{128,sustained-256}; publish only as checksummed release assets if needed",

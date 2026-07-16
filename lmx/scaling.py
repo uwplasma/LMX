@@ -98,6 +98,7 @@ _SCALING_TABLE_COLUMNS = (
     "signature_relative_tolerance",
     "physics_equivalent",
     "solver_faithful",
+    "sustained_timing_eligible",
 )
 
 _BUNDLE_FIELD_NAMES = (
@@ -291,13 +292,21 @@ def summarize_strong_scaling_records(
                     "signature_relative_tolerance": signature_rtol,
                     "physics_equivalent": physics_equivalent,
                     "solver_faithful": operator_path == "solve_extruded_inductionless",
+                    "sustained_timing_eligible": bool(
+                        record.get("sustained_timing_eligible", False)
+                    ),
                 }
             )
 
     solver_faithful_count = sum(1 for row in rows if row["solver_faithful"])
     profiled_count = sum(1 for row in rows if row["profile_path"])
     physics_equivalent_count = sum(1 for row in rows if row["physics_equivalent"])
+    sustained_count = sum(1 for row in rows if row["sustained_timing_eligible"])
     best_speedup = max((float(row["speedup"]) for row in rows), default=0.0)
+    best_sustained_speedup = max(
+        (float(row["speedup"]) for row in rows if row["sustained_timing_eligible"]),
+        default=0.0,
+    )
     best_parallel_efficiency = max(
         (float(row["parallel_efficiency"]) for row in rows), default=0.0
     )
@@ -306,7 +315,9 @@ def summarize_strong_scaling_records(
         "solver_faithful_record_count": solver_faithful_count,
         "profiled_record_count": profiled_count,
         "physics_equivalent_record_count": physics_equivalent_count,
+        "sustained_timing_record_count": sustained_count,
         "best_speedup": best_speedup,
+        "best_sustained_speedup": best_sustained_speedup,
         "best_parallel_efficiency": best_parallel_efficiency,
         "validation_status": "solver_faithful_records_present"
         if solver_faithful_count

@@ -337,6 +337,28 @@ def test_matched_scaling_worker_rejects_step_contract_mismatch(tmp_path: Path):
         )
 
 
+def test_sustained_scaling_requires_predeclared_multiminute_samples():
+    classify = run_strong_scaling_worker._sustained_timing_passed
+    assert not classify(0.0, [121.0, 122.0, 123.0])
+    assert not classify(120.0, [120.0, 119.999, 121.0])
+    assert classify(120.0, [120.0, 121.0, 122.0])
+
+    cpu = json.loads(Path(
+        "benchmarks/results/b2-schema6-cpu-scaling-20260716.json").read_text())
+    cpu_sustained = cpu["physical_core_sustained_confirmation"]
+    gpu = json.loads(Path(
+        "benchmarks/results/b2-gpu-scaling-calibration-20260715.json").read_text())
+    gpu_sustained = gpu["sustained_shared_host_calibration"]
+    for record in (cpu_sustained, gpu_sustained):
+        threshold = record.get("promotion_thresholds", record.get("problem"))
+        assert threshold["minimum_warm_seconds"] >= 120.0
+        assert all(
+            sample >= 120.0 for run in record["runs"].values()
+            for sample in run["warm_samples_seconds"])
+    assert not gpu_sustained["gates"]["authoritative_idle_host"]
+    assert not gpu_sustained["gates"]["timing_claim"]
+
+
 def test_write_scaling_report_writes_json(tmp_path: Path):
     record = benchmark_sharded_extruded_operator(
         nx=16, ny=8, nz=8, iterations=2, repeats=1, num_devices=1
@@ -382,16 +404,20 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
         "profile_path": None,
     }
 
-    summary = summarize_strong_scaling_records([baseline, two_device])
+    baseline_record = {**baseline.__dict__, "sustained_timing_eligible": True}
+    two_device["sustained_timing_eligible"] = True
+    summary = summarize_strong_scaling_records([baseline_record, two_device])
     table = write_strong_scaling_summary_table(
-        [baseline, two_device], tmp_path / "strong_scaling_table.csv"
+        [baseline_record, two_device], tmp_path / "strong_scaling_table.csv"
     )
 
     assert summary["validation_status"] == "solver_faithful_records_present"
     assert summary["solver_faithful_record_count"] == 2
     assert summary["profiled_record_count"] == 1
     assert summary["physics_equivalent_record_count"] == 2
+    assert summary["sustained_timing_record_count"] == 2
     assert summary["best_speedup"] == pytest.approx(2.0)
+    assert summary["best_sustained_speedup"] == pytest.approx(2.0)
     rows = summary["rows"]
     assert rows[0]["speedup"] == pytest.approx(1.0)
     assert rows[1]["speedup"] == pytest.approx(2.0)

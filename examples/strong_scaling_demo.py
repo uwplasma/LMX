@@ -480,9 +480,12 @@ def run_strong_scaling_demo(
             )
         )
 
-    plots = write_strong_scaling_plots(
-        records, out_dir, case_title="LMX strong scaling"
+    sustained = bool(records) and all(
+        record.get("sustained_timing_eligible", False) for record in records
     )
+    plots = write_strong_scaling_plots(records, out_dir, case_title=(
+        "LMX sustained fixed-work scaling" if sustained
+        else "LMX scaling smoke / calibration"))
     table_path = write_strong_scaling_summary_table(
         records, out_dir / "strong_scaling_table.csv"
     )

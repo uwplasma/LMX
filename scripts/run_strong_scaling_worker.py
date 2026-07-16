@@ -44,6 +44,7 @@ _B2_RESTART_FLUX_RTOL = 1.0e-5
 _B2_REPEAT_ATOL = 2.0e-9
 _B2_REPEAT_RTOL = 2.0e-8
 _B2_PROFILE_ITERATION_ATOL = 3
+_B2_SUSTAINED_WARM_SECONDS = 120.0
 _B2_FIELD_NAMES = (
     "u", "v", "w", "p", "phi", "jx", "jy", "jz", "rho_phi_plus", "rho_phi_inlet"
 )
@@ -51,6 +52,19 @@ _B2_FIELD_NAMES = (
 if ROOT not in Path(lmx.__file__).resolve().parents:
     raise RuntimeError(
         f"Scaling worker imported LMX outside its source tree: {lmx.__file__}"
+    )
+
+
+def _sustained_timing_passed(
+    minimum_warm_seconds: float, warm_samples: object
+) -> bool:
+    """Require a predeclared multi-minute workload for scaling evidence."""
+
+    samples = np.asarray(warm_samples, dtype=float)
+    return bool(
+        samples.size
+        and minimum_warm_seconds >= _B2_SUSTAINED_WARM_SECONDS
+        and np.all(samples >= _B2_SUSTAINED_WARM_SECONDS)
     )
 
 
@@ -476,9 +490,12 @@ def _matched_b2_smoke_benchmark(
         and profile_linear_iteration_max_abs <= _B2_PROFILE_ITERATION_ATOL
         and all(np.array_equal(left[:, offset + 1:], right[:, offset + 1:])
             for left, right, offset in profile_histories)))
-    acceptance_role = ("harness-smoke"
-        if direct.u.shape == (8, 7, 7) and executed_steps == 2
-        else "scaling-calibration")
+    if direct.u.shape == (8, 7, 7) and executed_steps == 2:
+        acceptance_role = "harness-smoke"
+    elif minimum_warm_seconds >= _B2_SUSTAINED_WARM_SECONDS:
+        acceptance_role = "sustained-scaling-calibration"
+    else:
+        acceptance_role = "fixed-work-debug"
     try:
         with tempfile.TemporaryDirectory(prefix="lmx-b2-serialized-restart-") as temporary:
             restart_path = Path(temporary) / "checkpoint.npz"
@@ -494,6 +511,7 @@ def _matched_b2_smoke_benchmark(
             )
     except Exception as error:
         warm = np.asarray(timings[1:])
+        sustained = _sustained_timing_passed(minimum_warm_seconds, warm)
         return {
             "benchmark_kind": "matched_b2_smoke",
             "acceptance_role": acceptance_role,
@@ -505,6 +523,9 @@ def _matched_b2_smoke_benchmark(
             "repeats": repeats, "cold_seconds": timings[0],
             "warm_samples_seconds": warm.tolist(),
             "warm_seconds": float(np.median(warm)), "validation_passed": False,
+            "sustained_minimum_warm_seconds": _B2_SUSTAINED_WARM_SECONDS,
+            "sustained_duration_passed": sustained,
+            "sustained_timing_eligible": False,
             "failure": {"phase": "restart", "type": type(error).__name__,
                 "message": str(error)},
         }
@@ -553,6 +574,7 @@ def _matched_b2_smoke_benchmark(
         and all(sample >= minimum_warm_seconds for sample in timings[1:])
     )
     warm = np.asarray(timings[1:])
+    sustained = _sustained_timing_passed(minimum_warm_seconds, warm)
     velocity_l2 = float(np.sqrt(sum(np.linalg.norm(np.asarray(getattr(direct, name))) ** 2
         for name in ("u", "v", "w"))))
     current_l2 = float(np.sqrt(sum(np.linalg.norm(np.asarray(getattr(direct, name))) ** 2
@@ -582,9 +604,11 @@ def _matched_b2_smoke_benchmark(
             executed_steps * direct.u.size / np.median(warm)
         ),
         "minimum_warm_seconds": minimum_warm_seconds,
-        "sustained_duration_passed": bool(
-            all(sample >= minimum_warm_seconds for sample in warm)
-        ),
+        "requested_duration_passed": bool(
+            all(sample >= minimum_warm_seconds for sample in warm)),
+        "sustained_minimum_warm_seconds": _B2_SUSTAINED_WARM_SECONDS,
+        "sustained_duration_passed": sustained,
+        "sustained_timing_eligible": bool(validation_passed and sustained),
         "velocity_l2": velocity_l2, "potential_l2": float(np.linalg.norm(np.asarray(direct.phi))),
         "current_l2": current_l2,
         "memory_bytes_estimate": _bundle_memory_bytes(direct),

@@ -34,15 +34,15 @@ optimization but miss the four-device bound. It is a two-update forced-device
 calibration, not a physical-core or production strong-scaling claim. Schema-6
 topology, explicit component placement, and exact serialized replay pass on
 one and two GPUs; shared-host timing is excluded. The affinity-controlled
-physical-CPU path now passes accepted 32-update sustained scaling: every warm
+Docker CPU-allocation path now passes 32-update sustained scaling: every warm
 trajectory lasts 147--246 s, speedup is 1.396x/1.658x on 4/8 versus 2 CPUs,
 and all confidence, efficiency, restart, and physics gates pass. A 96-update
 one/two-A4000 lane also passes 158--259 s duration, numerical, restart, and
 topology gates with 1.626x shared-host speedup, but persistent foreign contexts
 keep authoritative GPU scaling open. The fixed-work harness accepts
 an explicit update count, checkpoints at the deterministic midpoint, replays
-the remaining trajectory, and can require every warm sample to exceed 120 s;
-the two-update default remains the bounded CI/debug gate. This
+the remaining trajectory, and requires every warm sample to exceed 120 s for a
+sustained claim; the two-update default remains the bounded CI/debug gate. This
 single active plan records accepted baselines, active gates, and
 stop/go criteria—not campaign history. Completed campaign details belong in
 checksummed result records and the validation or performance documentation.
@@ -82,6 +82,9 @@ a stop rule, and a go/no-go threshold before launch. Escalate in this order:
 
 A failed bounded probe stops. It does not trigger an open-ended parameter
 search. Reuse a checksummed accepted record whenever it answers the question.
+Short scaling runs are smoke or calibration only. A CPU or GPU strong-scaling
+claim must predeclare a fixed workload for which every warm sample lasts at
+least 120 seconds; compilation, restart I/O, and observers remain untimed.
 
 ### Test only what changed
 
@@ -361,14 +364,14 @@ updates before rising to `1.72e-4` at 384, above the `5e-5` gate. Reject those
 timings and do not plot them as scaling evidence.
 
 A current-source `128 x 67 x 67` matched schema-6 pilot then establishes the
-bounded physical-core path without a blind steady solve. One CPU per JAX device
-is invalid: two devices on two CPUs hit the 40-second all-reduce rendezvous
-abort. The tiny preflight passes with two physical CPUs per device, so the
+bounded CPU-allocation path without a blind steady solve. One guest CPU per JAX
+device is invalid: two devices on two CPUs hit the 40-second all-reduce rendezvous
+abort. The tiny preflight passes with two guest CPUs per device, so the
 measured ladder uses nested 2/4/8-CPU masks for 1/2/4 devices. Warm medians are
 7.351, 5.546, and 4.574 seconds, giving 1.325x/1.607x speedups and
 66.3%/40.2% efficiency; CVs are below 2.2%. Schema-6, affinity, placement,
 restart, repeat, conservation, linear, Anderson, and cross-topology gates all
-pass. Accept this as a two-update physical-core pilot only. It authorizes one
+pass. Accept this as a two-update affinity-controlled pilot only. It authorizes one
 six-repeat `256 x 67 x 67` confirmation with the frozen 1.20x/1.40x
 confidence-bound and 60%/35% efficiency gates, not a steady-production claim.
 
@@ -382,16 +385,16 @@ The generalized fixed-work worker then rejected a 20-update duration pilot at
 1.396x/1.658x speedups, 1.378x/1.655x 95% lower bounds, and 69.8%/41.5%
 efficiency. CVs are below 0.71%; midpoint replay is exact and every placement,
 linear, conservation, Anderson, and cross-topology gate passes. Accept this as
-sustained fixed-work physical-CPU strong scaling, not steady-state or B2
-solution acceptance. Apply the same protocol to GPUs only after the shared
-host passes the 60-second idle/no-foreign-work gate.
+sustained fixed-work Docker CPU-allocation strong scaling, not exact M4
+host-core, steady-state, or B2 solution evidence. Apply the same protocol to
+GPUs only after the shared host passes the 60-second idle/no-foreign-work gate.
 
 The existing `101 x 77 x 77` coarse checkpoints were screened before launching
 that ladder. Three representative files match the current geometry and solver
 shape, but all normalize to `legacy_nonexact`, omit compact flux and schema-6
 Anderson state, and carry no source fingerprint. They may support a separately
 labelled warm-start diagnostic, but they cannot seed exact-restart, current-
-source, or steady-production physical-core evidence. That restart gate remains
+source, or steady-production exact-host-core evidence. That restart gate remains
 open independently of the matched two-update pilot.
 
 Compact CPU evidence is
