@@ -4,7 +4,7 @@ Status: 2026-07-15. The corrected two-update B2 smoke is keyed to `45bff84`;
 the current one-/two-/four-CPU-device equivalence and 64x pseudo-time cap are
 keyed to `c47ba09` and `2346d7f`. The independent electromagnetic momentum
 defect and restart schema 4 are keyed to `e6834ee`. The latest complete
-portable gate is committed at `c47ba09`. CPU/GPU calibration at
+portable gate on the current source is keyed to `2ec7eb6`. CPU/GPU calibration at
 `413185a` and deterministic GPU equivalence at `3a22078` predate the terminal
 restart fix and remain historical until refreshed. The isolated compiler trace
 is keyed to `f379f6b`.
@@ -124,14 +124,14 @@ immutable evidence, richer projection, and target-driven paths remain):
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The portable-gate artifact keyed to `13221ef` records 817 passes, 8 expected
-external-data skips, 95.0162% combined line/branch coverage, and 188.4 seconds on
-the reference Apple M4. It remains below the 300-second engineering target and
-600-second hard limit. Coverage remains above the enforced floor but below the
-95.5% engineering target. The six-worker record reports 48.3 seconds for
-reduced B2 and 37.4 seconds for weighted modal. The B2 node takes 14.8 seconds
-alone, so the concurrent duration identifies contention rather than a code
-regression; no scheduling change is promoted from this run.
+The portable-gate artifact keyed to `2ec7eb6` records 817 passes, 8 expected
+external-data skips, 95.0316% combined line/branch coverage, and 166.5 seconds on
+the reference Apple M4: 11.6% faster than the previous 188.4-second gate and
+below the 300-second engineering target and 600-second hard limit. Coverage
+remains above the enforced floor but below the 95.5% engineering target. The
+six-worker record reports 51.5 seconds for reduced B2 and 60.4 seconds for
+weighted modal; these concurrent durations identify contention rather than
+isolated regressions, so no scheduling change is promoted from this run.
 
 ## Priority 0: solver-free matched B2 harness — complete
 

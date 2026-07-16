@@ -10,7 +10,7 @@ devices alone is not evidence of parallel execution.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 817 pass, 8 skip, 95.02% combined line/branch coverage, 188.4 s | below the five-minute target |
+| portable test gate | Apple M4, six workers | 817 pass, 8 skip, 95.03% combined line/branch coverage, 166.5 s | 11.6% faster; below five-minute target |
 | exact B2 smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.8e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | B2 pseudo-time gate | Apple M4, `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x cap: map defect falls 2.16x; independent momentum defect falls 0.976→0.310 in four updates; exact restart | reduced numerical gate; direct threshold remains open |
 | B2 defect outcome probe | Apple M4, `7 x 7 x 7` | 16 updates in 28.66 s; defect 0.03870 at step 90/115.24 s; 0.01 confirmation missed 120 s | failed closed; diagnose convergence/floor before more stepping |
