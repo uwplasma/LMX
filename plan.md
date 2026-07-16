@@ -13,7 +13,7 @@ stopping. Its fixed-relaxation memory reduction
 is keyed to `791e496`, and its exact operator contract is keyed to `2d0fb50`.
 Commit `3e731fa` removes the projection reconstruction floor and refreezes the
 64x pseudo-time cap on a warm same-state ladder.
-The latest complete portable gate exercised source `c55e38a`. CPU/GPU calibration at
+The latest complete portable gate exercised source `3697e95`. CPU/GPU calibration at
 `413185a` remains historical; deterministic GPU equivalence at `3a22078` has
 been replaced by the current `8b6f97d` result and the refreshed calibration
 record committed at `3311d6d`. The isolated compiler trace keyed to `f379f6b`
@@ -125,12 +125,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,809 | stay below 35,000 while preserving the physical residual | 35,100 |
+| package lines | 34,780 | stay below 35,000 while preserving the physical residual | 35,100 |
 | maintained-core lines | 7,896 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,507 | no new file; stay below 21,000 | 31 / 21,100 |
+| test files / lines | 30 / 20,517 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 173 | delete only superseded or duplicate ownership | 180 |
-| tracked checkout | 3,323,316 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,322,863 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -139,13 +139,13 @@ The remaining result records, 13 scripts, and distinct Python/TOML examples
 retain current provenance, CI, or runnable-workflow ownership; do not merge
 them unless the replacement deletes code without weakening those contracts.
 
-The portable-gate artifact keyed to `c55e38a` records 816 passes, 8 expected
-external-data skips, 95.0622% combined line/branch coverage, and 148.6 seconds on
-the reference Apple M4. It is 1.4% faster than the prior 150.7-second record;
+The portable-gate artifact keyed to `3697e95` records 816 passes, 8 expected
+external-data skips, 95.0582% combined line/branch coverage, and 147.3 seconds on
+the reference Apple M4. It is 0.9% faster than the prior 148.6-second record;
 the gate remains below the 300-second engineering
 target and 600-second hard limit. Coverage
 remains above the enforced floor but below the 95.5% engineering target. The
-six-worker record reports 47.2 seconds for reduced B2 and 46.3 seconds for
+six-worker record reports 48.4 seconds for reduced B2 and 46.9 seconds for
 weighted modal; these concurrent durations identify contention rather than
 isolated regressions, so no scheduling change is promoted from this run.
 
@@ -200,7 +200,7 @@ measurements run alone.
 
 The modal pipe test reuses one physical projection and verifies direct
 mode-factor algebra without a second integration run. In the latest six-worker
-gate it reports 46.3 seconds, versus 47.2 seconds for reduced B2 and 25.9
+gate it reports 46.9 seconds, versus 48.4 seconds for reduced B2 and 25.3
 seconds for reduced B1. Isolated measurement attributes most of that tail to
 worker contention: reducing only the manufactured modal grid lowered its
 weighted path to 23.5--26.1 seconds, and the unchanged reduced-B2 restart and
@@ -220,10 +220,11 @@ gate (`gradient_z > 1.8`). Retain both original grids; their longer concurrent
 JUnit times are contention, not an isolated size bottleneck.
 
 Centralizing figure persistence permits one real PNG/PDF signature test and
-lightweight persistence stubs for the remaining plotting writers. The isolated
-plotting module falls from 18.65 to 9.84 seconds (47.2%, above the 25% promotion
-gate), while the complete portable gate falls from 150.7 to 148.6 seconds;
-source line and branch coverage are unchanged.
+lightweight persistence stubs for the remaining plotting writers. Replacing
+two redundant bent-pipe solves with synthetic writer fields then reduces that
+node from 6.39 to a 1.24-second median and the isolated plotting module from
+9.84 to 5.43 seconds. Bent-pipe physics remains owned by its fringing tests.
+Together these changes reduce the complete gate from 150.7 to 147.3 seconds.
 
 Keep the top ten concurrent node durations in the portable-gate record and
 treat any node above 45 seconds as a critical-path review trigger. The suite

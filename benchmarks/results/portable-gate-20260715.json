@@ -1,7 +1,7 @@
 {
   "schema_version": 15,
   "date": "2026-07-16",
-  "commit": "c55e38a95d427d5524048046a2c3f2cbbb43d76d",
+  "commit": "3697e95bc21373057dad4d10a5c0c048ee8210f0",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -20,41 +20,41 @@
   },
   "result": {
     "test_files": 30,
-    "test_lines": 20507,
+    "test_lines": 20517,
     "passed": 816,
     "skipped": 8,
-    "pytest_seconds": 146.42,
-    "gate_seconds": 148.6,
-    "covered_lines": 14137,
-    "total_lines": 14576,
-    "covered_branches": 2535,
-    "total_branches": 2962,
-    "combined_line_branch_coverage_percent": 95.06215075835328,
+    "pytest_seconds": 145.09,
+    "gate_seconds": 147.3,
+    "covered_lines": 14127,
+    "total_lines": 14566,
+    "covered_branches": 2531,
+    "total_branches": 2958,
+    "combined_line_branch_coverage_percent": 95.05820588906643,
     "passed_gate": true
   },
   "artifacts": {
-    "coverage_xml_sha256": "8683479475117b31efae1947efeb9ee67792994425930be84967d24aee7e3b85",
-    "junit_xml_sha256": "78cff3f20ef772b9544f899a844c06519d53e270c80719899089dce1ce382143"
+    "coverage_xml_sha256": "e532a5dafaaa684dd1caba3287a390d1a4028980a68a3b9a6eb678ba84dfefdd",
+    "junit_xml_sha256": "df1c8215e47daa432070afbe624d83f7e8f82c16155f1e6db0d155228504065b"
   },
   "duration_note": "Durations come from the current six-worker JUnit record; concurrent-node times identify CI pressure but are not isolated timings.",
   "slowest_tests": [
-    {"seconds": 47.179, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
-    {"seconds": 46.309, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]"},
-    {"seconds": 25.941, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
-    {"seconds": 20.056, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
-    {"seconds": 18.223, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
-    {"seconds": 17.589, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"},
-    {"seconds": 16.484, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"},
-    {"seconds": 16.14, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[base]"},
-    {"seconds": 15.553, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
-    {"seconds": 14.829, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_returns_finite_payload"}
+    {"seconds": 48.407, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
+    {"seconds": 46.936, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]"},
+    {"seconds": 25.307, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
+    {"seconds": 21.086, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
+    {"seconds": 17.564, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"},
+    {"seconds": 17.312, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
+    {"seconds": 16.121, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[base]"},
+    {"seconds": 15.543, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_returns_finite_payload"},
+    {"seconds": 15.375, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
+    {"seconds": 15.205, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"}
   ],
   "comparison": {
-    "previous_gate_seconds": 150.7,
-    "wall_time_change_percent": -1.3934970139349665,
-    "budget_fraction": 0.24766666666666665,
-    "engineering_target_fraction": 0.4953333333333333,
-    "interpretation": "The complete gate is 1.4% faster than the previous record and remains comfortably within both budgets; concurrent-node variation does not justify a scheduling change."
+    "previous_gate_seconds": 148.6,
+    "wall_time_change_percent": -0.8748317631224649,
+    "budget_fraction": 0.2455,
+    "engineering_target_fraction": 0.491,
+    "interpretation": "The complete gate is 0.9% faster than the previous record and remains comfortably within both budgets; concurrent-node variation does not justify a scheduling change."
   },
   "scheduling_probe": {
     "source_commit": "f379f6bab2e25acd8c2785eebe1c88a10ed854a9",
@@ -67,12 +67,12 @@
     "decision": "retain six workers; the 3.4% change is below the promotion threshold, and module grouping would imbalance fringing and autodiff owners"
   },
   "architecture": {
-    "source_commit": "c55e38a95d427d5524048046a2c3f2cbbb43d76d",
+    "source_commit": "3697e95bc21373057dad4d10a5c0c048ee8210f0",
     "package_modules": 35,
-    "package_lines": 34809,
+    "package_lines": 34780,
     "maintained_core_lines": 7896,
     "maintenance_scripts": 13,
-    "tracked_checkout_bytes": 3323316,
+    "tracked_checkout_bytes": 3322863,
     "stable_root_exports": 30,
     "curated_examples": 11
   },
