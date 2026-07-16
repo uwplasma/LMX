@@ -68,7 +68,6 @@ from lmx.fringing import (
     _face_flux_pressure_projection_duct,
     _face_flux_pressure_projection_pipe,
     _fixed_flow_face_flux_projection_pipe,
-    _masked_laplacian_pipe,
     clone_case_with_field,
     magnetic_obstacle_literature_reference_cases,
     run_extruded_inductionless_slice,
@@ -1205,16 +1204,22 @@ def test_pipe_diffusion_reconstructs_manufactured_field(steady):
         shape,
     )
     dt = 0.02
-    laplacian = _masked_laplacian_pipe(
-        manufactured,
-        jnp.ones(shape, dtype=bool),
+    coefficients = _pipe_variable_diffusion_coefficients_3d(
+        viscosity,
         dx=0.4,
         r_faces=r_faces,
         r_centers=r_centers,
         dtheta=2.0 * jnp.pi / 8,
-        radial_fluid_count=5,
     )
-    steady_rhs = -viscosity * laplacian + reaction * manufactured
+    wall_width = jnp.diff(r_faces)[-1]
+    wall_sink = jnp.zeros_like(manufactured).at[:, -1, :].set(
+        viscosity[:, -1, :]
+        * r_faces[-1]
+        / (r_centers[-1] * wall_width * (0.5 * wall_width))
+    )
+    steady_rhs = -_apply_pipe_diffusion_coefficients_3d(
+        manufactured, coefficients
+    ) + (wall_sink + reaction) * manufactured
     rhs = steady_rhs if steady else manufactured + dt * steady_rhs
     solved, residual, converged = _solvax_diffusion_pipe(
         rhs,
@@ -1440,7 +1445,7 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
         ) == pytest.approx(block_thomas_solve(probed, trial), rel=1.0e-10, abs=1.0e-10)
 
 
-def test_pipe_face_projection_and_masked_diffusion_use_fluid_wall_face():
+def test_pipe_face_projection_uses_fluid_wall_face():
     nx, nr, ntheta = 5, 5, 8
     r_faces = jnp.asarray([0.0, 0.12, 0.3, 0.55, 0.78, 1.0, 1.1])
     r_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
@@ -1476,19 +1481,6 @@ def test_pipe_face_projection_and_masked_diffusion_use_fluid_wall_face():
     assert jnp.allclose(projected_v[:, fluid_count:, :], 0.0)
     assert jnp.allclose(projected_w[:, fluid_count:, :], 0.0)
 
-    constant = jnp.where(mask, 1.0, 0.0)
-    laplacian = _masked_laplacian_pipe(
-        constant,
-        mask,
-        dx=0.25,
-        r_faces=r_faces,
-        r_centers=r_centers,
-        dtheta=2.0 * jnp.pi / ntheta,
-        radial_fluid_count=fluid_count,
-    )
-    assert jnp.allclose(laplacian[:, : fluid_count - 1, :], 0.0)
-    assert float(jnp.max(laplacian[:, fluid_count - 1, :])) < 0.0
-    assert jnp.allclose(laplacian[:, fluid_count:, :], 0.0)
     assert _pipe_radial_fluid_count(mask) == fluid_count
 
     def objective(amplitude):

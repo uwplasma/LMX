@@ -9,8 +9,7 @@ stopping. Its fixed-relaxation memory reduction
 is keyed to `791e496`, and its exact operator contract is keyed to `2d0fb50`.
 Commit `3e731fa` removes the projection reconstruction floor and refreezes the
 64x pseudo-time cap on a warm same-state ladder.
-The latest complete portable gate is keyed to `3065021` and exercised source
-`ef2d2b1`. CPU/GPU calibration at
+The latest complete portable gate exercised source `1a52c6d`. CPU/GPU calibration at
 `413185a` remains historical; deterministic GPU equivalence at `3a22078` has
 been replaced by the current `8b6f97d` result and the refreshed calibration
 record committed at `3311d6d`. The isolated compiler trace keyed to `f379f6b`
@@ -121,24 +120,26 @@ single-owner Samper freezer into its campaign runner, and making `Diagnostics`
 the single owner of standard NPZ/restart diagnostic fields, and consolidating
 four manual-validation workflow stubs into one behavior-preserving fixture (the
 immutable evidence, richer projection, and target-driven paths remain), and
-deleting stale test-only velocity-statistics and solver-mask wrappers:
+deleting stale test-only velocity-statistics, solver-mask, and pipe-Laplacian
+wrappers:
 
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 35,022 | return below 35,000 while preserving the physical residual | 35,100 |
+| package lines | 34,985 | stay below 35,000 while preserving the physical residual | 35,100 |
 | maintained-core lines | 7,931 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,890 | no new file; stay below 21,000 | 31 / 21,100 |
+| test files / lines | 30 / 20,882 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked checkout | 3,565,237 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 
-The portable-gate artifact keyed to `ef2d2b1` records 818 passes, 8 expected
-external-data skips, 95.0101% combined line/branch coverage, and 154.5 seconds on
-the reference Apple M4: 7.2% faster than the previous 166.5-second gate and
-below the 300-second engineering target and 600-second hard limit. Coverage
+The portable-gate artifact keyed to `1a52c6d` records 818 passes, 8 expected
+external-data skips, 95.0274% combined line/branch coverage, and 157.4 seconds on
+the reference Apple M4. The 1.9% change from the previous 154.5-second record is
+within run-to-run noise; the gate remains below the 300-second engineering
+target and 600-second hard limit. Coverage
 remains above the enforced floor but below the 95.5% engineering target. The
 six-worker record reports 49.5 seconds for reduced B2 and 53.4 seconds for
 weighted modal; these concurrent durations identify contention rather than

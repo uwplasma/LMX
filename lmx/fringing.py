@@ -3120,43 +3120,6 @@ def _solvax_diffusion_pipe(
     )
 
 
-def _masked_laplacian_pipe(
-    field: jnp.ndarray,
-    fluid_mask: jnp.ndarray,
-    *,
-    dx: float,
-    r_faces: jnp.ndarray,
-    r_centers: jnp.ndarray,
-    dtheta: float,
-    radial_fluid_count: int,
-) -> jnp.ndarray:
-    """Cylindrical no-slip diffusion with the wall at the fluid radial face."""
-
-    fluid = field[:, :radial_fluid_count, :]
-    faces = r_faces[: radial_fluid_count + 1]
-    centers = r_centers[:radial_fluid_count]
-    ones = jnp.ones_like(fluid)
-    coefficients = _pipe_variable_diffusion_coefficients_3d(
-        ones,
-        dx=dx,
-        r_faces=faces,
-        r_centers=centers,
-        dtheta=dtheta,
-    )
-    laplacian = _apply_pipe_diffusion_coefficients_3d(fluid, coefficients)
-    outer_wall = (
-        -faces[-1]
-        * fluid[:, -1, :]
-        / jnp.maximum(
-            centers[-1] * jnp.diff(faces)[-1] * (0.5 * jnp.diff(faces)[-1]),
-            1.0e-20,
-        )
-    )
-    laplacian = laplacian.at[:, -1, :].add(outer_wall)
-    full = jnp.zeros_like(field).at[:, :radial_fluid_count, :].set(laplacian)
-    return jnp.where(fluid_mask, full, 0.0)
-
-
 def _pipe_velocity_faces(
     u: jnp.ndarray, v: jnp.ndarray, w: jnp.ndarray
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:

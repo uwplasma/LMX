@@ -1,7 +1,7 @@
 {
-  "schema_version": 9,
+  "schema_version": 10,
   "date": "2026-07-15",
-  "commit": "ef2d2b1b9a06a7f2b10f3c9442f60b1fff9382c4",
+  "commit": "1a52c6dfe508cdb059a7f06348ab67ddcfe78ea5",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -20,23 +20,25 @@
   },
   "result": {
     "test_files": 30,
-    "test_lines": 20904,
+    "test_lines": 20890,
     "passed": 818,
     "skipped": 8,
-    "pytest_seconds": 151.873,
-    "gate_seconds": 154.5,
-    "covered_lines": 14328,
-    "total_lines": 14780,
-    "covered_branches": 2542,
-    "total_branches": 2976,
-    "combined_line_branch_coverage_percent": 95.01013741833746,
+    "pytest_seconds": 154.97,
+    "gate_seconds": 157.4,
+    "covered_lines": 14301,
+    "total_lines": 14749,
+    "covered_branches": 2535,
+    "total_branches": 2968,
+    "combined_line_branch_coverage_percent": 95.02737483772647,
     "passed_gate": true
   },
   "artifacts": {
-    "coverage_xml_sha256": "f2cab6ef8b936238a7194719aafb70a17b002d47810553db233d343b43d4669e",
-    "junit_xml_sha256": "fb99600427fa4fef7b6f57f1736b65791c24fff52bf375db15ae532213040048"
+    "coverage_xml_sha256": "98b406ef9be1b09a3f7ad3800d6427b857d266754a31057a028fdf2a42ebbde4",
+    "junit_xml_sha256": null,
+    "junit_status": "not emitted by this local invocation"
   },
-  "duration_note": "Durations come from the six-worker JUnit record; concurrent-node times identify CI pressure but are not isolated timings.",
+  "duration_note": "The slowest-node list is retained from ef2d2b1 because this refresh did not emit JUnit; concurrent-node times identify CI pressure but are not isolated timings.",
+  "slowest_tests_source_commit": "ef2d2b1b9a06a7f2b10f3c9442f60b1fff9382c4",
   "slowest_tests": [
     {"seconds": 53.442, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow[weighted-modal-rhie-chow]"},
     {"seconds": 49.517, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
@@ -50,11 +52,11 @@
     {"seconds": 14.932, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"}
   ],
   "comparison": {
-    "previous_gate_seconds": 166.5,
-    "wall_time_change_percent": -7.207207207207207,
-    "budget_fraction": 0.2575,
-    "engineering_target_fraction": 0.515,
-    "interpretation": "The complete gate is 7.2% faster and remains comfortably within both budgets. Concurrent JAX node durations still reflect contention and are not isolated regression claims."
+    "previous_gate_seconds": 154.5,
+    "wall_time_change_percent": 1.8770226537216865,
+    "budget_fraction": 0.2623333333333333,
+    "engineering_target_fraction": 0.5246666666666666,
+    "interpretation": "The complete gate is 1.9% slower than the previous record, within run-to-run noise, and remains comfortably within both budgets."
   },
   "scheduling_probe": {
     "source_commit": "f379f6bab2e25acd8c2785eebe1c88a10ed854a9",
@@ -68,10 +70,10 @@
   },
   "architecture": {
     "package_modules": 35,
-    "package_lines": 35100,
-    "maintained_core_lines": 7957,
+    "package_lines": 35022,
+    "maintained_core_lines": 7931,
     "maintenance_scripts": 13,
-    "tracked_checkout_bytes": 3550112,
+    "tracked_checkout_bytes": 3565237,
     "stable_root_exports": 30,
     "curated_examples": 11
   },
