@@ -43,6 +43,7 @@ def _run_worker(
     evaluator: Path | None = None,
     env: dict[str, str] | None = None,
     timeout_seconds: float | None = None,
+    minimum_warm_seconds: float = 0.0,
 ) -> dict[str, object]:
     command = [
         python_executable,
@@ -62,6 +63,8 @@ def _run_worker(
         str(iterations),
         "--repeats",
         str(repeats),
+        "--minimum-warm-seconds",
+        str(minimum_warm_seconds),
         "--output",
         str(output_path),
         *(["--profile-dir", str(profile_dir)] if profile_dir is not None else []),
@@ -155,6 +158,7 @@ def run_local_cpu_scaling(
     matched_input: Path | None = None,
     evaluator: Path | None = None,
     timeout_seconds: float | None = None,
+    minimum_warm_seconds: float = 0.0,
 ) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
     for count in device_counts:
@@ -180,6 +184,7 @@ def run_local_cpu_scaling(
             matched_input=matched_input,
             evaluator=evaluator,
             timeout_seconds=timeout_seconds,
+            minimum_warm_seconds=minimum_warm_seconds,
         )
         records.append(record)
         if benchmark_kind == "matched_b2_smoke" and not record["validation_passed"]:
@@ -289,6 +294,7 @@ def run_remote_gpu_scaling(
     matched_input: Path | None = None,
     evaluator: Path | None = None,
     timeout_seconds: float = 600.0,
+    minimum_warm_seconds: float = 0.0,
 ) -> list[dict[str, object]]:
     _sync_repo_to_remote(
         repo_root=repo_root, remote_host=remote_host, remote_dir=remote_dir
@@ -332,6 +338,7 @@ def run_remote_gpu_scaling(
             f"--benchmark-kind {shlex.quote(benchmark_kind)} --platform GPU --num-devices {count} "
             f"{'' if nx is None else f'--nx {nx} '}--ny {ny} --nz {nz} "
             f"--iterations {iterations} --repeats {repeats} --output {shlex.quote(remote_json)}"
+            f" --minimum-warm-seconds {minimum_warm_seconds}"
             f"{profile_arg}"
             f"{'' if remote_restart is None else f' --restart {shlex.quote(remote_restart)}'}"
             f"{'' if remote_matched is None else f' --matched-input {shlex.quote(remote_matched)} --evaluator {shlex.quote(remote_evaluator)}'}"
@@ -387,6 +394,7 @@ def run_strong_scaling_demo(
     cpu_restart_path: Path | None = None,
     gpu_restart_path: Path | None = None,
     timeout_seconds: float | None = None,
+    minimum_warm_seconds: float = 0.0,
 ) -> dict[str, object]:
     repo_root = Path(__file__).resolve().parents[1]
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -409,18 +417,26 @@ def run_strong_scaling_demo(
         )
         shape_label = "x".join(map(str, cpu_problem))
         matched_input, evaluator = (
-            out_dir / f"matched_b2_cpu_{shape_label}.json",
+            out_dir / f"matched_b2_cpu_{shape_label}_{cpu_iterations}steps.json",
             out_dir / "matched_b2_evaluator.json",
         )
         if not matched_input.exists():
-            materialize_matched_b2_lmx_input(matched_input, solver_shape=cpu_problem)
+            materialize_matched_b2_lmx_input(
+                matched_input,
+                solver_shape=cpu_problem,
+                executed_steps=cpu_iterations,
+            )
         if not evaluator.exists():
             materialize_matched_b2_evaluator(evaluator)
         gpu_label = "x".join(map(str, gpu_problem))
-        gpu_matched_input = out_dir / f"matched_b2_gpu_{gpu_label}.json"
+        gpu_matched_input = (
+            out_dir / f"matched_b2_gpu_{gpu_label}_{gpu_iterations}steps.json"
+        )
         if remote_host is not None and not gpu_matched_input.exists():
             materialize_matched_b2_lmx_input(
-                gpu_matched_input, solver_shape=gpu_problem
+                gpu_matched_input,
+                solver_shape=gpu_problem,
+                executed_steps=gpu_iterations,
             )
     records = run_local_cpu_scaling(
         repo_root=repo_root,
@@ -438,6 +454,7 @@ def run_strong_scaling_demo(
         matched_input=matched_input,
         evaluator=evaluator,
         timeout_seconds=timeout_seconds,
+        minimum_warm_seconds=minimum_warm_seconds,
     )
     if remote_host is not None:
         records.extend(
@@ -459,6 +476,7 @@ def run_strong_scaling_demo(
                 matched_input=gpu_matched_input,
                 evaluator=evaluator,
                 timeout_seconds=(600.0 if timeout_seconds is None else timeout_seconds),
+                minimum_warm_seconds=minimum_warm_seconds,
             )
         )
 
@@ -516,6 +534,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Hard wall-time ceiling in seconds for each isolated scaling worker.",
     )
     parser.add_argument(
+        "--minimum-warm-seconds",
+        type=float,
+        default=0.0,
+        help="Require every warm fixed-work trajectory to meet this duration.",
+    )
+    parser.add_argument(
         "--cpu-restart",
         type=Path,
         help="Validated restart matching the CPU production-solve grid.",
@@ -544,9 +568,9 @@ def main(argv: list[str] | None = None) -> int:
         args.gpu_iterations if args.gpu_iterations is not None else shared_iterations
     )
     if cpu_iterations is None:
-        cpu_iterations = 1024
+        cpu_iterations = 2 if args.benchmark_kind == "matched_b2_smoke" else 1024
     if gpu_iterations is None:
-        gpu_iterations = 2048
+        gpu_iterations = 2 if args.benchmark_kind == "matched_b2_smoke" else 2048
 
     cpu_problem = (args.cpu_nx, args.cpu_ny, args.cpu_nz)
     gpu_problem = (args.gpu_nx, args.gpu_ny, args.gpu_nz)
@@ -592,6 +616,7 @@ def main(argv: list[str] | None = None) -> int:
         cpu_restart_path=args.cpu_restart,
         gpu_restart_path=args.gpu_restart,
         timeout_seconds=args.worker_timeout,
+        minimum_warm_seconds=args.minimum_warm_seconds,
     )
     return 0
 

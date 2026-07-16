@@ -1,5 +1,5 @@
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "date": "2026-07-16",
   "baseline_commit": "aaa41b19c2e22f16b7bdbf1029f6c2c4b5b24e49",
   "optimized_commit": "14376199f84bb1fc0116e2928809a67da2f09c17",
@@ -168,6 +168,45 @@
     },
     "classification": "accepted-affinity-controlled-two-update-pilot; not steady-production strong scaling"
   },
+  "physical_core_repeated_confirmation": {
+    "shape": [256, 67, 67],
+    "total_cells": 1149184,
+    "updates_per_trajectory": 2,
+    "repeats": 6,
+    "measured_warm_samples": 5,
+    "runs": {
+      "2": {"jax_devices": 1, "warm_samples_seconds": [22.707876052000003, 22.894210553000008, 22.781015427, 22.96753176, 23.015422843999986], "warm_median_seconds": 22.894210553000008, "warm_cv": 0.004999972847905515, "speedup": 1.0, "speedup_ci95": [0.989815202675666, 1.0102895947615296], "parallel_efficiency": 1.0, "affinity_verified": true},
+      "4": {"jax_devices": 2, "warm_samples_seconds": [16.788153549000015, 15.952852382999993, 15.697913964999998, 16.036373133000012, 15.665575923999995], "warm_median_seconds": 15.952852382999993, "warm_cv": 0.025325456334242914, "speedup": 1.4351170563953195, "speedup_ci95": [1.363712244242828, 1.4661147391851233], "parallel_efficiency": 0.7175585281976598, "affinity_verified": true},
+      "8": {"jax_devices": 4, "warm_samples_seconds": [14.787249882000026, 14.252351380999983, 14.538420465000002, 13.956184048000011, 13.787013798000032], "warm_median_seconds": 14.252351380999983, "warm_cv": 0.025691466838817657, "speedup": 1.6063462049862602, "speedup_ci95": [1.5482399185576952, 1.6605634032455296], "parallel_efficiency": 0.40158655124656506, "affinity_verified": true}
+    },
+    "equivalence": {
+      "velocity_l2_max_abs": 1.1368683772161603e-13,
+      "potential_l2_max_abs": 1.8189894035458565e-11,
+      "current_l2_max_abs": 1.0186340659856796e-10,
+      "pressure_observable_max_abs": 6.323590739584772e-13,
+      "courant_max_abs": 4.46721788250129e-16,
+      "anderson_gram_max_abs": 9.313225746154785e-10,
+      "anderson_weights_max_abs": 1.0338206527828186e-15,
+      "cross_topology_gate": true
+    },
+    "promotion_thresholds": {
+      "warm_cv_max": 0.05,
+      "speedup_ci95_lower_min": {"4": 1.2, "8": 1.4},
+      "parallel_efficiency_min": {"4": 0.6, "8": 0.35},
+      "monotonic_warm_time": true
+    },
+    "gates": {
+      "schema6_and_physics": true,
+      "cross_topology": true,
+      "affinity": true,
+      "timing_stability": true,
+      "confidence_bounds": true,
+      "parallel_efficiency": true,
+      "repeated_calibration": true,
+      "sustained_multiminute_trajectory": false
+    },
+    "classification": "accepted repeated two-update calibration; not sustained strong scaling"
+  },
   "post_profile_decisions": {
     "axial_mean_omission": {
       "shape": [128, 35, 35],
@@ -213,8 +252,8 @@
     "production_sharding_correctness": true,
     "strong_scaling_claim": false,
     "steady_state_evidence": false,
-    "physical_core_scaling": "accepted two-update pilot only",
-    "reason": "The affinity-controlled 2/4/8-CPU pilot passes its provisional correctness, stability, and speedup gates, but the workload is a two-update calibration rather than a steady accepted production solve."
+    "physical_core_scaling": "accepted repeated two-update calibration only",
+    "reason": "The affinity-controlled 2/4/8-CPU pilot and 256 x 67 x 67 repeated confirmation pass correctness, stability, confidence, and efficiency gates. Each trajectory is still only two updates; sustained multi-minute and steady-production scaling remain open."
   },
   "raw_assets": {
     "location": "ignored artifacts/{schema6,global-coarse}-{topology,scaling}-20260716 and artifacts/docker-physical-core-schema6-128; publish only as a checksummed release asset if needed",
@@ -226,6 +265,6 @@
       "baseline_scaling": {"1": "9d1f6aafd10e973f63e43b437fdfbfdc6055490272a3a34a433368edd29c5e80", "2": "7108e2f9056d07de4aac4b403a0bb083dbc91088a4ae7d1c00bc1467b26f6c19", "4": "b3f823d8d3ac2a4722cb3659f28b8e003ea54081d07997ec2264154d03a1e4e5"},
       "optimized_scaling": {"2": "27739fe29a35d18261fd8e3e5f351a37e5e14017c7fa86a1ce5a710c0209528f", "4": "d5d89d23fecd4816d54b06949143561a93172c8e1967d4db01d719060f9fd1f4"}
     },
-    "physical_core_worker_sha256": {"2": "da2857c2fe3076e32e3dfaf37cfc81d5fc279e560664f28be053684525e54a6a", "4": "30aedaf95e36ec8f8393f73ed3a3d2ffcd40a86ae68f38c5e920c79ddff924c8", "8": "ef3a735e67be226420a43f3aa280a3451ec9054ba939021343e34b943e714aa3"}
+    "physical_core_worker_sha256": {"pilot": {"2": "da2857c2fe3076e32e3dfaf37cfc81d5fc279e560664f28be053684525e54a6a", "4": "30aedaf95e36ec8f8393f73ed3a3d2ffcd40a86ae68f38c5e920c79ddff924c8", "8": "ef3a735e67be226420a43f3aa280a3451ec9054ba939021343e34b943e714aa3"}, "repeated_confirmation": {"2": "8baa45312465ac58d49d96fc11698b5e076635ad5b6366b2842e247db7329acf", "4": "00c4e165749fe13ca3101c45f539b581bec69b068051a09edf9ab7939985b709", "8": "7df86eee09eaa2f9fe7875283c517cec75ad3ebe63dc45f0b862550a42b36dd2"}}
   }
 }

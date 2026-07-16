@@ -29,7 +29,7 @@ from lmx.scaling import (
     write_strong_scaling_summary_table,
 )
 from examples.strong_scaling_demo import _default_visible_devices
-from scripts import run_strong_scaling_worker
+from scripts import run_freemhd_parity_suite, run_strong_scaling_worker
 
 
 def test_b2_repeat_signature_ignores_gauge_and_detects_shard_changes():
@@ -58,22 +58,25 @@ def test_schema6_anderson_diagnostics_cover_restart_weights_and_placement():
     inlet0 = jnp.arange(4.0).reshape(2, 2)
     checkpoint = SimpleNamespace(
         anderson_state=(mapped0, residual0, flux0, inlet0),
-        stopping_state=(1, 0, "in_progress"),
+        stopping_state=(3, 0, "in_progress"),
     )
     direct = SimpleNamespace(
         anderson_state=(mapped1, residual1, flux0 + 0.5, inlet0 + 0.5),
-        stopping_state=(2, 0, "step_limit"),
+        stopping_state=(6, 0, "step_limit"),
     )
     resumed = SimpleNamespace(**direct.__dict__)
     serialized = SimpleNamespace(
         bundle=SimpleNamespace(**checkpoint.__dict__),
         metadata={"restart_schema": "b2_diagnostics_v6"},
     )
-    problem = SimpleNamespace(case=SimpleNamespace(solver=SimpleNamespace(
-        coupling_acceleration="anderson",
-        coupling_history_depth=2,
-        coupling_regularization=1.0e-8,
-    )))
+    problem = SimpleNamespace(case=SimpleNamespace(
+        solver=SimpleNamespace(
+            coupling_acceleration="anderson",
+            coupling_history_depth=2,
+            coupling_regularization=1.0e-8,
+        ),
+        time_stepper=SimpleNamespace(max_steps=6),
+    ))
 
     diagnostics = run_strong_scaling_worker._anderson_diagnostics(
         problem, checkpoint, direct, resumed, serialized, num_devices=1
@@ -251,6 +254,12 @@ def test_scaling_demo_requires_restart_for_production(monkeypatch) -> None:
     assert strong_scaling_demo.main(arguments) == 0
     assert options["cpu_problem"] == (16, 7, 7) and options["gpu_problem"] == (8, 7, 7)
     assert options["timeout_seconds"] == 45.0
+    assert options["cpu_iterations"] == options["gpu_iterations"] == 2
+    assert strong_scaling_demo.main([
+        *arguments, "--iterations", "6", "--minimum-warm-seconds", "120",
+    ]) == 0
+    assert options["cpu_iterations"] == options["gpu_iterations"] == 6
+    assert options["minimum_warm_seconds"] == 120.0
 
 
 def test_scaling_worker_command_forwards_restart(
@@ -284,16 +293,38 @@ def test_scaling_worker_command_forwards_restart(
     strong_scaling_demo._run_worker(
         python_executable="python", repo_root=tmp_path, output_path=output,
         platform="CPU", benchmark_kind="matched_b2_smoke", nx=None, num_devices=1,
-        ny=7, nz=7, iterations=2, repeats=4,
-        matched_input=tmp_path / "input.json", evaluator=tmp_path / "evaluator.json")
+        ny=7, nz=7, iterations=6, repeats=4,
+        matched_input=tmp_path / "input.json", evaluator=tmp_path / "evaluator.json",
+        minimum_warm_seconds=120.0)
     assert {commands[1][commands[1].index(flag) + 1] for flag in (
         "--matched-input", "--evaluator")} == {
             str(tmp_path / "input.json"), str(tmp_path / "evaluator.json")}
+    assert commands[1][commands[1].index("--iterations") + 1] == "6"
+    assert commands[1][commands[1].index("--minimum-warm-seconds") + 1] == "120.0"
     monkeypatch.setenv("XLA_FLAGS", "--xla_dump_to=/tmp/lmx-safe --xla_cpu_multi_thread_eigen=true")
     env = strong_scaling_demo._forced_cpu_environment(2)
     assert "--xla_dump_to=/tmp/lmx-safe" in env["XLA_FLAGS"]
     assert env["XLA_FLAGS"].count("--xla_force_host_platform_device_count=2") == 1
     assert "--xla_cpu_multi_thread_eigen=true" not in env["XLA_FLAGS"]
+
+
+def test_matched_scaling_worker_rejects_step_contract_mismatch(tmp_path: Path):
+    matched_input = tmp_path / "matched.json"
+    run_freemhd_parity_suite.materialize_matched_b2_lmx_input(
+        matched_input, executed_steps=6
+    )
+    evaluator = tmp_path / "evaluator.json"
+    evaluator.write_text("{}")
+
+    with pytest.raises(ValueError, match="executes 6 steps"):
+        run_strong_scaling_worker._matched_b2_smoke_benchmark(
+            matched_input, evaluator, repeats=4, num_devices=1, iterations=2
+        )
+    with pytest.raises(ValueError, match="minimum_warm_seconds"):
+        run_strong_scaling_worker._matched_b2_smoke_benchmark(
+            matched_input, evaluator, repeats=4, num_devices=1, iterations=6,
+            minimum_warm_seconds=-1.0,
+        )
 
 
 def test_write_scaling_report_writes_json(tmp_path: Path):
@@ -777,23 +808,39 @@ def test_scaling_worker_covers_solver_faithful_branch(
     payload = json.loads(output_path.read_text())
     assert payload["benchmark_kind"] == "extruded_solve"
     assert payload["operator_path"] == "solve_extruded_inductionless"
+    matched_calls = []
     monkeypatch.setattr(run_strong_scaling_worker, "_matched_b2_smoke_benchmark",
-        lambda input_path, evaluator, **options: {
-            "benchmark_kind": "matched_b2_smoke", "warm_seconds": 0.2,
-            "validation_passed": options == {"repeats": 4, "num_devices": 1,
-                "profile_dir": tmp_path / "profile"}
-            and input_path.name == "input.json" and evaluator.name == "evaluator.json"})
+        lambda input_path, evaluator, **options: matched_calls.append(
+            (input_path, evaluator, options)) or {
+                "benchmark_kind": "matched_b2_smoke", "warm_seconds": 0.2,
+                "validation_passed": True})
     (tmp_path / "input.json").write_text("input")
     (tmp_path / "evaluator.json").write_text("evaluator")
     output_path = tmp_path / "matched.json"
     assert run_strong_scaling_worker.main([
         "--benchmark-kind", "matched_b2_smoke", "--matched-input", str(tmp_path / "input.json"),
         "--evaluator", str(tmp_path / "evaluator.json"), "--repeats", "4",
+        "--iterations", "6", "--minimum-warm-seconds", "120",
         "--num-devices", "1", "--profile-dir", str(tmp_path / "profile"),
         "--output", str(output_path)]) == 0
     matched = json.loads(output_path.read_text())
     assert matched["validation_passed"]
     assert len(matched["source_fingerprint"]) == 64
+    input_path, evaluator, options = matched_calls.pop()
+    assert (input_path.name, evaluator.name) == ("input.json", "evaluator.json")
+    assert options == {
+        "repeats": 4, "num_devices": 1, "profile_dir": tmp_path / "profile",
+        "iterations": 6, "minimum_warm_seconds": 120.0,
+    }
+    assert run_strong_scaling_worker.main([
+        "--benchmark-kind", "matched_b2_smoke", "--repeats", "4",
+        "--matched-input", str(tmp_path / "input.json"),
+        "--evaluator", str(tmp_path / "evaluator.json"),
+        "--num-devices", "1", "--output", str(output_path)]) == 0
+    default_options = matched_calls.pop()[2]
+    assert default_options["iterations"] is None
+    assert default_options["minimum_warm_seconds"] == 0.0
+    assert matched_calls == []
     monkeypatch.setattr(run_strong_scaling_worker, "_matched_b2_smoke_benchmark",
         lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("stopped")))
     assert run_strong_scaling_worker.main([

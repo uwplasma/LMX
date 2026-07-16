@@ -152,6 +152,8 @@ def _anderson_diagnostics(
     )
     from solvax import anderson_weights
 
+    # This endpoint signature checks restart/topology parity. The solver still
+    # applies the schema-6 depth-two Anderson update at every trajectory step.
     residuals = jnp.stack((checkpoint_state[1], direct_state[1]))
     flat = residuals.reshape((2, -1))
     gram = flat @ flat.T
@@ -174,10 +176,14 @@ def _anderson_diagnostics(
         and (num_devices == 1 or value["replicated"] == (name == "rho_phi_inlet"))
         for name, value in state_placement.items()
     )
+    requested_steps = int(direct.stopping_state[0])
+    checkpoint_step = (requested_steps + 1) // 2
     depth_two = (
         depth == 2
-        and checkpoint.stopping_state[0] == 1
-        and direct.stopping_state[0] == resumed.stopping_state[0] == 2
+        and requested_steps >= 2
+        and checkpoint.stopping_state[0] == checkpoint_step
+        and direct.stopping_state == resumed.stopping_state
+        and direct.stopping_state[2] == "step_limit"
     )
     weights_sum_error = float(abs(np.sum(weights_np) - 1.0))
     valid = bool(
@@ -202,6 +208,7 @@ def _anderson_diagnostics(
         anderson_replay_flux_relative_l2=replay_flux_relative,
         anderson_gram=gram_np.tolist(),
         anderson_weights=weights_np.tolist(),
+        anderson_endpoint_steps=[checkpoint_step, requested_steps],
         anderson_weights_sum_error=weights_sum_error,
         anderson_state_placement=state_placement,
         anderson_validation_passed=valid,
@@ -382,8 +389,10 @@ def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: 
 def _matched_b2_smoke_benchmark(
     input_path: Path, evaluator: Path, *, repeats: int, num_devices: int,
     profile_dir: Path | None = None,
+    iterations: int | None = None,
+    minimum_warm_seconds: float = 0.0,
 ) -> dict[str, object]:
-    """Time the exact direct smoke; replay, I/O, and observation stay untimed."""
+    """Time a fixed-work B2 trajectory; replay, I/O, and observation stay untimed."""
 
     if repeats < 4:
         raise ValueError("matched_b2_smoke requires one cold and three warm runs")
@@ -401,6 +410,13 @@ def _matched_b2_smoke_benchmark(
     )
 
     problem = load_matched_b2_lmx_input(input_path)
+    executed_steps = int(problem.case.time_stepper.max_steps)
+    if iterations is not None and iterations != executed_steps:
+        raise ValueError(
+            f"matched input executes {executed_steps} steps, not --iterations {iterations}"
+        )
+    if minimum_warm_seconds < 0.0:
+        raise ValueError("minimum_warm_seconds must be nonnegative")
     timings, signatures, checkpoint, direct = [], [], None, None
     for _ in range(repeats):
         started = time.perf_counter()
@@ -445,9 +461,9 @@ def _matched_b2_smoke_benchmark(
         and profile_linear_iteration_max_abs <= _B2_PROFILE_ITERATION_ATOL
         and all(np.array_equal(left[:, offset + 1:], right[:, offset + 1:])
             for left, right, offset in profile_histories)))
-    acceptance_role = (
-        "harness-smoke" if direct.u.shape == (8, 7, 7) else "scaling-calibration"
-    )
+    acceptance_role = ("harness-smoke"
+        if direct.u.shape == (8, 7, 7) and executed_steps == 2
+        else "scaling-calibration")
     try:
         with tempfile.TemporaryDirectory(prefix="lmx-b2-serialized-restart-") as temporary:
             restart_path = Path(temporary) / "checkpoint.npz"
@@ -469,7 +485,8 @@ def _matched_b2_smoke_benchmark(
             "operator_path": "solve_extruded_inductionless",
             "backend": jax.default_backend(), "device_kind": jax.devices()[0].device_kind,
             "num_devices": num_devices, "nx": direct.u.shape[0],
-            "ny": direct.u.shape[1], "nz": direct.u.shape[2], "iterations": 2,
+            "ny": direct.u.shape[1], "nz": direct.u.shape[2],
+            "iterations": executed_steps,
             "repeats": repeats, "cold_seconds": timings[0],
             "warm_samples_seconds": warm.tolist(),
             "warm_seconds": float(np.median(warm)), "validation_passed": False,
@@ -502,7 +519,7 @@ def _matched_b2_smoke_benchmark(
         signature, signatures[0], rtol=_B2_REPEAT_RTOL, atol=_B2_REPEAT_ATOL)
         for signature in signatures[1:])
     validation_passed = bool(
-        observed["steps"] == 2 and observed["stop_reason"] == "step_limit"
+        observed["steps"] == executed_steps and observed["stop_reason"] == "step_limit"
         and max(observed["courant_max"]) <= limits["courant_max"]
         and all(observed[name] <= limits[f"{name}_max"] for name in (
             "mass_balance", "current_balance", "interface_current_balance"))
@@ -518,6 +535,7 @@ def _matched_b2_smoke_benchmark(
         and profile_signature_passed is not False
         and profile_linear_history_passed is not False
         and anderson["anderson_validation_passed"]
+        and all(sample >= minimum_warm_seconds for sample in timings[1:])
     )
     warm = np.asarray(timings[1:])
     velocity_l2 = float(np.sqrt(sum(np.linalg.norm(np.asarray(getattr(direct, name))) ** 2
@@ -543,8 +561,15 @@ def _matched_b2_smoke_benchmark(
         "warm_seconds": float(np.median(warm)), "mean_seconds": float(np.mean(timings)),
         "warm_samples_seconds": warm.tolist(), "warm_std_seconds": float(np.std(warm)),
         "warm_cv": float(np.std(warm) / max(np.mean(warm), 1.0e-30)),
-        "total_cells": int(direct.u.size), "cell_updates": int(2 * direct.u.size),
-        "warm_cell_updates_per_second": float(2 * direct.u.size / np.median(warm)),
+        "total_cells": int(direct.u.size),
+        "cell_updates": int(executed_steps * direct.u.size),
+        "warm_cell_updates_per_second": float(
+            executed_steps * direct.u.size / np.median(warm)
+        ),
+        "minimum_warm_seconds": minimum_warm_seconds,
+        "sustained_duration_passed": bool(
+            all(sample >= minimum_warm_seconds for sample in warm)
+        ),
         "velocity_l2": velocity_l2, "potential_l2": float(np.linalg.norm(np.asarray(direct.phi))),
         "current_l2": current_l2,
         "memory_bytes_estimate": _bundle_memory_bytes(direct),
@@ -587,7 +612,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--nx", type=int, default=384)
     parser.add_argument("--ny", type=int, default=1024)
     parser.add_argument("--nz", type=int, default=1024)
-    parser.add_argument("--iterations", type=int, default=120)
+    parser.add_argument("--iterations", type=int, default=None)
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--num-devices", type=int, required=True)
     parser.add_argument("--platform", type=str, default="cpu")
@@ -595,6 +620,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--profile-dir", type=Path, default=None)
     parser.add_argument("--matched-input", type=Path, default=None)
     parser.add_argument("--evaluator", type=Path, default=None)
+    parser.add_argument(
+        "--minimum-warm-seconds",
+        type=float,
+        default=0.0,
+        help="Fail validation if any warm trajectory is shorter than this duration.",
+    )
     parser.add_argument(
         "--restart",
         type=Path,
@@ -609,7 +640,10 @@ def main(argv: list[str] | None = None) -> int:
         try:
             payload = _matched_b2_smoke_benchmark(
                 args.matched_input, args.evaluator, repeats=args.repeats,
-                num_devices=args.num_devices, profile_dir=args.profile_dir)
+                num_devices=args.num_devices, profile_dir=args.profile_dir,
+                iterations=args.iterations,
+                minimum_warm_seconds=args.minimum_warm_seconds,
+            )
         except Exception as error:
             payload = {
                 "benchmark_kind": "matched_b2_smoke", "num_devices": args.num_devices,
@@ -618,25 +652,28 @@ def main(argv: list[str] | None = None) -> int:
                     "message": str(error)},
             }
     elif args.benchmark_kind == "duct_step_gate":
+        iterations = 120 if args.iterations is None else args.iterations
         payload = _duct_step_gate(nx=args.nx, ny=args.ny, nz=args.nz,
-            iterations=args.iterations, num_devices=args.num_devices)
+            iterations=iterations, num_devices=args.num_devices)
     elif args.benchmark_kind == "extruded_solve":
+        iterations = 120 if args.iterations is None else args.iterations
         record = benchmark_extruded_inductionless_solve(
             nx=args.nx,
             ny=args.ny,
             nz=args.nz,
-            max_steps=args.iterations,
+            max_steps=iterations,
             repeats=args.repeats,
             num_devices=args.num_devices,
             profile_dir=args.profile_dir,
             restart_path=args.restart,
         )
     elif args.benchmark_kind == "extruded3d":
+        iterations = 120 if args.iterations is None else args.iterations
         record = benchmark_sharded_extruded_operator(
             nx=args.nx,
             ny=args.ny,
             nz=args.nz,
-            iterations=args.iterations,
+            iterations=iterations,
             repeats=args.repeats,
             num_devices=args.num_devices,
         )

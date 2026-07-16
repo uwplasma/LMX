@@ -228,10 +228,13 @@ def _tiny_b2_problem(
     spec_root: str | Path | None = None,
     *,
     solver_shape: tuple[int, int, int] = (8, 7, 7),
+    executed_steps: int = 2,
 ) -> tuple[object, dict[str, object]]:
     from lmx._fringing_types import ExtrudedInductionlessProblem, FringingProfile
     from lmx.fringing import _cross_section_mesh
 
+    if isinstance(executed_steps, bool) or not isinstance(executed_steps, int) or executed_steps < 2:
+        raise ValueError("Matched B2 executed_steps must be an integer >= 2")
     problem = build_benchmark_b_problem("B2-fringing-square", mesh_level="coarse", root=spec_root)
     dt = 1.0 / 540000.0
     nx, ny, nz = solver_shape
@@ -240,7 +243,8 @@ def _tiny_b2_problem(
         raise ValueError("Matched B2 shape requires nx >= 2 and three transverse fluid cells")
     case = replace(
         problem.case,
-        name="alex_b2-fringing-square_harness-smoke",
+        name=("alex_b2-fringing-square_harness-smoke" if executed_steps == 2
+              else "alex_b2-fringing-square_scaling-calibration"),
         geometry=replace(
             problem.case.geometry,
             nx=nx,
@@ -248,7 +252,12 @@ def _tiny_b2_problem(
             nz=nz - sum(wall_cells[2:]),
             wall_cells=wall_cells,
         ),
-        time_stepper=replace(problem.case.time_stepper, dt=dt, t_final=2.0 * dt, max_steps=2),
+        time_stepper=replace(
+            problem.case.time_stepper,
+            dt=dt,
+            t_final=executed_steps * dt,
+            max_steps=executed_steps,
+        ),
     )
     mesh = _cross_section_mesh(case)
     generated_shape = tuple(len(getattr(mesh, f"{axis}_centers")) for axis in "xyz")
@@ -303,7 +312,7 @@ def _tiny_b2_problem(
             "projection_tolerance": 1.0e-12,
             "momentum_iterations": 400,
             "momentum_tolerance": 1.0e-10,
-            "executed_steps": 2,
+            "executed_steps": executed_steps,
             "steady_steps_required": 3,
             "expected_stop_reason": "step_limit",
         },
@@ -316,13 +325,16 @@ def materialize_matched_b2_lmx_input(
     *,
     spec_root: str | Path | None = None,
     solver_shape: tuple[int, int, int] = (8, 7, 7),
+    executed_steps: int = 2,
 ) -> dict[str, object]:
     """Write a deterministic matched-B2 input; the default is the exact smoke."""
 
     destination = Path(output_file)
     if destination.exists():
         raise FileExistsError(f"Refusing to overwrite existing LMX B2 input {destination}")
-    _, payload = _tiny_b2_problem(spec_root, solver_shape=solver_shape)
+    _, payload = _tiny_b2_problem(
+        spec_root, solver_shape=solver_shape, executed_steps=executed_steps
+    )
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(
         json.dumps(payload, allow_nan=False, indent=2, sort_keys=True) + "\n",
@@ -695,38 +707,52 @@ def materialize_matched_b2_preflight(
 
 
 def _run_matched_b2_lmx_direct(problem, *, num_devices: int):
-    """Run the exact two-step path and return its step-one checkpoint."""
+    """Run the fixed-work path and return its deterministic midpoint checkpoint."""
 
     import jax
     from lmx.fringing import solve_extruded_inductionless
 
+    requested_steps = int(problem.case.time_stepper.max_steps)
+    checkpoint_step = (requested_steps + 1) // 2
     progress = []
     direct = solve_extruded_inductionless(
         problem,
         num_devices=num_devices,
         progress_callback=progress.append,
-        checkpoint_interval=1,
+        checkpoint_interval=checkpoint_step,
     )
-    if len(progress) != 2 or progress[0].checkpoint is None:
-        raise ValueError("LMX B2 direct path did not emit its step-one checkpoint")
+    checkpoints = [item.checkpoint for item in progress
+        if item.step == checkpoint_step and item.checkpoint is not None]
+    if len(progress) != requested_steps or len(checkpoints) != 1:
+        raise ValueError("LMX B2 direct path did not emit its midpoint checkpoint")
     jax.block_until_ready((direct.bundle.u, direct.bundle.p, direct.bundle.phi))
     if direct.bundle.u.dtype != np.float64:
         raise ValueError("LMX B2 smoke requires float64 execution")
-    return progress[0].checkpoint, direct.bundle
+    return checkpoints[0], direct.bundle
 
 
 def _resume_matched_b2_lmx(problem, checkpoint, *, num_devices: int):
-    """Replay the second update from an exact matched-B2 checkpoint."""
+    """Replay the remaining updates from an exact matched-B2 checkpoint."""
 
     import jax
     from lmx.fringing import solve_extruded_inductionless
 
+    requested_steps = int(problem.case.time_stepper.max_steps)
+    completed_steps = int(checkpoint.stopping_state[0])
+    remaining_steps = requested_steps - completed_steps
+    if not 0 < completed_steps < requested_steps:
+        raise ValueError("LMX B2 checkpoint does not split the requested trajectory")
     replay = replace(problem, case=replace(problem.case, time_stepper=replace(
-        problem.case.time_stepper, t_final=problem.case.time_stepper.dt, max_steps=1)))
+        problem.case.time_stepper,
+        t_final=remaining_steps * problem.case.time_stepper.dt,
+        max_steps=remaining_steps,
+    )))
     resumed = solve_extruded_inductionless(
         replay, initial_bundle=checkpoint, num_devices=num_devices
     ).bundle
     jax.block_until_ready((resumed.u, resumed.p, resumed.phi))
+    if resumed.stopping_state[0] != requested_steps or resumed.stopping_state[2] != "step_limit":
+        raise ValueError("LMX B2 resumed path did not complete the fixed-work trajectory")
     return resumed
 
 

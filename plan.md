@@ -33,7 +33,12 @@ timing-stability gates. Its 1.229x/1.360x point speedups promote the two-device
 optimization but miss the four-device bound. It is a two-update forced-device
 calibration, not a physical-core or production strong-scaling claim. Schema-6
 topology, explicit component placement, and exact serialized replay pass on
-one and two GPUs; shared-host timing is excluded. This
+one and two GPUs; shared-host timing is excluded. The affinity-controlled
+physical-CPU path passes repeated two-update calibration, but sustained
+multi-minute CPU/GPU scaling remains open. The fixed-work harness now accepts
+an explicit update count, checkpoints at the deterministic midpoint, replays
+the remaining trajectory, and can require every warm sample to exceed 120 s;
+the two-update default remains the bounded CI/debug gate. This
 single active plan records accepted baselines, active gates, and
 stop/go criteria—not campaign history. Completed campaign details belong in
 checksummed result records and the validation or performance documentation.
@@ -362,6 +367,17 @@ restart, repeat, conservation, linear, Anderson, and cross-topology gates all
 pass. Accept this as a two-update physical-core pilot only. It authorizes one
 six-repeat `256 x 67 x 67` confirmation with the frozen 1.20x/1.40x
 confidence-bound and 60%/35% efficiency gates, not a steady-production claim.
+
+That confirmation is complete. Its 22.894/15.953/14.252-second warm medians
+give 1.435x/1.606x speedups, 1.364x/1.548x 95% lower bounds, and
+71.8%/40.2% efficiency; all correctness and calibration gates pass. These are
+five repeated samples of a two-update trajectory, not sustained strong scaling.
+The next implementation must generalize the matched input and worker to a
+configurable update count with an exact split restart. Actual CPU and GPU
+scaling rungs must each measure at least 120 post-warm-up seconds in one
+trajectory on identical state/input, while preserving the same placement,
+restart, linear, conservation, Anderson, and cross-topology gates. Do not claim
+production scaling from accumulated short repeats.
 
 The existing `101 x 77 x 77` coarse checkpoints were screened before launching
 that ladder. Three representative files match the current geometry and solver

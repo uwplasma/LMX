@@ -176,6 +176,8 @@ def _write_lmx_b2_output(root: Path, input_path: Path, evaluator: Path) -> None:
     faces = benchmarks.jnp.asarray(payload["mesh"]["y_faces"])
     y = z = 0.5 * (faces[1:] + faces[:-1])
     shape, dt = (8, 7, 7), payload["effective_controls"]["dt"]
+    executed_steps = payload["effective_controls"]["executed_steps"]
+    checkpoint_step = (executed_steps + 1) // 2
     case = load_matched_b2_lmx_input(input_path).case
 
     def bundle(steps: int) -> ExtrudedFieldBundle:
@@ -193,7 +195,8 @@ def _write_lmx_b2_output(root: Path, input_path: Path, evaluator: Path) -> None:
             aitken_state=((None, 1.0, 0)
                 if case.solver.coupling_acceleration == "aitken" else None),
             anderson_state=anderson_state,
-            stopping_state=(steps, 0, "step_limit" if steps == 2 else "in_progress"),
+            stopping_state=(steps, 0,
+                "step_limit" if steps == executed_steps else "in_progress"),
             jx=benchmarks.jnp.ones(shape), jz=benchmarks.jnp.ones(shape),
             volumetric_flow_rate=benchmarks.jnp.full(8, 4.0),
             charge_balance_residual=benchmarks.jnp.full(8, 1.0e-5),
@@ -213,7 +216,11 @@ def _write_lmx_b2_output(root: Path, input_path: Path, evaluator: Path) -> None:
         )
 
     root.mkdir()
-    for name, value in (("checkpoint.npz", bundle(1)), ("direct.npz", bundle(2)), ("resumed.npz", bundle(2))):
+    for name, value in (
+        ("checkpoint.npz", bundle(checkpoint_step)),
+        ("direct.npz", bundle(executed_steps)),
+        ("resumed.npz", bundle(executed_steps)),
+    ):
         write_extruded_bundle_restart_npz(value, case, root / name)
     (root / "run.json").write_text(json.dumps({
         "schema_version": 1, "code": "LMX", "case_id": "B2-fringing-square",
@@ -560,7 +567,12 @@ def test_freemhd_source_snapshot_rejects_unfrozen_evidence(
 
 
 def test_matched_b2_lmx_input_is_deterministic_real_and_observed(tmp_path: Path):
-    first, second, scaled = (tmp_path / name for name in ("first.json", "second.json", "scaled.json"))
+    first, second, scaled, sustained, sustained_copy = (
+        tmp_path / name for name in (
+            "first.json", "second.json", "scaled.json", "sustained.json",
+            "sustained-copy.json",
+        )
+    )
     payload = run_freemhd_parity_suite.materialize_matched_b2_lmx_input(first)
     run_freemhd_parity_suite.materialize_matched_b2_lmx_input(second)
     problem, contract = load_matched_b2_lmx_input(first), observe_lmx_b2_contract(first)
@@ -583,6 +595,28 @@ def test_matched_b2_lmx_input_is_deterministic_real_and_observed(tmp_path: Path)
     geometry = scaled_problem.case.geometry
     assert (geometry.nx, geometry.ny, geometry.nz) == (16, 5, 5)
     assert len(scaled_payload["field_profile"]["sample_x_over_L"]) == 16
+    sustained_payload = run_freemhd_parity_suite.materialize_matched_b2_lmx_input(
+        sustained, executed_steps=6
+    )
+    run_freemhd_parity_suite.materialize_matched_b2_lmx_input(
+        sustained_copy, executed_steps=6
+    )
+    sustained_problem = load_matched_b2_lmx_input(sustained)
+    assert sustained.read_bytes() == sustained_copy.read_bytes()
+    assert sustained_payload["effective_controls"]["executed_steps"] == 6
+    assert sustained_problem.case.name.endswith("_scaling-calibration")
+    assert sustained_problem.case.time_stepper.max_steps == 6
+    assert sustained_problem.case.time_stepper.t_final == pytest.approx(
+        6 * sustained_problem.case.time_stepper.dt
+    )
+    assert observe_lmx_b2_contract(sustained)["stopping_rules"] == (
+        sustained_payload["effective_controls"]
+    )
+    for invalid in (True, 1, 2.5):
+        with pytest.raises((TypeError, ValueError), match="executed_steps"):
+            run_freemhd_parity_suite.materialize_matched_b2_lmx_input(
+                tmp_path / f"invalid-{invalid}.json", executed_steps=invalid
+            )
     with pytest.raises(ValueError, match="requires nx"):
         run_freemhd_parity_suite.materialize_matched_b2_lmx_input(
             tmp_path / "bad", solver_shape=(8, 2, 7))
@@ -639,11 +673,14 @@ def test_independent_matched_b2_input_observers_agree(tmp_path: Path, monkeypatc
 
 
 @pytest.mark.parametrize("acceleration", ("anderson", "aitken"))
+@pytest.mark.parametrize("executed_steps", (2, 6))
 def test_lmx_b2_output_observer_replays_restart_evidence(
-    tmp_path: Path, acceleration: str
+    tmp_path: Path, acceleration: str, executed_steps: int
 ):
     input_path, evaluator = tmp_path / "lmx.json", tmp_path / "evaluator.json"
-    run_freemhd_parity_suite.materialize_matched_b2_lmx_input(input_path)
+    run_freemhd_parity_suite.materialize_matched_b2_lmx_input(
+        input_path, executed_steps=executed_steps
+    )
     if acceleration == "aitken":
         payload = json.loads(input_path.read_text())
         payload["case"]["solver"]["coupling_acceleration"] = acceleration
@@ -653,7 +690,9 @@ def test_lmx_b2_output_observer_replays_restart_evidence(
 
     observed = observe_lmx_b2_output(tmp_path / "output", input_path, evaluator)
 
-    assert observed["steps"] == 2 and observed["stop_reason"] == "step_limit"
+    assert observed["steps"] == executed_steps
+    assert observed["stop_reason"] == "step_limit"
+    assert len(observed["dt"]) == len(observed["courant_mean"]) == executed_steps
     assert all(observed[name] == 0.0 for name in (
         "restart_max_abs", "restart_state_max_abs", "restart_flux_max_abs",
         "restart_flux_relative_l2", "restart_derived_max_abs",

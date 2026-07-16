@@ -387,7 +387,11 @@ def _decode_matched_b2_lmx_input(path: str | Path):
         magnetic_field=MagneticFieldSpec(**magnetic), boundary_conditions=tuple(boundaries),
         time_stepper=time_stepper, solver=solver, output=output,
     )
-    if case.name != "alex_b2-fringing-square_harness-smoke" or case.geometry.kind != "layered_duct":
+    canonical_names = {
+        "alex_b2-fringing-square_harness-smoke",
+        "alex_b2-fringing-square_scaling-calibration",
+    }
+    if case.name not in canonical_names or case.geometry.kind != "layered_duct":
         raise ValueError("Matched B2 LMX input does not select the canonical solver path")
     mesh = _cross_section_mesh(case)
     mesh_payload = payload["mesh"]
@@ -487,11 +491,14 @@ def _decode_matched_b2_lmx_input(path: str | Path):
         "momentum_tolerance": min(case.solver.coupling_tolerance, 1.0e-10),
         "executed_steps": case.time_stepper.max_steps,
         "steady_steps_required": 3,
-        "expected_stop_reason": "step_limit" if case.time_stepper.max_steps < 3 else "in_progress",
+        "expected_stop_reason": "step_limit",
     }
+    expected_name = ("alex_b2-fringing-square_harness-smoke"
+        if case.time_stepper.max_steps == 2
+        else "alex_b2-fringing-square_scaling-calibration")
     if controls != expected_controls or not math.isclose(
         float(case.time_stepper.dt), float(controls.get("dt", math.nan))
-    ):
+    ) or case.name != expected_name:
         raise ValueError("Matched B2 effective controls do not reproduce the solver contract")
     problem = ExtrudedInductionlessProblem(
         case=case,
@@ -662,6 +669,8 @@ def observe_lmx_b2_output(
     ):
         raise ValueError("LMX B2 output provenance differs")
     problem = load_matched_b2_lmx_input(input_path)
+    requested_steps = int(problem.case.time_stepper.max_steps)
+    checkpoint_step = (requested_steps + 1) // 2
     checkpoint, direct, resumed = (
         load_extruded_restart_bundle(root / name)
         for name in ("checkpoint.npz", "direct.npz", "resumed.npz")
@@ -685,7 +694,12 @@ def observe_lmx_b2_output(
            or getattr(restart.bundle, acceleration_name) is None
            for restart in (checkpoint, direct, resumed)):
         raise ValueError(f"LMX B2 output {label} restart state is invalid")
-    if checkpoint.bundle.stopping_state[0] != 1 or direct.bundle.stopping_state != resumed.bundle.stopping_state:
+    if (
+        checkpoint.bundle.stopping_state[0] != checkpoint_step
+        or direct.bundle.stopping_state != resumed.bundle.stopping_state
+        or direct.bundle.stopping_state[0] != requested_steps
+        or direct.bundle.stopping_state[2] != "step_limit"
+    ):
         raise ValueError("LMX B2 restart stopping state differs")
     # Keep replay-driving state separate from recomputed fields and solver histories.
     state_names = """x y z field_scale u v w p residual volumetric_flow_rate
@@ -730,13 +744,13 @@ def observe_lmx_b2_output(
         SimpleNamespace(bundle=direct.bundle), "B2-fringing-square"
     ))
     if (
-        courant.shape != (2, 3)
+        courant.shape != (requested_steps, 3)
         or pressure.shape != (problem.case.geometry.nx,)
-        or direct.bundle.stopping_state[0] != 2
+        or direct.bundle.stopping_state[0] != requested_steps
     ):
         raise ValueError("LMX B2 output execution shape differs")
     return {
-        "steps": 2, "stop_reason": direct.bundle.stopping_state[2],
+        "steps": requested_steps, "stop_reason": direct.bundle.stopping_state[2],
         "steady_streak": direct.bundle.stopping_state[1],
         "dt": courant[:, 0].tolist(), "courant_mean": courant[:, 1].tolist(),
         "courant_max": courant[:, 2].tolist(),
