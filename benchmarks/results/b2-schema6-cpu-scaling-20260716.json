@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "date": "2026-07-16",
   "baseline_commit": "aaa41b19c2e22f16b7bdbf1029f6c2c4b5b24e49",
   "optimized_commit": "14376199f84bb1fc0116e2928809a67da2f09c17",
@@ -104,6 +104,70 @@
     },
     "classification": "accepted-calibration-rejected-performance-promotion"
   },
+  "physical_core_pilot": {
+    "shape": [128, 67, 67],
+    "total_cells": 574592,
+    "environment": {
+      "runtime": "native ARM64 Docker with verified Linux sched_getaffinity masks",
+      "hardware": "Apple M4 Docker VM, 10 visible CPUs",
+      "python": "3.12.13",
+      "jax": "0.10.2",
+      "jaxlib": "0.10.2",
+      "solvax": "0.8.4",
+      "precision": "float64",
+      "thread_contract": "two affinity-controlled physical CPUs per forced JAX CPU device"
+    },
+    "protocol": {
+      "updates": 2,
+      "repeats": 4,
+      "restart": "direct 2 versus serialized NPZ 1+1",
+      "restart_schema": "b2_diagnostics_v6",
+      "timing_statistic": "median of three post-compile warm samples",
+      "worker_timeout_seconds": 120
+    },
+    "runtime_thread_gate": {
+      "one_device_one_cpu": "validated",
+      "two_devices_two_cpus": "rejected: CPU all-reduce had one of two participants and hit the 40-second rendezvous termination timeout",
+      "two_devices_four_cpus_tiny_gate": "passed",
+      "decision": "use nested 2/4/8-CPU masks for 1/2/4 devices; do not mix the one-CPU diagnostic into scaling"
+    },
+    "runs": {
+      "2": {"jax_devices": 1, "warm_samples_seconds": [7.114426460999994, 7.351306087000012, 7.362066127999981], "warm_median_seconds": 7.351306087000012, "warm_cv": 0.015707503974205922, "speedup": 1.0, "parallel_efficiency": 1.0, "affinity_verified": true},
+      "4": {"jax_devices": 2, "warm_samples_seconds": [5.546109460999958, 5.594564961000003, 5.496317711000017], "warm_median_seconds": 5.546109460999958, "warm_cv": 0.007232769261258435, "speedup": 1.325488820351299, "parallel_efficiency": 0.6627444101756494, "affinity_verified": true},
+      "8": {"jax_devices": 4, "warm_samples_seconds": [4.376336168000023, 4.574468044000014, 4.594811835999963], "warm_median_seconds": 4.574468044000014, "warm_cv": 0.021825351529403948, "speedup": 1.6070297171803765, "parallel_efficiency": 0.4017574292950941, "affinity_verified": true}
+    },
+    "equivalence": {
+      "velocity_l2_max_abs": 1.1368683772161603e-13,
+      "potential_l2_max_abs": 9.094947017729282e-12,
+      "current_l2_max_abs": 1.8917489796876907e-10,
+      "pressure_observable_max_abs": 3.529339364163886e-13,
+      "courant_max_abs": 3.7201703984067816e-15,
+      "anderson_gram_max_abs": 1.1932570487260818e-9,
+      "anderson_weights_max_abs": 2.015186249208073e-15,
+      "cross_topology_gate": true
+    },
+    "promotion_thresholds": {
+      "warm_cv_max": 0.05,
+      "speedup_min": {"4": 1.15, "8": 1.3},
+      "monotonic_warm_time": true
+    },
+    "gates": {
+      "schema6": true,
+      "validation": true,
+      "placement": true,
+      "conservation": true,
+      "linear_solves": true,
+      "repeat": true,
+      "serialization": true,
+      "restart_replay": true,
+      "device_equivalence": true,
+      "affinity": true,
+      "timing_stability": true,
+      "monotonic_warm_time": true,
+      "pilot_performance": true
+    },
+    "classification": "accepted-affinity-controlled-two-update-pilot; not steady-production strong scaling"
+  },
   "post_profile_decisions": {
     "axial_mean_omission": {
       "shape": [128, 35, 35],
@@ -149,18 +213,19 @@
     "production_sharding_correctness": true,
     "strong_scaling_claim": false,
     "steady_state_evidence": false,
-    "physical_core_scaling": false,
-    "reason": "The global coarse correction removes partition-dependent electric iteration growth and improves two/four-device time by 7.8%/13.4%. Forced-device sharding is correct and stable, but the four-device speedup lower bound and efficiency still miss the frozen promotion thresholds."
+    "physical_core_scaling": "accepted two-update pilot only",
+    "reason": "The affinity-controlled 2/4/8-CPU pilot passes its provisional correctness, stability, and speedup gates, but the workload is a two-update calibration rather than a steady accepted production solve."
   },
   "raw_assets": {
-    "location": "ignored artifacts/{schema6,global-coarse}-{topology,scaling}-20260716; publish only as a checksummed release asset if needed",
-    "input_sha256": {"topology": "5382c1d68d9fb3508a408bb20befe6675ade77b852e6a80204781debab3aab2a", "scaling": "4721eb114966e55e08928098f944abbd0b07ed94a6c7fed0de82f707ccdd5978"},
+    "location": "ignored artifacts/{schema6,global-coarse}-{topology,scaling}-20260716 and artifacts/docker-physical-core-schema6-128; publish only as a checksummed release asset if needed",
+    "input_sha256": {"topology": "5382c1d68d9fb3508a408bb20befe6675ade77b852e6a80204781debab3aab2a", "scaling": "4721eb114966e55e08928098f944abbd0b07ed94a6c7fed0de82f707ccdd5978", "physical_core_pilot": "1aa490a56bbbd56dcaa2b7b7aa1b117efc10c5a0799eade47de38cb6ab3190b3"},
     "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa",
     "summary_sha256": {"baseline_topology": "dccd2bf1d8b5ad375daa32189c3affeb1850b699846588983381608b2b39c1ef", "baseline_scaling": "9fa2c4e4654a40e3f8f604d018467c5ebdc47fbd9d066f5fddcb39a1571635d5", "optimized_topology": "f85ec4b55f147e2285be66bcb6fc099345f69e4abba797f5d0ee9ae9e987bc57", "optimized_scaling": "ad70bdb17c06120a154c2cffb2a8521e1c929a0345af4307713bc62580990818"},
     "worker_sha256": {
       "topology": {"1": "cb1580f152bdb0c6f8448c10e4eebc0908dcd3148d382755fc12df86d0be21bd", "2": "cf2da78eaf68d2d5542fe568e54d855532e46290822532244cc8b5baf163fcb0", "4": "709b18acbcf7343129e72dfef6fc6954d340ffc3eeaf39457cbaff3338819bf4"},
       "baseline_scaling": {"1": "9d1f6aafd10e973f63e43b437fdfbfdc6055490272a3a34a433368edd29c5e80", "2": "7108e2f9056d07de4aac4b403a0bb083dbc91088a4ae7d1c00bc1467b26f6c19", "4": "b3f823d8d3ac2a4722cb3659f28b8e003ea54081d07997ec2264154d03a1e4e5"},
       "optimized_scaling": {"2": "27739fe29a35d18261fd8e3e5f351a37e5e14017c7fa86a1ce5a710c0209528f", "4": "d5d89d23fecd4816d54b06949143561a93172c8e1967d4db01d719060f9fd1f4"}
-    }
+    },
+    "physical_core_worker_sha256": {"2": "da2857c2fe3076e32e3dfaf37cfc81d5fc279e560664f28be053684525e54a6a", "4": "30aedaf95e36ec8f8393f73ed3a3d2ffcd40a86ae68f38c5e920c79ddff924c8", "8": "ef3a735e67be226420a43f3aa280a3451ec9054ba939021343e34b943e714aa3"}
   }
 }

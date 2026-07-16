@@ -4,14 +4,13 @@ LMX runs through JAX on CPUs and GPUs. Performance claims are accepted only for
 the real solver path with identical numerical results; visibility of multiple
 devices alone is not evidence of parallel execution.
 
-![Current B2 schema-6 CPU sharding calibration](_static/strong_scaling.webp)
+![Current B2 schema-6 forced-device calibration and physical-core pilot](_static/strong_scaling.webp)
 
-This panel is generated from the accepted schema-6 CPU calibration record. It
-demonstrates correct fixed-grid sharding and monotonic warm-time improvement,
-but not promoted strong scaling; the four-device confidence and efficiency
-gates remain open. Current one/two-GPU schema-6 topology is green. It is not
-shown because the shared-host replay is correctness evidence, not a timing
-curve.
+This composite is generated from the accepted schema-6 CPU record. The upper
+panel is forced-device calibration; the lower panel is an affinity-controlled
+2/4/8-CPU pilot. Both use two solver updates, so neither is steady-production
+strong scaling. Current one/two-GPU topology is green but omitted because the
+shared-host replay is correctness evidence, not a timing curve.
 
 ## Current evidence
 
@@ -20,6 +19,7 @@ curve.
 | portable test gate | Apple M4, six workers | 849 pass, 8 skip, 95.33% combined line/branch coverage, 143.0 s | timing delta treated as host variance; below five-minute target |
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | B2 schema-6 CPU calibration | Apple M4, `256 x 67 x 67`, 1/2/4 forced CPU devices | 15.159/12.337/11.146 s; 1.229x/1.360x speedup; exact restart and device equivalence pass | accepted correctness/calibration; four-device promotion gate not met |
+| B2 physical-core pilot | ARM64 Docker on Apple M4, `128 x 67 x 67`, 2/4/8 affinity-controlled CPUs for 1/2/4 devices | 7.351/5.546/4.574 s; 1.325x/1.607x; CV 0.72--2.18%; all schema-6 and cross-topology gates pass | accepted two-update pilot; not steady-production scaling |
 | B2 pseudo-time gate | Apple M4, corrected warm `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x/32x/16x map-rate spread 0.0768%; raw updates halve; exact restart | 64x refrozen; versioned stopping threshold open |
 | B2 physical-residual probe | Apple M4, `7 x 7 x 7` | residual 0.03870 at step 90; omitted reconstruction force is 0.0880 at step 4 | diagnostic has a plausible coarse split floor; never a stopping gate |
 | physical-core restart audit | existing `101 x 77 x 77` coarse checkpoints | geometry/shape load, but sampled files normalize to `legacy_nonexact` with no source fingerprint or schema-6 Anderson/compact-flux state | unsuitable for exact or promoted current-source scaling evidence |
@@ -160,12 +160,19 @@ solve only 0.85% (`0.7437` to `0.7374` seconds). That fast path is rejected
 before the large rung. These results remain forced-device sharding evidence,
 not physical-core strong scaling.
 
-An ARM64 Docker probe supplies auditable Linux `cpuset` masks, but its tiny
-real-solver grid is not an acceptable scaling workload. One/two/four shards
-agree within `5.2e-14`, while warm time regresses from 0.530 s to 0.575/0.693 s
-and the residual never passes the `5e-5` steady gate. No speedup or plot is
-claimed; the next physical-core experiment requires a valid larger-grid
-restart first.
+The first ARM64 Docker probe supplies auditable Linux `cpuset` masks, but its
+tiny real-solver grid is not an acceptable scaling workload. One/two/four
+shards agree within `5.2e-14`, while warm time regresses from 0.530 s to
+0.575/0.693 s and the residual never passes the `5e-5` steady gate. Those
+timings remain rejected. A subsequent current-source `128 x 67 x 67` matched
+schema-6 pilot found that one CPU per JAX device starves the CPU collective
+runtime: two devices on two CPUs hit the 40-second all-reduce rendezvous abort.
+The preflight therefore fixed two physical CPUs per device and reran nested
+2/4/8-CPU masks. Warm medians fall from 7.351 to 5.546/4.574 seconds, giving
+1.325x/1.607x speedups and 66.3%/40.2% efficiency. All affinity, placement,
+restart, repeat, conservation, linear, Anderson, and cross-topology gates pass.
+This authorizes one six-repeat `256 x 67 x 67` confirmation; it does not replace
+the still-open steady-production acceptance gate.
 
 The medium B2 tight solve converged across two restart-safe segments and ended
 at residual `2.500e-5`, divergence `1.829e-6`, and charge residual `1.149e-4`.
@@ -368,10 +375,11 @@ than silently reused.
 
 ## Next performance work
 
-1. Compare six tiny Anderson updates with the fixed-relaxation control.
-2. If that passes, run the bounded step-29 then strict step-96 outcome gates.
-3. Close canonical coarse/medium/fine and experimental-observable acceptance.
-4. Revisit accepted-workload CPU/GPU strong scaling only after that acceptance.
+1. Confirm the physical-core pilot once at `256 x 67 x 67` with six repeats and frozen confidence/efficiency gates.
+2. Compare six tiny Anderson updates with the fixed-relaxation control.
+3. If that passes, run the bounded step-29 then strict step-96 outcome gates.
+4. Close canonical coarse/medium/fine and experimental-observable acceptance.
+5. Revisit steady-production CPU/GPU strong scaling only after that acceptance.
 
 See [Testing](testing.md) for the portable gate and [Benchmark matrix](benchmark_matrix.md)
 for physics promotion criteria.

@@ -511,7 +511,9 @@ def test_write_strong_scaling_plots_writes_png_and_pdf(tmp_path: Path):
         {"platform": "GPU", "num_devices": 1, "warm_seconds": 1.8},
         {"platform": "GPU", "num_devices": 2, "mean_seconds": 1.0},
     ]
-    outputs = write_strong_scaling_plots(records, tmp_path, case_title="Scaling")
+    outputs = write_strong_scaling_plots(
+        records, tmp_path, case_title="Scaling", resource_label="Worker count"
+    )
 
     _assert_figure_pair(outputs, tmp_path, "strong_scaling")
 

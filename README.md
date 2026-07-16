@@ -135,11 +135,13 @@ Q2D-MHDfoam parity and blanket validation remain open.
 
 ## Scale on CPUs and GPUs
 
-![Current B2 schema-6 CPU sharding calibration](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/strong_scaling.webp)
+![Current B2 schema-6 forced-device calibration and physical-core pilot](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/strong_scaling.webp)
 
 Schema-6 B2 agrees on 1/2/4 forced CPU devices with exact restart replay. At
 `256 × 67 × 67`, two/four devices reach 1.229×/1.360×; four devices still miss
-the promotion gate. Two-GPU topology is current; GPU scaling remains open.
+the promotion gate. An affinity-controlled 128×67×67 pilot reaches 1.607× on
+eight versus two physical CPUs. It is a two-update calibration, not production
+scaling. Two-GPU topology is current; GPU scaling remains open.
 [Protocol and results →](https://lmx.readthedocs.io/en/latest/performance.html)
 
 ## Quality and citation

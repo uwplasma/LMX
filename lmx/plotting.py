@@ -1989,7 +1989,10 @@ def write_strong_scaling_plots(
     out_dir: str | Path,
     *,
     case_title: str,
+    resource_label: str = "Device count",
 ) -> list[Path]:
+    """Plot warm runtime and speedup against a named execution-resource count."""
+
     out_dir = _prepare_plot_output(out_dir)
 
     groups: dict[str, list[dict[str, object]]] = {}
@@ -2047,14 +2050,14 @@ def write_strong_scaling_plots(
     legend_labels.append("Ideal linear speedup")
 
     axes[0].set_title("Warm runtime", fontsize=13)
-    axes[0].set_xlabel("Device count")
+    axes[0].set_xlabel(resource_label)
     axes[0].set_ylabel("Runtime [s]")
     axes[0].set_yscale("log")
     axes[0].set_xscale("log", base=2)
     axes[0].set_xticks(sorted({int(item["num_devices"]) for item in records}))
     axes[0].get_xaxis().set_major_formatter(ScalarFormatter())
     axes[1].set_title("Strong-scaling speedup", fontsize=13)
-    axes[1].set_xlabel("Device count")
+    axes[1].set_xlabel(resource_label)
     axes[1].set_ylabel("Warm-runtime speedup")
     axes[1].set_xscale("log", base=2)
     axes[1].set_xticks(sorted({int(item["num_devices"]) for item in records}))

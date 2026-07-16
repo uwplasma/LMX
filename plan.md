@@ -349,17 +349,27 @@ two, and four physical shards and field-norm agreement within `5.2e-14`, but
 the small `64 x 27 x 27` total grid slows from 0.530 s to 0.575/0.693 s. It is
 also unsteady: continuation improves the update residual to `1.02e-4` at 256
 updates before rising to `1.72e-4` at 384, above the `5e-5` gate. Reject those
-timings and do not plot them as scaling evidence. The next affinity-controlled
-ladder requires a current, accepted larger-grid restart before its one-core
-baseline; no larger blind cold-start run is authorized.
+timings and do not plot them as scaling evidence.
+
+A current-source `128 x 67 x 67` matched schema-6 pilot then establishes the
+bounded physical-core path without a blind steady solve. One CPU per JAX device
+is invalid: two devices on two CPUs hit the 40-second all-reduce rendezvous
+abort. The tiny preflight passes with two physical CPUs per device, so the
+measured ladder uses nested 2/4/8-CPU masks for 1/2/4 devices. Warm medians are
+7.351, 5.546, and 4.574 seconds, giving 1.325x/1.607x speedups and
+66.3%/40.2% efficiency; CVs are below 2.2%. Schema-6, affinity, placement,
+restart, repeat, conservation, linear, Anderson, and cross-topology gates all
+pass. Accept this as a two-update physical-core pilot only. It authorizes one
+six-repeat `256 x 67 x 67` confirmation with the frozen 1.20x/1.40x
+confidence-bound and 60%/35% efficiency gates, not a steady-production claim.
 
 The existing `101 x 77 x 77` coarse checkpoints were screened before launching
 that ladder. Three representative files match the current geometry and solver
 shape, but all normalize to `legacy_nonexact`, omit compact flux and schema-6
 Anderson state, and carry no source fingerprint. They may support a separately
 labelled warm-start diagnostic, but they cannot seed exact-restart, current-
-source, or promoted physical-core evidence. The accepted larger-grid restart
-gate therefore remains open.
+source, or steady-production physical-core evidence. That restart gate remains
+open independently of the matched two-update pilot.
 
 Compact CPU evidence is
 `benchmarks/results/b2-schema6-cpu-scaling-20260716.json`; raw worker JSON and
