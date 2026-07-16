@@ -52,20 +52,6 @@ from .validation import (
 )
 
 
-class _EmptyDiagnostics:
-    potential_residual_history = jnp.asarray([])
-    potential_iterations_history = jnp.asarray([])
-    linear_residual_history = jnp.asarray([])
-    linear_iterations_history = jnp.asarray([])
-    volumetric_flow_rate_history = jnp.asarray([])
-    mean_current_magnitude_history = jnp.asarray([])
-    lorentz_power_history = jnp.asarray([])
-    div_current_max_history = jnp.asarray([])
-    charge_balance_residual_history = jnp.asarray([])
-    gauge_residual_history = jnp.asarray([])
-    interface_current_residual_history = jnp.asarray([])
-
-
 def _build_case(args: argparse.Namespace):
     if args.case == "hartmann":
         return make_hartmann_case(ha=args.ha, output_dir=args.output)
@@ -156,7 +142,7 @@ def _solve_case_with_optional_logger(
 
 
 def _runtime_summary(solution, case, out_dir: Path, outputs: dict[str, list[Path]], *, restart_info: dict[str, object] | None = None) -> dict[str, object]:
-    diag = getattr(solution, "diagnostics", _EmptyDiagnostics())
+    diag = getattr(solution, "diagnostics", None)
     geometry = getattr(getattr(case, "geometry", None), "kind", "unknown")
     u_field = getattr(solution.state, "u", jnp.asarray([0.0]))
     def _latest(name: str) -> float | None:

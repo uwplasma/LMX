@@ -11,6 +11,39 @@ from lmx.config import FringingSpec, LoggingSpec, RestartSpec, RunConfig
 pytestmark = pytest.mark.unit
 
 
+def _stub_validation_cli(
+    monkeypatch: pytest.MonkeyPatch, *, case_name: str, output_dir: Path
+) -> dict[str, object]:
+    case = SimpleNamespace(
+        name=case_name, output=SimpleNamespace(directory=str(output_dir))
+    )
+    solution = SimpleNamespace(
+        state=SimpleNamespace(time=1.25, residual=0.01), mesh=SimpleNamespace()
+    )
+    recorded: dict[str, object] = {}
+    monkeypatch.setattr(cli, "_build_case", lambda args: case)
+    monkeypatch.setattr(cli, "solve_steady", lambda built_case: solution)
+    monkeypatch.setattr(cli, "write_paraview", lambda solved, out_dir: [])
+    monkeypatch.setattr(cli, "write_profile_csv", lambda path, profile: path)
+    monkeypatch.setattr(
+        cli, "extract_centerline", lambda solved: {"y": [0.0], "u": [1.0]}
+    )
+    monkeypatch.setattr(
+        cli, "extract_midplane_profile", lambda solved, axis: {"z": [0.0], "u": [1.0]}
+    )
+    monkeypatch.setattr(
+        cli,
+        "validation_summary",
+        lambda solved, name, ha: {"case": name, "residual": 0.01, "u_max": 1.0},
+    )
+    monkeypatch.setattr(
+        cli,
+        "write_metrics_json",
+        lambda payload, path: recorded.update(metrics=payload, metrics_path=path) or path,
+    )
+    return recorded
+
+
 @pytest.mark.parametrize(
     ("arguments", "expected"),
     (
@@ -631,11 +664,8 @@ def test_cli_validate_branches_into_reference_comparison(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ):
     output_dir = tmp_path / "validate"
-    case = SimpleNamespace(
-        name="shercliff_ha5", output=SimpleNamespace(directory=str(output_dir))
-    )
-    solution = SimpleNamespace(
-        state=SimpleNamespace(time=1.25, residual=0.01), mesh=SimpleNamespace()
+    recorded = _stub_validation_cli(
+        monkeypatch, case_name="shercliff_ha5", output_dir=output_dir
     )
     comparison = SimpleNamespace(
         y_profile=SimpleNamespace(l2_error=0.2, linf_error=0.3),
@@ -644,27 +674,6 @@ def test_cli_validate_branches_into_reference_comparison(
     slice_report = SimpleNamespace(
         y_profile=SimpleNamespace(l2_error=0.6, linf_error=0.7),
         z_profile=SimpleNamespace(l2_error=0.8, linf_error=0.9),
-    )
-    recorded: dict[str, object] = {}
-
-    monkeypatch.setattr(cli, "_build_case", lambda args: case)
-    monkeypatch.setattr(cli, "solve_steady", lambda built_case: solution)
-    monkeypatch.setattr(cli, "write_paraview", lambda solved, out_dir: [])
-    monkeypatch.setattr(cli, "write_profile_csv", lambda path, profile: path)
-    monkeypatch.setattr(
-        cli, "extract_centerline", lambda solved: {"y": [0.0], "u": [1.0]}
-    )
-    monkeypatch.setattr(
-        cli, "extract_midplane_profile", lambda solved, axis: {"z": [0.0], "u": [1.0]}
-    )
-    monkeypatch.setattr(
-        cli,
-        "validation_summary",
-        lambda solved, case_name, ha: {
-            "case": case_name,
-            "residual": 0.01,
-            "u_max": 1.0,
-        },
     )
     monkeypatch.setattr(
         cli,
@@ -686,14 +695,6 @@ def test_cli_validate_branches_into_reference_comparison(
         "write_processed_slice_validation",
         lambda report, path: recorded.update(slice=path) or path,
     )
-    monkeypatch.setattr(
-        cli,
-        "write_metrics_json",
-        lambda payload, path: (
-            recorded.update(metrics=payload, metrics_path=path) or path
-        ),
-    )
-
     exit_code = cli.main(
         [
             "validate",
@@ -722,32 +723,8 @@ def test_cli_validate_hartmann_branch_writes_analytic_report(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ):
     output_dir = tmp_path / "validate"
-    case = SimpleNamespace(
-        name="hartmann_ha5", output=SimpleNamespace(directory=str(output_dir))
-    )
-    solution = SimpleNamespace(
-        state=SimpleNamespace(time=1.25, residual=0.01), mesh=SimpleNamespace()
-    )
-    recorded: dict[str, object] = {}
-
-    monkeypatch.setattr(cli, "_build_case", lambda args: case)
-    monkeypatch.setattr(cli, "solve_steady", lambda built_case: solution)
-    monkeypatch.setattr(cli, "write_paraview", lambda solved, out_dir: [])
-    monkeypatch.setattr(cli, "write_profile_csv", lambda path, profile: path)
-    monkeypatch.setattr(
-        cli, "extract_centerline", lambda solved: {"y": [0.0], "u": [1.0]}
-    )
-    monkeypatch.setattr(
-        cli, "extract_midplane_profile", lambda solved, axis: {"z": [0.0], "u": [1.0]}
-    )
-    monkeypatch.setattr(
-        cli,
-        "validation_summary",
-        lambda solved, case_name, ha: {
-            "case": case_name,
-            "residual": 0.01,
-            "u_max": 1.0,
-        },
+    recorded = _stub_validation_cli(
+        monkeypatch, case_name="hartmann_ha5", output_dir=output_dir
     )
     monkeypatch.setattr(
         cli,
@@ -777,14 +754,6 @@ def test_cli_validate_hartmann_branch_writes_analytic_report(
         "write_acceptance_report",
         lambda report, path: recorded.update(acceptance=path) or path,
     )
-    monkeypatch.setattr(
-        cli,
-        "write_metrics_json",
-        lambda payload, path: (
-            recorded.update(metrics=payload, metrics_path=path) or path
-        ),
-    )
-
     exit_code = cli.main(
         ["validate", "hartmann", "--ha", "5", "--output", str(output_dir)]
     )
@@ -801,36 +770,12 @@ def test_cli_validate_reference_branch_handles_missing_slice_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ):
     output_dir = tmp_path / "validate"
-    case = SimpleNamespace(
-        name="hunt_ha5", output=SimpleNamespace(directory=str(output_dir))
-    )
-    solution = SimpleNamespace(
-        state=SimpleNamespace(time=1.25, residual=0.01), mesh=SimpleNamespace()
+    recorded = _stub_validation_cli(
+        monkeypatch, case_name="hunt_ha5", output_dir=output_dir
     )
     comparison = SimpleNamespace(
         y_profile=SimpleNamespace(l2_error=0.2, linf_error=0.3),
         z_profile=SimpleNamespace(l2_error=0.4, linf_error=0.5),
-    )
-    recorded: dict[str, object] = {}
-
-    monkeypatch.setattr(cli, "_build_case", lambda args: case)
-    monkeypatch.setattr(cli, "solve_steady", lambda built_case: solution)
-    monkeypatch.setattr(cli, "write_paraview", lambda solved, out_dir: [])
-    monkeypatch.setattr(cli, "write_profile_csv", lambda path, profile: path)
-    monkeypatch.setattr(
-        cli, "extract_centerline", lambda solved: {"y": [0.0], "u": [1.0]}
-    )
-    monkeypatch.setattr(
-        cli, "extract_midplane_profile", lambda solved, axis: {"z": [0.0], "u": [1.0]}
-    )
-    monkeypatch.setattr(
-        cli,
-        "validation_summary",
-        lambda solved, case_name, ha: {
-            "case": case_name,
-            "residual": 0.01,
-            "u_max": 1.0,
-        },
     )
     monkeypatch.setattr(
         cli,
@@ -847,12 +792,6 @@ def test_cli_validate_reference_branch_handles_missing_slice_file(
         "write_closed_channel_validation",
         lambda report, path: recorded.update(closed=path) or path,
     )
-    monkeypatch.setattr(
-        cli,
-        "write_metrics_json",
-        lambda payload, path: recorded.update(metrics=payload) or path,
-    )
-
     exit_code = cli.main(
         [
             "validate",

@@ -133,11 +133,11 @@ into the installed package without duplication:
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,954 | stay below 35,000 while preserving the physical residual | 35,100 |
-| maintained-core lines | 7,914 | stay below 8,000 | 8,000 |
-| test files / lines | 30 / 20,778 | no new file; stay below 21,000 | 31 / 21,100 |
+| package lines | 34,940 | stay below 35,000 while preserving the physical residual | 35,100 |
+| maintained-core lines | 7,900 | stay below 8,000 | 8,000 |
+| test files / lines | 30 / 20,717 | no new file; stay below 21,000 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked checkout | 3,334,107 bytes | do not increase without a user-facing need | 4,194,304 bytes |
+| tracked checkout | 3,331,774 bytes | do not increase without a user-facing need | 4,194,304 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -203,7 +203,7 @@ measurements run alone.
 
 The modal pipe test reuses one physical projection and verifies direct
 mode-factor algebra without a second integration run. In the latest six-worker
-gate it reports 52.6 seconds, versus 48.8 seconds for reduced B2 and 27.0
+gate it reports 52.9 seconds, versus 48.1 seconds for reduced B2 and 26.5
 seconds for reduced B1. Isolated measurement attributes most of that tail to
 worker contention: reducing only the manufactured modal grid lowered its
 weighted path to 23.5--26.1 seconds, and the unchanged reduced-B2 restart and
@@ -413,7 +413,10 @@ release. SOLVAX draft PR 21 proposes `release/0.8.4` at `a8603dc` into
 commit `4808695`, followed only by corrected citation/changelog metadata. Local
 gates report 264 passes, 98.10% combined coverage, warning-free docs, lint, and
 artifact import checks; the hosted minimum/current Linux and current macOS
-matrix is also green. Do not tag or publish until review closes; rebuild
+matrix plus Codecov project/patch checks are all green. It remains a draft
+without requested review or approval. The local SOLVAX checkout contains
+unrelated user changes and is not a release-artifact source. Do not tag or
+publish until review closes; rebuild
 artifacts from the merged SHA.
 
 The device-cut audit compared released 0.8.3 with the pending 0.8.4 PCG and
