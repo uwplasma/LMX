@@ -153,11 +153,13 @@ Digitized pipe and square-duct pressure references live in
 Use:
 
 ```bash
-.venv/bin/python examples/pipe_reference_comparison_demo.py --help
+.venv/bin/python examples/pipe_reference_comparison_demo.py
 .venv/bin/python examples/fringing_benchmark_demo.py
 ```
 
-The pipe workflow uses optional external data. The rectangular fringing script
+Edit the pipe geometry, materials, numerical controls, and external-data path
+at the top of its Python file. The workflow uses optional external data and
+reports a mismatch diagnostic, not ALEX-B1 acceptance. The rectangular script
 is only an internal diagnostic; neither grants experimental acceptance. These
 cases remain research-stage until experimental observable, mesh/time,
 conservation, and steady-convergence gates pass together.

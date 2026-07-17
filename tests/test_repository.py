@@ -185,6 +185,7 @@ def test_curated_examples_use_submodules_and_linear_scripts_are_editable() -> No
             "hartmann_example.py",
             "hunt_example.py",
             "operator_verification_demo.py",
+            "pipe_reference_comparison_demo.py",
             "variable_field_extruded_demo.py",
         }:
             assert ast.get_docstring(tree)

@@ -8,17 +8,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from lmx.reference_data import default_fringing_pipe_reference_root
-
 
 pytestmark = pytest.mark.unit
-
-
-def _fringing_pipe_root_or_skip() -> Path:
-    root = default_fringing_pipe_reference_root()
-    if not root.exists():
-        pytest.skip("optional FreeMHD fringing-pipe reference data are not available")
-    return root
 
 
 def _load_example_module(filename: str):
@@ -186,20 +177,19 @@ def test_freemhd_continuum_velocity_audit_keeps_shared_scale_and_endpoint_disclo
     assert audit["axes"]["y"]["processed_freemhd_raw_analytical"]["l2_error"] > 0.0
 
 
-@pytest.mark.external
 def test_pipe_reference_comparison_demo_writes_summary(tmp_path: Path):
-    _fringing_pipe_root_or_skip()
-    module = _load_example_module("pipe_reference_comparison_demo.py")
-    summary = module.run_pipe_reference_comparison_demo(
-        out_dir=tmp_path,
-        nr=4,
-        ntheta=16,
-        nx_stations=4,
-        max_steps=4,
-        coupling_iterations=4,
-        potential_iterations=16,
+    reference_dir = (
+        tmp_path / "external/FreeMHDPaperAllFigures/FreeMHDPaperAllFigures/FringingBPipe"
     )
+    reference_dir.mkdir(parents=True)
+    header = "Points:2,U:2,Points:0,potE\n"
+    for stem, offset in (("CenterLine", 0.0), ("NegXLine", -0.3), ("PosXLine", 0.3)):
+        rows = "-1,0.5,{0},-1\n0,1,{0},0\n1,0.5,{0},1\n".format(offset)
+        (reference_dir / f"sample_{stem}_data.csv").write_text(header + rows)
+    script = Path(__file__).resolve().parents[1] / "examples/pipe_reference_comparison_demo.py"
+    subprocess.run([sys.executable, script], cwd=tmp_path, timeout=60, check=True)
+    summary_path = next((tmp_path / "artifacts").rglob("pipe_reference_comparison_summary.json"))
+    summary = json.loads(summary_path.read_text())
     assert summary["geometry_kind"] == "pipe_ogrid"
-    assert summary["normalization"]["center"] == "shared_peak_axial_velocity"
-    assert (tmp_path / "pipe_reference_comparison.png").exists()
-    assert (tmp_path / "pipe_reference_comparison_summary.json").exists()
+    assert summary["normalization"]["center"] == "independent_peak_axial_velocity"
+    assert (summary_path.parent / "pipe_reference_comparison.png").exists()

@@ -9,12 +9,9 @@ from lmx.reference_data import (
     _interpolated_centerline_profile,
     _match_single,
     default_closed_channel_reference_root,
-    default_fringing_pipe_reference_root,
     extract_processed_profile,
     extract_processed_midplane_profile,
-    fringing_pipe_profile_reference_path,
     load_closed_channel_analytical,
-    load_fringing_pipe_profile,
     load_hunt_analytical,
     load_processed_slice,
     load_shercliff_analytical,
@@ -31,13 +28,6 @@ def _closed_channel_root_or_skip() -> Path:
     root = default_closed_channel_reference_root()
     if not root.exists():
         pytest.skip("optional FreeMHD closed-channel reference data are not available")
-    return root
-
-
-def _fringing_pipe_root_or_skip() -> Path:
-    root = default_fringing_pipe_reference_root()
-    if not root.exists():
-        pytest.skip("optional FreeMHD fringing-pipe reference data are not available")
     return root
 
 
@@ -267,32 +257,8 @@ def test_case_specific_closed_channel_reference_helpers_forward_to_dataset():
     assert hunt.coordinate.shape[0] > 10
 
 
-@pytest.mark.external
-def test_default_fringing_pipe_reference_root_resolves_bundled_dataset():
-    root = _fringing_pipe_root_or_skip()
-    assert root.exists()
-    assert (
-        root
-        / "Buhler2020PaperProperties_Ha2k_Re20k_coarserZMesh5x_CenterLine_5.89s.csv"
-    ).exists()
-
-
-@pytest.mark.external
-def test_load_bundled_fringing_pipe_profile_uses_repo_dataset():
-    root = _fringing_pipe_root_or_skip()
-    center_path = fringing_pipe_profile_reference_path("center", root)
-    reference = load_fringing_pipe_profile("center", root)
-
-    assert center_path.exists()
-    assert reference.profile_kind == "center"
-    assert reference.coordinate.shape[0] > 10
-    assert reference.velocity.shape == reference.coordinate.shape
-    assert abs(reference.x_offset_fraction) < 1.0e-12
-
-
 def test_reference_root_overrides_and_missing_match(tmp_path: Path):
     assert default_closed_channel_reference_root(tmp_path) == tmp_path
-    assert default_fringing_pipe_reference_root(tmp_path) == tmp_path
     with pytest.raises(FileNotFoundError, match="No reference files"):
         _match_single(["*.missing"], tmp_path)
 
@@ -331,26 +297,6 @@ def test_centerline_profile_empty_one_sided_and_invalid_axes():
         extract_processed_midplane_profile(reference, axis="x")
     with pytest.raises(ValueError, match="Unsupported axis"):
         extract_processed_profile(reference, axis="x", field_name="U", component=0)
-    with pytest.raises(ValueError, match="Unsupported fringing"):
-        fringing_pipe_profile_reference_path("diagonal", ".")
-
-
-def test_fringing_pipe_loader_accepts_compact_headers_and_reports_missing_field(
-    tmp_path: Path,
-):
-    good = tmp_path / "sample_CenterLine_data.csv"
-    good.write_text("Points2,U2,Points0\n-1,2,0\n1,4,0\n")
-    reference = load_fringing_pipe_profile("center", tmp_path)
-    assert reference.coordinate.tolist() == pytest.approx([-1.0, 1.0])
-    assert reference.velocity.tolist() == pytest.approx([2.0, 4.0])
-
-    good.unlink()
-    bad = tmp_path / "sample_CenterLine_data.csv"
-    bad.write_text("Points2,Points0\n0,0\n")
-    with pytest.raises(KeyError, match="U:2"):
-        load_fringing_pipe_profile("center", tmp_path)
-
-
 def test_area_mean_empty_and_fill_noop():
     reference = ProcessedSliceReference(
         case_kind="empty",

@@ -30,15 +30,6 @@ class ProcessedSliceReference:
     path: str
 
 
-@dataclass(frozen=True)
-class FringingPipeProfileReference:
-    profile_kind: str
-    coordinate: jnp.ndarray
-    velocity: jnp.ndarray
-    x_offset_fraction: float
-    path: str
-
-
 def default_closed_channel_reference_root(reference_root: str | Path | None = None) -> Path:
     if reference_root is not None:
         return Path(reference_root)
@@ -47,15 +38,6 @@ def default_closed_channel_reference_root(reference_root: str | Path | None = No
     if preferred.exists():
         return preferred
     return repo_root / "external" / "FreeMHDPaperAllFigures" / "FreeMHDPaperAllFigures" / "ClosedChannel"
-
-
-def default_fringing_pipe_reference_root(reference_root: str | Path | None = None) -> Path:
-    if reference_root is not None:
-        return Path(reference_root)
-    repo_root = Path(__file__).resolve().parents[1]
-    return repo_root / "external" / "FreeMHDPaperAllFigures" / "FreeMHDPaperAllFigures" / "FringingBPipe"
-
-
 def _match_single(patterns: list[str], reference_root: Path) -> Path:
     matches: list[Path] = []
     for pattern in patterns:
@@ -346,44 +328,3 @@ def extract_processed_profile(
             "value": profile_values,
         }
     raise ValueError(f"Unsupported axis {axis}")
-
-
-def fringing_pipe_profile_reference_path(profile_kind: str, reference_root: str | Path | None = None) -> Path:
-    root = default_fringing_pipe_reference_root(reference_root)
-    stem = {
-        "center": "CenterLine",
-        "negative": "NegXLine",
-        "positive": "PosXLine",
-    }.get(profile_kind)
-    if stem is None:
-        raise ValueError(f"Unsupported fringing pipe profile kind {profile_kind!r}")
-    return _match_single([f"*_{stem}_*.csv"], root)
-
-
-def load_fringing_pipe_profile(profile_kind: str, reference_root: str | Path | None = None) -> FringingPipeProfileReference:
-    path = fringing_pipe_profile_reference_path(profile_kind, reference_root)
-    with path.open() as handle:
-        reader = csv.DictReader(handle)
-        points_z: list[float] = []
-        velocity: list[float] = []
-        points_x: list[float] = []
-
-        def _field(row: dict[str, str], *names: str) -> str:
-            for name in names:
-                if name in row and row[name] is not None:
-                    return row[name]
-            raise KeyError(names[0])
-
-        for row in reader:
-            points_z.append(float(_field(row, "Points:2", "Points2")))
-            velocity.append(float(_field(row, "U:2", "U2")))
-            points_x.append(float(_field(row, "Points:0", "Points0")))
-    coordinate = jnp.asarray(points_z)
-    coord_scale = jnp.maximum(jnp.max(jnp.abs(coordinate)), 1.0e-12)
-    return FringingPipeProfileReference(
-        profile_kind=profile_kind,
-        coordinate=coordinate / coord_scale,
-        velocity=jnp.asarray(velocity),
-        x_offset_fraction=float(jnp.mean(jnp.asarray(points_x)) / coord_scale),
-        path=str(path),
-    )
