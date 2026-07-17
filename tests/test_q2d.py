@@ -42,6 +42,11 @@ from lmx.q2d import (
 pytestmark = pytest.mark.unit
 
 
+def _assert_figure_pair(outputs: list[Path], out_dir: Path, stem: str) -> None:
+    assert outputs == [out_dir / f"{stem}.{suffix}" for suffix in ("png", "pdf")]
+    assert all(path.exists() for path in outputs)
+
+
 def test_q2d_decay_validation_passes_on_baseline_case():
     case = build_q2d_decay_case(nx=48, ny=48, dt=2.5e-4, t_final=0.04)
     solution = solve_q2d_decay(case)
@@ -57,12 +62,7 @@ def test_write_q2d_decay_plots_writes_png_and_pdf(tmp_path: Path):
     case = build_q2d_decay_case(nx=32, ny=32, dt=5.0e-4, t_final=0.02)
     solution = solve_q2d_decay(case)
     outputs = write_q2d_decay_plots(case, solution, tmp_path)
-    assert outputs == [
-        tmp_path / "q2d_decay_overview.png",
-        tmp_path / "q2d_decay_overview.pdf",
-    ]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(outputs, tmp_path, "q2d_decay_overview")
 
 
 def test_q2d_forced_validation_passes_on_baseline_case():
@@ -80,12 +80,7 @@ def test_write_q2d_forced_plots_writes_png_and_pdf(tmp_path: Path):
     case = build_q2d_forced_case(nx=32, ny=32, dt=5.0e-4, t_final=0.04)
     solution = solve_q2d_forced(case)
     outputs = write_q2d_forced_plots(case, solution, tmp_path)
-    assert outputs == [
-        tmp_path / "q2d_forced_overview.png",
-        tmp_path / "q2d_forced_overview.pdf",
-    ]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(outputs, tmp_path, "q2d_forced_overview")
 
 
 def test_q2d_wall_bounded_validation_passes_on_baseline_case():
@@ -103,12 +98,7 @@ def test_write_q2d_wall_bounded_plots_writes_png_and_pdf(tmp_path: Path):
     case = build_q2d_wall_bounded_forced_case(nx=32, ny=32, dt=5.0e-4, t_final=0.04)
     solution = solve_q2d_wall_bounded_forced(case)
     outputs = write_q2d_wall_bounded_forced_plots(case, solution, tmp_path)
-    assert outputs == [
-        tmp_path / "q2d_wall_bounded_overview.png",
-        tmp_path / "q2d_wall_bounded_overview.pdf",
-    ]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(outputs, tmp_path, "q2d_wall_bounded_overview")
 
 
 def test_write_q2d_turbulence_observable_plots_writes_png_and_pdf(tmp_path: Path):
@@ -122,12 +112,7 @@ def test_write_q2d_turbulence_observable_plots_writes_png_and_pdf(tmp_path: Path
         viscosity=case.viscosity,
         hartmann_friction=case.hartmann_friction,
     )
-    assert outputs == [
-        tmp_path / "q2d_turbulence_observables.png",
-        tmp_path / "q2d_turbulence_observables.pdf",
-    ]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(outputs, tmp_path, "q2d_turbulence_observables")
 
 
 def test_q2d_turbulence_decay_movie_and_observable_gate(tmp_path: Path):
@@ -184,12 +169,7 @@ def test_q2d_wall_driven_cavity_comparison_gate_and_plot(tmp_path: Path):
     assert observables["validation_pass"] is True
     assert comparison["matched_parity"] is True
     assert comparison["passed_observable_count"] == 4
-    assert outputs == [
-        tmp_path / "q2d_lmx_q2dmhdfoam_lid_driven_parity.png",
-        tmp_path / "q2d_lmx_q2dmhdfoam_lid_driven_parity.pdf",
-    ]
-    assert outputs[0].exists()
-    assert outputs[1].exists()
+    _assert_figure_pair(outputs, tmp_path, "q2d_lmx_q2dmhdfoam_lid_driven_parity")
 
 
 def test_q2d_wall_driven_cavity_external_grid_observables():

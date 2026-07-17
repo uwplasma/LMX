@@ -125,10 +125,10 @@ shared without removing cases or assertions.
 | package modules | 35 | no new module | 35 |
 | package lines | 34,436 | stay below 34,437 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 21,005 | no new file; next test change must reduce lines | 31 / 21,100 |
+| test files / lines | 30 / 20,985 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,570,935 bytes | stay below 4,570,936 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,570,014 bytes | stay below 4,570,015 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -176,6 +176,9 @@ The current gate passes 863 tests with 8 expected skips and 95.42% combined
 coverage in 124.7 seconds. Shared centerline validation removes 20 source lines;
 the layered-flow consolidation removes 17 test lines and one redundant
 6.894-second solve while retaining finite-field, current, and physics gates.
+Shared figure-pair assertions subsequently remove another 20 test lines while
+preserving all five ordered output and existence contracts; focused Q2D and
+repository gates pass.
 The next test change remains a net deletion.
 
 ### Canonical sharding and performance
@@ -464,10 +467,11 @@ test-owned budget. Host source frames, full-quality media, meshes, and raw
 outputs stay in checksummed releases. Put provenance and acceptance status
 beside every asset.
 
-Current README/docs media already covers accepted ducts and analytical/FreeMHD
-comparisons plus research-stage blanket, Q2D, curved-pipe, fringing, obstacle,
-restart, autodiff, and scaling results. All media is directly embedded and the
-20 tracked derivatives remain below the 1.25 MiB cap. Do not create a B2 movie
+The README is 617 words with 14 directly embedded visuals. README/docs media
+covers accepted ducts and analytical/FreeMHD comparisons plus research-stage
+blanket, Q2D, curved-pipe, fringing, obstacle, restart, autodiff, and scaling
+results. The 20 tracked derivatives remain below the 1.25 MiB cap. Do not
+create a B2 movie
 from bounded or rejected trajectories, relabel mapped-pipe profiles as ALEX-B1
 evidence, or add media without a new accepted physical result.
 
