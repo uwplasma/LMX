@@ -16,13 +16,12 @@ from jax.scipy.linalg import solve_triangular
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 from solvax import (
     KrylovSolution,
-    additive_preconditioner,
+    additive_tridiagonal_line_preconditioner,
     aitken_relaxation,
     anderson_mixing,
     anderson_weights,
     block_thomas_factor,
     block_thomas_solve,
-    cyclic_tridiagonal_solve,
     gmres,
     linear_solve,
     pcg_linear_solve,
@@ -996,42 +995,6 @@ def _rectangular_fluid_bounds(fluid_mask: jnp.ndarray) -> tuple[int, int, int, i
     return y0, y1, z0, z1
 
 
-def _additive_line_preconditioner_3d(
-    diagonal: jnp.ndarray,
-    directions: tuple[tuple[int, jnp.ndarray, jnp.ndarray], ...],
-    *,
-    periodic_last_axis: tuple[jnp.ndarray, jnp.ndarray] | None = None,
-):
-    line_solves = []
-    for axis, lower, upper in directions:
-        permutation = (axis,) + tuple(index for index in range(3) if index != axis)
-        inverse = tuple(np.argsort(permutation))
-
-        def solve_line(residual, lower=lower, upper=upper, permutation=permutation, inverse=inverse):
-            solved = tridiagonal_solve(
-                jnp.transpose(lower, permutation), jnp.transpose(diagonal, permutation),
-                jnp.transpose(upper, permutation), jnp.transpose(residual, permutation)
-            )
-            return jnp.transpose(solved, inverse)
-
-        line_solves.append(solve_line)
-    if periodic_last_axis is not None:
-        lower, upper = periodic_last_axis
-
-        def solve_periodic(residual: jnp.ndarray) -> jnp.ndarray:
-            solved = cyclic_tridiagonal_solve(
-                jnp.moveaxis(lower, -1, 0),
-                jnp.moveaxis(diagonal, -1, 0),
-                jnp.moveaxis(upper, -1, 0),
-                jnp.moveaxis(residual, -1, 0),
-            )
-            return jnp.moveaxis(solved, 0, -1)
-
-        line_solves.append(solve_periodic)
-
-    return additive_preconditioner(line_solves)
-
-
 def _axial_mean_preconditioner_3d(volume: jnp.ndarray, coef_x_w: jnp.ndarray, coef_x_e: jnp.ndarray, *, gauge: bool = True,
     field_sharding: NamedSharding | None = None):
     """Invert the Galerkin operator for cross-section-constant axial modes."""
@@ -1414,7 +1377,9 @@ def _solvax_pressure_poisson_duct(
     )
     if not include_axial_line:
         directions = directions[1:]
-    line_precondition = _additive_line_preconditioner_3d(diagonal, directions)
+    line_precondition = additive_tridiagonal_line_preconditioner(
+        diagonal, directions
+    )
     axial_precondition = _axial_mean_preconditioner_3d(
         volume, coef_x_w, coef_x_e, gauge=not mixed_axial_pressure,
         field_sharding=field_sharding,
@@ -2834,7 +2799,7 @@ def _solvax_pressure_poisson_pipe(
         (0, -volume * coef_x_w, -volume * coef_x_e),
         (1, -volume * coef_r_i, -volume * coef_r_o),
     )
-    precondition = _additive_line_preconditioner_3d(
+    precondition = additive_tridiagonal_line_preconditioner(
         diagonal,
         directions,
         periodic_last_axis=(
@@ -2915,7 +2880,7 @@ def _solve_pipe_diffusion_system(
             -volume * diffusion_coefficient * coef_r_o,
         ),
     )
-    precondition = _additive_line_preconditioner_3d(diagonal, directions)
+    precondition = additive_tridiagonal_line_preconditioner(diagonal, directions)
     solution = pcg_linear_solve(
         matvec,
         linear_rhs,

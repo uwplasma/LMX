@@ -1277,36 +1277,6 @@ def test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradie
     assert gradient == pytest.approx(-2.0 * value, rel=1.0e-6, abs=1.0e-8)
 
 
-def test_periodic_line_preconditioner_matches_variable_coefficient_dense_solve():
-    weights = jnp.asarray([0.4, 0.7, 0.5, 0.9, 0.6])
-    upper_1d = -weights
-    lower_1d = -jnp.roll(weights, 1)
-    diagonal_1d = 1.0 + weights + jnp.roll(weights, 1)
-    diagonal = diagonal_1d[None, None, :]
-    lower = lower_1d[None, None, :]
-    upper = upper_1d[None, None, :]
-    rhs = jnp.asarray([0.3, -0.1, 0.8, 0.2, -0.4])[None, None, :]
-
-    solve = fringing_impl._additive_line_preconditioner_3d(
-        diagonal, (), periodic_last_axis=(lower, upper)
-    )
-    solved = solve(rhs)
-    dense = jnp.diag(diagonal_1d)
-    dense = dense.at[jnp.arange(1, 5), jnp.arange(4)].set(lower_1d[1:])
-    dense = dense.at[jnp.arange(4), jnp.arange(1, 5)].set(upper_1d[:-1])
-    dense = dense.at[0, -1].set(lower_1d[0])
-    dense = dense.at[-1, 0].set(upper_1d[-1])
-    assert solved[0, 0] == pytest.approx(
-        jnp.linalg.solve(dense, rhs[0, 0]), abs=1.0e-12
-    )
-
-    def objective(scale):
-        return jnp.sum(solve(scale * rhs) ** 2)
-
-    value, gradient = jax.value_and_grad(objective)(jnp.asarray(1.0))
-    assert gradient == pytest.approx(2.0 * value, rel=1.0e-12)
-
-
 @pytest.mark.parametrize("steady", [False, True])
 def test_pipe_diffusion_reconstructs_manufactured_field(steady):
     r_faces = jnp.asarray([0.0, 0.12, 0.3, 0.55, 0.78, 1.0])
