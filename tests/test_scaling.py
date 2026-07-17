@@ -218,6 +218,7 @@ def test_builtin_admission_collectors_atomically_write_bound_evidence(
         published.append(Path(target))
         replace(source, target)
     monkeypatch.setattr(strong_scaling_demo.os, "replace", publish)
+    monkeypatch.setattr(strong_scaling_demo.shutil, "which", lambda name: f"/usr/bin/{name}")
     monkeypatch.setattr(strong_scaling_demo.os, "sched_getaffinity",
         lambda _: set(range(8)), raising=False)
     calls = 0
@@ -247,6 +248,9 @@ def test_builtin_admission_collectors_atomically_write_bound_evidence(
     assert strong_scaling_demo._remote_gpu_snapshot("office", ("0",)) == (
         identity, 0.0, 1, 1)
     assert published == [cpu_path, gpu_path]
+    monkeypatch.setattr(strong_scaling_demo.shutil, "which", lambda name: None)
+    with pytest.raises(RuntimeError, match="ps, taskset"):
+        strong_scaling_demo._collect_cpu_admission(cpu_path, num_devices=1, source_commit="abc")
 
 
 def test_sustained_ladders_collect_each_rung_and_pass_cpu_affinity(

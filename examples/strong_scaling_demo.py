@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import shlex
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -103,6 +104,9 @@ def _collect_cpu_admission(
 ) -> None:
     """Observe an idle Linux cpuset for 60 seconds before one CPU rung."""
 
+    missing = [name for name in ("ps", "taskset") if shutil.which(name) is None]
+    if missing:
+        raise RuntimeError(f"Sustained CPU scaling requires: {', '.join(missing)}")
     if not hasattr(os, "sched_getaffinity"):
         raise RuntimeError("Sustained CPU scaling requires Linux affinity control")
     available = tuple(sorted(os.sched_getaffinity(0)))
