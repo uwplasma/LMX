@@ -207,6 +207,8 @@ def _sustained_timing_evidence(record: Mapping[str, object]) -> bool:
         and contract.get("warm_samples_exclude_compilation") is True
         and contract.get("synchronization") == "jax.block_until_ready"
         and contract.get("timed_observers_excluded") is True
+        and contract.get("optional_progress_callbacks_excluded") is True
+        and contract.get("restart_audit_excluded") is True
         and samples.ndim == 1
         and samples.size >= _SUSTAINED_WARM_SAMPLES
         and repeats == samples.size + 1
@@ -263,7 +265,7 @@ def _continuous_environment_evidence(record: Mapping[str, object]) -> bool:
         and record.get("source_fingerprint") not in (None, "")
         and monitor.get("verified") is True
         and len(digest) == 64 and set(digest) <= set("0123456789abcdef")
-        and 0.0 < period <= gap <= 5.0
+        and 0.0 < period <= gap <= 2.0
         and monitored >= required > 0.0
         and postflight >= 15.0
         and np.all(np.isfinite((monitor_start, worker_start, worker_end, monitor_end)))

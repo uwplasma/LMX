@@ -9,7 +9,8 @@ devices alone is not evidence of parallel execution.
 The upper row is the accepted callback-free fixed-work ladder on 2/4/8 Docker
 guest CPUs for 1/2/4 JAX devices. The lower row is a multi-minute one/two-GPU
 shared-host calibration; foreign contexts still fail its idle gate. Short
-timings and the GPU result remain calibration.
+timings remain debug/calibration evidence; the multi-minute GPU ladder remains
+calibration until idle-host admission passes.
 
 ## Current evidence
 
@@ -380,7 +381,7 @@ ignored `<backend>_N.monitor.jsonl` automatically; keep promoted raw traces as
 release artifacts. Each worker record must carry compact schema-2
 `resource_monitoring` evidence: matching backend/device count, a raw SHA-256,
 source fingerprint, bracketed worker timestamps, sample period and maximum gap
-at most five seconds, full cold-plus-warm coverage, at least 15 postflight
+at most two seconds, full cold-plus-warm coverage, at least 15 postflight
 seconds, and zero violations. Missing or malformed monitoring leaves timings
 visible as candidates but blocks promotion.
 The protocol rejected a cleanly admitted 24-update ladder after runtime

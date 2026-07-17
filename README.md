@@ -90,8 +90,9 @@ observables pass the 1% finite-grid gate.
 ![B2 fringe-field diagnostics](docs/_static/readme-alex-b2-field-pressure.webp)
 
 B2 passes exact restart and schema-6 topology gates (1/2/4 CPU; 1/2 GPU).
-Shared-norm acceleration and production parity remain open; CPU-allocation
-scaling is accepted, while exact-core and idle-host GPU timing remain open.
+Shared-norm acceleration and production parity remain open; multi-minute
+Docker CPU-allocation scaling is accepted, while exact-core and idle-host GPU
+timing remain open.
 [Fringing status →](https://lmx.readthedocs.io/en/latest/fringing.html)
 
 ## Follow curved pipes
@@ -133,13 +134,13 @@ validation remain open.
 
 ## Scale on CPUs and GPUs
 
-![Multi-minute strong scaling](docs/_static/strong_scaling.webp)
+![Multi-minute CPU scaling and GPU calibration](docs/_static/strong_scaling.webp)
 
 The callback-free `256 × 67 × 67` CPU ladder (32 updates, three warm/rung) takes
 244.923/172.521/148.460 s, reaching **1.420×/1.650×** on 2/4 JAX devices with
 0.219% maximum CV. Observer exclusion, exact restart, and continuous monitoring
-pass. GPU reaches 1.626× on two A4000s, but foreign contexts keep that result a
-shared-host calibration.
+pass. A multi-minute 1/2-GPU ladder reaches 1.626× on two A4000s, but foreign
+contexts keep that result a shared-host calibration.
 [Protocol and results →](https://lmx.readthedocs.io/en/latest/performance.html)
 
 ## Quality and citation

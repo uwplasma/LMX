@@ -137,13 +137,13 @@ exact serialized replay pass on one and two GPUs. The callback-free
 medians and 1.420x/1.650x speedups on one/two/four devices; exact restart,
 placement, memory, and continuous monitoring pass. This establishes Docker
 CPU-allocation scaling, not steady-production scaling or exact M4 core mapping.
-The `128 x 67 x 67` pre-schema-6 GPU calibration has low-variance warm medians of 2.780
-and 2.400 seconds. Its 1.159x speedup misses the 1.2x promotion gate.
-The doubled-axial GPU rung is stable but reaches only 1.125x, below
-the promotion threshold. Authoritative idle-host GPU timing remains open. A superseded
-formulation's fixed-size timing improved from 36.96 s to 22.23 s; this is not a
-current scaling claim. The fine-checkpoint transverse Galerkin
-gate separately reduces electric iterations 5.18x and matched two-update time
+The current 96-update `256 x 67 x 67` GPU ladder has multi-minute warm medians
+of 258.913 and 159.234 seconds on one and two A4000s, a 1.626x speedup with
+below-0.29% CV. Numerical, duration, replay, and placement gates pass, but
+foreign CUDA contexts fail idle-host admission, so the result remains
+calibration rather than an authoritative scaling claim. The fine-checkpoint
+transverse Galerkin gate separately reduces electric iterations 5.18x and matched
+two-update time
 1.87x with equivalent fields and residuals. The resulting fine baseline plus
 doubled-iteration and wall confirmations pass; its tighter-tolerance variant
 remains open. These are solver and numerical results, not experimental

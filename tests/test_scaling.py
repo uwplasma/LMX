@@ -646,7 +646,7 @@ def test_sustained_claim_fails_closed_on_incomplete_evidence():
         ("schema_version", 0), ("scope", "preflight"),
             ("backend", "gpu"), ("num_devices", 8), ("verified", False),
             ("raw_sha256", "A" * 64), ("sample_period_seconds", 0.0),
-            ("max_sample_gap_seconds", 5.001),
+            ("max_sample_gap_seconds", 2.001),
             ("monitored_worker_seconds", "invalid"),
             ("monitored_worker_seconds", 1.0),
             ("postflight_seconds", 14.999), ("violation_count", 1))]
@@ -678,6 +678,9 @@ def test_sustained_claim_rederives_multiminute_worker_evidence():
         {"sustained_duration_passed": False}, {"acceptance_role": "fixed-work-debug"},
         {"large_fixed_work_passed": False},
         {"measurement_class": "debug-or-calibration"},
+        *({"timing_contract": {
+            **run_strong_scaling_worker._B2_TIMING_CONTRACT, field: False}}
+            for field in ("optional_progress_callbacks_excluded", "restart_audit_excluded")),
     )
     for mutation in variants:
         records = [dict(record) for record in _sustained_ladder((1, 2, 4))]

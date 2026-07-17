@@ -67,14 +67,11 @@ current-closure, and power-closure gates; no solver was rerun for presentation.
   predates the terminal-restart fix. The replacement pre-schema-6 ladder passed
   exact repeat/restart and 1/2-GPU equivalence. Current schema-6 topology and
   exact serialized replay pass on one and two GPUs. Callback-free 32-update
-  Docker CPU-allocation scaling is accepted on 1/2/4 devices; steady
-  convergence, exact-core mapping, and authoritative idle-host GPU timing are
-  still open. The `128 x 67 x 67`
-  pre-schema-6 calibration has
-  equivalent observables and exact state/flux replay. A trace-authorized
-  validation fusion raises its low-variance speedup to 1.159x, still below the
-  promotion gate. A historical doubled-axial rung
-  reaches only 1.125x, below the scaling-promotion threshold. A three-update
+  multi-minute Docker CPU-allocation scaling is accepted on 1/2/4 devices;
+  steady convergence, exact-core mapping, and authoritative idle-host GPU timing are
+  still open. The current 96-update `256 x 67 x 67` one/two-A4000 ladder has
+  multi-minute warm medians of 258.913/159.234 seconds and a 1.626x speedup;
+  foreign CUDA contexts keep it calibration-only. A three-update
   trajectory preserves all primary fields exactly. This is not production
   parity or steady scaling. The current schema-6 depth-two Anderson path also
   fails its six-update cold outcome gate (`0.5281` versus `0.1145` fixed-control

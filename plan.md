@@ -12,8 +12,9 @@ The accepted callback-free `256 x 67 x 67`, 32-update CPU ladder at source
 two/four-device speedups, and 0.219% maximum CV. Observer exclusion, exact
 restart, numerics, placement, memory, and continuous/postflight monitoring pass.
 This establishes Docker CPU-allocation scaling; exact M4 P/E-core mapping and
-steady-state evidence remain open. The 1.626x two-A4000 calibration remains
-non-authoritative because foreign contexts block GPU admission.
+steady-state evidence remain open. The multi-minute 1.626x two-A4000
+calibration remains non-authoritative because foreign contexts block GPU
+admission.
 
 A composed momentum/projection JIT is rejected before sustained timing: its
 four-device medium screen improves only 3.6%, raises peak RSS 15.4%, and fails
@@ -25,7 +26,7 @@ restart, history, interface-current, and placement gate, but changes the
 four-device warm median from 1.971 to 2.011 seconds (2.06% slower) in its clean
 screen; an independent rerun regresses further. Do not sustain either variant.
 
-The `--sustained` preset keeps 32 CPU or 96 GPU updates, one cold plus three
+The `--sustained` preset defaults to 32 CPU or 96 GPU updates, one cold plus three
 warm trajectories, a 120-second warm minimum, an 1800-second ceiling, and
 checksummed per-rung admission plus continuous/postflight monitoring. Every
 rung needs a fresh source/host/device-bound 60-second admission. Promotion also
@@ -248,7 +249,8 @@ the physics-valid path.
 
 Exit: portable tests stay below ten minutes; CPU/GPU topology and replay remain
 exact; callback-free Docker CPU-allocation scaling remains passing. Next obtain
-idle-host GPU timing, then exact M4 core mapping; both remain open.
+the authoritative idle-host GPU multi-minute ladder, then multi-minute exact-M4
+core mapping; seconds-scale runs remain debug screens. Both claims remain open.
 
 ## Priority 3: canonical B2 validation
 
