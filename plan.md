@@ -122,17 +122,17 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,588 | stay below 34,600 | 35,100 |
+| package lines | 34,563 | stay below 34,575 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 21,019 | no new file; stay below 21,025 | 31 / 21,100 |
+| test files / lines | 30 / 21,024 | no new file; stay below 21,025 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,541,388 bytes | stay below 4,545,000 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,540,826 bytes | stay below 4,545,000 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
-The latest audits unified the field schema and removed a test-only modal fallback;
-the direct retained-modal B1 gate remains, and B2 reuses complete checkpoints.
+The latest audits unified field/CSV ownership and removed a test-only modal
+fallback; the direct B1 gate remains, and B2 reuses complete checkpoints.
 The remaining result records, 13 scripts, and distinct Python/TOML examples
 retain current provenance, CI, or runnable-workflow ownership; do not merge
 them unless the replacement deletes code without weakening those contracts.

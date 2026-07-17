@@ -792,8 +792,9 @@ def write_li_aln_phase0_2_artifacts(
     units_csv = out / f"{filename_stem}_unit_audit.csv"
     png_path = out / f"{filename_stem}.png"
     json_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
-    _write_mapping_csv(units_csv, summary["unit_audit"])
-    _write_response_csv(response_csv, summary["response_rows"])
+    unit_rows = [{"quantity": key, "value": value} for key, value in summary["unit_audit"].items()]
+    _write_generic_rows_csv(units_csv, unit_rows)
+    _write_generic_rows_csv(response_csv, summary["response_rows"])
     _write_li_aln_phase0_2_plot(png_path, summary)
     return [json_path, response_csv, units_csv, png_path]
 
@@ -847,32 +848,6 @@ def _case_payload(case: WallStackStudyCase) -> dict[str, object]:
     payload = asdict(case)
     payload["lithium"]["kinematic_viscosity"] = case.lithium.kinematic_viscosity
     return payload
-
-
-def _write_mapping_csv(path: Path, values: dict[str, object]) -> None:
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.writer(handle, lineterminator="\n")
-        writer.writerow(["quantity", "value"])
-        for key, value in values.items():
-            writer.writerow([key, value])
-
-
-def _write_response_csv(path: Path, rows: Sequence[dict[str, object]]) -> None:
-    columns = [
-        "wall_model",
-        "conductance_ratio",
-        "effective_conductance_ratio",
-        "pinhole_fraction",
-        "current_closure_proxy",
-        "lorentz_drag_proxy",
-        "ideal_insulator_deviation_fraction",
-        "mhd_performance_only",
-    ]
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({column: row.get(column, "") for column in columns})
 
 
 def _li_aln_operating_rows(

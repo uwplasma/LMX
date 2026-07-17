@@ -85,6 +85,11 @@ def test_write_li_aln_phase0_2_artifacts(tmp_path: Path):
 
     assert [path.suffix for path in outputs] == [".json", ".csv", ".csv", ".png"]
     assert all(path.exists() and path.stat().st_size > 0 for path in outputs)
+    assert outputs[1].read_text().splitlines()[0] == (
+        "wall_model,conductance_ratio,effective_conductance_ratio,pinhole_fraction,"
+        "current_closure_proxy,lorentz_drag_proxy,ideal_insulator_deviation_fraction,mhd_performance_only"
+    )
+    assert outputs[2].read_text().splitlines()[0] == "quantity,value"
 
 
 def test_li_aln_phase3_6_summary_reports_operating_and_degradation_thresholds():
