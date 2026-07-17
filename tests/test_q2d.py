@@ -47,58 +47,37 @@ def _assert_figure_pair(outputs: list[Path], out_dir: Path, stem: str) -> None:
     assert all(path.exists() for path in outputs)
 
 
-def test_q2d_decay_validation_passes_on_baseline_case():
-    case = build_q2d_decay_case(nx=48, ny=48, dt=2.5e-4, t_final=0.04)
-    solution = solve_q2d_decay(case)
-    validation = validate_q2d_decay_solution(case, solution)
-    energy_budget = validate_q2d_decay_energy_budget(case, solution)
-    assert validation["l2_error"] < 5.0e-2
+@pytest.mark.parametrize(
+    "kind", ("decay", "forced", "wall-bounded")
+)
+def test_q2d_modal_baselines_validate_energy_and_plot(
+    tmp_path: Path, kind: str
+):
+    if kind == "decay":
+        case = build_q2d_decay_case(nx=48, ny=48, dt=2.5e-4, t_final=0.04)
+        solver, validator = solve_q2d_decay, validate_q2d_decay_solution
+        budget_validator, l2_limit = validate_q2d_decay_energy_budget, 5.0e-2
+        plotter, stem = write_q2d_decay_plots, "q2d_decay_overview"
+    elif kind == "forced":
+        case = build_q2d_forced_case(nx=48, ny=48, dt=2.5e-4, t_final=0.08)
+        solver, validator = solve_q2d_forced, validate_q2d_forced_solution
+        budget_validator, l2_limit = validate_q2d_forced_energy_budget, 7.0e-2
+        plotter, stem = write_q2d_forced_plots, "q2d_forced_overview"
+    else:
+        case = build_q2d_wall_bounded_forced_case(
+            nx=48, ny=48, dt=2.5e-4, t_final=0.08
+        )
+        solver = solve_q2d_wall_bounded_forced
+        validator = validate_q2d_wall_bounded_forced_solution
+        budget_validator, l2_limit = validate_q2d_wall_bounded_energy_budget, 8.0e-2
+        plotter, stem = write_q2d_wall_bounded_forced_plots, "q2d_wall_bounded_overview"
+    solution = solver(case)
+    validation, energy_budget = validator(case, solution), budget_validator(case, solution)
+    assert validation["l2_error"] < l2_limit
     assert validation["validation_pass"] is True
     assert energy_budget["relative_budget_l2"] < 6.0e-2
     assert energy_budget["validation_pass"] is True
-
-
-def test_write_q2d_decay_plots_writes_png_and_pdf(tmp_path: Path):
-    case = build_q2d_decay_case(nx=32, ny=32, dt=5.0e-4, t_final=0.02)
-    solution = solve_q2d_decay(case)
-    outputs = write_q2d_decay_plots(case, solution, tmp_path)
-    _assert_figure_pair(outputs, tmp_path, "q2d_decay_overview")
-
-
-def test_q2d_forced_validation_passes_on_baseline_case():
-    case = build_q2d_forced_case(nx=48, ny=48, dt=2.5e-4, t_final=0.08)
-    solution = solve_q2d_forced(case)
-    validation = validate_q2d_forced_solution(case, solution)
-    energy_budget = validate_q2d_forced_energy_budget(case, solution)
-    assert validation["l2_error"] < 7.0e-2
-    assert validation["validation_pass"] is True
-    assert energy_budget["relative_budget_l2"] < 6.0e-2
-    assert energy_budget["validation_pass"] is True
-
-
-def test_write_q2d_forced_plots_writes_png_and_pdf(tmp_path: Path):
-    case = build_q2d_forced_case(nx=32, ny=32, dt=5.0e-4, t_final=0.04)
-    solution = solve_q2d_forced(case)
-    outputs = write_q2d_forced_plots(case, solution, tmp_path)
-    _assert_figure_pair(outputs, tmp_path, "q2d_forced_overview")
-
-
-def test_q2d_wall_bounded_validation_passes_on_baseline_case():
-    case = build_q2d_wall_bounded_forced_case(nx=48, ny=48, dt=2.5e-4, t_final=0.08)
-    solution = solve_q2d_wall_bounded_forced(case)
-    validation = validate_q2d_wall_bounded_forced_solution(case, solution)
-    energy_budget = validate_q2d_wall_bounded_energy_budget(case, solution)
-    assert validation["l2_error"] < 8.0e-2
-    assert validation["validation_pass"] is True
-    assert energy_budget["relative_budget_l2"] < 6.0e-2
-    assert energy_budget["validation_pass"] is True
-
-
-def test_write_q2d_wall_bounded_plots_writes_png_and_pdf(tmp_path: Path):
-    case = build_q2d_wall_bounded_forced_case(nx=32, ny=32, dt=5.0e-4, t_final=0.04)
-    solution = solve_q2d_wall_bounded_forced(case)
-    outputs = write_q2d_wall_bounded_forced_plots(case, solution, tmp_path)
-    _assert_figure_pair(outputs, tmp_path, "q2d_wall_bounded_overview")
+    _assert_figure_pair(plotter(case, solution, tmp_path), tmp_path, stem)
 
 
 def test_write_q2d_turbulence_observable_plots_writes_png_and_pdf(tmp_path: Path):
