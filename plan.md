@@ -251,10 +251,11 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
-The last complete gate passed 867 tests with 8 expected skips and 95.41% combined
-coverage in 171.1 seconds after the sustained CPU run. It remains below both
-the 300-second engineering target and 600-second hard limit; investigate the
-thermal/system-state increase before changing worker count.
+The current complete gate passes 858 tests with 8 expected skips and 95.41%
+combined coverage in 272.1 seconds. It remains below both the 300-second
+engineering target and 600-second hard limit. Refresh the slowest-node profile
+to explain the increase before changing worker count; obsolete wrapper-test
+deletion accounts for the lower test count.
 Merging identical magnetic-obstacle checks preserves 33 assertions, removes two
 solves and 28 lines, and cuts focused wall time 5.86 -> 4.52 seconds. The current
 suite is 20,888 lines; its next change remains a net deletion. Across the

@@ -1,7 +1,7 @@
 {
   "schema_version": 42,
   "date": "2026-07-17",
-  "commit": "e22cc86ceac62819a7448c33f562166aea556811",
+  "commit": "275c971e1290a6b604bf1504a6c31b1dd026b999",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -20,22 +20,22 @@
   },
   "result": {
     "test_files": 30,
-    "test_lines": 21073,
-    "passed": 867,
+    "test_lines": 20888,
+    "passed": 858,
     "skipped": 8,
-    "pytest_seconds": 117.7,
-    "gate_seconds": 118.0,
-    "covered_lines": 13950,
-    "total_lines": 14354,
-    "covered_branches": 2551,
-    "total_branches": 2940,
-    "combined_line_branch_coverage_percent": 95.4145946571065,
+    "pytest_seconds": 271.42,
+    "gate_seconds": 272.1,
+    "covered_lines": 13865,
+    "total_lines": 14267,
+    "covered_branches": 2542,
+    "total_branches": 2930,
+    "combined_line_branch_coverage_percent": 95.406175495726,
     "passed_gate": true
   },
   "artifacts": {
-    "coverage_xml_sha256": "0dcbb143cebcb8275d179053d938b1c5dfc1c286a3aaf3daa42d0585cbc22700"
+    "coverage_xml_sha256": "67004ad398532b2bb634732e205f63f7046108a7cc3b35c955be62597ea3c560"
   },
-  "duration_note": "Current wrapper, pytest, and coverage records come from one six-worker gate; the slowest-node profile below is the preceding same-environment gate.",
+  "duration_note": "Current wrapper, pytest, and coverage records come from one six-worker gate at 275c971; the slowest-node profile below remains historical and must be refreshed before changing worker scheduling.",
   "slowest_tests_source_commit": "75d167b41fad58328aac5a4493976d0a1596ae88",
   "slowest_tests": [
     {"seconds": 34.279, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
@@ -50,26 +50,26 @@
     {"seconds": 12.130, "nodeid": "tests.test_fringing::test_solve_extruded_inductionless_supports_layered_analytic_variable_field"}
   ],
   "comparison": {
-    "previous_gate_seconds": 121.5,
-    "previous_pytest_seconds": 121.17,
-    "wall_time_change_percent": -2.8806584362139898,
-    "pytest_seconds_change_percent": -2.8637451514401224,
-    "budget_fraction": 0.19666666666666666,
-    "engineering_target_fraction": 0.3933333333333333,
+    "previous_gate_seconds": 118.0,
+    "previous_pytest_seconds": 117.7,
+    "wall_time_change_percent": 130.59322033898303,
+    "pytest_seconds_change_percent": 130.60322854715378,
+    "budget_fraction": 0.4535,
+    "engineering_target_fraction": 0.907,
     "latest_slimming": {
       "source_commit_before": "75d167b41fad58328aac5a4493976d0a1596ae88",
-      "source_commit_after": "e22cc86ceac62819a7448c33f562166aea556811",
+      "source_commit_after": "275c971e1290a6b604bf1504a6c31b1dd026b999",
       "package_lines_before": 34273,
-      "package_lines_after": 34246,
-      "source_lines_removed": 27,
+      "package_lines_after": 34084,
+      "source_lines_removed": 189,
       "test_lines_before": 21094,
-      "test_lines_after": 21073,
-      "test_lines_removed": 21,
+      "test_lines_after": 20888,
+      "test_lines_removed": 206,
       "test_cases_before": 876,
-      "test_cases_after": 875,
-      "test_cases_removed": 1
+      "test_cases_after": 866,
+      "test_cases_removed": 10
     },
-    "interpretation": "Builder reuse and consolidated scaling and magnetic-obstacle checks leave 27 fewer package lines and 21 fewer test lines overall. The current gate is 2.9% faster, uses under 20% of the hard budget, and preserves 95.41% combined coverage."
+    "interpretation": "Runner deletion, editable examples, and one-use plotting removal leave 189 fewer package lines and 206 fewer test lines than the comparison baseline while preserving 95.41% combined coverage. The current gate takes 272.1 seconds, below the 300-second engineering target and 600-second hard limit; the timing increase needs a fresh slow-node profile before any scheduler change."
   },
   "scheduling_probe": {
     "evidence_scope": "historical",
@@ -83,12 +83,12 @@
     "decision": "retain six workers; the 3.4% change is below the promotion threshold, and module grouping would imbalance fringing and autodiff owners"
   },
   "architecture": {
-    "source_commit": "e22cc86ceac62819a7448c33f562166aea556811",
-    "package_modules": 35,
-    "package_lines": 34246,
-    "maintained_core_lines": 7869,
+    "source_commit": "275c971e1290a6b604bf1504a6c31b1dd026b999",
+    "package_modules": 34,
+    "package_lines": 34084,
+    "maintained_core_lines": 7614,
     "maintenance_scripts": 13,
-    "tracked_checkout_bytes": 4579089,
+    "tracked_checkout_bytes": 4598958,
     "stable_root_exports": 30,
     "curated_examples": 11
   },
