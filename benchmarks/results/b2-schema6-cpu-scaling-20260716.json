@@ -402,6 +402,28 @@
     "classification": "controlled Docker diagnostic; full-volume momentum gathers and greater than 20% collective occupancy require a sharding-aware momentum fix before another sustained ladder"
   },
   "post_profile_decisions": {
+    "sharding_aware_momentum_halos": {
+      "shape": [128, 35, 35],
+      "updates": 2,
+      "devices": 4,
+      "baseline_warm_median_seconds": 1.653702918,
+      "candidate_warm_median_seconds": 1.514523418,
+      "wall_time_improvement": 0.08416,
+      "momentum_phase_improvement": 0.20229,
+      "collective_time_improvement": 0.20787,
+      "peak_rss_change": -0.01187,
+      "full_vector_all_gather_static_sites": {"baseline": 12, "candidate": 2},
+      "full_vector_all_gather_gmres_sites": {"baseline": 6, "candidate": 0},
+      "replacement": "twelve static one-plane vector ppermutes; ppermute union increased from 0.007829 to 0.017773 seconds",
+      "numerics_restart_and_placement_exact": true,
+      "promotion_thresholds": {
+        "wall_time_improvement": 0.08,
+        "momentum_phase_improvement": 0.15,
+        "collective_time_improvement": 0.25,
+        "maximum_rss_growth": 0.05
+      },
+      "decision": "reject and revert; collective improvement misses the predeclared 25% gate; next candidate must reuse one halo across diffusion and convection"
+    },
     "axial_mean_omission": {
       "shape": [128, 35, 35],
       "devices": 4,

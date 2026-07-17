@@ -350,6 +350,15 @@ A larger transverse section may confirm asymptotic behavior after the
 algorithmic candidate passes; increasing runtime or axial length alone is not a
 remedy. Never run rungs concurrently on the same Mac.
 
+The first explicit-halo momentum candidate is rejected and reverted. It removes
+all six full-vector gathers from GMRES, improves the affected phase 20.23%, wall
+time 8.42%, and RSS 1.19%, while preserving every exact numerical gate. But
+collective time improves only 20.79%, below the predeclared 25% threshold,
+because twelve static one-plane permutations replace the gathers and permutation
+time more than doubles. The next bounded candidate must compute one reusable
+field halo for both diffusion and convection and eliminate the separate west
+transport exchange; do not rerun the reverted variant or relax its gate.
+
 Keep the GPU diagnosis separate. Its existing trace spends only about 9% of
 device-active time in collectives and about 75% in transverse SOLVAX line work,
 so GPU promotion should optimize or fuse compute kernels while preserving exact

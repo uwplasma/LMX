@@ -207,6 +207,13 @@ sharding-aware; another multi-minute ladder is allowed only after the candidate
 reduces collective time by 25%, the affected phase by 15%, and two-update wall
 time by 8% with unchanged physics and less than 5% RSS growth.
 
+The first such candidate is rejected despite removing every full-vector gather
+from GMRES. It improves wall time 8.42% and momentum 20.23%, but twelve one-plane
+permutations replace the gathers and collective time falls only 20.79%, missing
+the frozen 25% gate. The implementation is reverted. A successor must reuse one
+halo across diffusion and convection and avoid the separate west-transport
+exchange before another bounded profile is justified.
+
 Superseded pilots and rejected ladders remain auditable in
 `benchmarks/results/b2-schema6-cpu-scaling-20260716.json`.
 
