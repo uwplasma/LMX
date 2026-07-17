@@ -28,7 +28,8 @@ The same rule applies to research-stage families:
 | Q2D models | `lmx.q2d` |
 | Plotting | `lmx.plotting` |
 | External-code observables and audits | `lmx.external_validation` or `lmx.freemhd` |
-| Blanket and wall-stack studies | `lmx.blanket_flow`, `lmx.wall_study` |
+| Blanket studies | `lmx.blanket_flow` |
+| Wall-stack physics | `lmx.wall_models`, `lmx.mesh` |
 
 The obsolete, undocumented `build_case_from_freemhd_reference` policy adapter
 and its adapter-only inference wrappers were removed after their repository
@@ -41,3 +42,9 @@ The obsolete station-wise approximations `clone_case_with_field`,
 removed. Use `solve_extruded_inductionless`, which preserves axial coupling and
 supports every documented extruded geometry. Its fallback-only `solver=`
 injection argument was removed with those approximations.
+
+The case-specific `lmx.wall_study` report wrappers were retired after their
+repository callers disappeared. The editable
+`examples/li_aln_wall_stack_example.py` now shows the full material, mesh,
+solver, validation, and plotting workflow using the reusable wall and mesh
+APIs directly.

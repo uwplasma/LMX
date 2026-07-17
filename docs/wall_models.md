@@ -56,7 +56,7 @@ layers = [
     WallLayer(name="metal", thickness=4e-3, conductivity=1.0e6),
 ]
 c = tangential_stack_conductance_ratio(
-    layers, fluid_conductivity=3.0e6, fluid_length_scale=0.05
+    layers, fluid_conductivity=3.0e6, length_scale=0.05
 )
 ```
 
@@ -75,6 +75,11 @@ belong in `examples/cases/`.
 Shercliff and Hunt cases provide the stable wall-current verification surface.
 More complex Li/AlN and blanket stacks remain research workflows until their
 material data and external reference are frozen.
+
+Run `python examples/li_aln_wall_stack_example.py` for an editable, top-to-bottom
+Li/AlN workflow. The script constructs each layer and `CaseSpec` explicitly,
+runs intact-coating and bare-metal limits, checks solver diagnostics, and writes
+one compact comparison figure under `artifacts/`.
 
 ![Research-stage Li/AlN multilayer convergence](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-li-aln-multilayer-convergence.webp)
 

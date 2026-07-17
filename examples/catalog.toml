@@ -28,6 +28,15 @@ outputs = ["solution", "plots", "diagnostics"]
 docs = "docs/case_cookbook.md"
 
 [[example]]
+id = "li-aln-wall-stack"
+path = "examples/li_aln_wall_stack_example.py"
+command = "python examples/li_aln_wall_stack_example.py"
+status = "research-stage"
+runtime = "portable"
+outputs = ["wall-model comparison", "plots", "diagnostics"]
+docs = "docs/wall_models.md"
+
+[[example]]
 id = "operator-verification"
 path = "examples/operator_verification_demo.py"
 command = "python examples/operator_verification_demo.py"

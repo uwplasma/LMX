@@ -9,6 +9,7 @@ tested, and labels its validation status honestly. Generated files go under
 | Hartmann CLI | `lmx examples/hartmann_case.toml` | stable | [quickstart](../docs/getting_started.md) |
 | Hartmann Python | `python examples/hartmann_example.py` | stable | [quickstart](../docs/getting_started.md) |
 | Hunt duct | `python examples/hunt_example.py` | stable | [cookbook](../docs/case_cookbook.md) |
+| Li/AlN wall stack | `python examples/li_aln_wall_stack_example.py` | research-stage | [wall models](../docs/wall_models.md) |
 | Operator verification | `python examples/operator_verification_demo.py` | stable | [convergence plot](../docs/numerics.md#manufactured-solution-verification) |
 | FreeMHD comparison | `python examples/freemhd_closed_channel_observable_parity.py` | external data | [external benchmarks](../docs/external_benchmarks.md) |
 | Editable rectangular fringe | `python examples/fringing_benchmark_demo.py` | research-stage internal diagnostic | [fringing evidence](../docs/fringing.md) |

@@ -197,6 +197,7 @@ def test_curated_examples_use_submodules_and_linear_scripts_are_editable() -> No
             "fringing_benchmark_demo.py": 160,
             "hartmann_example.py": 160,
             "hunt_example.py": 160,
+            "li_aln_wall_stack_example.py": 250,
             "operator_verification_demo.py": 160,
             "pipe_reference_comparison_demo.py": 160,
             "variable_field_extruded_demo.py": 160,
@@ -214,7 +215,7 @@ def test_curated_examples_declare_user_facing_contracts(tmp_path: Path) -> None:
     inventory = build_inventory()["inventory"]
     curated = inventory["curated_examples"]
     assert {item["path"] for item in curated} == set(inventory["examples"])
-    assert len(curated) == 11
+    assert len(curated) == 12
     for item in curated:
         assert item["command"]
         assert item["outputs"]

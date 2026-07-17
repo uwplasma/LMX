@@ -77,3 +77,32 @@ def test_pipe_reference_comparison_demo_writes_summary(tmp_path: Path):
     assert summary["geometry_kind"] == "pipe_ogrid"
     assert summary["normalization"]["center"] == "independent_peak_axial_velocity"
     assert (summary_path.parent / "pipe_reference_comparison.png").exists()
+
+
+def test_li_aln_wall_stack_example_runs_explicit_models(tmp_path: Path):
+    script = (
+        Path(__file__).resolve().parents[1]
+        / "examples/li_aln_wall_stack_example.py"
+    )
+    subprocess.run([sys.executable, script], cwd=tmp_path, timeout=60, check=True)
+    summary_path = next(
+        (tmp_path / "artifacts").rglob("li_aln_wall_stack_summary.json")
+    )
+    summary = json.loads(summary_path.read_text())
+
+    assert summary["inductionless_assumption_pass"] is True
+    assert set(summary["models"]) == {"intact_aln", "bare_metal"}
+    assert (
+        summary["models"]["bare_metal"]["tangential_conductance_ratio"]
+        > summary["models"]["intact_aln"]["tangential_conductance_ratio"]
+    )
+    assert all(
+        model["validation"]["linear_residual"] >= 0.0
+        for model in summary["models"].values()
+    )
+    assert all(
+        model["validation"]["charge_balance_relative"] < 1.0e-8
+        and model["validation"]["interface_current_relative"] < 1.0e-5
+        for model in summary["models"].values()
+    )
+    assert (summary_path.parent / "li_aln_wall_stack.png").is_file()

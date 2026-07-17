@@ -43,7 +43,6 @@ RESEARCH_STAGE = {
     "centerline_fields.py",
     "dean.py",
     "scaling.py",
-    "wall_study.py",
 }
 COMPATIBILITY: set[str] = set()
 VISUALIZATION = {"plotting.py"}
