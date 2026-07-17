@@ -125,7 +125,7 @@ shared without removing cases or assertions.
 | test files / lines | 30 / 21,007 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,552,868 bytes | next tranche must reduce bytes without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,553,206 bytes | next tranche must reduce bytes without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -166,11 +166,11 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
-The current gate passes 865 tests with 8 expected skips and 95.40% combined
-coverage in 131.5 seconds. Fused loss/gradient evaluation removes 38 redundant
-primal solves; shared validation and Q2D serialization delete 37 package lines.
-Scaling-admission coverage is included while shared fixtures keep the suite four
-lines below its prior test-line ratchet; the next test change remains a net deletion.
+The current gate passes 865 tests with 8 expected skips and 95.39% combined
+coverage in 125.8 seconds. Canonical finite-volume ownership removes 72 source
+lines; the smaller wall-resolved B2 gate retains physics, convergence,
+checkpoint, and exact-restart assertions, cuts its hotspot by 5.94 seconds, and
+deletes 11 test lines. The next test change remains a net deletion.
 
 ### Canonical sharding and performance
 
