@@ -129,10 +129,10 @@ shared without removing cases or assertions.
 | package modules | 35 | no new module | 35 |
 | package lines | 34,273 | stay below 34,274 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 21,087 | no new file; next test change must reduce lines | 31 / 21,100 |
+| test files / lines | 30 / 21,094 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,599,696 bytes | stay below 4,599,697 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,609,979 bytes | stay below 4,609,980 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -194,7 +194,7 @@ preserving all five ordered output and existence contracts; focused Q2D and
 repository gates pass.
 The safety-reviewed native S3 harness raised the suite to 21,099 lines without
 a new test file; consolidating optional-field skip ownership recovered 12 lines.
-The next test change remains a net deletion from the current 21,087-line suite.
+The next test change remains a net deletion from the current 21,094-line suite.
 
 ### Canonical sharding and performance
 
@@ -494,9 +494,10 @@ beside every asset.
 The README is 617 words with 14 directly embedded visuals. README/docs media
 covers accepted ducts and analytical/FreeMHD comparisons plus research-stage
 blanket, Q2D, curved-pipe, fringing, obstacle, restart, autodiff, and scaling
-results. The 20 tracked derivatives remain below the 1.25 MiB cap. Do not
-create a B2 movie
-from bounded or rejected trajectories, relabel mapped-pipe profiles as ALEX-B1
+results. The 20 tracked derivatives remain below the 1.25 MiB cap.
+The blanket loop now spends its first three seconds on the physically active
+startup and still spans the full 72-frame source trajectory in 7.014 seconds. Do not create
+a B2 movie from bounded or rejected trajectories, relabel mapped-pipe profiles as ALEX-B1
 evidence, or add media without a new accepted physical result.
 
 Read the Docs deployment remains externally blocked by stale GitHub

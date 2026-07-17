@@ -103,8 +103,11 @@ def write_manifest(path: Path = MANIFEST_PATH, root: Path = ROOT) -> dict[str, A
     if path.is_file():
         existing = json.loads(path.read_text(encoding="utf-8"))
         if existing.get("release", {}).get("status") == "uploaded":
-            raise ValueError("Uploaded release-asset manifests are immutable")
-    payload = build_manifest(root)
+            payload = existing | {"showcase": _tracked_showcase(root)}
+        else:
+            payload = build_manifest(root)
+    else:
+        payload = build_manifest(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(_canonical(payload), encoding="utf-8")
     return payload
@@ -300,15 +303,18 @@ def write_animated_webp(
     seconds: float = 7.0,
     fps: int = 8,
     quality: int = 50,
+    sampling_power: float = 1.0,
 ) -> Path:
-    """Downsample an existing animation to a small, directly embeddable WebP."""
+    """Downsample an animation; powers above one emphasize early dynamics."""
 
     from PIL import Image
 
+    if sampling_power <= 0.0:
+        raise ValueError("sampling_power must be positive")
     with Image.open(source) as image:
         frame_count = max(2, round(seconds * fps))
         indices = [
-            round(index * (image.n_frames - 1) / (frame_count - 1))
+            round((index / (frame_count - 1)) ** sampling_power * (image.n_frames - 1))
             for index in range(frame_count)
         ]
         height = round(image.height * width / image.width)
@@ -372,6 +378,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seconds", type=float, default=7.0)
     parser.add_argument("--fps", type=int, default=8)
     parser.add_argument("--quality", type=int, default=50)
+    parser.add_argument("--sampling-power", type=float, default=1.0)
     args = parser.parse_args(argv)
     if args.write_static_webp:
         source, output = args.write_static_webp
@@ -386,6 +393,7 @@ def main(argv: list[str] | None = None) -> int:
             seconds=args.seconds,
             fps=args.fps,
             quality=args.quality,
+            sampling_power=args.sampling_power,
         )
         print(f"Animated WebP: {output}")
     elif args.write_benchmark_a_plot:

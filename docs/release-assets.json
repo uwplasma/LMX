@@ -563,8 +563,8 @@
   ],
   "generated_by": "scripts/manage_release_assets.py",
   "release": {
-    "archive_sha256": "71b22c98100ce9e18b253ef4b96c89c1d51aeae6200536445ac2bc5a98879f88",
     "archive_name": "lmx-research-assets-v1.tar.gz",
+    "archive_sha256": "71b22c98100ce9e18b253ef4b96c89c1d51aeae6200536445ac2bc5a98879f88",
     "download_url": "https://github.com/uwplasma/lmx/releases/download/lmx-research-assets-v1/lmx-research-assets-v1.tar.gz",
     "repository": "uwplasma/lmx",
     "status": "uploaded",
@@ -572,7 +572,7 @@
   },
   "schema_version": 2,
   "showcase": {
-    "bytes": 1273604,
+    "bytes": 1282964,
     "files": [
       {
         "bytes": 71620,
@@ -625,9 +625,9 @@
         "sha256": "f2add9fe96a044a082a3b0ca28a3de50b71a0961399ac362caf2ebcaa049aa28"
       },
       {
-        "bytes": 61776,
+        "bytes": 71136,
         "path": "docs/_static/readme-blanket-flow.webp",
-        "sha256": "43d28f5c7d75b31b9247562faa3d0661f51d47d6836a9ec7694d98de01344927"
+        "sha256": "c67288733a450f2223db51d3ac1a8792b2b4b293e5e3d31d9ce37a4e14425064"
       },
       {
         "bytes": 94236,

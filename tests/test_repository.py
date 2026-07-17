@@ -272,7 +272,9 @@ def test_animated_webp_is_bounded_and_preserves_motion(tmp_path: Path) -> None:
         duration=80,
         loop=0,
     )
-    output = write_animated_webp(source, tmp_path / "motion.webp", width=24, fps=2)
+    output = write_animated_webp(
+        source, tmp_path / "motion.webp", width=24, fps=2, sampling_power=1.7
+    )
     with Image.open(output) as animation:
         assert animation.size == (24, 16)
         assert animation.n_frames >= 3
@@ -302,6 +304,11 @@ def test_release_asset_archive_is_deterministic_and_verified(tmp_path: Path) -> 
     assert build_archive(first, root) == build_archive(second, root)
     assert first.read_bytes() == second.read_bytes()
     verify_archive(first, manifest)
+    manifest["release"].update(status="uploaded", archive_sha256="a" * 64)
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest))
+    poster.write_bytes(b"refreshed")
+    refreshed = write_manifest(tmp_path / "manifest.json", root)
+    assert refreshed["release"]["status"] == "uploaded" and refreshed["showcase"]["bytes"] == 9
 
 
 def test_release_asset_manifest_detects_drift(tmp_path: Path) -> None:

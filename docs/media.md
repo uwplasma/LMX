@@ -39,7 +39,7 @@ serve one claim family.
 
 ## Tracked web set
 
-Twenty files in `docs/_static/` total 1,273,604 bytes. The `showcase` section of
+Twenty files in `docs/_static/` total 1,282,964 bytes. The `showcase` section of
 [`release-assets.json`](release-assets.json) records every byte count and
 SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 
@@ -60,7 +60,7 @@ SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 | geometry gallery | 61,600 | compressed WebP | released derivative `e844f069...` |
 | variable-field response | 41,648 | compressed WebP | released derivative `5d4b593c...` |
 | magnetic obstacle | 48,630 | compressed WebP | released derivative `6e351e80...` |
-| blanket-flow loop | 61,776 | 480 × 222 animated WebP, 7 s | Python/Pillow derivative of released GIF `1a23d23...`; 42 frames |
+| blanket-flow loop | 71,136 | 480 × 222 animated WebP, 7 s | released GIF `1a23d23...`; 42 startup-weighted timing slots, 38 encoded frames |
 | Q2D loop | 117,102 | 440 × 381 animated WebP, 7 s | Python/Pillow derivative of released GIF `feb9e145...`; 42 frames |
 | B2 field, pressure, and acceleration | 48,994 | 1,000 × 895 WebP | released field/pressure source plus raw, bounded, and residual-spectrum gates; shared-norm acceleration rejected |
 | curved-pipe validation | 94,236 | compressed WebP | released derivative `d32d666a...` |
@@ -70,12 +70,13 @@ Regenerate the Samper derivative from tracked evidence only with
 `python scripts/manage_release_assets.py --write-benchmark-a-plot docs/_static/samper_benchmark_a.webp`.
 The plot path is covered by `test_acceptance_plot_uses_only_frozen_json`.
 
-The blanket and Q2D motion derivatives are regenerated with
+The blanket and Q2D motion derivatives use
 `python scripts/manage_release_assets.py --write-animated-webp SOURCE OUTPUT`.
-They sample existing physical frames to 42 frames over 7 seconds and use lossy
-animated WebP compression; no solver or motion interpolation is involved. The
-Hunt/Shercliff comparison likewise samples 35 paired physical frames at 5 fps;
-its frozen 200-step inputs and source hashes are recorded above. Full-quality
+Both use 42 timing slots over 7 seconds and lossy WebP compression. Q2D samples
+uniformly; blanket uses `--sampling-power 1.7`, slowing its physically active
+startup before traversing the full 72-frame source. Repeated source frames
+coalesce to 38 encoded frames. No solver or motion interpolation is involved.
+Hunt/Shercliff likewise samples 35 paired physical frames at 5 fps. Full-quality
 MP4s and source GIFs remain in the release or ignored artifacts.
 
 ## Release-source provenance
