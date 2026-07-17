@@ -985,13 +985,21 @@ def _comparison_payload(
     }
 
 
-def write_validation_report(report: ValidationReport, path: str | Path) -> Path:
+def _profile_validation_payload(
+    report: ClosedChannelValidation | ProcessedSliceValidation,
+) -> dict[str, object]:
     payload = {
-        "case_name": report.case_name,
-        "metrics": report.metrics,
-        "artifacts": report.artifacts,
+        name: value
+        for name, value in vars(report).items()
+        if name not in {"y_profile", "z_profile"}
     }
-    return _write_json(payload, path)
+    for name in ("y_profile", "z_profile"):
+        payload[name] = _comparison_payload(getattr(report, name))
+    return payload
+
+
+def write_validation_report(report: ValidationReport, path: str | Path) -> Path:
+    return _write_json(vars(report), path)
 
 
 def write_analytic_comparison(comparison: AnalyticComparison, path: str | Path, axis_name: str = "coordinate") -> Path:
@@ -999,41 +1007,15 @@ def write_analytic_comparison(comparison: AnalyticComparison, path: str | Path, 
 
 
 def write_closed_channel_validation(report: ClosedChannelValidation, path: str | Path) -> Path:
-    payload = {
-        "case_kind": report.case_kind,
-        "ha": report.ha,
-        "reference_pressure_drop": report.reference_pressure_drop,
-        "reference_path": report.reference_path,
-        "y_profile": _comparison_payload(report.y_profile),
-        "z_profile": _comparison_payload(report.z_profile),
-    }
-    return _write_json(payload, path)
+    return _write_json(_profile_validation_payload(report), path)
 
 
 def write_processed_slice_validation(report: ProcessedSliceValidation, path: str | Path) -> Path:
-    payload = {
-        "case_kind": report.case_kind,
-        "ha": report.ha,
-        "x_slice": report.x_slice,
-        "reference_path": report.reference_path,
-        "y_profile": _comparison_payload(report.y_profile),
-        "z_profile": _comparison_payload(report.z_profile),
-    }
-    return _write_json(payload, path)
+    return _write_json(_profile_validation_payload(report), path)
 
 
 def write_acceptance_report(report: AcceptanceReport, path: str | Path) -> Path:
-    payload = {
-        "case_name": report.case_name,
-        "l2_error": report.l2_error,
-        "linf_error": report.linf_error,
-        "l2_threshold": report.l2_threshold,
-        "linf_threshold": report.linf_threshold,
-        "passed_l2": report.passed_l2,
-        "passed_linf": report.passed_linf,
-        "passed": report.passed,
-    }
-    return _write_json(payload, path)
+    return _write_json(vars(report), path)
 
 
 def write_metrics_json(metrics: dict[str, float | str], path: str | Path) -> Path:
