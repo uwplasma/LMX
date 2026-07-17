@@ -128,7 +128,7 @@ shared without removing cases or assertions.
 | test files / lines | 30 / 21,005 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,571,085 bytes | stay below 4,571,086 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,570,935 bytes | stay below 4,570,936 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.

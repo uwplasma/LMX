@@ -39,7 +39,7 @@ current-closure, and power-closure gates; no solver was rerun for presentation.
   passes primal, implicit-gradient, independent transpose, CPU/GPU, and bounded
   end-to-end gates.
 - The portable package gate passes 863 tests with 8 expected external-data
-  skips and 95.40% combined line/branch coverage in 121.5 seconds on the
+  skips and 95.42% combined line/branch coverage in 124.7 seconds on the
   reference Mac.
 - The B2 projection now preserves predictor cells and reconstructs only its
   pressure correction. The corrected warm 64x/32x/16x map-rate ladder spans

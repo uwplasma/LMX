@@ -1,7 +1,7 @@
 {
-  "schema_version": 35,
+  "schema_version": 36,
   "date": "2026-07-17",
-  "commit": "a4d42bf30ebff9f6f4fa3f3a559b710333198e1b",
+  "commit": "876a751417685a203858324d3f7caff6d9ce62ee",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -23,17 +23,17 @@
     "test_lines": 21005,
     "passed": 863,
     "skipped": 8,
-    "pytest_seconds": 121.20,
-    "gate_seconds": 121.5,
-    "covered_lines": 13964,
-    "total_lines": 14370,
-    "covered_branches": 2552,
-    "total_branches": 2942,
-    "combined_line_branch_coverage_percent": 95.40203327171903,
+    "pytest_seconds": 124.35,
+    "gate_seconds": 124.7,
+    "covered_lines": 13959,
+    "total_lines": 14363,
+    "covered_branches": 2551,
+    "total_branches": 2940,
+    "combined_line_branch_coverage_percent": 95.41697971450037,
     "passed_gate": true
   },
   "artifacts": {
-    "coverage_xml_sha256": "0f1660946b7de2e6156efa9ccb86142d894b731145737779df7db746ca4bb538",
+    "coverage_xml_sha256": "02301d01ab3c39aa86a9067aaeea3c3c8d3e664c8d27a7bcf2a17c17fd07c0c9",
     "junit_xml_sha256": null
   },
   "duration_note": "Current wrapper and pytest durations are exact; the wrapper emitted coverage XML but no JUnit. Slowest-node timings below remain the prior comparable six-worker JUnit evidence.",
@@ -50,28 +50,26 @@
     {"seconds": 11.468, "nodeid": "tests.test_fringing::test_solve_extruded_inductionless_supports_layered_analytic_variable_field"}
   ],
   "comparison": {
-    "previous_gate_seconds": 122.8,
-    "previous_pytest_seconds": 122.497,
-    "wall_time_change_percent": -1.058631921824102,
-    "pytest_seconds_change_percent": -1.0588014400352637,
-    "budget_fraction": 0.2025,
-    "engineering_target_fraction": 0.405,
+    "previous_gate_seconds": 121.5,
+    "previous_pytest_seconds": 121.20,
+    "wall_time_change_percent": 2.633744855967078,
+    "pytest_seconds_change_percent": 2.599009900990097,
+    "budget_fraction": 0.20783333333333334,
+    "engineering_target_fraction": 0.4156666666666667,
     "latest_slimming": {
-      "source_commit_before": "7314b8ae6f3cff7b5b1012f700b8daf667dfa946",
-      "source_commit_after": "0278fe66c09373d435e6e801b5c01bd02fa0629f",
-      "package_lines_before": 34445,
-      "package_lines_after": 34425,
-      "source_lines_removed": 20,
+      "source_commit_before": "5edbe4c6904a047fbdc0195f48657a10bdb7bf59",
+      "source_commit_after": "876a751417685a203858324d3f7caff6d9ce62ee",
+      "package_lines_before": 34446,
+      "package_lines_after": 34436,
+      "source_lines_removed": 10,
       "test_lines_before": 21005,
-      "test_lines_after": 20988,
-      "test_lines_removed": 17,
-      "test_cases_before": 872,
+      "test_lines_after": 21005,
+      "test_lines_removed": 0,
+      "test_cases_before": 871,
       "test_cases_after": 871,
-      "test_cases_removed": 1,
-      "removed_nodeid": "tests.test_fringing::test_solve_extruded_inductionless_projection_returns_finite_layered_bundle",
-      "removed_node_seconds": 6.894
+      "test_cases_removed": 0
     },
-    "interpretation": "Large-work scaling enforcement adds 21 package and 17 test lines while closing an acceptance gap. The clean portable gate improves by 1.06% and remains at 20% of the hard budget."
+    "interpretation": "Shared coordinate-edge ownership removes 10 package lines with no test or behavior loss. The clean portable gate varies by 2.63% and remains at 21% of the hard budget."
   },
   "scheduling_probe": {
     "evidence_scope": "historical",
@@ -85,12 +83,12 @@
     "decision": "retain six workers; the 3.4% change is below the promotion threshold, and module grouping would imbalance fringing and autodiff owners"
   },
   "architecture": {
-    "source_commit": "a4d42bf30ebff9f6f4fa3f3a559b710333198e1b",
+    "source_commit": "876a751417685a203858324d3f7caff6d9ce62ee",
     "package_modules": 35,
-    "package_lines": 34446,
+    "package_lines": 34436,
     "maintained_core_lines": 7869,
     "maintenance_scripts": 13,
-    "tracked_checkout_bytes": 4569781,
+    "tracked_checkout_bytes": 4571085,
     "stable_root_exports": 30,
     "curated_examples": 11
   },
