@@ -17,7 +17,7 @@ from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
 from .benchmarks import build_benchmark_b_field_profile, build_benchmark_b_problem
 from .fringing import solve_extruded_inductionless
-from .io import load_extruded_restart_bundle, validate_extruded_restart_bundle
+from .io import _EXTRUDED_FIELD_NAMES, load_extruded_restart_bundle, validate_extruded_restart_bundle
 
 
 @dataclass(frozen=True)
@@ -102,21 +102,6 @@ _SCALING_TABLE_COLUMNS = (
     "sustained_timing_eligible",
     "sustained_claim_eligible",
 )
-
-_BUNDLE_FIELD_NAMES = (
-    "u",
-    "v",
-    "w",
-    "p",
-    "phi",
-    "jx",
-    "jy",
-    "jz",
-    "lorentz_x",
-    "lorentz_y",
-    "lorentz_z",
-)
-
 
 def _number_or_none(value: object, *, conversion):
     try:
@@ -551,7 +536,7 @@ def _shard_placement(array: object, expected_shards: int) -> tuple[bool, int]:
 
 def _bundle_memory_bytes(bundle: object) -> int:
     return sum(
-        _array_nbytes(getattr(bundle, name, None)) for name in _BUNDLE_FIELD_NAMES
+        _array_nbytes(getattr(bundle, name, None)) for name in _EXTRUDED_FIELD_NAMES
     )
 
 
@@ -561,10 +546,9 @@ def _field_l2(bundle: object, *names: str) -> float:
 
 
 def _factor_device_mesh(num_devices: int) -> tuple[int, int]:
-    for rows in range(int(np.sqrt(num_devices)), 0, -1):
-        if num_devices % rows == 0:
-            return rows, num_devices // rows
-    return 1, num_devices
+    limit = int(np.sqrt(num_devices))
+    rows = next((r for r in range(limit, 0, -1) if num_devices % r == 0), 1)
+    return rows, num_devices // rows
 
 
 def _two_axis_mesh_and_sharding(
@@ -755,7 +739,7 @@ def benchmark_extruded_inductionless_solve(
                 solve_kwargs["initial_bundle"] = initial_bundle
             solution = solve_extruded_inductionless(problem, **solve_kwargs)
             jax.block_until_ready(
-                tuple(getattr(solution.bundle, name) for name in _BUNDLE_FIELD_NAMES)
+                tuple(getattr(solution.bundle, name) for name in _EXTRUDED_FIELD_NAMES)
             )
         finally:
             if trace_started:

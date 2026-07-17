@@ -276,7 +276,7 @@ def _solver_scaling_bundle(shape=(4, 4, 4), *, signature=True, charge=1.0e-6):
     one, zero = jnp.ones(shape), jnp.zeros(shape)
     return SimpleNamespace(
         **{name: one if signature and name in {"u", "phi", "jx"} else zero
-            for name in scaling._BUNDLE_FIELD_NAMES},
+            for name in scaling._EXTRUDED_FIELD_NAMES},
         charge_balance_residual=jnp.asarray([charge]),
         boundary_current_residual=jnp.asarray([2.0e-6]),
         iteration_electric_linear_history=jnp.asarray(

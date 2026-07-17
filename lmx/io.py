@@ -25,6 +25,7 @@ _B2_ANDERSON_FIELDS = (
 _EXTRUDED_ARRAY_FIELDS = """x y z field_scale u v w p phi jx jy jz lorentz_x lorentz_y lorentz_z
 residual volumetric_flow_rate mean_velocity axial_current wall_current_leakage current_scaled_pressure_proxy
 charge_balance_residual boundary_current_residual""".split()
+_EXTRUDED_FIELD_NAMES = tuple(_EXTRUDED_ARRAY_FIELDS[4:15])
 
 
 def _portable_path(path: str | Path, *, relative_to: str | Path | None = None) -> str:
@@ -696,19 +697,7 @@ def _write_extruded_station_archives(
         "station_count": int(bundle.x.shape[0]),
         "archived_station_indices": station_indices,
         "archived_files": [path.relative_to(layout.root).as_posix() for path in files],
-        "fields": [
-            "u",
-            "v",
-            "w",
-            "p",
-            "phi",
-            "jx",
-            "jy",
-            "jz",
-            "lorentz_x",
-            "lorentz_y",
-            "lorentz_z",
-        ],
+        "fields": _EXTRUDED_FIELD_NAMES,
     }
     manifest_path = layout.system_dir / f"{case.name}_extruded_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")

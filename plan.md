@@ -122,16 +122,16 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,726 | do not grow before SOLVAX adoption | 35,100 |
-| maintained-core lines | 7,880 | stay below 7,890 | 8,000 |
+| package lines | 34,699 | stay below 34,700 | 35,100 |
+| maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
 | test files / lines | 30 / 21,074 | no new file; stay below 21,075 | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,547,665 bytes | stay below 4,550,000 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,547,363 bytes | stay below 4,550,000 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
-The latest ownership audit removed one unreferenced superseded GPU record.
+The latest audit gave restart, output, and scaling one field-schema owner.
 The remaining result records, 13 scripts, and distinct Python/TOML examples
 retain current provenance, CI, or runnable-workflow ownership; do not merge
 them unless the replacement deletes code without weakening those contracts.
