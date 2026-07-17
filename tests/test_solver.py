@@ -39,6 +39,13 @@ def _fake_step_result(u, **overrides):
     return (u, *(values[name] for name in values))
 
 
+def _steady_stopping_case(**time_stepper):
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    return replace(
+        case, time_stepper=replace(case.time_stepper, **time_stepper)
+    )
+
+
 def test_hartmann_solver_runs(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=10.0, ny=12, nz=12)
     assert case.solver.kind == "fully_developed_inductionless"
@@ -313,7 +320,8 @@ def test_hunt_inlet_flow_rate_boundary_drives_short_transient(
     )
 
 
-def test_transient_restart_matches_direct_run(
+@pytest.fixture
+def transient_restart_setup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
@@ -341,13 +349,16 @@ def test_transient_restart_matches_direct_run(
     monkeypatch.setattr(
         solvers, "_fully_developed_case_step", fake_fully_developed_case_step
     )
-
-    direct = solve_transient(direct_case)
     partial = solve_transient(partial_case)
-    restart_path = write_solution_npz(
-        partial, partial_case, tmp_path / "partial_restart.npz"
+    restart = load_restart_bundle(
+        write_solution_npz(partial, partial_case, tmp_path / "partial_restart.npz")
     )
-    restart = load_restart_bundle(restart_path)
+    return direct_case, restart
+
+
+def test_transient_restart_matches_direct_run(transient_restart_setup):
+    direct_case, restart = transient_restart_setup
+    direct = solve_transient(direct_case)
     resumed = solve_transient(
         direct_case,
         initial_state=restart.state,
@@ -377,39 +388,9 @@ def test_public_solvers_reject_unknown_solver_kind(solver, mode):
 
 
 def test_transient_restart_can_append_diagnostics(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    transient_restart_setup,
 ):
-    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    direct_case = replace(
-        case,
-        time_stepper=replace(case.time_stepper, dt=0.01, t_final=0.04, max_steps=4),
-    )
-    partial_case = replace(
-        case,
-        time_stepper=replace(case.time_stepper, dt=0.01, t_final=0.02, max_steps=2),
-    )
-
-    def fake_fully_developed_case_step(**kwargs):
-        u_prev = kwargs["u_previous"]
-        step_time = kwargs["step_time"]
-        updated = jnp.full_like(u_prev, step_time * 10.0)
-        return _fake_step_result(
-            updated, velocity_residual=1e-6, potential_residual=1e-6,
-            linear_residual=2.0, linear_iterations=0.3,
-            face_current_max=0.2, emf_max=0.1, face_lorentz_max=0.05,
-            applied_forcing=0.3, potential_initial_residual=1e-3,
-            linear_initial_residual=1e-3,
-        )
-
-    monkeypatch.setattr(
-        solvers, "_fully_developed_case_step", fake_fully_developed_case_step
-    )
-
-    partial = solve_transient(partial_case)
-    restart = load_restart_bundle(
-        write_solution_npz(partial, partial_case, tmp_path / "partial_append.npz")
-    )
-
+    direct_case, restart = transient_restart_setup
     resumed = solve_transient(
         direct_case,
         initial_state=restart.state,
@@ -1164,16 +1145,8 @@ def test_conductive_current_components_keep_wall_currents_for_interface_audits()
 def test_solve_steady_respects_t_final_when_tolerance_not_reached(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    case = replace(
-        case,
-        time_stepper=replace(
-            case.time_stepper,
-            dt=0.002,
-            t_final=0.01,
-            max_steps=200,
-            steady_tolerance=0.0,
-        ),
+    case = _steady_stopping_case(
+        dt=0.002, t_final=0.01, max_steps=200, steady_tolerance=0.0
     )
 
     def fake_fully_developed_case_step(**kwargs):
@@ -1611,15 +1584,8 @@ def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity
 def test_fully_developed_steady_stops_once_residual_reaches_tolerance(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    case = replace(
-        case,
-        time_stepper=replace(
-            case.time_stepper,
-            max_steps=10,
-            steady_tolerance=1e-4,
-            potential_tolerance=1.0e-2,
-        ),
+    case = _steady_stopping_case(
+        max_steps=10, steady_tolerance=1e-4, potential_tolerance=1.0e-2
     )
     residuals = iter([1.0e-1, 1.0e-2, 1.0e-5, 1.0e-6])
 
@@ -1647,15 +1613,8 @@ def test_fully_developed_steady_stops_once_residual_reaches_tolerance(
 def test_fully_developed_steady_requires_outer_state_convergence(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    case = replace(
-        case,
-        time_stepper=replace(
-            case.time_stepper,
-            max_steps=5,
-            steady_tolerance=1.0e-4,
-            potential_tolerance=1.0e-2,
-        ),
+    case = _steady_stopping_case(
+        max_steps=5, steady_tolerance=1.0e-4, potential_tolerance=1.0e-2
     )
     updates = iter([1.0e-2, 1.0e-5])
 
@@ -1681,15 +1640,8 @@ def test_fully_developed_steady_requires_outer_state_convergence(
 def test_fully_developed_steady_can_require_potential_residual_when_requested(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    case = replace(
-        case,
-        time_stepper=replace(
-            case.time_stepper,
-            max_steps=6,
-            steady_tolerance=1e-4,
-            steady_potential_tolerance=5e-4,
-        ),
+    case = _steady_stopping_case(
+        max_steps=6, steady_tolerance=1e-4, steady_potential_tolerance=5e-4
     )
     residuals = iter([1.0e-3, 1.0e-5, 1.0e-5, 1.0e-6])
     potential_residuals = iter([1.0e-2, 1.0e-3, 1.0e-4, 1.0e-5])
@@ -1832,13 +1784,13 @@ def test_poisson_cg_volume_residual_scale_controls_unscaled_maximum() -> None:
         )
 
 
-def test_potential_y_line_preconditioner_uses_solvax_and_anchors_gauge(
+def test_potential_line_preconditioners_use_solvax_and_anchor_gauge(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    captured: dict[str, jnp.ndarray] = {}
+    calls: list[dict[str, jnp.ndarray]] = []
 
     def fake_tridiagonal(lower, diagonal, upper, rhs):
-        captured.update(lower=lower, diagonal=diagonal, upper=upper, rhs=rhs)
+        calls.append({"lower": lower, "diagonal": diagonal, "upper": upper, "rhs": rhs})
         return rhs / diagonal
 
     monkeypatch.setattr(solvers, "_solvax_tridiagonal_solve", fake_tridiagonal)
@@ -1851,20 +1803,11 @@ def test_potential_y_line_preconditioner_uses_solvax_and_anchors_gauge(
     )
     assert preconditioner is not None
     result = preconditioner(jnp.ones((4, 3)))
+    captured = calls.pop()
     assert captured["diagonal"][anchor] == 1.0
     assert captured["lower"][anchor] == captured["upper"][anchor] == 0.0
     assert captured["rhs"][anchor] == result[anchor] == 0.0
 
-def test_potential_additive_line_preconditioner_solves_both_directions(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    calls: list[tuple[int, ...]] = []
-
-    def fake_tridiagonal(lower, diagonal, upper, rhs):
-        calls.append(rhs.shape)
-        return rhs / diagonal
-
-    monkeypatch.setattr(solvers, "_solvax_tridiagonal_solve", fake_tridiagonal)
     shape = (4, 3)
     diagonal = jnp.full(shape, 6.0)
     neighbor = jnp.ones(shape)
@@ -1872,7 +1815,7 @@ def test_potential_additive_line_preconditioner_solves_both_directions(
         diagonal, neighbor, neighbor, neighbor, neighbor, (2, 1)
     )
     result = preconditioner(jnp.ones(shape))
-    assert calls == [(4, 3), (3, 4)]
+    assert [call["rhs"].shape for call in calls] == [(4, 3), (3, 4)]
     assert result.shape == shape
     assert result[2, 1] == 0.0
 
