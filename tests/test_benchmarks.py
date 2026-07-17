@@ -528,9 +528,13 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     profile = build_benchmark_b_field_profile(
         "B2-fringing-square", axial_stations=case.geometry.nx
     )
+    progress = []
     solution = solve_extruded_inductionless(
         replace(problem, case=case, profile=profile),
+        progress_callback=progress.append,
+        checkpoint_interval=1,
     )
+    assert len(progress) == 4 and all(item.checkpoint is not None for item in progress)
 
     assert float(benchmarks.jnp.mean(solution.bundle.mean_velocity)) == pytest.approx(
         1.0, abs=1.0e-10
@@ -574,17 +578,15 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     continuation_problem = replace(
         problem, case=continuation_case, profile=profile
     )
-    direct_two_problem = replace(continuation_problem, case=replace(
-        continuation_case,
-        time_stepper=replace(continuation_case.time_stepper, max_steps=2),
-    ))
-    direct_two = solve_extruded_inductionless(direct_two_problem)
-    terminal = solve_extruded_inductionless(continuation_problem)
+    terminal, direct_two = (
+        replace(item.checkpoint, stopping_state=(*item.checkpoint.stopping_state[:2], "step_limit"))
+        for item in progress[:2]
+    )
     path = write_extruded_bundle_restart_npz(
-        terminal.bundle, continuation_case, tmp_path / "b2.npz"
+        terminal, continuation_case, tmp_path / "b2.npz"
     )
     restart = load_extruded_restart_bundle(path)
-    assert terminal.bundle.aitken_state is None
+    assert terminal.aitken_state is None
     assert restart.bundle.aitken_state is None
     assert all(value is not None for value in restart.bundle.anderson_state)
     with pytest.raises(ValueError, match="both compact flux arrays"):
@@ -622,14 +624,14 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
         "iteration_courant_history",
     ):
         assert benchmarks.jnp.array_equal(
-            getattr(resumed.bundle, name), getattr(direct_two.bundle, name)
+            getattr(resumed.bundle, name), getattr(direct_two, name)
         )
     assert all(benchmarks.jnp.array_equal(resumed_value, direct_value)
                for resumed_value, direct_value in zip(
                    resumed.bundle.anderson_state,
-                   direct_two.bundle.anderson_state,
+                   direct_two.anderson_state,
                    strict=True))
-    assert resumed.bundle.stopping_state == direct_two.bundle.stopping_state
+    assert resumed.bundle.stopping_state == direct_two.stopping_state
     convergence_problem = replace(
         continuation_problem,
         case=replace(
