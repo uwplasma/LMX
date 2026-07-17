@@ -10,8 +10,8 @@ This composite is generated from the compact schema-6 CPU and GPU records. The u
 panel is forced-device calibration; the middle panel is multi-minute fixed-work
 calibration on affinity-controlled 2/4/8 CPUs; the lower panel is a
 multi-minute one/two-GPU shared-host calibration. GPU correctness is green, but
-the timing claim remains open because foreign contexts fail the idle gate. The
-CPU timing now also awaits confirmation under continuous host monitoring.
+foreign contexts fail the idle gate. A current monitored CPU confirmation also
+failed stability, duration, and swapout gates, so neither timing claim is promoted.
 
 ## Current evidence
 
@@ -22,6 +22,7 @@ CPU timing now also awaits confirmation under continuous host monitoring.
 | B2 schema-6 CPU calibration | Apple M4, `256 x 67 x 67`, 1/2/4 forced CPU devices | 15.159/12.337/11.146 s; 1.229x/1.360x speedup; exact restart and device equivalence pass | accepted correctness/calibration; four-device promotion gate not met |
 | B2 CPU-allocation confirmation | ARM64 Docker on Apple M4, `256 x 67 x 67`, 2/4/8 affinity-controlled guest CPUs for 1/2/4 devices | 22.894/15.953/14.252 s; 1.435x/1.606x; 95% lower bounds 1.364x/1.548x; efficiency 71.8%/40.2% | repeated two-update calibration; host P/E-core mapping unverified |
 | B2 sustained CPU calibration | same grid/masks, 32 updates, three warm trajectories per topology | 246.702/187.307/146.524 s; 1.317x/1.684x; peak process RSS 4.65/5.22/5.43 GB; CV below 4.45% | source-keyed `a92b4e6` result passed the former static-preflight gate; current continuous/postflight promotion remains open |
+| B2 monitored CPU diagnostic | same grid/masks, 24 updates, three warm trajectories per topology | 193.234/132.962/133.753 s; apparent 1.453x/1.445x; CV 8.46%/1.55%/12.91% | rejected: one short four-device sample and a two-device swapout; numerics, restart, and placement pass |
 | B2 sustained GPU calibration | 1/2 RTX A4000, same grid, 96 updates, three warm trajectories per topology | 258.913/159.234 s; 1.626x; peak device memory 2.50 GB vs 1.41/1.31 GB; CV below 0.29% | numerical/duration gates pass; persistent foreign contexts block an authoritative timing claim |
 | B2 pseudo-time gate | Apple M4, corrected warm `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x/32x/16x map-rate spread 0.0768%; raw updates halve; exact restart | 64x refrozen; versioned stopping threshold open |
 | B2 physical-residual probe | Apple M4, `7 x 7 x 7` | residual 0.03870 at step 90; omitted reconstruction force is 0.0880 at step 4 | diagnostic has a plausible coarse split floor; never a stopping gate |
@@ -203,6 +204,12 @@ placement, and cross-topology gates pass. It remains useful multi-minute
 calibration, but the current gate requires a fresh continuous/postflight host
 trace before promotion. Linux affinity is verified inside the Docker VM;
 Docker Desktop does not expose how those vCPUs map onto heterogeneous cores.
+
+The current-source 24-update monitored ladder then measured 193.234, 132.962,
+and 133.753 s. It failed closed: one/four-device CVs were 8.46%/12.91%, the
+two-device monitor saw 179 swapout pages, and one four-device sample lasted
+117.941 s. Numerical, restart, pressure-solve, Anderson, and placement checks
+still pass; the apparent 1.453x/1.445x speedups are diagnostic only.
 
 The medium B2 tight solve converged across two restart-safe segments and ended
 at residual `2.500e-5`, divergence `1.829e-6`, and charge residual `1.149e-4`.
@@ -387,6 +394,8 @@ source fingerprint, bracketed worker timestamps, sample period and maximum gap
 at most five seconds, full cold-plus-warm coverage, at least 15 postflight
 seconds, and zero violations. Missing or malformed monitoring leaves timings
 visible as candidates but blocks promotion.
+The current protocol did exactly that for a cleanly admitted 24-update ladder:
+runtime swapout, unstable samples, and one sub-120-second sample rejected it.
 This manual lane stays outside portable tests.
 
 The solver-faithful example requires a validated restart matching each timed

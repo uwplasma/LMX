@@ -139,14 +139,12 @@ Q2D-MHDfoam parity and blanket validation remain open.
 
 ![B2 seconds-scale correctness calibration, sustained CPU scaling, and non-idle-host GPU calibration](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/strong_scaling.webp)
 
-Actual scaling evidence uses matched multi-minute trajectories. An earlier
-60-second-preflight Docker campaign used fixed `256 × 67 × 67`, 32-update warm
-trajectories lasting 147–269 s and reached 1.317×/1.684× on two/four versus one
-JAX device. Current promotion additionally requires continuous and postflight
-monitoring; its clean-host confirmation remains open. A 96-update shared-host
-GPU calibration reaches 1.626× on two A4000s with 159–259 s warm trajectories;
-foreign GPU contexts keep the authoritative timing claim open. Seconds-scale
-runs in the top panel are correctness calibration only.
+Matched scaling uses multi-minute trajectories. The plotted 32-update CPU
+calibration reached 1.317×/1.684× on two/four JAX devices. A newer monitored
+24-update diagnostic measured 1.453×/1.445×, but timing variance, one short
+sample, and swapout activity block promotion. The GPU calibration reaches
+1.626× on two A4000s; foreign contexts keep that claim open. Seconds-scale
+results are correctness checks only.
 [Protocol and results →](https://lmx.readthedocs.io/en/latest/performance.html)
 
 ## Quality and citation
