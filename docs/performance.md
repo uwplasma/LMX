@@ -9,6 +9,8 @@ devices alone is not evidence of parallel execution.
 The upper row is the accepted continuously monitored fixed-work ladder on
 2/4/8 Docker guest CPUs for 1/2/4 JAX devices. The lower row is a multi-minute
 one/two-GPU shared-host calibration; foreign contexts still fail its idle gate.
+Only the monitored CPU row below is an accepted scaling claim; short timings
+are diagnostics, and the GPU timing remains a calibration.
 
 ## Current evidence
 
@@ -16,8 +18,8 @@ one/two-GPU shared-host calibration; foreign contexts still fail its idle gate.
 |---|---|---|---|
 | portable test gate | Apple M4, six workers | 863 pass, 8 skip, 95.41% combined line/branch coverage, 122.8 s | 41% of the five-minute target and 20% of the ten-minute budget |
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
-| B2 monitored CPU scaling | same grid/masks, 32 updates, three warm trajectories per topology | 250.756/173.993/151.342 s; 1.441x/1.657x; peak process RSS 4.758/5.078/5.578 GB; CV at most 0.631% | accepted Docker CPU-allocation scaling from source `6f89d1a`, evaluated by `6729bdf`; environment, numerics, restart, and placement pass; exact host-core mapping and steady-state acceptance remain open |
-| B2 sustained GPU calibration | 1/2 RTX A4000, same grid, 96 updates, three warm trajectories per topology | 258.913/159.234 s; 1.626x; peak device memory 2.50 GB vs 1.41/1.31 GB; CV below 0.29% | numerical/duration gates pass; persistent foreign contexts block an authoritative timing claim |
+| B2 monitored CPU scaling | `256 x 67 x 67`, 32 updates, 2/4/8 guest CPUs, 1/2/4 JAX devices, three warm trajectories per topology | 250.756/173.993/151.342 s; 1.441x/1.657x; peak process RSS 4.758/5.078/5.578 GB; CV at most 0.631% | accepted Docker CPU-allocation scaling from source `6f89d1a`, evaluated by `6729bdf`; environment, numerics, restart, and placement pass; exact host-core mapping and steady-state acceptance remain open |
+| B2 multi-minute GPU calibration | `256 x 67 x 67`, 1/2 RTX A4000, 96 updates, three warm trajectories per topology | 258.913/159.234 s; 1.626x; peak device memory 2.50 GB vs 1.41/1.31 GB; CV below 0.29% | recorded source `78858f5`; numerical/duration gates pass, but persistent foreign contexts block an authoritative timing claim |
 | B2 pseudo-time gate | Apple M4, corrected warm `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x/32x/16x map-rate spread 0.0768%; raw updates halve; exact restart | 64x refrozen; versioned stopping threshold open |
 | B2 physical-residual probe | Apple M4, `7 x 7 x 7` | residual 0.03870 at step 90; omitted reconstruction force is 0.0880 at step 4 | diagnostic has a plausible coarse split floor; never a stopping gate |
 | CPU-allocation restart audit | existing `101 x 77 x 77` coarse checkpoints | geometry/shape load, but sampled files normalize to `legacy_nonexact` with no source fingerprint or schema-6 Anderson/compact-flux state | unsuitable for exact or promoted current-source scaling evidence |
@@ -46,8 +48,9 @@ The CPU/GPU correctness calibrations and larger results are recorded in
 `benchmarks/results/b2-gpu-device-equivalence-20260715.json`,
 `benchmarks/results/b2-schema6-cpu-scaling-20260716.json`, and
 `benchmarks/results/b2-gpu-scaling-calibration-20260715.json`.
-The current trace measures 1.510x scaling across momentum, projection, and
-electric phases. Reusing the existing host station payload for validation cuts
+The seconds-scale diagnostic trace measures a 1.510x phase ratio across
+momentum, projection, and electric work; it is not strong-scaling evidence.
+Reusing the existing host station payload for validation cuts
 the two-GPU end-to-end median by 0.290 s and removes 12 source lines, but the
 remaining post-map transfer tail leaves the result below 1.2x. The fixed-grid
 ladder therefore stops without a larger run or production-speed claim.
@@ -320,10 +323,11 @@ python scripts/run_strong_scaling_worker.py --help
 ```
 
 The matched-B2 worker keeps two updates as its fast debug/CI default. Such runs
-can verify numerics but are never scaling evidence. A sustained record must
-predeclare a two-minute minimum, run one cold plus at least three warm
-trajectories per rung, and require every warm trajectory to meet it; direct and
-midpoint-restart paths must still finish identically. The sustained preset uses
+can verify numerics but are never scaling evidence. A sustained record must use
+at least one million global cells and 32 million cell-updates, predeclare a
+two-minute minimum, run one cold plus at least three warm trajectories per
+rung, and require every warm trajectory to meet it; direct and midpoint-restart
+paths must still finish identically. The sustained preset uses
 256 × 67 × 67, 32 CPU updates, 96 GPU updates, four repeats, a 120-second warm
 minimum, and an 1800-second worker ceiling:
 

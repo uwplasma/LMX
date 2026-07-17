@@ -35,6 +35,8 @@ from lmx.fringing import (
 )
 from lmx.scaling import (
     _SUSTAINED_WARM_CV_MAX,
+    _SUSTAINED_MIN_CELLS,
+    _SUSTAINED_MIN_CELL_UPDATES,
     _SUSTAINED_WARM_SAMPLES,
     _SUSTAINED_WARM_SECONDS,
     _bundle_memory_bytes,
@@ -527,6 +529,10 @@ def _matched_b2_smoke_benchmark(
     except Exception as error:
         warm = np.asarray(timings[1:])
         sustained = _sustained_timing_passed(minimum_warm_seconds, warm)
+        total_cells = int(direct.u.size)
+        cell_updates = executed_steps * total_cells
+        large_work = bool(total_cells >= _SUSTAINED_MIN_CELLS
+            and cell_updates >= _SUSTAINED_MIN_CELL_UPDATES)
         return {
             "benchmark_kind": "matched_b2_smoke",
             "acceptance_role": acceptance_role,
@@ -535,12 +541,16 @@ def _matched_b2_smoke_benchmark(
             "num_devices": num_devices, "nx": direct.u.shape[0],
             "ny": direct.u.shape[1], "nz": direct.u.shape[2],
             "iterations": executed_steps,
+            "total_cells": total_cells, "cell_updates": cell_updates,
             "repeats": repeats, "cold_seconds": timings[0],
             "timing_contract": _B2_TIMING_CONTRACT,
             "warm_samples_seconds": warm.tolist(),
             "warm_seconds": float(np.median(warm)), "validation_passed": False,
             "sustained_minimum_warm_seconds": _SUSTAINED_WARM_SECONDS,
             "sustained_duration_passed": sustained,
+            "large_fixed_work_passed": large_work,
+            "measurement_class": ("sustained-multiminute"
+                if sustained and large_work else "debug-or-calibration"),
             "sustained_timing_eligible": False,
             "failure": {"phase": "restart", "type": type(error).__name__,
                 "message": str(error)},
@@ -591,6 +601,10 @@ def _matched_b2_smoke_benchmark(
     )
     warm = np.asarray(timings[1:])
     sustained = _sustained_timing_passed(minimum_warm_seconds, warm)
+    total_cells = int(direct.u.size)
+    cell_updates = executed_steps * total_cells
+    large_work = bool(total_cells >= _SUSTAINED_MIN_CELLS
+        and cell_updates >= _SUSTAINED_MIN_CELL_UPDATES)
     velocity_l2 = float(np.sqrt(sum(np.linalg.norm(np.asarray(getattr(direct, name))) ** 2
         for name in ("u", "v", "w"))))
     current_l2 = float(np.sqrt(sum(np.linalg.norm(np.asarray(getattr(direct, name))) ** 2
@@ -615,8 +629,7 @@ def _matched_b2_smoke_benchmark(
         "warm_seconds": float(np.median(warm)), "mean_seconds": float(np.mean(timings)),
         "warm_samples_seconds": warm.tolist(), "warm_std_seconds": float(np.std(warm)),
         "warm_cv": float(np.std(warm) / max(np.mean(warm), 1.0e-30)),
-        "total_cells": int(direct.u.size),
-        "cell_updates": int(executed_steps * direct.u.size),
+        "total_cells": total_cells, "cell_updates": cell_updates,
         "warm_cell_updates_per_second": float(
             executed_steps * direct.u.size / np.median(warm)
         ),
@@ -625,7 +638,10 @@ def _matched_b2_smoke_benchmark(
             all(sample >= minimum_warm_seconds for sample in warm)),
         "sustained_minimum_warm_seconds": _SUSTAINED_WARM_SECONDS,
         "sustained_duration_passed": sustained,
-        "sustained_timing_eligible": bool(validation_passed and sustained),
+        "large_fixed_work_passed": large_work,
+        "measurement_class": ("sustained-multiminute"
+            if sustained and large_work else "debug-or-calibration"),
+        "sustained_timing_eligible": bool(validation_passed and sustained and large_work),
         "velocity_l2": velocity_l2, "potential_l2": float(np.linalg.norm(np.asarray(direct.phi))),
         "current_l2": current_l2,
         "memory_bytes_estimate": _bundle_memory_bytes(direct),

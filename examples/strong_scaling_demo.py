@@ -23,6 +23,8 @@ import numpy as np
 
 from lmx.plotting import write_strong_scaling_plots
 from lmx.scaling import (
+    _SUSTAINED_MIN_CELLS,
+    _SUSTAINED_MIN_CELL_UPDATES,
     summarize_strong_scaling_records,
     write_strong_scaling_summary_table,
 )
@@ -1179,11 +1181,27 @@ def main(argv: list[str] | None = None) -> int:
         if args.iterations is None and args.gpu_iterations is None:
             gpu_iterations = 12
 
+    cpu_counts = tuple(int(value) for value in args.cpu_counts.split(",") if value)
+    gpu_counts = tuple(int(value) for value in args.gpu_counts.split(",") if value)
+    if args.sustained:
+        workloads = [("CPU", cpu_counts, cpu_problem, cpu_iterations)]
+        if args.remote_host is not None:
+            workloads.append(("GPU", gpu_counts, gpu_problem, gpu_iterations))
+        for label, counts, shape, iterations in workloads:
+            cells = shape[0] * shape[1] * shape[2]
+            if counts and (cells < _SUSTAINED_MIN_CELLS
+                    or cells * iterations < _SUSTAINED_MIN_CELL_UPDATES):
+                parser.error(
+                    f"sustained {label} work requires at least "
+                    f"{_SUSTAINED_MIN_CELLS:,} cells and "
+                    f"{_SUSTAINED_MIN_CELL_UPDATES:,} cell-updates"
+                )
+
     run_strong_scaling_demo(
         out_dir=args.output,
         benchmark_kind=args.benchmark_kind,
-        cpu_counts=tuple(int(value) for value in args.cpu_counts.split(",") if value),
-        gpu_counts=tuple(int(value) for value in args.gpu_counts.split(",") if value),
+        cpu_counts=cpu_counts,
+        gpu_counts=gpu_counts,
         cpu_problem=cpu_problem,
         gpu_problem=gpu_problem,
         cpu_iterations=cpu_iterations,

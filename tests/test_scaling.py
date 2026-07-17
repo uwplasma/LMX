@@ -400,6 +400,8 @@ def _sustained_ladder(counts, backend="cpu"):
             device_kind="cpu" if backend == "cpu" else "NVIDIA RTX",
             cold_seconds=cold, warm_seconds=warm, mean_seconds=warm,
             benchmark_kind="matched_b2_smoke", operator_path="solve_extruded_inductionless",
+            nx=256, ny=67, nz=67, iterations=32, total_cells=1_149_184,
+            cell_updates=36_773_888,
             memory_bytes_estimate=2**21, spatially_sharded=count > 1,
             global_shard_count=count, velocity_l2=3.0, potential_l2=2.0,
             current_l2=1.0, validation_passed=True)
@@ -411,6 +413,8 @@ def _sustained_ladder(counts, backend="cpu"):
             "device_memory": ([{"peak_bytes_in_use": 1024} for _ in range(count)]
                 if backend == "gpu" else []),
             "acceptance_role": "sustained-candidate", "minimum_warm_seconds": 120.0,
+            "measurement_class": "sustained-multiminute",
+            "large_fixed_work_passed": True,
             "sustained_minimum_warm_seconds": 120.0, "warm_samples_seconds": samples,
             "timing_contract": run_strong_scaling_worker._B2_TIMING_CONTRACT,
             "resource_monitoring": {"schema_version": 2, "scope": "continuous-and-postflight",
@@ -439,6 +443,11 @@ def test_scaling_demo_requires_restart_for_production(monkeypatch) -> None:
     assert options["cpu_iterations"] == options["gpu_iterations"] == 2
     assert strong_scaling_demo.main([*arguments, "--iterations", "6", "--minimum-warm-seconds", "120"]) == 0
     assert (options["cpu_iterations"], options["gpu_iterations"], options["minimum_warm_seconds"]) == (6, 6, 120.0)
+    with pytest.raises(SystemExit):
+        strong_scaling_demo.main([
+            "--benchmark-kind", "matched_b2_smoke", "--sustained",
+            "--cpu-nx", "128",
+        ])
     assert strong_scaling_demo.main(["--benchmark-kind", "matched_b2_smoke", "--sustained"]) == 0
     assert options["cpu_problem"] == options["gpu_problem"] == (256, 67, 67)
     assert (options["cpu_iterations"], options["gpu_iterations"], options["repeats"],
@@ -622,6 +631,12 @@ def test_sustained_claim_fails_closed_on_incomplete_evidence():
     noisy = _sustained_ladder((1, 2, 4))
     noisy[-1].update(warm_samples_seconds=[120.0, 121.0, 180.0], warm_seconds=121.0)
     bad.append(noisy)
+    for field, value in (("total_cells", 1), ("cell_updates", 1),
+            ("large_fixed_work_passed", False),
+            ("measurement_class", "debug-or-calibration")):
+        records = _sustained_ladder((1, 2, 4))
+        records[-1][field] = value
+        bad.append(records)
     for field, value in (("schema_version", 0), ("scope", "preflight"),
             ("backend", "gpu"), ("num_devices", 8), ("verified", False),
             ("raw_sha256", "A" * 64), ("sample_period_seconds", 0.0),
@@ -658,6 +673,8 @@ def test_sustained_claim_rederives_multiminute_worker_evidence():
         {"minimum_warm_seconds": 0.0}, {"warm_seconds": 999.0},
         {"warm_samples_seconds": [121.0, np.nan, 123.0]},
         {"sustained_duration_passed": False}, {"acceptance_role": "fixed-work-debug"},
+        {"large_fixed_work_passed": False},
+        {"measurement_class": "debug-or-calibration"},
     )
     for mutation in variants:
         records = [dict(record) for record in _sustained_ladder((1, 2, 4))]

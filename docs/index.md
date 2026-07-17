@@ -76,7 +76,7 @@ developer_guide
 - consume SOLVAX's additive line builder after 0.8.5 is published
 - extend the passing primal and transpose gradient gates to new objectives
 - freeze and close the published pipe and square-duct fringing-field cases
-- rerun multi-minute CPU/GPU scaling only after fresh bound host admission
+- rerun exact-core CPU or idle-host GPU scaling only after fresh bound admission
 
 Useful anchors for that work include the [Samper et al. MHD validation
 ladder](https://www.scipedia.com/wd/images/b/b8/Draft_Samper_360028846_6045_art042.pdf),

@@ -20,8 +20,9 @@ The `--sustained` preset keeps 32 CPU or 96 GPU updates, one cold plus three
 warm trajectories, a 120-second warm minimum, an 1800-second ceiling, and
 checksummed per-rung admission plus continuous/postflight monitoring. Every
 rung needs a fresh source/host/device-bound 60-second admission. Promotion also
-requires exact numerics/placement, memory evidence, warm CV at most 5%, and a
-clean runtime/postflight trace. Short runs remain debug evidence.
+requires at least one million global cells and 32 million cell-updates, exact
+numerics/placement, memory evidence, warm CV at most 5%, and a clean
+runtime/postflight trace. Short or undersized runs remain debug evidence.
 
 ## Product outcome
 
@@ -213,7 +214,8 @@ Compact CPU evidence is
 plots remain ignored. The worker fingerprint must include package-owned frozen
 specifications before any cross-host comparison is accepted.
 
-GPU topology/replay is exact on 1/2 A4000s. The current 96-update calibration
+GPU topology/replay is exact on 1/2 A4000s. The recorded-source `78858f5`
+96-update calibration
 reports 258.913/159.234 seconds and 1.626x speedup, but foreign contexts block
 an authoritative timing claim. A fresh current-source admission found 12
 foreign CUDA contexts and three CPU-heavy foreign processes, so no new timing

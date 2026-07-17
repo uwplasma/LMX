@@ -163,6 +163,25 @@ _SUSTAINED_RUNTIME_IDENTITY = (
 _SUSTAINED_WARM_SECONDS = 120.0
 _SUSTAINED_WARM_SAMPLES = 3
 _SUSTAINED_WARM_CV_MAX = 0.05
+_SUSTAINED_MIN_CELLS = 1_000_000
+_SUSTAINED_MIN_CELL_UPDATES = 32_000_000
+
+
+def _large_fixed_work_evidence(record: Mapping[str, object]) -> bool:
+    """Re-derive the spatial and update floors for sustained measurements."""
+
+    try:
+        cells = int(record["nx"]) * int(record["ny"]) * int(record["nz"])
+        updates = cells * int(record["iterations"])
+        reported_cells = int(record["total_cells"])
+        reported_updates = int(record["cell_updates"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    return bool(
+        cells == reported_cells >= _SUSTAINED_MIN_CELLS
+        and updates == reported_updates >= _SUSTAINED_MIN_CELL_UPDATES
+        and record.get("large_fixed_work_passed") is True
+    )
 
 
 def _sustained_timing_evidence(record: Mapping[str, object]) -> bool:
@@ -180,6 +199,8 @@ def _sustained_timing_evidence(record: Mapping[str, object]) -> bool:
     return bool(
         record.get("benchmark_kind") == "matched_b2_smoke"
         and record.get("acceptance_role") == "sustained-candidate"
+        and record.get("measurement_class") == "sustained-multiminute"
+        and _large_fixed_work_evidence(record)
         and isinstance(contract, Mapping)
         and contract.get("cold_sample_count") == 1
         and contract.get("compile_in_cold_sample") is True

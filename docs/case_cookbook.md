@@ -118,7 +118,8 @@ JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0,1 python scripts/run_strong_scaling_wo
 
 Scaling results must use fixed global physics, include a one-device baseline,
 separate compilation from warm execution, prove shard placement, and pass
-solution-equivalence gates. See [Performance](performance.md).
+solution-equivalence gates. Defaults are debug/CI smoke checks; `--sustained`
+enables the multi-minute acceptance protocol. See [Performance](performance.md).
 
 ## Choose the right example
 
