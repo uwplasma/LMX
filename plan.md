@@ -144,12 +144,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 34 | no new module | 34 |
-| package lines | 34,084 | stay below 34,085 | 34,950 |
+| package lines | 34,038 | stay below 34,039 | 34,950 |
 | maintained-core lines | 7,614 | stay below 7,615 | 7,800 |
-| test files / lines | 30 / 20,888 | no new file; next test change must reduce lines | 30 / 20,900 |
+| test files / lines | 30 / 20,889 | no new file; next test change must reduce lines | 30 / 20,900 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 185 | no new file without retiring another owner | 186 |
-| tracked checkout | 4,598,958 bytes | stay below 4,598,959 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,601,061 bytes | stay below 4,601,062 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets come from ownership deletion and shared helpers, never unreadable
 formatting or arbitrary test merging. Recent moves delete 190 builder lines and
@@ -258,7 +258,7 @@ to explain the increase before changing worker count; obsolete wrapper-test
 deletion accounts for the lower test count.
 Merging identical magnetic-obstacle checks preserves 33 assertions, removes two
 solves and 28 lines, and cuts focused wall time 5.86 -> 4.52 seconds. The current
-suite is 20,888 lines; its next change remains a net deletion. Across the
+suite is 20,889 lines; its next change remains a net deletion. Across the
 editable-example, runner-deletion, autodiff-slimming, and steady-media-gate
 tranches, package and test lines remain net lower than the prior baseline.
 
@@ -381,6 +381,19 @@ second algebra path for speed. First refactor the existing stencil primitives
 to accept precomputed axial neighbors and compact face ownership, with a net
 source reduction or at most 100 candidate lines; only then reconsider this HLO
 topology under the unchanged numerical and performance gates.
+
+The authorized replacement is a three-stage shared-owner refactor, not another
+fast path. Stage A adds optional cell-aligned `(west, east)` injection to the
+existing gradient, limiter, stress, diffusion, and convection primitives and
+must be bitwise/JVP/VJP equivalent with at most 13 net source lines. Stage B
+vectorizes `(u,v,w,q)` gradients and shares frozen momentum setup between solve
+and defect diagnostics, deleting at least 14 net lines. Only then may Stage C
+add two compact boundary-slab gathers, with cumulative production growth at
+most 60 lines (expected about 35). Before timing, HLO must contain zero
+full-volume axial gathers, zero setup face-data permutation, at most two compact
+setup gathers below 0.28/0.35 MB, and exactly two iterative vector-plane
+permutations. The existing numerical and 25%/15%/8%/5% promotion gates remain
+unchanged.
 
 Keep the GPU diagnosis separate. Its existing trace spends only about 9% of
 device-active time in collectives and about 75% in transverse SOLVAX line work,

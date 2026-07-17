@@ -4406,52 +4406,6 @@ def build_square_duct_extruded_problem(
     return ExtrudedInductionlessProblem(case=case, profile=profile)
 
 
-def build_variable_field_duct_extruded_problem(
-    *,
-    width: float = 2.4,
-    height: float = 1.6,
-    base_bz: float = 12.0,
-    perturbation: float = 0.12,
-    ny: int = 40,
-    nz: int = 40,
-    length: float = 6.0,
-    nx_stations: int = 21,
-    entry_center: float = 1.5,
-    exit_center: float = 4.5,
-    transition_width: float = 0.35,
-) -> ExtrudedInductionlessProblem:
-    from .field_models import make_divergence_free_cross_section_field
-
-    field_fn = make_divergence_free_cross_section_field(
-        width=width,
-        height=height,
-        base_bz=base_bz,
-        perturbation=perturbation,
-    )
-    problem = build_square_duct_extruded_problem(
-        ha_peak=1.0,
-        width=width,
-        height=height,
-        ny=ny,
-        nz=nz,
-        length=length,
-        nx_stations=nx_stations,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-    )
-    case = replace(
-        problem.case,
-        name=f"variable_field_duct_bz{int(base_bz)}",
-        magnetic_field=MagneticFieldSpec(kind="analytic", fn=field_fn),
-        notes=(
-            "Rectangular extruded inductionless solve with analytic divergence-free "
-            "cross-sectional magnetic field variation."
-        ),
-    )
-    return replace(problem, case=case)
-
-
 def build_variable_field_layered_extruded_problem(
     *,
     width: float = 2.0,

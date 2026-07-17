@@ -1,5 +1,8 @@
+import json
 from pathlib import Path
 import importlib.util
+import subprocess
+import sys
 from types import SimpleNamespace
 
 import numpy as np
@@ -161,21 +164,18 @@ def test_fringing_benchmark_demo_writes_extruded_bundle_summary(
 
 
 def test_variable_field_extruded_demo_writes_summary(tmp_path: Path):
-    module = _load_example_module("variable_field_extruded_demo.py")
-    module.OUTPUT_DIR = tmp_path
-    module.NY = 16
-    module.NZ = 16
-    module.NX_STATIONS = 9
-    summary = module.run_variable_field_extruded_demo()
+    script = Path(__file__).resolve().parents[1] / "examples/variable_field_extruded_demo.py"
+    subprocess.run([sys.executable, script], cwd=tmp_path, timeout=60, check=True)
+    summary_path = next((tmp_path / "artifacts").rglob("variable_field_extruded_summary.json"))
+    summary = json.loads(summary_path.read_text())
     validation = summary["validation"]
-    assert summary["case"] == "variable_field_extruded"
+    assert summary["case"].startswith("variable_field_duct")
     assert summary["geometry_kind"] == "rect_duct"
     assert validation["finite_velocity"] is True
     assert validation["mean_velocity_change"] > 0.0
     assert validation["current_proxy_change"] > 0.0
     assert isinstance(validation["validation_pass"], bool)
-    assert (tmp_path / "extruded_overview.png").exists()
-    assert (tmp_path / "variable_field_extruded_summary.json").exists()
+    assert (summary_path.parent / "extruded_overview.png").exists()
 
 
 def test_extruded_restart_demo_is_state_exact(tmp_path: Path):

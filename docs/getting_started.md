@@ -81,7 +81,7 @@ many host devices is intended for sharding tests, not routine speedups.
 Use the bounded custom-field example:
 
 ```bash
-python examples/variable_field_extruded_demo.py --help
+python examples/variable_field_extruded_demo.py
 ```
 
 Then inspect the reusable TOML cases:

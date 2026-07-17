@@ -183,6 +183,7 @@ def test_curated_examples_use_submodules_and_linear_scripts_are_editable() -> No
             "hartmann_example.py",
             "hunt_example.py",
             "operator_verification_demo.py",
+            "variable_field_extruded_demo.py",
         }:
             assert ast.get_docstring(tree)
             assert "# Inputs:" in source and "# Run" in source and len(source.splitlines()) <= 160

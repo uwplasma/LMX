@@ -1,72 +1,117 @@
+"""Solve an extruded rectangular duct with a custom analytic magnetic field.
+
+Edit the inputs below, then run ``python examples/variable_field_extruded_demo.py``.
+Outputs are written beneath the ignored ``artifacts/`` directory.
+"""
+
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
+from lmx.cases import make_shercliff_case
+from lmx.field_models import (
+    make_divergence_free_cross_section_field,
+    sample_cross_section_field,
+)
 from lmx.fringing import (
-    build_variable_field_duct_extruded_problem,
+    ExtrudedInductionlessProblem,
+    smooth_fringing_profile,
     solve_extruded_inductionless,
     validate_variable_field_extruded_solution,
 )
-from lmx.plotting import (
-    write_cross_section_field_plots,
-    write_extruded_overview_plots,
-)
-from lmx.field_models import sample_cross_section_field
+from lmx.plotting import write_cross_section_field_plots, write_extruded_overview_plots
+from lmx.specs import CaseSpec, MagneticFieldSpec
 
 
+# Inputs: geometry, field variation, axial profile, solver effort, and outputs.
 OUTPUT_DIR = Path("artifacts/examples/variable_field_extruded")
-WIDTH = 2.4
-HEIGHT = 1.6
+WIDTH, HEIGHT, LENGTH = 2.4, 1.6, 6.0
+NY = NZ = 16  # Increase together to refine the rectangular cross-section.
+NX_STATIONS = 9
 BASE_BZ = 12.0
-PERTURBATION = 0.12
-NY = 32
-NZ = 32
-NX_STATIONS = 15
+PERTURBATION = 0.12  # Set to zero for a cross-sectionally uniform field.
+ENTRY_CENTER, EXIT_CENTER = 1.5, 4.5
+TRANSITION_WIDTH = 0.35
+MAX_STEPS = 80
+POTENTIAL_ITERATIONS = 80
+COUPLING_ITERATIONS = 8
+STEADY_TOLERANCE = 1.0e-6
+FIELD_PLOT_POINTS = 61
 
 
-def run_variable_field_extruded_demo() -> dict[str, object]:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    problem = build_variable_field_duct_extruded_problem(
-        width=WIDTH,
-        height=HEIGHT,
-        base_bz=BASE_BZ,
-        perturbation=PERTURBATION,
-        ny=NY,
-        nz=NZ,
-        nx_stations=NX_STATIONS,
-    )
-    solution = solve_extruded_inductionless(problem)
-    field_fn = problem.case.magnetic_field.fn
-    assert field_fn is not None
-    y, z, field = sample_cross_section_field(
-        field_fn, width=WIDTH, height=HEIGHT, ny=81, nz=81
-    )
-    field_plots = write_cross_section_field_plots(
-        y=y,
-        z=z,
-        field=field,
-        out_dir=OUTPUT_DIR,
-        title="Analytic cross-sectional magnetic field used in the extruded solve",
-    )
-    extruded_plots = write_extruded_overview_plots(
-        solution,
-        OUTPUT_DIR,
-        case_title="Variable-field extruded inductionless duct",
-    )
-    validation = validate_variable_field_extruded_solution(solution)
-    summary = {
-        "case": "variable_field_extruded",
-        "geometry_kind": solution.bundle.geometry_kind,
-        "field_plots": [path.name for path in field_plots],
-        "extruded_plots": [path.name for path in extruded_plots],
-        "validation": validation,
-    }
-    (OUTPUT_DIR / "variable_field_extruded_summary.json").write_text(
-        json.dumps(summary, indent=2) + "\n"
-    )
-    return summary
+# Define the imposed vector field explicitly; this callable is evaluated on the mesh.
+field_function = make_divergence_free_cross_section_field(
+    width=WIDTH,
+    height=HEIGHT,
+    base_bz=BASE_BZ,
+    perturbation=PERTURBATION,
+)
 
+# Compose a public CaseSpec so geometry, numerics, and field remain easy to inspect.
+case: CaseSpec = make_shercliff_case(
+    ha=1.0, width=WIDTH, height=HEIGHT, ny=NY, nz=NZ, output_dir=str(OUTPUT_DIR)
+)
+case = replace(
+    case,
+    name=f"variable_field_duct_bz{int(BASE_BZ)}",
+    geometry=replace(case.geometry, length=LENGTH, nx=NX_STATIONS),
+    magnetic_field=MagneticFieldSpec(kind="analytic", fn=field_function),
+    time_stepper=replace(
+        case.time_stepper,
+        max_steps=MAX_STEPS,
+        potential_iterations=POTENTIAL_ITERATIONS,
+        steady_tolerance=STEADY_TOLERANCE,
+    ),
+    solver=replace(
+        case.solver,
+        kind="extruded_inductionless",
+        coupling_iterations=COUPLING_ITERATIONS,
+        coupling_tolerance=1.0e-7,
+    ),
+    notes="Extruded rectangular duct with an analytic divergence-free imposed field.",
+)
 
-if __name__ == "__main__":
-    run_variable_field_extruded_demo()
+# Run: add the editable axial envelope, then form and solve the extruded problem.
+profile = smooth_fringing_profile(
+    length=LENGTH,
+    nx=NX_STATIONS,
+    entry_center=ENTRY_CENTER,
+    exit_center=EXIT_CENTER,
+    transition_width=TRANSITION_WIDTH,
+    axis="z",
+)
+problem = ExtrudedInductionlessProblem(case=case, profile=profile)
+solution = solve_extruded_inductionless(problem)
+
+# Sample the exact imposed field and save both field and flow diagnostics.
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+y, z, sampled_field = sample_cross_section_field(
+    field_function,
+    width=WIDTH,
+    height=HEIGHT,
+    ny=FIELD_PLOT_POINTS,
+    nz=FIELD_PLOT_POINTS,
+)
+field_plots = write_cross_section_field_plots(
+    y=y,
+    z=z,
+    field=sampled_field,
+    out_dir=OUTPUT_DIR,
+    title="Analytic cross-sectional field used by the solver",
+)
+flow_plots = write_extruded_overview_plots(
+    solution, OUTPUT_DIR, case_title="Variable-field extruded duct"
+)
+validation = validate_variable_field_extruded_solution(solution)
+summary = {
+    "case": case.name,
+    "geometry_kind": solution.bundle.geometry_kind,
+    "field_plots": [path.name for path in field_plots],
+    "flow_plots": [path.name for path in flow_plots],
+    "validation": validation,
+}
+summary_path = OUTPUT_DIR / "variable_field_extruded_summary.json"
+summary_path.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+print(json.dumps(summary, indent=2))

@@ -85,7 +85,7 @@ Use atomic partial checkpoints for long extruded runs.
 ## Custom imposed field
 
 ```bash
-python examples/variable_field_extruded_demo.py --help
+python examples/variable_field_extruded_demo.py
 lmx examples/cases/fringing/fringing_tabulated_case.toml
 ```
 

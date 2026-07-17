@@ -44,8 +44,11 @@ vortices.
 externally sampled imposed fields. The compact custom-field workflow is:
 
 ```bash
-python examples/variable_field_extruded_demo.py --help
+python examples/variable_field_extruded_demo.py
 ```
+
+Edit the field callable, duct geometry, axial envelope, and solver controls at
+the top of the file; the complete `CaseSpec` and problem composition are shown.
 
 Tabulated field input must provide monotone coordinates, component arrays with
 matching shapes, explicit units, finite values, and adequate coverage of the
