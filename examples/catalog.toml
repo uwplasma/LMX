@@ -39,7 +39,7 @@ docs = "docs/numerics.md"
 [[example]]
 id = "freemhd-validation"
 path = "examples/freemhd_closed_channel_observable_parity.py"
-command = "python -m examples.freemhd_closed_channel_observable_parity --reference-root /path/to/ClosedChannel"
+command = "python examples/freemhd_closed_channel_observable_parity.py"
 status = "external-data"
 runtime = "external"
 outputs = ["observable comparison", "plots"]

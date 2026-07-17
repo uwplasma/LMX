@@ -147,12 +147,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 34 | no new module | 34 |
-| package lines | 33,573 | do not exceed 33,573 in the FreeMHD deletion tranche | 34,950 |
+| package lines | 33,434 | do not exceed 33,434 in the next source tranche | 34,950 |
 | maintained-core lines | 7,614 | stay below 7,615 | 7,800 |
-| test files / lines | 30 / 20,662 | no new file; the next tranche must be a net deletion | 30 / 20,900 |
+| test files / lines | 30 / 20,445 | no new file; the next tranche must be a net deletion | 30 / 20,900 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 185 | no new file without retiring another owner | 186 |
-| tracked checkout | 4,577,164 bytes | stay below 4,577,165 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,566,798 bytes | stay below 4,566,799 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets come from ownership deletion and shared helpers, never unreadable
 formatting or arbitrary test merging. Recent moves delete 190 builder lines and
@@ -194,23 +194,18 @@ its tranche removes 240 tracked lines and 112 mock-test lines. The example-only
 writer are deleted. The pipe comparison is now a 160-line explicit, editable
 research-stage workflow; its tranche deletes 285 tracked lines and the package
 reference-data wrappers rather than hiding geometry and CSV handling behind a
-one-use API. The repository contract currently covers eight of ten Python
-examples. The remaining offenders are the 625-line FreeMHD observable workflow
-and the 1,238-line scaling driver; both still use parsers, `main()` guards, and
-opaque workflow owners.
-
-Refactor FreeMHD next in two reviewable commits. First replace the example and
-one Hunt physics-test call to the 149-line
-`showcase.solve_closed_channel_benchmark` with explicit public case, mesh,
-analytic-seed, solve, and validation construction; then delete that wrapper,
-its six dedicated tests, and its fixture. Preserve the accepted JSON schema and
-independent physics gates. Second make the example a top-to-bottom script with
-editable path, mesh, material, solver, and output inputs; keep only documented
-evidence helpers, execute Shercliff and Hunt visibly, and replace import/mutate
-automation with environment-backed execution plus reading the known summary.
-The exact evidence schema makes a safe 360--430-line target more credible than
-an arbitrary 160-line cap, while the combined tranche should still delete about
-350--500 tracked lines. Expand the AST contract to every Python example.
+one-use API. The repository contract now covers nine of ten Python examples.
+The FreeMHD workflow is a documented top-to-bottom script with editable path,
+geometry, material, field, mesh, and solver inputs. It explicitly builds and
+solves Shercliff and Hunt, has no parser, `main()` or guard, and scheduled
+parity uses environment-backed execution plus the known JSON artifact. Its
+two-commit tranche removes the 149-line one-use source wrapper, dedicated mock
+fixtures, and import/mutate automation for 269 net tracked lines while
+preserving the evidence schema and optional real-physics gate. The 700-line
+research-evidence script remains above the preferred 360--430-line target;
+reduce it only by finding genuinely reusable validation ownership or deleting
+redundant evidence, not by hiding case construction or compressing readable
+code. The only remaining Python offender is the 1,238-line scaling driver.
 
 The 1,238-line
 strong-scaling program is operational orchestration, not a pedagogical example:
@@ -236,8 +231,9 @@ test lines; `fabca0a` folded the one-use square-duct helper for another 28
 package lines. Finally `05e754a` transferred the duplicate additive line
 preconditioner to released SOLVAX, deleting 35 package and 30 test lines while
 retaining bitwise primal/JIT/JVP/VJP, coefficient-gradient, and four-shard
-placement gates. The clean current tree is 33,573 package lines,
-`fringing.py` is 7,823 lines, and tests are 20,662 lines. Keep 34 modules and add
+placement gates. After phase annotations and the FreeMHD ownership deletion,
+the current tree is 33,434 package lines, `fringing.py` is 7,838 lines, and
+tests are 20,445 lines. Keep 34 modules and add
 no file. Split
 `_solve_extruded_projection` into same-module pipe and duct owners only after
 the FreeMHD deletion tranche establishes the next smaller ownership surface.
@@ -293,11 +289,11 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
-The current complete gate after `05e754a` passes 854 tests with 5 expected
-skips and 95.37% combined coverage in 142.6 seconds. It remains below both the
-300-second engineering target and 600-second hard limit. Keep the six-worker
-setting unless a fresh slow-node profile finds a node above 45 seconds or the
-gate materially regresses; example/mock deletion and the new axial-injection
+The current complete gate after the FreeMHD linearization passes 846 tests with
+5 expected skips and 95.37% combined coverage in 160.4 seconds. It remains
+below both the 300-second engineering target and 600-second hard limit. Keep
+the six-worker setting unless a fresh slow-node profile finds a node above 45
+seconds or the gate materially regresses; example/mock deletion and the new axial-injection
 gate account for the changed test count.
 Merging identical magnetic-obstacle checks preserves 33 assertions, removes two
 solves and 28 lines, and cuts focused wall time 5.86 -> 4.52 seconds. The current
@@ -378,14 +374,36 @@ full scalar-field gathers. Pressure PCG uses only 5,120-byte axial-mean gathers;
 the electric coarse modal gather is 173,056 bytes. Insufficient duration and
 axial size are ruled out, and the communication-defect gate passes.
 
-Profile the accepted Stage-B implementation phase by phase before changing its
-topology again. Add zero-numerics annotations around LMX momentum setup and
-GMRES, projection PCG, electric PCG, reconstruction, and Anderson work; annotate
-SOLVAX matvec, preconditioner, Arnoldi/inner-product reductions, line solves,
-axial mean, and coarse correction. Capture one non-truncated four-device trace
-with phase barriers plus an ordinary asynchronous wall-time control. Report
-union time and per-iteration time rather than summed concurrent device activity,
-and require exact profile/control signatures and linear histories.
+The accepted Stage-B implementation is now profiled phase by phase before any
+new topology change. Zero-numerics annotations cover LMX momentum, projection,
+electric, reconstruction, defect, and Anderson work plus SOLVAX matvec,
+preconditioner, reductions, and line solves. The non-truncated four-device
+trace and ordinary asynchronous controls have exact signatures, linear
+histories, restart, and placement. Report union time and per-iteration time,
+never summed concurrent device activity.
+
+The zero-numerics annotations are now present in LMX and released on SOLVAX
+main at `bb9ee81`. Raw XPlane attribution for the current `128 x 35 x 35`,
+four-device, two-update control gives projection 46.23%, electric 36.04%,
+momentum 13.15%, defect 4.21%, and reconstruction plus EMF 0.36% of selected
+module time. Projection averages 231.60 ms, about 3.5 times momentum. Its two
+151/155-iteration solves each perform one all-reduce, one preconditioner
+all-gather, and two neighbor exchanges per PCG iteration. Device-zero
+communication occupies 19.8/20.6% of projection wall, while the additive
+tridiagonal line-solve scope occupies 54.5/54.1%. The bottleneck is therefore
+both local line work and fixed synchronization, not an undersized momentum
+problem alone. The profiled trace has 28.9% overhead relative to the best
+ordinary warm sample, so these shares establish ownership but do not replace
+throughput measurements.
+
+Before another algorithm change, add opt-in synchronized phase timers to the
+scaling worker only. Block one representative result after momentum,
+projection, electric, and defect, record phase wall and iteration counts, and
+retain an unbarriered control. Run the same fixed case at 1/2/4 devices; do not
+launch a sustained ladder. A successor should target the per-iteration
+preconditioner all-gather or a distributed/transversely owned line solve, then
+reduce PCG iterations or synchronization. Larger transverse workloads may
+improve compute/communication ratio but cannot remove the measured fixed costs.
 
 The existing evidence already narrows ownership: momentum is only 0.084 seconds
 of the captured active slice versus 0.407 seconds for projection, and the trace

@@ -75,7 +75,7 @@
       "tests": [
         "tests/test_benchmarks.py::test_compact_freemhd_evidence_is_portable_and_deterministic",
         "tests/test_physics.py::test_small_shercliff_solution_matches_bundled_reference_profiles",
-        "tests/test_example_runner.py::test_freemhd_closed_channel_observable_parity_writes_summary"
+        "tests/test_freemhd.py::test_parity_suite_gates_profile_comparison_on_audited_inputs"
       ],
       "tier": "A",
       "title": "Fully developed Shercliff duct and FreeMHD parity",
@@ -116,7 +116,7 @@
       "tests": [
         "tests/test_benchmarks.py::test_compact_freemhd_evidence_is_portable_and_deterministic",
         "tests/test_physics.py::test_small_hunt_solution_matches_bundled_reference_profiles",
-        "tests/test_example_runner.py::test_freemhd_closed_channel_observable_parity_writes_summary"
+        "tests/test_freemhd.py::test_parity_suite_gates_profile_comparison_on_audited_inputs"
       ],
       "tier": "A",
       "title": "Fully developed Hunt duct and FreeMHD parity",

@@ -1584,16 +1584,24 @@ def run_suite(
             )
 
     if has_processed_reference:
-        from examples import freemhd_closed_channel_observable_parity as observable
-
-        observable.OUTPUT_DIR = output / "closed_channel_observable_parity"
-        observable.REFERENCE_ROOT = processed_root
-        observable_summary = observable.run_freemhd_closed_channel_observable_parity()
+        observable_output = output / "closed_channel_observable_parity"
+        observable_script = Path(__file__).resolve().parents[1] / "examples" / "freemhd_closed_channel_observable_parity.py"
+        subprocess.run(
+            [sys.executable, str(observable_script)],
+            check=True,
+            env={
+                **os.environ,
+                "LMX_FREEMHD_PROCESSED_ROOT": str(processed_root),
+                "LMX_FREEMHD_OBSERVABLE_OUTPUT": str(observable_output),
+            },
+        )
+        observable_summary_path = observable_output / "freemhd_closed_channel_observable_parity_summary.json"
+        observable_summary = json.loads(observable_summary_path.read_text())
         summary["runs"]["closed_channel_observable_parity"] = observable_summary
         gate = observable_summary.get("observable_gate")
         if isinstance(gate, dict):
             observable_gate = gate
-        summary["parity_output"] = str(observable.OUTPUT_DIR / "freemhd_closed_channel_observable_parity_summary.json")
+        summary["parity_output"] = str(observable_summary_path)
         records = list(observable_summary.get("records", []))
         y_value = _max_metric(records, ("observables", None, "y", "l2_error"))
         z_value = _max_metric(records, ("observables", None, "z", "l2_error"))

@@ -190,18 +190,21 @@ def test_curated_examples_use_submodules_and_linear_scripts_are_editable() -> No
         assert root_imports <= stable, (
             f"{path} imports legacy root APIs: {root_imports - stable}"
         )
-        if path.name in {
-            "autodiff_design_demo.py",
-            "extruded_restart_demo.py",
-            "fringing_benchmark_demo.py",
-            "hartmann_example.py",
-            "hunt_example.py",
-            "operator_verification_demo.py",
-            "pipe_reference_comparison_demo.py",
-            "variable_field_extruded_demo.py",
-        }:
+        linear_limits = {
+            "autodiff_design_demo.py": 160,
+            "extruded_restart_demo.py": 160,
+            "freemhd_closed_channel_observable_parity.py": 700,
+            "fringing_benchmark_demo.py": 160,
+            "hartmann_example.py": 160,
+            "hunt_example.py": 160,
+            "operator_verification_demo.py": 160,
+            "pipe_reference_comparison_demo.py": 160,
+            "variable_field_extruded_demo.py": 160,
+        }
+        if path.name in linear_limits:
             assert ast.get_docstring(tree)
-            assert "# Inputs:" in source and "# Run" in source and len(source.splitlines()) <= 160
+            assert "# Inputs:" in source and "# Run" in source
+            assert len(source.splitlines()) <= linear_limits[path.name]
             functions = (node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef))
             assert all(node.name != "main" and ast.get_docstring(node) for node in functions)
             assert "argparse" not in source and "__name__" not in source

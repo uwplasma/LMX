@@ -1329,8 +1329,7 @@ def test_parity_suite_gates_profile_comparison_on_audited_inputs(
     processed = tmp_path / ("processed" if matched else "missing")
     if matched:
         processed.mkdir()
-        observable = SimpleNamespace(OUTPUT_DIR=tmp_path / "unset", REFERENCE_ROOT=tmp_path / "unset")
-        observable.run_freemhd_closed_channel_observable_parity = lambda: {
+        observable_summary = {
             "records": [
                 {
                     "observables": {
@@ -1341,7 +1340,18 @@ def test_parity_suite_gates_profile_comparison_on_audited_inputs(
             ],
             "observable_gate": {"research_grade_validation_pass": True},
         }
-        monkeypatch.setattr(examples, "freemhd_closed_channel_observable_parity", observable, raising=False)
+
+        def run_observable(command, *, env, **_kwargs):
+            assert command[-1].endswith("examples/freemhd_closed_channel_observable_parity.py")
+            assert env["LMX_FREEMHD_PROCESSED_ROOT"] == str(processed)
+            observable_output = Path(env["LMX_FREEMHD_OBSERVABLE_OUTPUT"])
+            observable_output.mkdir(parents=True)
+            (observable_output / "freemhd_closed_channel_observable_parity_summary.json").write_text(
+                json.dumps(observable_summary)
+            )
+            return subprocess.CompletedProcess(command, 0)
+
+        monkeypatch.setattr(run_freemhd_parity_suite.subprocess, "run", run_observable)
     monkeypatch.setattr(
         run_freemhd_parity_suite,
         "audit_freemhd_case_against_spec",

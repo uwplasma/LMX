@@ -43,12 +43,13 @@ OpenFOAM logs, VTK, reconstructed fields, and raw time histories remain in the
 external workspace. Only compact, checksummed acceptance records belong in
 LMX; large reusable artifacts belong in a versioned release.
 
-To compare processed profiles (see `--help` for required CSVs):
+To compare processed profiles, edit the input block in the example or provide
+environment-backed paths for scheduled validation:
 
 ```bash
-.venv/bin/python -m examples.freemhd_closed_channel_observable_parity \
-  --reference-root /path/to/ClosedChannel \
-  --output artifacts/examples/freemhd_closed_channel_observable_parity
+LMX_FREEMHD_PROCESSED_ROOT=/path/to/ClosedChannel \
+LMX_FREEMHD_OBSERVABLE_OUTPUT=artifacts/examples/freemhd_closed_channel_observable_parity \
+  .venv/bin/python examples/freemhd_closed_channel_observable_parity.py
 ```
 
 The frozen Benchmark A aggregate is
