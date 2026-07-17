@@ -171,8 +171,8 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
-The current gate passes 863 tests with 8 expected skips and 95.41% combined
-coverage in 122.8 seconds. Shared centerline validation removes 20 source lines;
+The current gate passes 863 tests with 8 expected skips and 95.40% combined
+coverage in 121.5 seconds. Shared centerline validation removes 20 source lines;
 the layered-flow consolidation removes 17 test lines and one redundant
 6.894-second solve while retaining finite-field, current, and physics gates.
 The next test change remains a net deletion.
@@ -217,10 +217,11 @@ specifications before any cross-host comparison is accepted.
 GPU topology/replay is exact on 1/2 A4000s. The recorded-source `78858f5`
 96-update calibration
 reports 258.913/159.234 seconds and 1.626x speedup, but foreign contexts block
-an authoritative timing claim. A fresh current-source admission found 12
-foreign CUDA contexts and three CPU-heavy foreign processes, so no new timing
-was launched. Preserve the calibrated `256 x 67 x 67`, 96-update workload and
-rerun its one-cold-plus-three-warm ladder only after clean admission.
+an authoritative timing claim. The latest audit found five foreign contexts on
+each GPU, including a CPU-heavy VMEC-JAX process, so no new timing was launched.
+A dedicated JAX/CUDA 0.6.2 and SOLVAX 0.8.4 benchmark environment now passes
+the two-device import check. Preserve the calibrated `256 x 67 x 67`, 96-update
+workload and rerun its one-cold-plus-three-warm ladder only after clean admission.
 
 Every current calibration fails closed on physical repeat signatures, linear
 status/history, placement, restart, conservation, and device equivalence.

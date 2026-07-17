@@ -1,7 +1,7 @@
 {
-  "schema_version": 34,
+  "schema_version": 35,
   "date": "2026-07-17",
-  "commit": "0278fe66c09373d435e6e801b5c01bd02fa0629f",
+  "commit": "a4d42bf30ebff9f6f4fa3f3a559b710333198e1b",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -20,23 +20,23 @@
   },
   "result": {
     "test_files": 30,
-    "test_lines": 20988,
+    "test_lines": 21005,
     "passed": 863,
     "skipped": 8,
-    "pytest_seconds": 122.497,
-    "gate_seconds": 122.8,
-    "covered_lines": 13955,
-    "total_lines": 14359,
+    "pytest_seconds": 121.20,
+    "gate_seconds": 121.5,
+    "covered_lines": 13964,
+    "total_lines": 14370,
     "covered_branches": 2552,
     "total_branches": 2942,
-    "combined_line_branch_coverage_percent": 95.41066990347379,
+    "combined_line_branch_coverage_percent": 95.40203327171903,
     "passed_gate": true
   },
   "artifacts": {
-    "coverage_xml_sha256": "e8a5309e18d001c4e828bbcfc6daa46ab6f2d28bcd069a3811eb4de5fe352075",
-    "junit_xml_sha256": "4c06e9e09864608a797ae3202c7fcfe8f00f1fba19cb0efabc258471916e78b2"
+    "coverage_xml_sha256": "0f1660946b7de2e6156efa9ccb86142d894b731145737779df7db746ca4bb538",
+    "junit_xml_sha256": null
   },
-  "duration_note": "Durations come from the current six-worker JUnit record; concurrent-node times identify CI pressure but are not isolated timings.",
+  "duration_note": "Current wrapper and pytest durations are exact; the wrapper emitted coverage XML but no JUnit. Slowest-node timings below remain the prior comparable six-worker JUnit evidence.",
   "slowest_tests": [
     {"seconds": 32.712, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
     {"seconds": 23.620, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
@@ -50,12 +50,12 @@
     {"seconds": 11.468, "nodeid": "tests.test_fringing::test_solve_extruded_inductionless_supports_layered_analytic_variable_field"}
   ],
   "comparison": {
-    "previous_gate_seconds": 122.6,
-    "previous_pytest_seconds": 122.299,
-    "wall_time_change_percent": 0.16313213703100793,
-    "pytest_seconds_change_percent": 0.1618982984325168,
-    "budget_fraction": 0.20466666666666666,
-    "engineering_target_fraction": 0.4093333333333333,
+    "previous_gate_seconds": 122.8,
+    "previous_pytest_seconds": 122.497,
+    "wall_time_change_percent": -1.058631921824102,
+    "pytest_seconds_change_percent": -1.0588014400352637,
+    "budget_fraction": 0.2025,
+    "engineering_target_fraction": 0.405,
     "latest_slimming": {
       "source_commit_before": "7314b8ae6f3cff7b5b1012f700b8daf667dfa946",
       "source_commit_after": "0278fe66c09373d435e6e801b5c01bd02fa0629f",
@@ -71,7 +71,7 @@
       "removed_nodeid": "tests.test_fringing::test_solve_extruded_inductionless_projection_returns_finite_layered_bundle",
       "removed_node_seconds": 6.894
     },
-    "interpretation": "Shared centerline validation removes 20 source lines, while layered-flow validation consolidation removes 17 test lines and one redundant 6.894-second test. The clean gate changes by 0.16% relative to the prior run and remains at 20% of the hard budget."
+    "interpretation": "Large-work scaling enforcement adds 21 package and 17 test lines while closing an acceptance gap. The clean portable gate improves by 1.06% and remains at 20% of the hard budget."
   },
   "scheduling_probe": {
     "evidence_scope": "historical",
@@ -85,12 +85,12 @@
     "decision": "retain six workers; the 3.4% change is below the promotion threshold, and module grouping would imbalance fringing and autodiff owners"
   },
   "architecture": {
-    "source_commit": "0278fe66c09373d435e6e801b5c01bd02fa0629f",
+    "source_commit": "a4d42bf30ebff9f6f4fa3f3a559b710333198e1b",
     "package_modules": 35,
-    "package_lines": 34425,
+    "package_lines": 34446,
     "maintained_core_lines": 7869,
     "maintenance_scripts": 13,
-    "tracked_checkout_bytes": 4549932,
+    "tracked_checkout_bytes": 4569781,
     "stable_root_exports": 30,
     "curated_examples": 11
   },
