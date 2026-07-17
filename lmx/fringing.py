@@ -6811,6 +6811,11 @@ def _solve_extruded_projection(
             return (*components,
                 current_inlet + relaxation * (mapped_inlet - current_inlet))
 
+        momentum_solve = jax.named_call(momentum_solve, name="lmx.b2.momentum")
+        momentum_defect = jax.named_call(
+            momentum_defect, name="lmx.b2.momentum_defect"
+        )
+
         if field_sharding is not None:  # pragma: no cover - hardware gate
             initialize_flux = jax.jit(initialize_flux,
                 in_shardings=(field_sharding,) * 4,
@@ -7038,6 +7043,16 @@ def _solve_extruded_projection(
                 mix(flux0, flux1),
                 mix(inlet0, inlet1),
             )
+
+        mixed_boundary_projection = jax.named_call(
+            mixed_boundary_projection, name="lmx.b2.projection"
+        )
+        electric_solve = jax.named_call(electric_solve, name="lmx.b2.electric")
+        emf_operator = jax.named_call(emf_operator, name="lmx.b2.emf")
+        reconstruct_electric = jax.named_call(
+            reconstruct_electric, name="lmx.b2.reconstruction"
+        )
+        mix_anderson = jax.named_call(mix_anderson, name="lmx.b2.anderson")
 
         if field_sharding is not None:  # pragma: no cover - hardware gate
             axial_sharding = NamedSharding(field_sharding.mesh, P("x"))
