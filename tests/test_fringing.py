@@ -33,7 +33,6 @@ from lmx.fringing import (
     build_magnetic_obstacle_rect_extruded_problem,
     build_pipe_ogrid_extruded_problem,
     build_square_duct_extruded_problem,
-    build_square_duct_fringing_benchmark,
     build_variable_field_bent_pipe_extruded_problem,
     build_variable_field_layered_extruded_problem,
     build_variable_field_pipe_ogrid_extruded_problem,
@@ -66,14 +65,10 @@ from lmx.fringing import (
     _face_flux_pressure_projection_duct,
     _face_flux_pressure_projection_pipe,
     _fixed_flow_face_flux_projection_pipe,
-    clone_case_with_field,
     magnetic_obstacle_literature_reference_cases,
-    run_extruded_inductionless_slice,
-    run_fringing_station_sweep,
     solve_extruded_inductionless,
     smooth_fringing_profile,
     validate_bent_pipe_low_de_baseline,
-    validate_extruded_inductionless_solution,
     validate_magnetic_obstacle_baseline,
     validate_magnetic_obstacle_external_readiness,
     validate_magnetic_obstacle_literature_slice,
@@ -1814,140 +1809,6 @@ def test_fringing_profile_and_constant_field_builders():
             axis="bad",
         )
 
-    base_case, _ = build_square_duct_fringing_benchmark(nx_stations=5, ny=8, nz=8)
-    shifted = clone_case_with_field(base_case, axis="y", magnitude=3.0, suffix="probe")
-    assert shifted.name.endswith("probe")
-    assert shifted.magnetic_field.value == (0.0, 3.0, 0.0)
-    assert clone_case_with_field(
-        base_case, axis="x", magnitude=2.0
-    ).magnetic_field.value == (2.0, 0.0, 0.0)
-    with pytest.raises(ValueError, match="Unsupported magnetic axis"):
-        clone_case_with_field(base_case, axis="bad", magnitude=1.0)
-
-
-def test_run_fringing_station_sweep_chains_state_and_requires_constant_field(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    base_case, profile = build_square_duct_fringing_benchmark(nx_stations=3, ny=8, nz=8)
-    calls: list[tuple[str, object]] = []
-
-    class _State:
-        def __init__(self, value: float):
-            self.time = 0.0
-            self.residual = value
-
-    class _Solution:
-        def __init__(self, value: float):
-            self.state = _State(value)
-
-    def fake_solver(case, initial_state=None):
-        calls.append((case.name, initial_state))
-        return _Solution(float(len(calls)))
-
-    monkeypatch.setattr(
-        "lmx.fringing.validation_summary",
-        lambda solution, case_name, ha=None: {
-            "u_max": 0.1,
-            "mean_velocity": 0.2,
-            "volumetric_flow_rate": 0.3,
-            "current_scaled_pressure_proxy": 0.4,
-        },
-    )
-
-    history = run_fringing_station_sweep(base_case, profile, solver=fake_solver)
-
-    assert len(history) == 3
-    assert calls[0][1] is None
-    assert calls[1][1] is not None
-    assert history[-1]["current_scaled_pressure_proxy"] == pytest.approx(0.4)
-
-    bad_case = replace(
-        base_case,
-        magnetic_field=replace(
-            base_case.magnetic_field,
-            kind="analytic",
-            fn=lambda y, z: jnp.zeros(y.shape + (3,)),
-        ),
-    )
-    with pytest.raises(ValueError, match="constant-field"):
-        run_fringing_station_sweep(bad_case, profile)
-
-
-def test_run_extruded_inductionless_slice_stacks_station_fields():
-    base_case, profile = build_square_duct_fringing_benchmark(nx_stations=4, ny=6, nz=6)
-    shape = (base_case.geometry.ny, base_case.geometry.nz)
-    y_centers = jnp.linspace(-1.0, 1.0, shape[0])
-    z_centers = jnp.linspace(-1.0, 1.0, shape[1])
-
-    class _State:
-        def __init__(self, value: float):
-            self.u = jnp.full(shape, value)
-            self.phi = jnp.full(shape, 0.1 * value)
-            self.jy = jnp.zeros(shape)
-            self.jz = jnp.zeros(shape)
-            self.lorentz_x = jnp.full(shape, 0.01 * value)
-            self.time = 0.0
-            self.residual = value
-
-    class _Diagnostics:
-        def __init__(self, value: float):
-            self.volumetric_flow_rate_history = jnp.asarray([value])
-            self.mean_velocity_history = jnp.asarray([0.5 * value])
-            self.current_scaled_pressure_proxy_history = jnp.asarray([0.25 * value])
-            self.charge_balance_residual_history = jnp.asarray([1.0e-6 * value])
-
-    class _Solution:
-        def __init__(self, value: float):
-            self.mesh = type(
-                "Mesh", (), {"y_centers": y_centers, "z_centers": z_centers}
-            )()
-            self.state = _State(value)
-            self.diagnostics = _Diagnostics(value)
-
-    call_count = {"value": 0}
-
-    def fake_solver(case, initial_state=None):
-        call_count["value"] += 1
-        return _Solution(float(call_count["value"]))
-
-    bundle = run_extruded_inductionless_slice(base_case, profile, solver=fake_solver)
-
-    assert bundle.u.shape == (4, 6, 6)
-    assert bundle.phi.shape == (4, 6, 6)
-    assert bundle.v.shape == (4, 6, 6)
-    assert bundle.w.shape == (4, 6, 6)
-    assert bundle.p.shape == (4, 6, 6)
-    assert bundle.jx.shape == (4, 6, 6)
-    assert bundle.x.shape == (4,)
-    assert bundle.y.shape == (6,)
-    assert bundle.z.shape == (6,)
-    assert bundle.geometry_kind == base_case.geometry.kind
-    assert bundle.solver_kind == base_case.solver.kind
-    assert jnp.isfinite(bundle.u).all()
-    assert jnp.isfinite(bundle.axial_current).all()
-    assert jnp.isfinite(bundle.wall_current_leakage).all()
-    assert jnp.isfinite(bundle.charge_balance_residual).all()
-
-
-def test_run_extruded_inductionless_slice_rejects_invalid_inputs():
-    base_case, profile = build_square_duct_fringing_benchmark(nx_stations=3, ny=6, nz=6)
-    bad_case = replace(
-        base_case, geometry=replace(base_case.geometry, kind="pipe_ogrid")
-    )
-    with pytest.raises(ValueError, match="rectangular and layered ducts"):
-        run_extruded_inductionless_slice(bad_case, profile)
-    bad_field_case = replace(
-        base_case,
-        magnetic_field=replace(
-            base_case.magnetic_field,
-            kind="analytic",
-            fn=lambda y, z: jnp.zeros(y.shape + (3,)),
-        ),
-    )
-    with pytest.raises(ValueError, match="constant-field"):
-        run_extruded_inductionless_slice(bad_field_case, profile)
-
-
 @pytest.mark.parametrize(
     ("builder", "kwargs", "geometry_kind"),
     (
@@ -2007,61 +1868,6 @@ def test_cross_section_mesh_supports_pipe_ogrid_geometry():
     )
     mesh = _cross_section_mesh(pipe_case)
     assert mesh.geometry == "pipe_ogrid"
-
-
-def test_validate_extruded_inductionless_solution_reports_metrics():
-    base_case, profile = build_square_duct_fringing_benchmark(nx_stations=4, ny=6, nz=6)
-    bundle = run_extruded_inductionless_slice(
-        base_case,
-        profile,
-        solver=lambda case, initial_state=None: type(
-            "Solution",
-            (),
-            {
-                "mesh": type(
-                    "Mesh",
-                    (),
-                    {
-                        "y_centers": jnp.linspace(-1.0, 1.0, 6),
-                        "z_centers": jnp.linspace(-1.0, 1.0, 6),
-                    },
-                )(),
-                "state": type(
-                    "State",
-                    (),
-                    {
-                        "u": jnp.ones((6, 6)),
-                        "phi": jnp.zeros((6, 6)),
-                        "jy": jnp.zeros((6, 6)),
-                        "jz": jnp.zeros((6, 6)),
-                        "lorentz_x": jnp.zeros((6, 6)),
-                        "time": 0.0,
-                        "residual": 1.0e-6,
-                    },
-                )(),
-                "diagnostics": type(
-                    "Diagnostics",
-                    (),
-                    {
-                        "volumetric_flow_rate_history": jnp.asarray([1.0]),
-                        "mean_velocity_history": jnp.asarray([0.5]),
-                        "current_scaled_pressure_proxy_history": jnp.asarray([0.2]),
-                        "charge_balance_residual_history": jnp.asarray([1.0e-7]),
-                    },
-                )(),
-            },
-        )(),
-    )
-
-    report = validate_extruded_inductionless_solution(bundle)
-    assert report.station_count == 4
-    assert report.max_charge_balance_residual >= 0.0
-    assert report.axial_current_span >= 0.0
-    assert report.peak_velocity_span >= 0.0
-    assert report.pressure_span_range >= 0.0
-    assert report.max_wall_current_leakage >= 0.0
-    assert report.net_boundary_current_residual >= 0.0
-    assert jnp.isfinite(report.field_mean_velocity_correlation)
 
 
 def test_solve_extruded_inductionless_wraps_history_bundle_and_validation(

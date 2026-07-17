@@ -35,3 +35,9 @@ and its adapter-only inference wrappers were removed after their repository
 callers disappeared. Use canonical LMX builders plus independently materialized
 and audited external inputs; raw FreeMHD dictionary parsers remain available in
 `lmx.freemhd`.
+
+The obsolete station-wise approximations `clone_case_with_field`,
+`run_fringing_station_sweep`, and `run_extruded_inductionless_slice` were also
+removed. Use `solve_extruded_inductionless`, which preserves axial coupling and
+supports every documented extruded geometry. Its fallback-only `solver=`
+injection argument was removed with those approximations.

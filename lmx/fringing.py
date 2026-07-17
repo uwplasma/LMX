@@ -37,7 +37,6 @@ except Exception:  # pragma: no cover - SciPy should be present in shipped envir
     sparse_spsolve = None
 
 from .cases import _ha_to_b, make_shercliff_case
-from .core import Solution
 from .field_models import load_tabulated_field, sample_tabulated_field_volume
 from .mesh import (
     generate_bent_pipe_mesh,
@@ -56,8 +55,6 @@ from .specs import (
     SolverConfig,
     TimeStepperConfig,
 )
-from .solvers import solve_steady
-from .validation import validation_summary
 from ._fringing_types import (
     EXTRUDED_HISTORY_WIDTHS,
     ExtrudedFieldBundle,
@@ -4313,21 +4310,6 @@ def smooth_fringing_profile(
     return FringingProfile(x=x, field_scale=peak_scale * rise * fall, axis=axis)
 
 
-def clone_case_with_field(
-    case: CaseSpec, *, axis: str, magnitude: float, suffix: str | None = None
-) -> CaseSpec:
-    if axis not in {"x", "y", "z"}:
-        raise ValueError(f"Unsupported magnetic axis {axis!r}")
-    vector = tuple(magnitude if name == axis else 0.0 for name in "xyz")
-    magnetic_field = replace(
-        case.magnetic_field,
-        kind="constant",
-        value=vector,
-    )
-    name = case.name if suffix is None else f"{case.name}_{suffix}"
-    return replace(case, name=name, magnetic_field=magnetic_field)
-
-
 def build_square_duct_fringing_benchmark(
     *,
     ha_peak: float = 20.0,
@@ -5604,173 +5586,6 @@ def build_extruded_problem_from_case(
         axis=axis,
     )
     return ExtrudedInductionlessProblem(case=case, profile=profile)
-
-
-def _station_case(
-    base_case: CaseSpec, *, axis: str, magnitude: float, suffix: str
-) -> CaseSpec:
-    station_case = clone_case_with_field(
-        base_case, axis=axis, magnitude=magnitude, suffix=suffix
-    )
-    return replace(
-        station_case,
-        solver=replace(station_case.solver, kind="fully_developed_inductionless"),
-    )
-
-
-def run_fringing_station_sweep(
-    base_case: CaseSpec,
-    profile: FringingProfile,
-    *,
-    solver=solve_steady,
-) -> list[dict[str, float]]:
-    if (
-        base_case.magnetic_field.kind != "constant"
-        or base_case.magnetic_field.value is None
-    ):
-        raise ValueError("Fringing station sweep requires a constant-field base case")
-
-    base_magnitude = max(
-        abs(float(component)) for component in base_case.magnetic_field.value
-    )
-    history: list[dict[str, float]] = []
-    previous_state = None
-    for index, (x_value, scale) in enumerate(
-        zip(profile.x, profile.field_scale, strict=True)
-    ):
-        station_case = _station_case(
-            base_case,
-            axis=profile.axis,
-            magnitude=base_magnitude * float(scale),
-            suffix=f"station{index:03d}",
-        )
-        solution: Solution = solver(station_case, initial_state=previous_state)
-        metrics = validation_summary(
-            solution, station_case.name, ha=base_case.geometry.target_ha
-        )
-        history.append(
-            {
-                "x": float(x_value),
-                "field_scale": float(scale),
-                "u_max": float(metrics["u_max"]),
-                "mean_velocity": float(metrics["mean_velocity"]),
-                "volumetric_flow_rate": float(metrics["volumetric_flow_rate"]),
-                "current_scaled_pressure_proxy": float(
-                    metrics["current_scaled_pressure_proxy"]
-                ),
-                "residual": float(solution.state.residual),
-            }
-        )
-        previous_state = solution.state
-    return history
-
-
-def run_extruded_inductionless_slice(
-    base_case: CaseSpec,
-    profile: FringingProfile,
-    *,
-    solver=solve_steady,
-) -> ExtrudedFieldBundle:
-    if base_case.geometry.kind not in {"rect_duct", "layered_duct"}:
-        raise ValueError(
-            "The current extruded_inductionless slice is only implemented for rectangular and layered ducts"
-        )
-    if (
-        base_case.magnetic_field.kind != "constant"
-        or base_case.magnetic_field.value is None
-    ):
-        raise ValueError("Extruded fringing slice requires a constant-field base case")
-
-    base_magnitude = max(
-        abs(float(component)) for component in base_case.magnetic_field.value
-    )
-    previous_state = None
-    station_solutions: list[Solution] = []
-    for index, scale in enumerate(profile.field_scale):
-        station_case = _station_case(
-            base_case,
-            axis=profile.axis,
-            magnitude=base_magnitude * float(scale),
-            suffix=f"station{index:03d}",
-        )
-        solution = solver(station_case, initial_state=previous_state)
-        station_solutions.append(solution)
-        previous_state = solution.state
-
-    first = station_solutions[0]
-    u = jnp.stack([solution.state.u for solution in station_solutions], axis=0)
-    phi = jnp.stack([solution.state.phi for solution in station_solutions], axis=0)
-    jy = jnp.stack([solution.state.jy for solution in station_solutions], axis=0)
-    jz = jnp.stack([solution.state.jz for solution in station_solutions], axis=0)
-    lorentz_x = jnp.stack(
-        [solution.state.lorentz_x for solution in station_solutions], axis=0
-    )
-    residual = jnp.asarray(
-        [solution.state.residual for solution in station_solutions], dtype=float
-    )
-    volumetric_flow_rate = jnp.asarray(
-        [
-            float(solution.diagnostics.volumetric_flow_rate_history[-1])
-            if solution.diagnostics.volumetric_flow_rate_history.size
-            else 0.0
-            for solution in station_solutions
-        ],
-        dtype=float,
-    )
-    mean_velocity = jnp.asarray(
-        [
-            float(solution.diagnostics.mean_velocity_history[-1])
-            if solution.diagnostics.mean_velocity_history.size
-            else float(jnp.mean(solution.state.u))
-            for solution in station_solutions
-        ],
-        dtype=float,
-    )
-    current_scaled_pressure_proxy = jnp.asarray(
-        [
-            float(solution.diagnostics.current_scaled_pressure_proxy_history[-1])
-            if solution.diagnostics.current_scaled_pressure_proxy_history.size
-            else 0.0
-            for solution in station_solutions
-        ],
-        dtype=float,
-    )
-    charge_balance_residual = jnp.asarray(
-        [
-            float(solution.diagnostics.charge_balance_residual_history[-1])
-            if solution.diagnostics.charge_balance_residual_history.size
-            else 0.0
-            for solution in station_solutions
-        ],
-        dtype=float,
-    )
-    return ExtrudedFieldBundle(
-        x=jnp.asarray(profile.x, dtype=float),
-        y=first.mesh.y_centers,
-        z=first.mesh.z_centers,
-        field_scale=jnp.asarray(profile.field_scale, dtype=float),
-        u=u,
-        v=jnp.zeros_like(u),
-        w=jnp.zeros_like(u),
-        p=jnp.zeros_like(u),
-        phi=phi,
-        jx=jnp.zeros_like(u),
-        jy=jy,
-        jz=jz,
-        lorentz_x=lorentz_x,
-        lorentz_y=jnp.zeros_like(u),
-        lorentz_z=jnp.zeros_like(u),
-        residual=residual,
-        volumetric_flow_rate=volumetric_flow_rate,
-        mean_velocity=mean_velocity,
-        axial_current=jnp.zeros_like(mean_velocity),
-        wall_current_leakage=jnp.zeros_like(mean_velocity),
-        current_scaled_pressure_proxy=current_scaled_pressure_proxy,
-        charge_balance_residual=charge_balance_residual,
-        boundary_current_residual=jnp.zeros_like(mean_velocity),
-        geometry_kind=base_case.geometry.kind,
-        solver_kind=base_case.solver.kind,
-    )
 
 
 def _shard_extruded_fields(
@@ -8178,7 +7993,6 @@ def validate_extruded_inductionless_solution(
 def solve_extruded_inductionless(
     problem: ExtrudedInductionlessProblem,
     *,
-    solver=solve_steady,
     initial_bundle: ExtrudedFieldBundle | None = None,
     num_devices: int | None = None,
     progress_callback: Callable[[ExtrudedIterationProgress], None] | None = None,
@@ -8194,28 +8008,15 @@ def solve_extruded_inductionless(
     if checkpoint_interval is not None and checkpoint_interval <= 0:
         raise ValueError("checkpoint_interval must be positive")
 
-    if problem.case.geometry.kind in {
-        "rect_duct",
-        "layered_duct",
-        "pipe_ogrid",
-        "bent_pipe",
-    }:
-        projection_kwargs = {
-            "initial_bundle": initial_bundle,
-            "progress_callback": progress_callback,
-            "checkpoint_interval": checkpoint_interval,
-        }
-        if num_devices is not None:
-            projection_kwargs["num_devices"] = num_devices
-        bundle = _solve_extruded_projection(problem, **projection_kwargs)
-        station_history = _bundle_station_history(bundle)
-    else:
-        station_history = run_fringing_station_sweep(
-            problem.case, problem.profile, solver=solver
-        )
-        bundle = run_extruded_inductionless_slice(
-            problem.case, problem.profile, solver=solver
-        )
+    projection_kwargs = {
+        "initial_bundle": initial_bundle,
+        "progress_callback": progress_callback,
+        "checkpoint_interval": checkpoint_interval,
+    }
+    if num_devices is not None:
+        projection_kwargs["num_devices"] = num_devices
+    bundle = _solve_extruded_projection(problem, **projection_kwargs)
+    station_history = _bundle_station_history(bundle)
     validation = validate_extruded_inductionless_solution(
         bundle, station_history=station_history
     )
