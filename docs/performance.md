@@ -14,7 +14,7 @@ one/two-GPU shared-host calibration; foreign contexts still fail its idle gate.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 864 pass, 8 skip, 95.39% combined line/branch coverage, 122.6 s | 41% of the five-minute target and 20% of the ten-minute budget |
+| portable test gate | Apple M4, six workers | 863 pass, 8 skip, 95.41% combined line/branch coverage, 122.8 s | 41% of the five-minute target and 20% of the ten-minute budget |
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | B2 monitored CPU scaling | same grid/masks, 32 updates, three warm trajectories per topology | 250.756/173.993/151.342 s; 1.441x/1.657x; peak process RSS 4.758/5.078/5.578 GB; CV at most 0.631% | accepted Docker CPU-allocation scaling from source `6f89d1a`, evaluated by `6729bdf`; environment, numerics, restart, and placement pass; exact host-core mapping and steady-state acceptance remain open |
 | B2 sustained GPU calibration | 1/2 RTX A4000, same grid, 96 updates, three warm trajectories per topology | 258.913/159.234 s; 1.626x; peak device memory 2.50 GB vs 1.41/1.31 GB; CV below 0.29% | numerical/duration gates pass; persistent foreign contexts block an authoritative timing claim |

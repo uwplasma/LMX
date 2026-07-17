@@ -122,18 +122,19 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,445 | stay below 34,446 | 35,100 |
+| package lines | 34,425 | stay below 34,426 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 21,005 | no new file; next test change must reduce lines | 31 / 21,100 |
+| test files / lines | 30 / 20,988 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,551,170 bytes | stay below 4,551,171 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,550,352 bytes | stay below 4,550,353 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
-The latest audits unified WHAM route-axis ownership, made variable-field
-validation fail closed on nonfinite velocity, and removed its duplicate solve
-test. The direct B1 gate remains, and B2 reuses complete checkpoints.
+The latest audits unified route-axis and centerline validation ownership, made
+variable-field validation fail closed on nonfinite velocity, and folded two
+duplicate solve tests into stronger physics owners. The direct B1 gate remains,
+and B2 reuses complete checkpoints.
 The remaining result records, 13 scripts, and distinct Python/TOML examples
 retain current provenance, CI, or runnable-workflow ownership; do not merge
 them unless the replacement deletes code without weakening those contracts.
@@ -169,11 +170,11 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
-The current gate passes 864 tests with 8 expected skips and 95.39% combined
-coverage in 122.6 seconds. Canonical finite-volume ownership removes 72 source
-lines; the smaller wall-resolved B2 gate retains physics, convergence,
-checkpoint, and exact-restart assertions, cuts its hotspot by 5.94 seconds, and
-deletes 11 test lines. The next test change remains a net deletion.
+The current gate passes 863 tests with 8 expected skips and 95.41% combined
+coverage in 122.8 seconds. Shared centerline validation removes 20 source lines;
+the layered-flow consolidation removes 17 test lines and one redundant
+6.894-second solve while retaining finite-field, current, and physics gates.
+The next test change remains a net deletion.
 
 ### Canonical sharding and performance
 
@@ -369,9 +370,11 @@ stable accepted claim.
 
 ## Priority 4: B1 and remaining research functionality
 
-Apply the proved harness to B1: exact tiny parity, coarse agreement, then medium
-and one large confirmation only if required. Retained-modal results remain
-numerical evidence, not exact-formulation evidence.
+The current FreeMHD harness is B2-only, and the pinned source has no pipe/O-grid
+ALEX case. Do not launch coarse B1 or claim parity. First freeze a solver-free
+B1 input/observer contract; only then authorize a bounded `7 x 7 x 12`,
+two-update Docker harness pilot. Retained-modal results remain numerical
+evidence, not exact-formulation evidence.
 
 Magnetic obstacles, Q2D turbulence, blanket models, mapped/pipe geometries,
 inverse design, and other research workflows retain bounded portable examples
@@ -389,7 +392,9 @@ so LMX must not import the new API or use a Git dependency.
 After publication, raise the tested minimum to 0.8.5, adopt
 `additive_tridiagonal_line_preconditioner`, and delete LMX's duplicate 3D
 builder only after exact primal, gradient, JIT, physics, and timing gates pass.
-Then audit the smaller 2D potential-line duplicate under the same gates.
+The prepared A/B is bitwise exact and would delete 35 production plus 28
+duplicate-test lines. Then audit the smaller 2D potential-line duplicate under
+the same gates.
 
 LMX owns MHD equations, discretization, geometry, boundaries/gauges, corrected
 flux, physical residuals, restart, sharding policy, observables, and acceptance.

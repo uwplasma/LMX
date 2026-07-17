@@ -1,7 +1,7 @@
 {
-  "schema_version": 33,
-  "date": "2026-07-16",
-  "commit": "b0c04b7fd30a155212c14ab62fd50dd09d4b0337",
+  "schema_version": 34,
+  "date": "2026-07-17",
+  "commit": "0278fe66c09373d435e6e801b5c01bd02fa0629f",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -20,64 +20,61 @@
   },
   "result": {
     "test_files": 30,
-    "test_lines": 21007,
-    "passed": 865,
+    "test_lines": 20988,
+    "passed": 863,
     "skipped": 8,
-    "pytest_seconds": 125.51,
-    "gate_seconds": 125.8,
-    "covered_lines": 13968,
-    "total_lines": 14374,
-    "covered_branches": 2554,
-    "total_branches": 2946,
-    "combined_line_branch_coverage_percent": 95.39260969976905,
+    "pytest_seconds": 122.497,
+    "gate_seconds": 122.8,
+    "covered_lines": 13955,
+    "total_lines": 14359,
+    "covered_branches": 2552,
+    "total_branches": 2942,
+    "combined_line_branch_coverage_percent": 95.41066990347379,
     "passed_gate": true
   },
   "artifacts": {
-    "coverage_xml_sha256": "dad8e70c153581037a57f76c1bb7ef25ae3a586a65c806c3f34c7f9954fd43c1",
-    "junit_xml_sha256": "e3355ece9634bcf6513a926c77d2642d60a0e9568e32b8cee6b4bd8a8fb88b97"
+    "coverage_xml_sha256": "e8a5309e18d001c4e828bbcfc6daa46ab6f2d28bcd069a3811eb4de5fe352075",
+    "junit_xml_sha256": "4c06e9e09864608a797ae3202c7fcfe8f00f1fba19cb0efabc258471916e78b2"
   },
   "duration_note": "Durations come from the current six-worker JUnit record; concurrent-node times identify CI pressure but are not isolated timings.",
   "slowest_tests": [
-    {"seconds": 34.465, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
-    {"seconds": 24.434, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
-    {"seconds": 16.661, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
-    {"seconds": 16.484, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"},
-    {"seconds": 16.035, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow"},
-    {"seconds": 15.527, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
-    {"seconds": 14.598, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
-    {"seconds": 13.181, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"},
-    {"seconds": 12.396, "nodeid": "tests.test_example_runner::test_variable_field_extruded_demo_writes_summary"},
-    {"seconds": 11.390, "nodeid": "tests.test_fringing::test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradient"}
+    {"seconds": 32.712, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
+    {"seconds": 23.620, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
+    {"seconds": 16.063, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
+    {"seconds": 15.904, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"},
+    {"seconds": 15.673, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow"},
+    {"seconds": 14.839, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
+    {"seconds": 14.514, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
+    {"seconds": 12.377, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"},
+    {"seconds": 11.909, "nodeid": "tests.test_example_runner::test_variable_field_extruded_demo_writes_summary"},
+    {"seconds": 11.468, "nodeid": "tests.test_fringing::test_solve_extruded_inductionless_supports_layered_analytic_variable_field"}
   ],
   "comparison": {
-    "previous_gate_seconds": 131.5,
-    "previous_pytest_seconds": 131.21,
-    "wall_time_change_percent": -4.334600760456276,
-    "pytest_seconds_change_percent": -4.344181083758858,
-    "budget_fraction": 0.20966666666666667,
-    "engineering_target_fraction": 0.41933333333333334,
-    "removed_obsolete_node_seconds": 64.658,
-    "b2_checkpoint_reuse": {"updates_before": 10, "updates_after": 7, "node_seconds_before": 67.516, "node_seconds_after": 56.729},
-    "autodiff_value_and_grad": {
-      "redundant_primal_evaluations_removed": 38,
-      "tracked_nodes_before_seconds": 65.841,
-      "tracked_nodes_after_seconds": 47.091,
-      "tracked_nodes_reduction_fraction": 0.2847769626828267,
-      "response_inverse_seconds": {"before": 28.970, "after": 16.616},
-      "nonrect_target_seconds": {"before": 19.874, "after": 16.717},
-      "field_inverse_seconds": {"before": 16.997, "after": 13.758}
-    },
+    "previous_gate_seconds": 122.6,
+    "previous_pytest_seconds": 122.299,
+    "wall_time_change_percent": 0.16313213703100793,
+    "pytest_seconds_change_percent": 0.1618982984325168,
+    "budget_fraction": 0.20466666666666666,
+    "engineering_target_fraction": 0.4093333333333333,
     "latest_slimming": {
-      "package_lines_before": 34545,
-      "package_lines_after": 34454,
-      "test_lines_before": 21065,
-      "test_lines_after": 21007,
-      "b1_updates_before": 4,
-      "b1_updates_after": 3
+      "source_commit_before": "7314b8ae6f3cff7b5b1012f700b8daf667dfa946",
+      "source_commit_after": "0278fe66c09373d435e6e801b5c01bd02fa0629f",
+      "package_lines_before": 34445,
+      "package_lines_after": 34425,
+      "source_lines_removed": 20,
+      "test_lines_before": 21005,
+      "test_lines_after": 20988,
+      "test_lines_removed": 17,
+      "test_cases_before": 872,
+      "test_cases_after": 871,
+      "test_cases_removed": 1,
+      "removed_nodeid": "tests.test_fringing::test_solve_extruded_inductionless_projection_returns_finite_layered_bundle",
+      "removed_node_seconds": 6.894
     },
-    "interpretation": "Canonical finite-volume ownership removes 72 source lines, and the smaller B2 gate preserves wall, closure, convergence, checkpoint, and exact-restart coverage while deleting 11 test lines. Its hotspot falls from 40.407 to 34.465 seconds; full wall time falls 4.3% and remains 21% of the hard budget."
+    "interpretation": "Shared centerline validation removes 20 source lines, while layered-flow validation consolidation removes 17 test lines and one redundant 6.894-second test. The clean gate changes by 0.16% relative to the prior run and remains at 20% of the hard budget."
   },
   "scheduling_probe": {
+    "evidence_scope": "historical",
     "source_commit": "f379f6bab2e25acd8c2785eebe1c88a10ed854a9",
     "protocol": "The same six slow JAX nodes in fresh no-coverage processes using worksteal; 180-second ceiling per arm.",
     "all_nodes_passed": true,
@@ -88,16 +85,17 @@
     "decision": "retain six workers; the 3.4% change is below the promotion threshold, and module grouping would imbalance fringing and autodiff owners"
   },
   "architecture": {
-    "source_commit": "b0c04b7fd30a155212c14ab62fd50dd09d4b0337",
+    "source_commit": "0278fe66c09373d435e6e801b5c01bd02fa0629f",
     "package_modules": 35,
-    "package_lines": 34454,
+    "package_lines": 34425,
     "maintained_core_lines": 7869,
     "maintenance_scripts": 13,
-    "tracked_checkout_bytes": 4552856,
+    "tracked_checkout_bytes": 4549932,
     "stable_root_exports": 30,
     "curated_examples": 11
   },
   "distribution": {
+    "evidence_scope": "historical",
     "source_commit": "ca7535ec9143e29e3dfe5b4a55bb19c5d78cbb87",
     "wheel_bytes": 315709,
     "wheel_members": 48,
@@ -115,6 +113,8 @@
     "numerical_modules_import_without_visualization": true
   },
   "hosted_ci": {
+    "evidence_scope": "historical",
+    "source_commit": "a97eeaf1c5cd0a1f3aeddf2ccf605434a5a0e990",
     "status": "administratively_not_started",
     "reason": "GitHub Actions reported an account billing or spending-limit failure before runner assignment; every affected job had zero executed steps.",
     "code_failure_observed": false,

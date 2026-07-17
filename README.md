@@ -149,8 +149,8 @@ shared-host calibration.
 
 ## Quality and citation
 
-The portable gate records **864 passing tests**, **95.39% combined line/branch
-coverage**, and **122.6 s** on six Apple-Silicon workers.
+The portable gate records **863 passing tests**, **95.41% combined line/branch
+coverage**, and **122.8 s** on six Apple-Silicon workers.
 [Testing](https://lmx.readthedocs.io/en/latest/testing.html) ·
 [Theory](https://lmx.readthedocs.io/en/latest/theory.html) ·
 [Numerics](https://lmx.readthedocs.io/en/latest/numerics.html) ·

@@ -10,13 +10,15 @@ external solvers, long physics campaigns, and hardware scaling.
 ```
 
 The driver runs the full suite with branch coverage, a minimum coverage of 95%,
-and a hard ten-minute timeout. The current Apple M4 record is 864 passed,
-8 expected external-data skips, 95.39% combined line/branch coverage, and 122.6
+and a hard ten-minute timeout. The current Apple M4 record is 863 passed,
+8 expected external-data skips, 95.41% combined line/branch coverage, and 122.8
 seconds with six workers. The default warning threshold is five minutes, and
 the current run leaves more than seven minutes of hard-budget headroom. The
 record keeps the ten slowest node IDs for critical-path review.
 
-The latest pass shares the differentiable and production conservative-current
+The current pass centralizes centerline validation, deleting 20 source lines;
+its layered-flow consolidation deletes 17 test lines and one 6.894-second solve.
+The earlier pass shares the differentiable and production conservative-current
 kernels, removing 72 source lines. A smaller wall-resolved B2 gate retains
 closure, three-step convergence, checkpoint, and exact-restart assertions while
 cutting that node from 40.41 to 34.47 seconds and deleting 11 test lines.
