@@ -956,11 +956,14 @@ def q2d_modal_energy_budget(
     }
 
 
-def validate_q2d_decay_energy_budget(
-    case: Q2DDecayCase,
-    solution: Q2DDecaySolution,
+def _validate_q2d_energy_budget(
+    case: Q2DDecayCase | Q2DForcedCase | Q2DWallBoundedForcedCase,
+    solution: Q2DDecaySolution | Q2DForcedSolution | Q2DWallBoundedForcedSolution,
+    *,
+    wall_bounded: bool = False,
 ) -> dict[str, float | bool]:
-    mode_mean_square, mode_peak = _periodic_mode_statistics(
+    statistics = _wall_mode_statistics if wall_bounded else _periodic_mode_statistics
+    mode_mean_square, mode_peak = statistics(
         nx=case.nx,
         ny=case.ny,
         lx=case.lx,
@@ -974,51 +977,29 @@ def validate_q2d_decay_energy_budget(
         decay_rate=solution.decay_rate,
         mode_mean_square=mode_mean_square,
         mode_peak=mode_peak,
+        forcing_amplitude=getattr(case, "forcing_amplitude", 0.0),
     )
+
+
+def validate_q2d_decay_energy_budget(
+    case: Q2DDecayCase,
+    solution: Q2DDecaySolution,
+) -> dict[str, float | bool]:
+    return _validate_q2d_energy_budget(case, solution)
 
 
 def validate_q2d_forced_energy_budget(
     case: Q2DForcedCase,
     solution: Q2DForcedSolution,
 ) -> dict[str, float | bool]:
-    mode_mean_square, mode_peak = _periodic_mode_statistics(
-        nx=case.nx,
-        ny=case.ny,
-        lx=case.lx,
-        ly=case.ly,
-        mode_x=case.mode_x,
-        mode_y=case.mode_y,
-    )
-    return q2d_modal_energy_budget(
-        time=solution.time,
-        amplitude=solution.amplitude_numeric,
-        decay_rate=solution.decay_rate,
-        mode_mean_square=mode_mean_square,
-        mode_peak=mode_peak,
-        forcing_amplitude=case.forcing_amplitude,
-    )
+    return _validate_q2d_energy_budget(case, solution)
 
 
 def validate_q2d_wall_bounded_energy_budget(
     case: Q2DWallBoundedForcedCase,
     solution: Q2DWallBoundedForcedSolution,
 ) -> dict[str, float | bool]:
-    mode_mean_square, mode_peak = _wall_mode_statistics(
-        nx=case.nx,
-        ny=case.ny,
-        lx=case.lx,
-        ly=case.ly,
-        mode_x=case.mode_x,
-        mode_y=case.mode_y,
-    )
-    return q2d_modal_energy_budget(
-        time=solution.time,
-        amplitude=solution.amplitude_numeric,
-        decay_rate=solution.decay_rate,
-        mode_mean_square=mode_mean_square,
-        mode_peak=mode_peak,
-        forcing_amplitude=case.forcing_amplitude,
-    )
+    return _validate_q2d_energy_budget(case, solution, wall_bounded=True)
 
 
 def q2d_energy_spectrum(
