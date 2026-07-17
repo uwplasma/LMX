@@ -751,20 +751,21 @@ def _variable_diffusion_coefficients_3d(
     dz: float | jnp.ndarray,
     validated_spacing: bool = False,
     thin_wall_fluid_mask: jnp.ndarray | None = None,
+    axial_coefficients: tuple[jnp.ndarray, jnp.ndarray] | None = None,
 ) -> tuple[jnp.ndarray, ...]:
-    """Cell-volume-normalized face coefficients for ``div(sigma grad)``."""
+    """Return normalized diffusion coefficients; axial pairs are cell-aligned."""
 
     nx, ny, nz = conductivity.shape
     spacing = _coerce_spacing_vector if validated_spacing else _spacing_vector
     dy_widths = spacing(dy, ny, dtype=conductivity.dtype)
     dz_widths = spacing(dz, nz, dtype=conductivity.dtype)
-    sigma_x = _harmonic_mean(conductivity[1:], conductivity[:-1])
-    coef_x_w = jnp.concatenate(
-        [jnp.zeros_like(conductivity[:1]), sigma_x / max(dx**2, 1.0e-12)], axis=0
-    )
-    coef_x_e = jnp.concatenate(
-        [sigma_x / max(dx**2, 1.0e-12), jnp.zeros_like(conductivity[-1:])], axis=0
-    )
+    if axial_coefficients is None:
+        sigma_x = _harmonic_mean(conductivity[1:], conductivity[:-1])
+        scaled = sigma_x / max(dx**2, 1.0e-12)
+        coef_x_w = jnp.concatenate([jnp.zeros_like(conductivity[:1]), scaled], axis=0)
+        coef_x_e = jnp.concatenate([scaled, jnp.zeros_like(conductivity[-1:])], axis=0)
+    else:
+        coef_x_w, coef_x_e = axial_coefficients
 
     sigma_y = _distance_weighted_harmonic_mean(
         conductivity[:, 1:, :],
@@ -1617,13 +1618,17 @@ def _cell_limited_least_squares_gradient_duct(
     field: jnp.ndarray,
     boundary_values: tuple[jnp.ndarray, ...],
     widths: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
+    *, axial_neighbours: tuple[jnp.ndarray, jnp.ndarray] | None = None,
 ) -> tuple[jnp.ndarray, ...]:
-    """Return ``cellLimited leastSquares 1`` from patch-face values x-, x+, y-, y+, z-, z+."""
+    """Return limited gradients; optional axial neighbours are cell-aligned."""
     gradients, neighbours = [], []
     for axis, width in enumerate(widths):
         values = jnp.moveaxis(field, axis, 0)
-        lo = jnp.concatenate((boundary_values[2 * axis][None], values[:-1]))
-        hi = jnp.concatenate((values[1:], boundary_values[2 * axis + 1][None]))
+        if axis == 0 and axial_neighbours is not None:
+            lo, hi = axial_neighbours
+        else:
+            lo = jnp.concatenate((boundary_values[2 * axis][None], values[:-1]))
+            hi = jnp.concatenate((values[1:], boundary_values[2 * axis + 1][None]))
         centers = 0.5 * (width[:-1] + width[1:])
         dm = jnp.concatenate((0.5 * width[:1], centers))[:, None, None]
         dp = jnp.concatenate((centers, 0.5 * width[-1:]))[:, None, None]
@@ -1657,32 +1662,30 @@ def _explicit_deviatoric_stress_duct(
     dynamic_viscosity: jnp.ndarray,
     boundary_velocity: tuple[jnp.ndarray, ...],
     widths: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
+    *, gradient: jnp.ndarray | None = None,
+    axial_tractions: tuple[jnp.ndarray, jnp.ndarray] | None = None,
 ) -> jnp.ndarray:
     """Return lagged ``div(mu*dev2(T(grad(U))))`` with limited gradients.
-    Parity is claimed only for canonical constant ``mu``."""
-    gradient = jnp.stack(
-        tuple(
-            jnp.stack(
-                _cell_limited_least_squares_gradient_duct(
-                    velocity[..., component],
-                    tuple(patch[..., component] for patch in boundary_velocity),
-                    widths,
-                ),
-                axis=-1,
-            )
-            for component in range(3)
-        ),
-        axis=-1,
-    )
+    Injected gradients and axial tractions are cell-aligned; constant-mu only.
+    """
+    if gradient is None:
+        component_gradients = (_cell_limited_least_squares_gradient_duct(
+            velocity[..., component],
+            tuple(patch[..., component] for patch in boundary_velocity), widths)
+            for component in range(3))
+        gradient = jnp.stack(
+            tuple(jnp.stack(value, axis=-1) for value in component_gradients), axis=-1)
     identity = jnp.eye(3, dtype=velocity.dtype)
 
     def traction(value, coefficient, axis):
         trace = jnp.trace(value, axis1=-2, axis2=-1)
-        return coefficient[..., None] * (
-            value[..., :, axis] - (2.0 / 3.0) * trace[..., None] * identity[axis]
-        )
+        deviatoric = value[..., :, axis] - (2.0 / 3.0) * trace[..., None] * identity[axis]
+        return coefficient[..., None] * deviatoric
     correction = jnp.zeros_like(velocity)
     for axis, width in enumerate(widths):
+        if axis == 0 and axial_tractions is not None:
+            correction += (axial_tractions[1] - axial_tractions[0]) / width[:, None, None, None]
+            continue
         cell_traction = traction(gradient, dynamic_viscosity, axis)
         patch_tractions = []
         for side, index in ((0, 0), (1, -1)):
@@ -1717,12 +1720,14 @@ def _limited_linear_vector_face_weights_duct(
     rho_phi: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
     boundary_velocity: tuple[jnp.ndarray, ...],
     widths: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
+    *, gradient: tuple[jnp.ndarray, ...] | None = None,
 ) -> tuple[jnp.ndarray, ...]:
-    """Freeze v2206 vector weights from patch-face values x-, x+, y-, y+, z-, z+."""
+    """Freeze v2206 vector weights, optionally from precomputed gradients."""
     q = jnp.sum(velocity**2, axis=-1)
-    gradients = _cell_limited_least_squares_gradient_duct(
-        q, tuple(jnp.sum(value**2, axis=-1) for value in boundary_velocity), widths
-    )
+    gradients = gradient
+    if gradients is None:
+        gradients = _cell_limited_least_squares_gradient_duct(
+            q, tuple(jnp.sum(value**2, axis=-1) for value in boundary_velocity), widths)
     weights = []
     for axis, (width, gradient, face_flux) in enumerate(
         zip(widths, gradients, rho_phi, strict=True)
@@ -1745,26 +1750,34 @@ def _limited_linear_vector_face_weights_duct(
 
 
 def _limited_linear_convection_matrix_action_duct(
-    field, rho_phi, weights, boundary_values, widths
-):
-    """Return cell-volume divergence from patch-face values x-, x+, y-, y+, z-, z+."""
+    field, rho_phi, weights, boundary_values, widths, *,
+    neighbours: tuple[jnp.ndarray, jnp.ndarray] | None = None,
+    axial_fluxes: tuple[jnp.ndarray, jnp.ndarray] | None = None,
+    axial_weights: tuple[jnp.ndarray, jnp.ndarray] | None = None,
+) -> jnp.ndarray:
+    """Return divergence; optional axial pairs are cell-aligned and indivisible."""
+    supplied = tuple(value is not None for value in (neighbours, axial_fluxes, axial_weights))
+    if any(supplied) and not all(supplied):
+        raise ValueError("neighbours, axial_fluxes, and axial_weights must be supplied together")
     dx, dy, dz = widths
     volume = dx[:, None, None] * dy[None, :, None] * dz[None, None, :]
     action = jnp.zeros_like(field)
     for axis, (face_flux, weight) in enumerate(zip(rho_phi, weights, strict=True)):
+        if axis == 0 and axial_fluxes is not None:
+            assert neighbours is not None and axial_weights is not None
+            west = axial_weights[0][..., None] * neighbours[0] + (
+                1.0 - axial_weights[0][..., None]) * field
+            east = axial_weights[1][..., None] * field + (
+                1.0 - axial_weights[1][..., None]) * neighbours[1]
+            action += (axial_fluxes[1][..., None] * east
+                       - axial_fluxes[0][..., None] * west) / volume[..., None]
+            continue
         values = jnp.moveaxis(field, axis, 0)
         weight = jnp.moveaxis(weight, axis, 0)[..., None]
         interpolated = weight * values[:-1] + (1.0 - weight) * values[1:]
-        faces = jnp.concatenate(
-            (
-                boundary_values[2 * axis][None],
-                interpolated,
-                boundary_values[2 * axis + 1][None],
-            )
-        )
-        divergence = jnp.diff(
-            jnp.moveaxis(face_flux, axis, 0)[..., None] * faces, axis=0
-        )
+        faces = jnp.concatenate((boundary_values[2 * axis][None], interpolated,
+                                 boundary_values[2 * axis + 1][None]))
+        divergence = jnp.diff(jnp.moveaxis(face_flux, axis, 0)[..., None] * faces, axis=0)
         action += jnp.moveaxis(divergence, 0, axis) / volume[..., None]
     return action
 
