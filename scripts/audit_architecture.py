@@ -46,7 +46,7 @@ RESEARCH_STAGE = {
     "wall_study.py",
 }
 COMPATIBILITY: set[str] = set()
-VISUALIZATION = {"plotting.py", "showcase.py"}
+VISUALIZATION = {"plotting.py"}
 VALIDATION = {
     "validation.py",
     "external_validation.py",

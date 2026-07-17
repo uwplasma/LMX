@@ -146,13 +146,13 @@ shared without removing cases or assertions.
 
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
-| package modules | 34 | no new module | 34 |
-| package lines | 33,485 | diagnostic ceiling; next source tranche must return below 33,434 | 34,950 |
+| package modules | 33 | no new module without retiring an owner | 34 |
+| package lines | 32,788 | stay below 32,789 | 34,950 |
 | maintained-core lines | 7,614 | stay below 7,615 | 7,800 |
-| test files / lines | 30 / 20,476 | no new file; the next tranche must be a net deletion | 30 / 20,900 |
+| test files / lines | 29 / 20,243 | no new file; the next tranche must be a net deletion | 30 / 20,900 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked files | 185 | no new file without retiring another owner | 186 |
-| tracked checkout | 4,574,914 bytes | diagnostic ceiling; next source tranche below 4,566,798 | 4,718,592 bytes |
+| tracked files | 183 | no new file without retiring another owner | 186 |
+| tracked checkout | 4,542,636 bytes | stay below 4,542,637 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets come from ownership deletion and shared helpers, never unreadable
 formatting or arbitrary test merging. Recent moves delete 190 builder lines and
@@ -232,10 +232,11 @@ package lines. Finally `05e754a` transferred the duplicate additive line
 preconditioner to released SOLVAX, deleting 35 package and 30 test lines while
 retaining bitwise primal/JIT/JVP/VJP, coefficient-gradient, and four-shard
 placement gates. After phase annotations and the FreeMHD ownership deletion,
-the phase-timing diagnostic brings the current tree to 33,485 package lines,
-`fringing.py` to 7,889 lines, and tests to 20,476 lines. The next source
-deletion must recover the 51 diagnostic lines and return below 33,434. Keep 34 modules and add
-no file. Split
+the phase-timing diagnostic temporarily brought the tree to 33,485 package
+lines. Removing the orphaned `lmx.showcase` workflow owner and its mock-only
+test file then deleted 697 package and 233 test lines. The current tree is
+32,788 package lines, `fringing.py` is 7,889 lines, and tests are 20,243 lines;
+the diagnostic cost is fully recovered. Keep 33 modules and add no file. Split
 `_solve_extruded_projection` into same-module pipe and duct owners only after
 the FreeMHD deletion tranche establishes the next smaller ownership surface.
 Subsequent audits are
@@ -290,8 +291,9 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
-The current complete gate after the FreeMHD linearization passes 846 tests with
-5 expected skips and 95.37% combined coverage in 160.4 seconds. It remains
+The current complete gate after the phase diagnostic and orphan-showcase
+deletion passes 841 tests with 5 expected skips and 95.33% combined coverage in
+131.9 seconds. It remains
 below both the 300-second engineering target and 600-second hard limit. Keep
 the six-worker setting unless a fresh slow-node profile finds a node above 45
 seconds or the gate materially regresses; example/mock deletion and the new axial-injection
@@ -507,9 +509,9 @@ admission.
 Exit order: annotations, raw XPlane attribution, and the synchronized Stage-B
 1/2/4 screen are complete. Decide whether SOLVAX's Krylov/operator layer can
 remove the pressure/electric preconditioner all-gather or own a distributed
-line solve without importing LMX physics. Recover the 51 diagnostic source
-lines through the next deletion-producing ownership tranche. A new solver
-candidate must first pass exact/HLO and bounded four-device gates, then the
+line solve without importing LMX physics. The orphan-showcase deletion has
+already recovered the 51 diagnostic lines and a further 646 package lines. A
+new solver candidate must first pass exact/HLO and bounded four-device gates, then the
 fixed-work medium CPU gate, and only then the multi-minute local CPU ladder with
 exact M4 core mapping. Optimize the separately profiled GPU compute path and rerun its
 multi-minute ladder only after clean office-host admission. Portable tests stay
