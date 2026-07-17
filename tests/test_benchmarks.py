@@ -411,16 +411,13 @@ def test_benchmark_b_pipe_mesh_resolves_frozen_hartmann_layer():
 
 
 def test_benchmark_b_problem_rejects_unfrozen_choices():
-    with pytest.raises(ValueError, match="mesh_level"):
-        build_benchmark_b_problem("B1-fringing-pipe", mesh_level="tiny")
-    with pytest.raises(ValueError, match="wall_realization"):
-        build_benchmark_b_problem(
-            "B1-fringing-pipe", mesh_level="coarse", wall_realization="thick"
-        )
-    with pytest.raises(ValueError, match="num_devices"):
-        build_benchmark_b_problem(
-            "B2-fringing-square", mesh_level="coarse", num_devices=0
-        )
+    for case_id, message, options in (
+        ("B1-fringing-pipe", "mesh_level", {"mesh_level": "tiny"}),
+        ("B1-fringing-pipe", "wall_realization", {"mesh_level": "coarse", "wall_realization": "thick"}),
+        ("B2-fringing-square", "num_devices", {"mesh_level": "coarse", "num_devices": 0}),
+    ):
+        with pytest.raises(ValueError, match=message):
+            build_benchmark_b_problem(case_id, **options)
 
 
 def test_benchmark_b_sharded_mesh_rounds_frozen_axial_minimum_upward():
@@ -760,26 +757,24 @@ def test_benchmark_b_reference_rejects_physical_contract_violations(
         load_benchmark_b_reference("B1-fringing-pipe", tmp_path)
 
 
-def test_benchmark_b_field_profile_rejects_extrapolation(monkeypatch):
-    spec = deepcopy(load_benchmark_b_spec("B1-fringing-pipe"))
-    reference = load_benchmark_b_reference("B1-fringing-pipe")
-    spec["geometry"]["x_over_L_min"] = -20.0
-    monkeypatch.setattr(benchmarks, "load_benchmark_b_spec", lambda *_: spec)
-    monkeypatch.setattr(benchmarks, "load_benchmark_b_reference", lambda *_: reference)
-    with pytest.raises(ValueError, match="cannot extrapolate"):
-        build_benchmark_b_field_profile("B1-fringing-pipe", axial_stations=20)
-
-
-def test_benchmark_b_field_profile_rejects_nonmonotone_field(monkeypatch):
-    spec = load_benchmark_b_spec("B1-fringing-pipe")
-    reference = dict(load_benchmark_b_reference("B1-fringing-pipe"))
-    field = list(reference["b_over_B0"])
-    field[8] = field[7] + 0.1
-    reference["b_over_B0"] = tuple(field)
-    monkeypatch.setattr(benchmarks, "load_benchmark_b_spec", lambda *_: spec)
-    monkeypatch.setattr(benchmarks, "load_benchmark_b_reference", lambda *_: reference)
-    with pytest.raises(ValueError, match="must remain monotone"):
-        build_benchmark_b_field_profile("B1-fringing-pipe", axial_stations=101)
+def test_benchmark_b_field_profile_rejects_contract_violations(monkeypatch):
+    base_spec = load_benchmark_b_spec("B1-fringing-pipe")
+    base_reference = load_benchmark_b_reference("B1-fringing-pipe")
+    for violation, stations, message in (
+        ("extrapolation", 20, "cannot extrapolate"),
+        ("nonmonotone", 101, "must remain monotone"),
+    ):
+        spec, reference = deepcopy(base_spec), dict(base_reference)
+        if violation == "extrapolation":
+            spec["geometry"]["x_over_L_min"] = -20.0
+        else:
+            field = list(reference["b_over_B0"])
+            field[8] = field[7] + 0.1
+            reference["b_over_B0"] = tuple(field)
+        monkeypatch.setattr(benchmarks, "load_benchmark_b_spec", lambda *_: spec)
+        monkeypatch.setattr(benchmarks, "load_benchmark_b_reference", lambda *_: reference)
+        with pytest.raises(ValueError, match=message):
+            build_benchmark_b_field_profile("B1-fringing-pipe", axial_stations=stations)
 
 
 @pytest.mark.parametrize(
