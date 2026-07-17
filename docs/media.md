@@ -52,7 +52,7 @@ SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 | mapped-pipe profiles | 52,768 | 1,100 × 655 WebP | released source `d3343a09...`; failing FreeMHD-profile diagnostic, not ALEX |
 | Votyakov obstacle target | 32,966 | 1,100 × 458 WebP | released source `7bb3ca51...`; strict reverse-flow mismatch |
 | Q2D external diagnostics | 87,350 | 1,000 × 1,509 WebP | released sources `5bc14089...` and `11f452c1...`; external parity explicitly open |
-| manufactured operators | 41,120 | 1,600 × 624 WebP | bounded example; orders 2.00/1.94/1.91; `test_example_runner.py` / `test_plotting.py` |
+| manufactured operators | 41,120 | 1,600 × 624 WebP | bounded example; orders 2.00/1.94/1.91; `test_repository.py` / `test_plotting.py` |
 | Samper Benchmark A | 74,438 | 1,405 × 913 WebP | accepted aggregate `9f94ea15...`; eight rows; JSON-only writer/test |
 | B2 schema-6 scaling evidence | 73,040 | 1,400 × 1,285 WebP | current-source callback-free multi-minute CPU scaling plus calibration-only multi-minute shared-host GPU scaling; authoritative GPU idle-host claim remains open |
 | Hunt/Shercliff startup | 75,998 | 800 × 260 animated WebP, 7 s | 35 physical samples from current-source Hunt `934c9aea...` and Shercliff `3188bd21...` GIFs; no interpolation |

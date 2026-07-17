@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -177,6 +178,45 @@ def test_write_closed_channel_startup_movies_dispatches_to_movie_writer(
     assert (tmp_path / "shercliff_startup_2d.gif") in outputs
     assert (tmp_path / "shercliff_startup_2d.gif").exists()
     assert not (tmp_path / "shercliff_startup_3d.gif").exists()
+
+
+def test_solve_case_snapshots_records_fully_developed_frames(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    case = showcase.make_shercliff_case(ha=5.0, ny=6, nz=6)
+    case = replace(
+        case,
+        time_stepper=replace(case.time_stepper, t_final=0.003, max_steps=3),
+    )
+
+    def fake_step(**kwargs):
+        updated = np.asarray(kwargs["u_previous"]) + 0.1
+        zeros = np.zeros_like(updated)
+        return (
+            updated,
+            zeros,
+            zeros,
+            zeros,
+            zeros,
+            1.0e-6,
+            1.0e-6,
+            2,
+            1.0e-6,
+            3,
+            0.2,
+            0.1,
+            0.05,
+            float(np.mean(updated)),
+            0.3,
+            1.0e-4,
+            1.0e-4,
+        )
+
+    monkeypatch.setattr(showcase.solvers, "_fully_developed_case_step", fake_step)
+    frames = showcase.solve_case_snapshots(case, frame_count=3)
+    assert len(frames) == 4
+    assert frames[-1]["time"] > frames[0]["time"]
+    assert {"pressure_proxy", "face_lorentz_max"} <= frames[0].keys()
 
 
 def test_write_closed_channel_startup_movies_rejects_unsupported_case(tmp_path: Path):

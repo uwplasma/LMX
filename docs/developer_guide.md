@@ -9,15 +9,15 @@ dependency, or large generated-asset change:
 .venv/bin/python scripts/audit_architecture.py --check --measure-import
 ```
 
-The current checkpoint records 35 package modules and 34,246 total
-package lines. The maintained stable core is 7,869 lines;
+The current checkpoint records 34 package modules and 34,152 total
+package lines. The maintained stable core is 7,597 lines;
 the rest is explicitly classified as research-stage extensions,
 validation/evidence tooling, or visualization. The stable root surface is 30
 exports and the curated catalog contains 11 workflows. Lightweight import is
 about 19 ms on the audited development machine. Advanced APIs import from their
 owning submodules; see the [migration guide](migration.md).
 
-The current tracked checkout is 4,592,161 bytes, below its 4.5 MiB hard cap.
+The current tracked checkout is 4,595,219 bytes, below its 4.5 MiB hard cap.
 Sixty-five generated files larger than 128 KiB were bundled in the versioned release
 indexed by [`release-assets.json`](release-assets.json)
 and removed only after a fresh download passed archive membership, size, and
@@ -36,8 +36,8 @@ python scripts/manage_release_assets.py --verify-archive PATH_TO_ARCHIVE
 New generated files above 128 KiB fail the manifest check until deliberately
 assigned to a new versioned asset release.
 
-The live architecture gate caps the package at 35 modules, 35,100 source lines,
-8,000 maintained-core lines, 31 test files, 21,100 test lines, 13 maintenance
+The live architecture gate caps the package at 34 modules, 34,950 source lines,
+7,800 maintained-core lines, 30 test files, 20,900 test lines, 13 maintenance
 scripts, 30 root exports, 12 curated examples, a 4.5 MiB tracked checkout, and a
 0.25 s median lazy root import. Release builds cap the wheel at 384 KiB and the
 source distribution at 512 KiB. The wheel contains only `lmx/` and metadata;

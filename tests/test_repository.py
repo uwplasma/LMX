@@ -128,7 +128,7 @@ def test_numerical_modules_do_not_import_optional_visualization() -> None:
     code = """
 import sys
 import lmx.blanket_flow, lmx.blanket_geometry, lmx.centerline_fields
-import lmx.example_runner, lmx.plotting, lmx.q2d, lmx.showcase
+import lmx.plotting, lmx.q2d, lmx.showcase
 assert not any(name == 'matplotlib' or name.startswith('matplotlib.') for name in sys.modules)
 assert not any(name == 'PIL' or name.startswith('PIL.') for name in sys.modules)
 """
