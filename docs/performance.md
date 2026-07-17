@@ -16,7 +16,7 @@ calibration until idle-host admission passes.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 855 pass, 5 skip, 95.38% combined line/branch coverage, 164.9 s | 55% of the five-minute target and 27% of the ten-minute budget |
+| portable test gate | Apple M4, six workers | 854 pass, 5 skip, 95.37% combined line/branch coverage, 142.6 s | 48% of the five-minute target and 24% of the ten-minute budget |
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | B2 monitored CPU scaling | `256 x 67 x 67`, 32 updates, 2/4/8 guest CPUs, 1/2/4 JAX devices, three warm trajectories per topology | 244.763/173.033/158.354 s; 1.415x/1.546x; CV at most 2.318% | accepted CPU-allocation scaling at source `3339e95`; observer exclusion, exact restart, numerics, placement, memory, and continuous/postflight monitoring pass |
 | B2 multi-minute GPU calibration | `256 x 67 x 67`, 1/2 RTX A4000, 96 updates, three warm trajectories per topology | 258.913/159.234 s; 1.626x; peak device memory 2.50 GB vs 1.41/1.31 GB; CV below 0.29% | recorded source `78858f5`; numerical/duration gates pass, but persistent foreign contexts block an authoritative timing claim |
@@ -136,8 +136,9 @@ matched JAX 0.8.0 replay measured warm-time ratios of 1.155 for an immediate
 0.8.1 control and 1.184 for 0.8.2, so both miss the one-shot 1.10 threshold
 despite passing every forward, gradient, transpose, residual, memory, device,
 and Hartmann gate. SOLVAX PCG is unchanged between those releases; this is not
-evidence of a 0.8.2 regression, and no refresh is planned. SOLVAX 0.8.4 now
-owns the Anderson-weight API used by B2 restart schema 6.
+evidence of a 0.8.2 regression, and no refresh is planned. SOLVAX has owned the
+Anderson-weight API used by B2 restart schema 6 since 0.8.4; LMX now accepts
+released `solvax>=0.8.5,<1` and uses its additive line-preconditioner owner.
 The raw [0.8.1 control](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/solvax-pcg-0.8.1-control-gpu.json)
 (`ab54c5aa4a4787e1024d72d29ac5cd1c465c951bcaed82f179539cf75544fc7b`)
 and [0.8.2 probe](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/solvax-pcg-0.8.2-equivalence-gpu.json)

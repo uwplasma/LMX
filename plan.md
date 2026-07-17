@@ -1,6 +1,7 @@
 # LMX authoritative development plan
 
-Status: 2026-07-17. LMX consumes released SOLVAX 0.8.4. Restart schema 6
+Status: 2026-07-17. LMX consumes released SOLVAX 0.8.6 through the compatible
+`solvax>=0.8.5,<1` range. Restart schema 6
 provides compact, exact one-plus-one replay and correct 1/2/4-CPU plus 1/2-GPU
 placement. Its tested Anderson and bounded affine variants miss the frozen 15%
 velocity-map gain, so fixed relaxation 2 remains the B2 control. The current
@@ -134,7 +135,7 @@ large reusable artifacts go in checksummed releases.
 | Matched B2 harness | deterministic inputs, pinned sources, independent observers, and native two-update LMX/FreeMHD execution pass every frozen schema-3 smoke gate | production acceptance and mesh convergence remain open |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
 | README/docs | concise feature-led README, sourced comparison table, feature-specific visuals, steady-gated seven-second blanket loop, and Li/AlN convergence | replace legacy Hunt/Shercliff and Q2D loops only after their physical terminal gates pass; refresh B2/scaling only from accepted records |
-| SOLVAX | published 0.8.4 owns generic algebra and Anderson weights; main `d0623a2` prepares 0.8.5 with the accepted additive line builder | consume and delete LMX's duplicate only after 0.8.5 is tagged and published |
+| SOLVAX | released 0.8.6 owns generic algebra, Anderson weights, and the additive tridiagonal line preconditioner; LMX consumes the compatible `>=0.8.5,<1` API | add profiling ownership in SOLVAX's Krylov layer before another scaling algorithm change |
 | Distribution | lean installed wheel loads all frozen A/B references and runs a tiny solve without Matplotlib/Pillow; plotting is an explicit extra; source artifact excludes repository tests | bump 1.1.3 before publication; hosted release gate must be green |
 
 Current structure reflects completed ownership moves: frozen resources are
@@ -146,12 +147,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 34 | no new module | 34 |
-| package lines | 33,778 | reduce to at most 33,750 with the test-only builder deletion | 34,950 |
+| package lines | 33,573 | do not exceed 33,573 in the FreeMHD deletion tranche | 34,950 |
 | maintained-core lines | 7,614 | stay below 7,615 | 7,800 |
-| test files / lines | 30 / 20,663 | no new file; stay below 20,664 | 30 / 20,900 |
+| test files / lines | 30 / 20,662 | no new file; the next tranche must be a net deletion | 30 / 20,900 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 185 | no new file without retiring another owner | 186 |
-| tracked checkout | 4,583,844 bytes | stay below 4,583,845 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,577,164 bytes | stay below 4,577,165 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets come from ownership deletion and shared helpers, never unreadable
 formatting or arbitrary test merging. Recent moves delete 190 builder lines and
@@ -193,8 +194,25 @@ its tranche removes 240 tracked lines and 112 mock-test lines. The example-only
 writer are deleted. The pipe comparison is now a 160-line explicit, editable
 research-stage workflow; its tranche deletes 285 tracked lines and the package
 reference-data wrappers rather than hiding geometry and CSV handling behind a
-one-use API. Next make FreeMHD construction explicit and delete one-use
-convenience builders once no caller remains. The 1,238-line
+one-use API. The repository contract currently covers eight of ten Python
+examples. The remaining offenders are the 625-line FreeMHD observable workflow
+and the 1,238-line scaling driver; both still use parsers, `main()` guards, and
+opaque workflow owners.
+
+Refactor FreeMHD next in two reviewable commits. First replace the example and
+one Hunt physics-test call to the 149-line
+`showcase.solve_closed_channel_benchmark` with explicit public case, mesh,
+analytic-seed, solve, and validation construction; then delete that wrapper,
+its six dedicated tests, and its fixture. Preserve the accepted JSON schema and
+independent physics gates. Second make the example a top-to-bottom script with
+editable path, mesh, material, solver, and output inputs; keep only documented
+evidence helpers, execute Shercliff and Hunt visibly, and replace import/mutate
+automation with environment-backed execution plus reading the known summary.
+The exact evidence schema makes a safe 360--430-line target more credible than
+an arbitrary 160-line cap, while the combined tranche should still delete about
+350--500 tracked lines. Expand the AST contract to every Python example.
+
+The 1,238-line
 strong-scaling program is operational orchestration, not a pedagogical example:
 consolidate its reusable admission/monitor/worker logic into the existing
 scaling owner and leave only a short editable scaling workflow, or classify the
@@ -211,16 +229,19 @@ CLI input.
 
 Slim source by ownership, not by arbitrary splitting. `fringing.py` remains the
 first target. Stage B brought the package to 34,036 lines before the pipe
-tranche. Commit `b111813` then removed the confirmed dead station fallback,
-obsolete wrapper branch and solver hook: 199 package and 194 test lines. The
-clean current tree is 33,778 package lines and `fringing.py` is 8,028 lines.
-Next move the three test-only variable-field builders into their tests,
-deleting another 136 package lines for only about 20--30 test lines; later fold the one-use
-`build_square_duct_fringing_benchmark` for another 15--25 package lines. Keep 34
-modules, add no file, and after this group ratchet `fringing.py` to at most 8,000
-lines, the package to 33,750, and tests to 20,800. Split
+tranche. Commit `b111813` removed the confirmed dead station fallback, obsolete
+wrapper branch, and solver hook. Commit `8acf862` then moved three test-only
+variable-field builders into explicit tests, deleting 142 package lines for 29
+test lines; `fabca0a` folded the one-use square-duct helper for another 28
+package lines. Finally `05e754a` transferred the duplicate additive line
+preconditioner to released SOLVAX, deleting 35 package and 30 test lines while
+retaining bitwise primal/JIT/JVP/VJP, coefficient-gradient, and four-shard
+placement gates. The clean current tree is 33,573 package lines,
+`fringing.py` is 7,823 lines, and tests are 20,662 lines. Keep 34 modules and add
+no file. Split
 `_solve_extruded_projection` into same-module pipe and duct owners only after
-those deletions establish the smaller ownership surface. Subsequent audits are
+the FreeMHD deletion tranche establishes the next smaller ownership surface.
+Subsequent audits are
 `plotting.py`, `external_validation.py`, `solvers.py`, `wall_study.py`,
 `blanket_flow.py`, `autodiff.py`, `q2d.py`, `freemhd.py`, and `validation.py`.
 For each file, inventory public contracts and call sites; delete one-use example
@@ -236,8 +257,9 @@ all public functionality that remains claimed, and pass focused numerical and
 physics tests in under two minutes before commit and push. Run the complete
 portable gate once after a coherent structural/source group and before the next
 algorithmic stage. Stages A and B finish at 34,036 package lines, below the
-34,038-line pre-Stage-A baseline; the pipe and dead-fallback tranches lower the
-clean tree to 33,778. Do not combine a structural move with a numerical algorithm change.
+34,038-line pre-Stage-A baseline; the pipe, dead-fallback, builder, and SOLVAX
+ownership tranches lower the clean tree to 33,573. Do not combine a structural
+move with a numerical algorithm change.
 
 Exit: every example satisfies the shared workflow contract; the broken and
 opaque case/catalog layer is gone; no source file remains thousands of lines
@@ -271,15 +293,15 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
-The current complete gate after `2df2336` passes 855 tests with 5 expected
-skips and 95.38% combined coverage in 164.9 seconds. It remains below both the
+The current complete gate after `05e754a` passes 854 tests with 5 expected
+skips and 95.37% combined coverage in 142.6 seconds. It remains below both the
 300-second engineering target and 600-second hard limit. Keep the six-worker
 setting unless a fresh slow-node profile finds a node above 45 seconds or the
 gate materially regresses; example/mock deletion and the new axial-injection
 gate account for the changed test count.
 Merging identical magnetic-obstacle checks preserves 33 assertions, removes two
 solves and 28 lines, and cuts focused wall time 5.86 -> 4.52 seconds. The current
-suite is 20,663 lines; its next change remains a net deletion. Across the
+suite is 20,662 lines; its next change remains a net deletion. Across the
 editable-example, runner-deletion, autodiff-slimming, and steady-media-gate
 tranches, package and test lines remain net lower than the prior baseline.
 
@@ -357,10 +379,22 @@ the electric coarse modal gather is 173,056 bytes. Insufficient duration and
 axial size are ruled out, and the communication-defect gate passes.
 
 Profile the accepted Stage-B implementation phase by phase before changing its
-topology again. Attribute full-volume exchange, reductions, and iteration work
-to LMX setup, SOLVAX Krylov/operator ownership, projection, and transverse modal
-correction. In particular, determine whether Krylov can own compact sharded
-operator communication without duplicating LMX's physics algebra. Preserve
+topology again. Add zero-numerics annotations around LMX momentum setup and
+GMRES, projection PCG, electric PCG, reconstruction, and Anderson work; annotate
+SOLVAX matvec, preconditioner, Arnoldi/inner-product reductions, line solves,
+axial mean, and coarse correction. Capture one non-truncated four-device trace
+with phase barriers plus an ordinary asynchronous wall-time control. Report
+union time and per-iteration time rather than summed concurrent device activity,
+and require exact profile/control signatures and linear histories.
+
+The existing evidence already narrows ownership: momentum is only 0.084 seconds
+of the captured active slice versus 0.407 seconds for projection, and the trace
+contains roughly 560 PCG-loop collective events versus about 20 occurrences of
+each principal GMRES gather. SOLVAX single-reduction PCG is already enabled, so
+the next profile must distinguish synchronization from transverse-line,
+axial-mean, and replicated coarse-correction compute. Determine whether Krylov
+can own compact sharded operator communication without duplicating LMX's physics
+algebra. Preserve
 restricted-grid pressure conditioning; the global modal correction cannot be
 deleted merely because it communicates. Docker verifies guest affinity but
 exposes opaque vCPUs, so exact mapping to the M4's four performance and six
@@ -421,7 +455,11 @@ are 278,784 and 348,480 bytes, with the intended removal of full-volume setup
 payloads. Nevertheless, on the frozen `128 x 35 x 35`, six-step four-CPU screen,
 its 2.192642-second median is 0.03% slower than the Stage-B 2.191924-second
 median, far short of the required 10% medium-screen gain. No multi-minute run
-was launched. This topology is cancelled: do not restore it, relax the gate, or
+was launched. The candidate also raises total electric iterations from 371 to
+384, including 57 to 70 on its second step, while pressure iterations stay
+effectively unchanged. That extra downstream work and latency-heavy plane
+permutations explain why smaller setup payloads did not improve the complete
+solve. This topology is cancelled: do not restore it, relax the gate, or
 try another arrangement of the same boundary slabs without a new profile and a
 materially different communication owner.
 
@@ -432,9 +470,10 @@ placement. Do not impose a CPU communication remedy on the GPU path without a
 new GPU trace. The authoritative two-A4000 ladder still waits for clean host
 admission.
 
-Exit order: finish the test-only builder source-slimming group, capture a fresh
-Stage-B phase and HLO profile, and decide communication ownership with SOLVAX's
-Krylov/operator layer before authorizing another topology implementation. A new
+Exit order: the builder/SOLVAX source-slimming group is complete. Add profiling
+annotations, capture a fresh Stage-B phase and HLO profile, and decide
+communication ownership with SOLVAX's Krylov/operator layer before authorizing
+another topology implementation. A new
 candidate must first pass exact/HLO and bounded four-device gates, then the
 fixed-work medium CPU gate, and only then the multi-minute local CPU ladder with
 exact M4 core mapping. Optimize the separately profiled GPU compute path and rerun its
@@ -503,7 +542,7 @@ and operator audits are in
 `benchmarks/results/b2-pseudotime-map-rate-20260715.json` and
 `benchmarks/results/b2-momentum-defect-20260715.json`.
 
-SOLVAX 0.8.4 and LMX schema 6 are complete. The CPU topology proves one shared
+The SOLVAX Anderson integration and LMX schema 6 are complete. The CPU topology proves one shared
 distributed Gram/weight calculation and exact serialized replay while retaining
 about 35.8 MiB of prior state on the coarse grid instead of about 416.7 MiB for
 a depth-16 iterate/residual history. B1 retains its separate arbitrary-depth
@@ -610,23 +649,20 @@ self-promote unrelated features.
 
 ## SOLVAX ownership
 
-LMX remains on the published range `solvax>=0.8.4,<1`. SOLVAX main `d0623a2`
-prepares 0.8.5: 269 tests pass at 98.13% branch coverage, docs/lint pass, and
-the built wheel reports version 0.8.5. No `v0.8.5` tag or PyPI release exists,
-so LMX must not import the new API or use a Git dependency.
+LMX now uses the published range `solvax>=0.8.5,<1`; the clean environment
+resolves released 0.8.6. Commit `05e754a` adopts
+`additive_tridiagonal_line_preconditioner` and deletes LMX's duplicate 3D
+builder and direct unit contract. Duct, pipe, periodic, primal, JIT, JVP, VJP,
+coefficient-gradient, and forced four-shard comparisons are bitwise exact. The
+Python 3.10 compatibility lane retains 0.8.5 as the tested minimum, so this is a
+compatible range rather than a latest-release lock. Next audit the smaller 2D
+potential-line duplicate under the same gates.
 
-A `v0.8.5` tag automatically triggers SOLVAX's trusted PyPI publication, so it
-requires explicit release authority rather than ordinary commit/push authority.
-If publication is authorized after 2026-07-16, first correct the prepared dates
-in SOLVAX's `CITATION.cff` and `CHANGELOG.md`, push and await green checks, then
-tag the exact green commit and wait for PyPI metadata before changing LMX.
-
-After publication, raise the tested minimum to 0.8.5, adopt
-`additive_tridiagonal_line_preconditioner`, and delete LMX's duplicate 3D
-builder only after exact primal, gradient, JIT, physics, and timing gates pass.
-The prepared A/B is bitwise exact and would delete 35 production plus 28
-duplicate-test lines. Then audit the smaller 2D potential-line duplicate under
-the same gates.
+Before another scaling algorithm change, add profiling scopes to SOLVAX GMRES
+and PCG ownership: matvec, preconditioner, Arnoldi/inner-product reductions, and
+line solves. Make that change from a clean worktree based on current
+`origin/main`; the existing local SOLVAX checkout has unrelated user changes
+and must not be overwritten.
 
 LMX owns MHD equations, discretization, geometry, boundaries/gauges, corrected
 flux, physical residuals, restart, sharding policy, observables, and acceptance.
