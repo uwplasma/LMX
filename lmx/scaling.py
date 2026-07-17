@@ -162,6 +162,7 @@ _SUSTAINED_RUNTIME_IDENTITY = (
 )
 _SUSTAINED_WARM_SECONDS = 120.0
 _SUSTAINED_WARM_SAMPLES = 3
+_SUSTAINED_WARM_CV_MAX = 0.05
 
 
 def _sustained_timing_evidence(record: Mapping[str, object]) -> bool:
@@ -192,6 +193,7 @@ def _sustained_timing_evidence(record: Mapping[str, object]) -> bool:
         and np.all(np.isfinite(samples))
         and np.all(samples >= requested)
         and np.isclose(median, np.median(samples), rtol=1.0e-12, atol=1.0e-12)
+        and _warm_timing_stable(record)
         and all(bool(record.get(name)) for name in (
             "requested_duration_passed", "sustained_duration_passed",
             "sustained_timing_eligible", "timed_signature_excluded",
@@ -262,7 +264,7 @@ def _warm_timing_stable(record: Mapping[str, object]) -> bool:
         cv = float(np.std(samples) / mean)
     except (TypeError, ValueError):
         return False
-    return bool(mean > 0.0 and np.isfinite(cv) and cv <= 0.05)
+    return bool(mean > 0.0 and np.isfinite(cv) and cv <= _SUSTAINED_WARM_CV_MAX)
 
 
 def _sustained_group(records: Sequence[Mapping[str, object]],

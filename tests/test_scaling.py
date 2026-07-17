@@ -539,6 +539,7 @@ def test_sustained_scaling_requires_predeclared_multiminute_samples():
     assert not classify(0.0, [121.0, 122.0, 123.0])
     assert not classify(120.0, [120.0, 121.0])
     assert not classify(120.0, [120.0, 119.999, 121.0])
+    assert not classify(120.0, [120.0, 121.0, 180.0])
     assert classify(120.0, [120.0, 121.0, 122.0])
 
     cpu = json.loads(Path("benchmarks/results/b2-schema6-cpu-scaling-20260716.json").read_text())
@@ -635,6 +636,9 @@ def test_sustained_claim_fails_closed_on_incomplete_evidence():
     summaries = [summarize_strong_scaling_records(records) for records in bad]
     assert all(not summary["sustained_claim_eligible"] for summary in summaries)
     assert all(summary["best_sustained_speedup"] == 0.0 for summary in summaries)
+    assert not summarize_strong_scaling_records(noisy)["rows"][-1][
+        "sustained_timing_eligible"
+    ]
 
     static = _sustained_ladder((1, 2, 4))
     for record in static:

@@ -194,7 +194,9 @@ scaling.
 The sustained CPU launcher now records one-second host samples through the
 worker plus a 15-second postflight and binds the ignored JSONL digest to the
 source fingerprint; any probe, affinity, swapout, foreign-work, or gap violation
-blocks promotion. The remote GPU supervisor additionally binds UUID/PCI
+blocks promotion. Worker records and final summaries independently rederive
+the three-sample, two-minute, finite, 5%-CV timing gate. The remote GPU
+supervisor additionally binds UUID/PCI
 identity, worker contexts, utilization, and safe own-PID timeout cleanup.
 Each multi-minute rung now collects and atomically publishes fresh admission
 evidence immediately before launch, applies its admitted CPU affinity, and
@@ -207,7 +209,10 @@ specifications before any cross-host comparison is accepted.
 
 GPU topology/replay is exact on 1/2 A4000s. The current 96-update calibration
 reports 258.913/159.234 seconds and 1.626x speedup, but foreign contexts block
-an authoritative timing claim.
+an authoritative timing claim. A fresh current-source admission found 12
+foreign CUDA contexts and three CPU-heavy foreign processes, so no new timing
+was launched. Preserve the calibrated `256 x 67 x 67`, 96-update workload and
+rerun its one-cold-plus-three-warm ladder only after clean admission.
 
 Every current calibration fails closed on physical repeat signatures, linear
 status/history, placement, restart, conservation, and device equivalence.

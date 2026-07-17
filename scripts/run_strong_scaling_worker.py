@@ -34,6 +34,7 @@ from lmx.fringing import (
     _unpack_duct_mass_flux,
 )
 from lmx.scaling import (
+    _SUSTAINED_WARM_CV_MAX,
     _SUSTAINED_WARM_SAMPLES,
     _SUSTAINED_WARM_SECONDS,
     _bundle_memory_bytes,
@@ -70,10 +71,15 @@ def _sustained_timing_passed(
     """Require a predeclared multi-minute workload for scaling evidence."""
 
     samples = np.asarray(warm_samples, dtype=float)
+    mean = float(np.mean(samples)) if samples.size else 0.0
     return bool(
-        samples.size >= _SUSTAINED_WARM_SAMPLES
+        samples.ndim == 1
+        and samples.size >= _SUSTAINED_WARM_SAMPLES
         and minimum_warm_seconds >= _SUSTAINED_WARM_SECONDS
+        and np.all(np.isfinite(samples))
         and np.all(samples >= _SUSTAINED_WARM_SECONDS)
+        and mean > 0.0
+        and np.std(samples) / mean <= _SUSTAINED_WARM_CV_MAX
     )
 
 
