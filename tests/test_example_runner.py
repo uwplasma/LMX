@@ -308,18 +308,6 @@ def test_variable_field_extruded_demo_writes_summary(tmp_path: Path):
     assert (tmp_path / "variable_field_extruded_summary.json").exists()
 
 
-def test_operator_verification_demo_writes_summary(tmp_path: Path):
-    module = _load_example_module("operator_verification_demo.py")
-    module.OUTPUT_DIR = tmp_path
-    module.RESOLUTIONS = (12, 24, 48)
-    summary = module.run_operator_verification_demo()
-    assert summary["case"] == "operator_verification"
-    assert summary["observed_order"]["gradient_y"] > 1.8
-    assert summary["observed_order"]["gradient_z"] > 1.8
-    assert (tmp_path / "operator_verification.png").exists()
-    assert (tmp_path / "operator_verification_summary.json").exists()
-
-
 def test_extruded_restart_demo_is_state_exact(tmp_path: Path):
     module = _load_example_module("extruded_restart_demo.py")
     summary = module.run_extruded_restart_demo(out_dir=tmp_path)

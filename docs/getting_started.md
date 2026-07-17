@@ -46,7 +46,7 @@ lmx examples/cases/ducts/hunt_case.toml
 directory under ignored `artifacts/` or `out/` storage.
 
 Hartmann and Shercliff cases use canonical insulating/conducting duct limits.
-The Hunt case has conducting side walls and insulating Hartmann walls. These
+The Hunt case has conducting Hartmann walls and insulating side walls. These
 fully developed cases are the stable first-run surface.
 
 ## Python API

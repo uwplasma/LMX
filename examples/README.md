@@ -26,7 +26,9 @@ lmx examples/cases/ducts/hunt_case.toml
 lmx examples/cases/fringing/fringing_rect_case.toml
 ```
 
-Most Python examples accept `--help` and an output directory. The
+Python examples put editable inputs immediately after their imports and follow
+the same setup, solve, validation, output, and plotting order. Edit those
+values, then run the file from top to bottom. The
 [getting-started guide](../docs/getting_started.md) explains the stable path;
 the [case cookbook](../docs/case_cookbook.md) covers restarts, wall models,
 custom fields, and output.

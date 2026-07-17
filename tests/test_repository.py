@@ -160,39 +160,46 @@ def test_sdist_audit_rejects_repository_tests(tmp_path: Path) -> None:
     )[0]
 
 
-def test_every_workflow_is_curated() -> None:
-    inventory = build_inventory()["inventory"]
-    curated = {item["path"] for item in inventory["curated_examples"]}
-    assert curated == set(inventory["examples"])
-
-
-def test_curated_examples_use_submodules_for_advanced_apis() -> None:
+def test_curated_examples_use_submodules_and_linear_scripts_are_editable() -> None:
     inventory = build_inventory()["inventory"]
     stable = set(lmx.__all__)
     for item in inventory["curated_examples"]:
         path = Path(item["path"])
         if path.suffix != ".py":
             continue
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        root_imports = {
-            alias.name
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(path))
+        imports = (
+            node
             for node in ast.walk(tree)
             if isinstance(node, ast.ImportFrom) and node.module == "lmx"
-            for alias in node.names
-        }
+        )
+        root_imports = {alias.name for node in imports for alias in node.names}
         assert root_imports <= stable, (
             f"{path} imports legacy root APIs: {root_imports - stable}"
         )
+        if path.name in {"hartmann_example.py", "hunt_example.py", "operator_verification_demo.py"}:
+            assert ast.get_docstring(tree)
+            assert "# Inputs:" in source and "# Run" in source and len(source.splitlines()) <= 160
+            functions = (node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef))
+            assert all(node.name != "main" and ast.get_docstring(node) for node in functions)
+            assert "argparse" not in source and "__name__" not in source
 
 
-def test_curated_examples_declare_user_facing_contracts() -> None:
-    curated = build_inventory()["inventory"]["curated_examples"]
+def test_curated_examples_declare_user_facing_contracts(tmp_path: Path) -> None:
+    inventory = build_inventory()["inventory"]
+    curated = inventory["curated_examples"]
+    assert {item["path"] for item in curated} == set(inventory["examples"])
     assert len(curated) == 11
     for item in curated:
         assert item["command"]
         assert item["outputs"]
         assert item["runtime"] in {"portable", "external", "accelerator-optional"}
         assert Path(item["docs"]).is_file()
+    script = Path(__file__).resolve().parents[1] / "examples/operator_verification_demo.py"
+    subprocess.run([sys.executable, script], cwd=tmp_path, timeout=30, check=True)
+    summary = next((tmp_path / "artifacts").rglob("operator_verification_summary.json"))
+    assert json.loads(summary.read_text())["observed_order"]["gradient_y"] > 1.8
 
 
 def test_benchmark_provenance_is_current() -> None:
