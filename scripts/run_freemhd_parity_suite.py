@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import time
+import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -44,9 +45,80 @@ DEFAULT_FREEMHD_INSTALL_DIR = Path("/Users/rogerio/local/tests/freemhd_install")
 DEFAULT_FREEMHD_SOURCE_REPO = Path("/Users/rogerio/local/tests/lmx_external_codes/FreeMHD")
 DEFAULT_PROCESSED_ROOT = default_closed_channel_reference_root()
 
+_S3_PIPE_ARCHIVE = {
+    "name": "S3_Buhler_Ha616.zip",
+    "drive_id": "1vrLEVOk2NzH6O_Qv80ze0BPM0kM0rYoF",
+    "size": 1_930_938_126,
+    "sha256": "6aa165e95275f29fd2d014c6ef3a91e4e8d80b16d82b3040d9d6b90ab74e6091",
+    "member_count": 315,
+    "expanded_bytes": 8_768_646_452,
+    "members": {
+        "system/blockMeshDict.m4": (9457, "4daad09ddaad1f8667e483edf0f08643c475244be247267d947de317d625d56b"),
+        "system/controlDict": (4411, "c229acce568c65b108de034b4c072c40ea224e12017fa50fdcb3878c69a1e3aa"),
+        "system/liquid/changeDictionaryDict": (6242, "13c643f2137e5166fb7e68793c0c19cb14a5dfd1e9e2f94881362d0bb20fae80"),
+        "system/liquid/setExprFieldsDict": (1447, "3df6afb74fdc744991e20c46406e430a1048504197b711c461e061912461dbef"),
+        "constant/liquid/thermophysicalProperties.liquidMetal": (1462, "5ac916feee7bf3c286d878500f198b270d770e61d14678bdb82d3c1f4eb787a9"),
+        "constant/solidWalls/thermophysicalProperties": (1380, "dfbea3db8730d4b19cf1e2ae7ad23134b3eea13d9a99a5648fb012afdb0e8d96"),
+        "postProcessing/vtkWrite/liquid/S3_Buhler_Ha616_CenterLine_3.08s.csv": (277389, "92a0f469b2c3f1ed7387e49c95d354e6ca10967a2a6fd06f94ad43d986e83e8e"),
+    },
+}
+
 _FREEMHD_SOURCE_NAMES = (
     "momentum", "electric", "limiter", "scheme_macro", "limiter_registration", "nvd", "vector_transform",
 )
+
+
+def preflight_freemhd_s3_pipe_archive(archive: str | Path) -> dict[str, object]:
+    """Verify the public native-pipe archive without extracting or claiming B1 parity."""
+
+    source, expected, failed = Path(archive), _S3_PIPE_ARCHIVE, []
+    observed_sha256 = None
+    try:
+        if source.name != expected["name"]:
+            failed.append("archive.basename")
+        if source.is_symlink() or not source.is_file():
+            failed.append("archive.regular_file")
+        elif source.stat().st_size != expected["size"]:
+            failed.append("archive.size")
+        else:
+            observed_sha256 = artifact_sha256(source, "file")
+            if observed_sha256 != expected["sha256"]:
+                failed.append("archive.sha256")
+        if not failed:
+            with zipfile.ZipFile(source) as zipped:
+                entries = zipped.infolist()
+                if len(entries) != expected["member_count"]:
+                    failed.append("archive.member_count")
+                if sum(entry.file_size for entry in entries) != expected["expanded_bytes"]:
+                    failed.append("archive.expanded_bytes")
+                for name, (size, digest) in expected["members"].items():
+                    matches = [entry for entry in entries if entry.filename == name]
+                    if len(matches) != 1:
+                        failed.append(f"member.{name}.count")
+                    elif matches[0].file_size != size:
+                        failed.append(f"member.{name}.size")
+                    elif hashlib.sha256(zipped.read(matches[0])).hexdigest() != digest:
+                        failed.append(f"member.{name}.sha256")
+    except (OSError, RuntimeError, ValueError, zipfile.BadZipFile) as error:
+        failed.append(f"archive.error.{type(error).__name__}")
+    passed = not failed
+    return {
+        "schema_version": 1,
+        "archive": expected["name"],
+        "drive_id": expected["drive_id"],
+        "expected_sha256": expected["sha256"],
+        "observed_sha256": observed_sha256,
+        "preflight_pass": passed,
+        "failed_checks": failed,
+        "classification": "native-freemhd-pipe-regression" if passed else "unverified-user-archive",
+        "mesh_design_hartmann_number": 615.4967525064808,
+        "runtime_property_hartmann_number": 573.33628803877,
+        "alex_b1_parity": False,
+        "solver_executed": False,
+        "source_commit_available": False,
+        "archived_observer_eligible": False,
+        "extraction_authorized": False,
+    }
 
 
 def audit_freemhd_case_against_spec(
@@ -1248,6 +1320,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="run and independently validate the exact two-update LMX/FreeMHD smoke",
     )
+    mode.add_argument(
+        "--freemhd-s3-preflight",
+        type=Path,
+        metavar="ARCHIVE",
+        help="verify the public native-pipe archive without extracting it",
+    )
     parser.add_argument("--freemhd-image", default=os.environ.get("LMX_FREEMHD_IMAGE", "freemhd-install:latest"))
     parser.add_argument("--nproc", type=int, default=2)
     parser.add_argument("--smoke-timeout", type=float, default=600.0)
@@ -1268,6 +1346,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    if args.freemhd_s3_preflight:
+        report = preflight_freemhd_s3_pipe_archive(args.freemhd_s3_preflight)
+        _write_json(args.output / "freemhd-s3-preflight.json", report)
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return 0 if report["preflight_pass"] else 2
     if args.materialize:
         manifest = materialize_matched_freemhd_case(
             args.freemhd_install_dir / "cases" / f"{args.materialize}_demo",

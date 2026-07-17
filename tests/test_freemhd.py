@@ -1049,6 +1049,25 @@ def test_parity_command_materializes_without_running_suite(tmp_path: Path, monke
     ]) == 0
 
 
+def test_s3_pipe_archive_preflight_is_identity_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    archive, member, content = tmp_path / "S3_Buhler_Ha616.zip", "system/controlDict", b"control"
+    with run_freemhd_parity_suite.zipfile.ZipFile(archive, "w") as zipped:
+        zipped.writestr(member, content)
+    expected = {
+        "name": archive.name, "drive_id": "fixture", "size": archive.stat().st_size,
+        "sha256": artifact_sha256(archive, "file"), "member_count": 1,
+        "expanded_bytes": len(content), "members": {member: (len(content), hashlib.sha256(content).hexdigest())},
+    }
+    monkeypatch.setattr(run_freemhd_parity_suite, "_S3_PIPE_ARCHIVE", expected)
+    assert run_freemhd_parity_suite.main(
+        ["--output", str(tmp_path / "preflight"), "--freemhd-s3-preflight", str(archive)]) == 0
+    report = json.loads((tmp_path / "preflight/freemhd-s3-preflight.json").read_text())
+    assert report["preflight_pass"] and not report["alex_b1_parity"]
+    expected["members"][member] = (len(content), "0" * 64)
+    rejected = run_freemhd_parity_suite.preflight_freemhd_s3_pipe_archive(archive)
+    assert not rejected["preflight_pass"] and rejected["classification"] == "unverified-user-archive"
+
+
 @pytest.mark.parametrize("result", ["success", "timeout", "failure"])
 def test_matched_b2_docker_runner_enforces_deadline_and_cleanup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, result: str

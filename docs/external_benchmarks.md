@@ -61,6 +61,23 @@ The original Docker examples were found to describe physical `Ha = 1000`, not
 the nominal `Ha = 20` comparison. Those outputs are historical workflow data,
 not accepted parity evidence. The audited case specification is authoritative.
 
+### Native fringing-pipe archive admission
+
+Verify a user-supplied `S3_Buhler_Ha616.zip` without extracting its 8.77 GB
+payload:
+
+```bash
+.venv/bin/python scripts/run_freemhd_parity_suite.py \
+  --freemhd-s3-preflight /external/S3_Buhler_Ha616.zip \
+  --output /external/s3-preflight
+```
+
+The gate streams the frozen 1.93 GB hash and verifies seven small members. A
+pass means only `native-freemhd-pipe-regression`: the archive has no source SHA
+or explicit reuse license, its supplied observer contains nonfinite data, and
+its runtime `Ha ≈ 573` differs from both its design label and ALEX B1. The gate
+therefore never authorizes extraction, archived-output acceptance, or B1 parity.
+
 ## Matched Benchmark B contract
 
 Benchmark-B acceptance no longer trusts a record-supplied

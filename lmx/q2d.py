@@ -9,6 +9,8 @@ import numpy as np
 
 @dataclass(frozen=True)
 class Q2DDecayCase:
+    """Periodic single-mode decay case with linear Hartmann friction."""
+
     nx: int = 96
     ny: int = 96
     lx: float = 2.0
@@ -37,6 +39,8 @@ class Q2DDecaySolution:
 
 @dataclass(frozen=True)
 class Q2DForcedCase:
+    """Periodic forced single-mode case with linear Hartmann friction."""
+
     nx: int = 96
     ny: int = 96
     lx: float = 2.0
@@ -65,6 +69,8 @@ class Q2DForcedSolution:
 
 @dataclass(frozen=True)
 class Q2DWallBoundedForcedCase:
+    """Dirichlet-wall forced single-mode case."""
+
     nx: int = 96
     ny: int = 96
     lx: float = 2.0
@@ -93,6 +99,8 @@ class Q2DWallBoundedForcedSolution:
 
 @dataclass(frozen=True)
 class Q2DWallDrivenCavityCase:
+    """Side-wall-driven Q2D cavity case."""
+
     nx: int = 201
     ny: int = 101
     lx: float = 0.04
@@ -122,6 +130,8 @@ class Q2DWallDrivenCavitySolution:
 
 @dataclass(frozen=True)
 class Q2DTurbulenceDecayCase:
+    """Periodic nonlinear Q2D vorticity-decay case."""
+
     nx: int = 96
     ny: int = 96
     lx: float = 2.0
@@ -152,149 +162,13 @@ class Q2DTurbulenceDecaySolution:
     final_spectrum: dict[str, list[float]]
 
 
-def build_q2d_decay_case(
-    *,
-    nx: int = 96,
-    ny: int = 96,
-    lx: float = 2.0,
-    ly: float = 2.0,
-    viscosity: float = 0.01,
-    hartmann_friction: float = 2.0,
-    mode_x: int = 1,
-    mode_y: int = 1,
-    amplitude: float = 1.0,
-    dt: float = 5.0e-4,
-    t_final: float = 0.08,
-) -> Q2DDecayCase:
-    return Q2DDecayCase(
-        nx=nx,
-        ny=ny,
-        lx=lx,
-        ly=ly,
-        viscosity=viscosity,
-        hartmann_friction=hartmann_friction,
-        mode_x=mode_x,
-        mode_y=mode_y,
-        amplitude=amplitude,
-        dt=dt,
-        t_final=t_final,
-    )
-
-
-def build_q2d_turbulence_decay_case(
-    *,
-    nx: int = 96,
-    ny: int = 96,
-    lx: float = 2.0,
-    ly: float = 2.0,
-    viscosity: float = 8.0e-4,
-    hartmann_friction: float = 0.08,
-    amplitude: float = 6.0,
-    forcing_amplitude: float = 0.08,
-    forcing_wavenumber: int = 4,
-    dt: float = 2.0e-3,
-    t_final: float = 3.0,
-    frame_count: int = 72,
-) -> Q2DTurbulenceDecayCase:
-    return Q2DTurbulenceDecayCase(
-        nx=nx,
-        ny=ny,
-        lx=lx,
-        ly=ly,
-        viscosity=viscosity,
-        hartmann_friction=hartmann_friction,
-        amplitude=amplitude,
-        forcing_amplitude=forcing_amplitude,
-        forcing_wavenumber=forcing_wavenumber,
-        dt=dt,
-        t_final=t_final,
-        frame_count=frame_count,
-    )
-
-
-def build_q2d_forced_case(
-    *,
-    nx: int = 96,
-    ny: int = 96,
-    lx: float = 2.0,
-    ly: float = 2.0,
-    viscosity: float = 0.01,
-    hartmann_friction: float = 2.0,
-    mode_x: int = 1,
-    mode_y: int = 1,
-    forcing_amplitude: float = 1.0,
-    dt: float = 5.0e-4,
-    t_final: float = 0.2,
-) -> Q2DForcedCase:
-    return Q2DForcedCase(
-        nx=nx,
-        ny=ny,
-        lx=lx,
-        ly=ly,
-        viscosity=viscosity,
-        hartmann_friction=hartmann_friction,
-        mode_x=mode_x,
-        mode_y=mode_y,
-        forcing_amplitude=forcing_amplitude,
-        dt=dt,
-        t_final=t_final,
-    )
-
-
-def build_q2d_wall_bounded_forced_case(
-    *,
-    nx: int = 96,
-    ny: int = 96,
-    lx: float = 2.0,
-    ly: float = 2.0,
-    viscosity: float = 0.01,
-    hartmann_friction: float = 2.0,
-    mode_x: int = 1,
-    mode_y: int = 1,
-    forcing_amplitude: float = 1.0,
-    dt: float = 5.0e-4,
-    t_final: float = 0.2,
-) -> Q2DWallBoundedForcedCase:
-    return Q2DWallBoundedForcedCase(
-        nx=nx,
-        ny=ny,
-        lx=lx,
-        ly=ly,
-        viscosity=viscosity,
-        hartmann_friction=hartmann_friction,
-        mode_x=mode_x,
-        mode_y=mode_y,
-        forcing_amplitude=forcing_amplitude,
-        dt=dt,
-        t_final=t_final,
-    )
-
-
-def build_q2d_wall_driven_cavity_case(
-    *,
-    nx: int = 201,
-    ny: int = 101,
-    lx: float = 0.04,
-    ly: float = 0.04,
-    viscosity: float = 2.27e-7,
-    hartmann_friction: float = 1.7025e-2,
-    right_wall_velocity: float = 0.1,
-    dt: float = 5.0e-4,
-    t_final: float = 1.0,
-    frame_count: int = 48,
-) -> Q2DWallDrivenCavityCase:
-    return Q2DWallDrivenCavityCase(
-        nx=nx,
-        ny=ny,
-        lx=lx,
-        ly=ly,
-        viscosity=viscosity,
-        hartmann_friction=hartmann_friction,
-        right_wall_velocity=right_wall_velocity,
-        dt=dt,
-        t_final=t_final,
-        frame_count=frame_count,
-    )
+# Public builder spellings remain compatible while the frozen dataclasses own
+# every field, default, constructor signature, and validation-facing type.
+build_q2d_decay_case = Q2DDecayCase
+build_q2d_turbulence_decay_case = Q2DTurbulenceDecayCase
+build_q2d_forced_case = Q2DForcedCase
+build_q2d_wall_bounded_forced_case = Q2DWallBoundedForcedCase
+build_q2d_wall_driven_cavity_case = Q2DWallDrivenCavityCase
 
 
 def _periodic_laplacian(field: np.ndarray, *, dx: float, dy: float) -> np.ndarray:

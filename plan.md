@@ -123,12 +123,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,436 | stay below 34,437 | 35,100 |
+| package lines | 34,310 | stay below 34,311 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 20,985 | no new file; next test change must reduce lines | 31 / 21,100 |
+| test files / lines | 30 / 21,004 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,570,014 bytes | stay below 4,570,015 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,574,159 bytes | stay below 4,574,160 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -137,6 +137,9 @@ variable-field validation fail closed on nonfinite velocity, folded two
 duplicate solve tests into stronger physics owners, and removed Q2D's duplicate
 coordinate-edge helper without changing rendered output. The direct B1 gate
 remains, and B2 reuses complete checkpoints.
+Five Q2D builder wrappers are now compatibility aliases to their documented
+frozen dataclass owners, deleting another 126 package lines while preserving
+every current keyword call, default, result type, solver, plot, and movie path.
 The remaining result records, 13 scripts, and distinct Python/TOML examples
 retain current provenance, CI, or runnable-workflow ownership; do not merge
 them unless the replacement deletes code without weakening those contracts.
@@ -172,13 +175,15 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
-The current gate passes 863 tests with 8 expected skips and 95.42% combined
-coverage in 124.7 seconds. Shared centerline validation removes 20 source lines;
+The current gate passes 864 tests with 8 expected skips and 95.42% combined
+coverage in 122.8 seconds. Shared centerline validation removes 20 source lines;
 the layered-flow consolidation removes 17 test lines and one redundant
 6.894-second solve while retaining finite-field, current, and physics gates.
 Shared figure-pair assertions subsequently remove another 20 test lines while
 preserving all five ordered output and existence contracts; focused Q2D and
 repository gates pass.
+The native S3 archive workflow adds one 19-line API/CLI mutation test, leaving
+the combined test tranche one line below its 21,005-line starting point.
 The next test change remains a net deletion.
 
 ### Canonical sharding and performance
@@ -223,6 +228,7 @@ GPU topology/replay is exact on 1/2 A4000s. The recorded-source `78858f5`
 reports 258.913/159.234 seconds and 1.626x speedup, but foreign contexts block
 an authoritative timing claim. The latest audit found five foreign contexts on
 each GPU, including a CPU-heavy VMEC-JAX process, so no new timing was launched.
+A fresh audit also found two host processes above the admission CPU threshold.
 A dedicated JAX/CUDA 0.6.2 and SOLVAX 0.8.4 benchmark environment now passes
 the two-device import check. Preserve the calibrated `256 x 67 x 67`, 96-update
 workload and rerun its one-cold-plus-three-warm ladder only after clean admission.
@@ -385,13 +391,14 @@ fluid/conducting-wall O-grid is geometry-compatible with LMX's pipe mapping and
 was prepared for 96 MPI ranks, but the archive does not expose a reuse license
 and its Ha=616 PbLi-like setup is not parameter-identical to frozen ALEX B1 at
 Ha=6600. Never add the 1.93 GB archive or its 8.77 GB expanded mesh to Git.
-First freeze a solver-free, user-supplied-archive preflight keyed by Drive ID,
-exact size, full and selected small-file hashes. It must report the runtime
-property Ha near 573 separately from the mesh-design label near 616 and classify
-the case only as a native-FreeMHD pipe regression. Then freeze coordinates,
-nondimensionalization, and observer mapping before authorizing a reduced-mesh,
-two-update Docker pilot. Retained-modal results remain numerical evidence, not
-exact-formulation parity.
+The manual runner's `--freemhd-s3-preflight` gate now streams the full hash and
+verifies seven small members without extraction. It reports the runtime-property
+Ha near 573 separately from the mesh-design label near 616, classifies the case
+only as a native-FreeMHD pipe regression, and always denies ALEX parity,
+archived-observer acceptance, source pinning, and solver execution. Next freeze
+coordinates, nondimensionalization, and observer mapping in a reduced O-grid
+materializer before authorizing a two-update pinned-source Docker pilot.
+Retained-modal results remain numerical evidence, not exact-formulation parity.
 The supplied 2.62-million-cell archive ran 8.22 hours on 96 ranks, records no
 FreeMHD Git SHA, and its 3.08-second centerline CSV contains a nonfinite row;
 the 2.28-to-3.08-second velocity change is still about 10%. Therefore archived
