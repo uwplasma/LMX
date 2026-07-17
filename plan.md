@@ -146,13 +146,13 @@ shared without removing cases or assertions.
 
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
-| package modules | 33 | no new module without retiring an owner | 34 |
-| package lines | 32,788 | stay below 32,789 | 34,950 |
+| package modules | 32 | no new module without retiring an owner | 34 |
+| package lines | 30,852 | stay below 30,853 | 34,950 |
 | maintained-core lines | 7,614 | stay below 7,615 | 7,800 |
-| test files / lines | 29 / 20,243 | no new file; the next tranche must be a net deletion | 30 / 20,900 |
+| test files / lines | 28 / 19,669 | no new file; the next tranche must be a net deletion | 30 / 20,900 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
-| tracked files | 183 | no new file without retiring another owner | 186 |
-| tracked checkout | 4,543,473 bytes | stay below 4,543,474 without hiding direct visuals | 4,718,592 bytes |
+| tracked files | 182 | no new file without retiring another owner | 186 |
+| tracked checkout | 4,427,464 bytes | stay below 4,427,465 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets come from ownership deletion and shared helpers, never unreadable
 formatting or arbitrary test merging. Recent moves delete 190 builder lines and
@@ -194,7 +194,7 @@ its tranche removes 240 tracked lines and 112 mock-test lines. The example-only
 writer are deleted. The pipe comparison is now a 160-line explicit, editable
 research-stage workflow; its tranche deletes 285 tracked lines and the package
 reference-data wrappers rather than hiding geometry and CSV handling behind a
-one-use API. The repository contract now covers nine of ten Python examples.
+one-use API. The repository contract now covers all eleven Python examples.
 The FreeMHD workflow is a documented top-to-bottom script with editable path,
 geometry, material, field, mesh, and solver inputs. It explicitly builds and
 solves Shercliff and Hunt, has no parser, `main()` or guard, and scheduled
@@ -205,14 +205,19 @@ preserving the evidence schema and optional real-physics gate. The 700-line
 research-evidence script remains above the preferred 360--430-line target;
 reduce it only by finding genuinely reusable validation ownership or deleting
 redundant evidence, not by hiding case construction or compressing readable
-code. The only remaining Python offender is the 1,238-line scaling driver.
+code. Commit `7e4363c` reclassifies the strong-scaling campaign without moving
+it unchanged: the example falls from 1,238 to 113 linear, editable lines; its
+tests fall from 1,104 to 856 lines; and the six-file tranche deletes 619 net
+tracked lines. The existing fingerprinted worker now owns one B2-only campaign,
+retained single-rung modes, fresh admission, continuous/postflight monitoring,
+local CPU execution, and the directly executed office two-GPU workflow. The
+example and worker together fall from 2,145 to 1,783 lines.
 
-The 1,238-line
-strong-scaling program is operational orchestration, not a pedagogical example:
-consolidate its reusable admission/monitor/worker logic into the existing
-scaling owner and leave only a short editable scaling workflow, or classify the
-reproducer as maintenance tooling while keeping a small example. Do not move
-1,238 lines unchanged to another folder.
+Commit `4e48817` retires the 1,936-line case-specific `wall_study` leaf and its
+359-line mock-only test. One 241-line Li/AlN example now explicitly constructs
+the wall stack, mesh, solve, diagnostics, JSON, and plot through generic wall,
+mesh, unit, and solver owners. The tranche deletes 2,003 net lines and one
+tracked file; its 36 focused physics/example/architecture gates pass.
 
 After the Python replacements pass, delete `examples/cases/`, `catalog.toml`,
 the root TOML example, and the tracked tabulated-field fixture. This removes
@@ -235,22 +240,23 @@ placement gates. After phase annotations and the FreeMHD ownership deletion,
 the phase-timing diagnostic temporarily brought the tree to 33,485 package
 lines. Removing the orphaned `lmx.showcase` workflow owner and its mock-only
 test file then deleted 697 package and 233 test lines. The current tree is
-32,788 package lines, `fringing.py` is 7,889 lines, and tests are 20,243 lines;
-the diagnostic cost is fully recovered. Keep 33 modules and add no file.
+30,852 package lines, `fringing.py` is 7,889 lines, and tests are 19,669 lines;
+the diagnostic cost is fully recovered. Keep 32 modules and add no file.
 
-The completed hotspot audit sets the next ownership order:
+The scaling and wall-study ownership decisions are complete. The next order is:
 
-1. reclassify the 1,238-line scaling campaign as operational infrastructure and
-   leave a short linear local scaling example; do not move it unchanged;
-2. decide the 1,936-line Li/AlN `wall_study` leaf: retain reusable wall physics
-   and make its actual workflow visible in one example before retiring wrappers;
-3. keep the computational core of `blanket_flow`, but move one-off JSON, CSV,
-   plot, frame, and movie assembly into a visible blanket example;
-4. keep differentiable objectives and primitives in `autodiff`, while moving
+1. delete the now-unnecessary `examples/cases/`, catalog, root TOML, and broken
+   tabulated fixture while keeping one documented copy-paste TOML schema;
+2. keep the computational core of `blanket_flow`, but move one-off JSON, CSV,
+   plot, frame, and movie assembly into a visible blanket example. The completed
+   read-only audit identifies 909 removable package lines and projects the
+   module from 1,762 to about 849 lines; consolidate essential physics/AD gates
+   into existing test files and preserve the accepted seven-second asset;
+3. keep differentiable objectives and primitives in `autodiff`, while moving
    host gradient-descent loops and history assembly into the design example;
-5. decide whether NumPy/SciPy `q2d` is ported to JAX with a real example or
+4. decide whether NumPy/SciPy `q2d` is ported to JAX with a real example or
    explicitly demoted from the differentiable core;
-6. only then separate the reviewed duct and mapped-pipe owners inside the
+5. only then separate the reviewed duct and mapped-pipe owners inside the
    7,889-line fringing solver, preserving current public imports during the
    transition.
 
@@ -271,8 +277,9 @@ physics tests in under two minutes before commit and push. Run the complete
 portable gate once after a coherent structural/source group and before the next
 algorithmic stage. Stages A and B finish at 34,036 package lines, below the
 34,038-line pre-Stage-A baseline; the pipe, dead-fallback, builder, and SOLVAX
-ownership tranches plus the FreeMHD/showcase deletions lower the clean tree to
-32,788. Do not combine a structural move with a numerical algorithm change.
+ownership tranches plus the FreeMHD/showcase, wall-study, and scaling deletions
+lower the clean tree to 30,852. Do not combine a structural move with a
+numerical algorithm change.
 
 Exit: every example satisfies the shared workflow contract; the broken and
 opaque case/catalog layer is gone; no source file remains thousands of lines
@@ -306,16 +313,20 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
-The current complete gate after the phase diagnostic and orphan-showcase
-deletion passes 841 tests with 5 expected skips and 95.33% combined coverage in
-131.9 seconds. It remains
-below both the 300-second engineering target and 600-second hard limit. Keep
-the six-worker setting unless a fresh slow-node profile finds a node above 45
-seconds or the gate materially regresses; example/mock deletion and the new axial-injection
-gate account for the changed test count.
+The current complete gate after the scaling and wall-study deletions passes 818
+tests with 5 expected skips and 95.26% combined line/branch coverage in 281.0
+seconds. It remains below the 300-second engineering target and 600-second hard
+limit, but with only 19 seconds of engineering headroom. Four nodes exceed the
+45-second review threshold: the B2 reduced restart gate (78.02 s), axial
+injection primal/JVP/VJP gate (56.27 s), real Li/AlN example gate (54.80 s), and
+nonrectangular autodiff inverse-design gate (45.77 s). Preserve their physics
+and differentiation assertions, but make these the next CI-runtime targets;
+the new wall example should reuse a smaller accepted smoke setup or shared
+compiled fixture before any test expansion. Keep six-worker work stealing
+unless an isolated A/B clears 10%.
 Merging identical magnetic-obstacle checks preserves 33 assertions, removes two
 solves and 28 lines, and cuts focused wall time 5.86 -> 4.52 seconds. The current
-suite is 20,243 lines; its next change remains a net deletion. Across the
+suite is 19,669 lines; its next change remains a net deletion. Across the
 editable-example, runner-deletion, autodiff-slimming, and steady-media-gate
 tranches, package and test lines remain net lower than the prior baseline.
 
@@ -786,7 +797,7 @@ test-owned budget. Host source frames, full-quality media, meshes, and raw
 outputs stay in checksummed releases. Put provenance and acceptance status
 beside every asset.
 
-The README is 617 words with 14 directly embedded visuals. README/docs media
+The README is 673 words with 14 directly embedded visuals. README/docs media
 covers accepted ducts and analytical/FreeMHD comparisons plus research-stage
 blanket, Q2D, curved-pipe, fringing, obstacle, restart, autodiff, and scaling
 results. The 20 tracked derivatives remain below the 1.25 MiB cap.
