@@ -106,7 +106,7 @@ The retained specifications and references are:
 | Case | Geometry | Reference | Status |
 |---|---|---|---|
 | B1 | conducting circular pipe | `alex-b1-pipe.csv` | pressure solver accepted; experimental observable open |
-| B2 | conducting square duct | `alex-b2-square.csv` | research-stage; bounded 1/2-GPU calibration passes, steady scaling open |
+| B2 | conducting square duct | `alex-b2-square.csv` | research-stage; CPU-allocation scaling passes, steady acceptance open |
 
 Files live in `lmx/data/benchmarks/specs/` and
 `lmx/data/benchmarks/references/`. Construction and
@@ -132,10 +132,15 @@ B2 supports named axial sharding. The current canonical tiny path has equivalent
 observables and exact restart on one, two, and four CPU devices. The
 pre-schema-6 replacement passed exact 1/2-GPU repeat/restart, conservation,
 placement, and equivalence gates. Current schema-6 topology, placement, and
-exact serialized replay pass on one and two GPUs. The `128 x 67 x 67` pre-schema-6 calibration has low-variance warm medians of 2.780
+exact serialized replay pass on one and two GPUs. The callback-free
+`256 x 67 x 67`, 32-update CPU ladder has 244.923/172.521/148.460-second
+medians and 1.420x/1.650x speedups on one/two/four devices; exact restart,
+placement, memory, and continuous monitoring pass. This establishes Docker
+CPU-allocation scaling, not steady-production scaling or exact M4 core mapping.
+The `128 x 67 x 67` pre-schema-6 GPU calibration has low-variance warm medians of 2.780
 and 2.400 seconds. Its 1.159x speedup misses the 1.2x promotion gate.
-The doubled-axial `256 x 67 x 67` rung is stable but reaches only 1.125x, below
-the promotion threshold. Production scaling remains open. A superseded
+The doubled-axial GPU rung is stable but reaches only 1.125x, below
+the promotion threshold. Authoritative idle-host GPU timing remains open. A superseded
 formulation's fixed-size timing improved from 36.96 s to 22.23 s; this is not a
 current scaling claim. The fine-checkpoint transverse Galerkin
 gate separately reduces electric iterations 5.18x and matched two-update time

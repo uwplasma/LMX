@@ -90,7 +90,8 @@ observables pass the 1% finite-grid gate.
 ![B2 fringe-field diagnostics](docs/_static/readme-alex-b2-field-pressure.webp)
 
 B2 passes exact restart and schema-6 topology gates (1/2/4 CPU; 1/2 GPU).
-Shared-norm acceleration fails; production parity/scaling promotion remain open.
+Shared-norm acceleration and production parity remain open; CPU-allocation
+scaling is accepted, while exact-core and idle-host GPU timing remain open.
 [Fringing status →](https://lmx.readthedocs.io/en/latest/fringing.html)
 
 ## Follow curved pipes

@@ -68,7 +68,7 @@ Exact benchmark node IDs and source hashes remain in the
 | Fields, geometry, walls, and blanket models | field, mesh, wall, and blanket tests | limiting cases and convergence | scoped external status |
 | Differentiability | autodiff and gradient-focused solver tests | finite-difference and transpose evidence | stable paths accepted |
 | Q2D and external adapters | Q2D and external-validation tests | independent-data readiness | quantitative parity open |
-| Sharding and scaling | scaling and placement tests | exact topology plus monitored multi-minute records | callback-free CPU, physical-core, and authoritative GPU scaling open |
+| Sharding and scaling | scaling and placement tests | exact topology plus promoted callback-free Docker CPU-allocation scaling | exact physical-core and authoritative GPU scaling open |
 | Plots, examples, and packaging | plotting, showcase, repository, and reporting tests | media, docs, wheel, and provenance gates | stable |
 
 Coverage is a floor, not a validation claim. Physics acceptance requires

@@ -148,14 +148,15 @@ the placement gate now rejects that invalid point. The divisible `516`-station
 diagnostic verifies 2/4/6 real shards and shows that four CPU devices are best
 for this small operator workload. It is not a production-solver speedup claim.
 
-The current schema-6 CPU gate uses the real two-update B2 path on a fixed
+The earlier schema-6 CPU precursor uses the real two-update B2 path on a fixed
 `256 x 67 x 67` grid. A global correction on the restricted coarse grid removes
 artificial Neumann interfaces at shard boundaries and restores electric PCG
 counts from `159/129` and `193/157` to `109/87`. Warm medians are 15.159,
 12.337, and 11.146 seconds on one/two/four forced JAX CPU devices. The 95%
 speedup lower bounds are 1.209 and 1.319: two devices pass, but four devices
-miss the frozen 1.40 speedup and 35% efficiency gates. Correctness and the
-optimization are accepted; production strong scaling is not.
+miss the frozen 1.40 speedup and 35% efficiency gates. It established
+correctness but not scaling; the later callback-free 32-update ladder
+supersedes its timing classification.
 
 A paired `128 x 35 x 35` probe rejected removing the separate axial-mean
 correction when the global modal basis is active: four-device time regressed

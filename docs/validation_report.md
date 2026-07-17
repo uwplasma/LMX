@@ -66,7 +66,10 @@ current-closure, and power-closure gates; no solver was rerun for presentation.
   observables on 1/2/4 CPU devices. The prior 1/2 deterministic-GPU ladder
   predates the terminal-restart fix. The replacement pre-schema-6 ladder passed
   exact repeat/restart and 1/2-GPU equivalence. Current schema-6 topology and
-  exact serialized replay pass on one and two GPUs. The `128 x 67 x 67`
+  exact serialized replay pass on one and two GPUs. Callback-free 32-update
+  Docker CPU-allocation scaling is accepted on 1/2/4 devices; steady
+  convergence, exact-core mapping, and authoritative idle-host GPU timing are
+  still open. The `128 x 67 x 67`
   pre-schema-6 calibration has
   equivalent observables and exact state/flux replay. A trace-authorized
   validation fusion raises its low-variance speedup to 1.159x, still below the
