@@ -8,7 +8,8 @@ from pathlib import Path
 
 import numpy as np
 
-from .mesh import StructuredMesh, centerline_pipe_mesh_quality_metrics
+from .mesh import StructuredMesh, _validated_centerline_arrays
+from .mesh import centerline_pipe_mesh_quality_metrics
 
 
 def _load_visualization() -> None:
@@ -94,15 +95,7 @@ def tube_surface_from_centerline(
     if radius <= 0.0:
         raise ValueError("radius must be positive")
     n_theta = max(int(circumferential_points), 8)
-    centers = np.column_stack(
-        [
-            np.asarray(centerline["x"], dtype=float),
-            np.asarray(centerline["y"], dtype=float),
-            np.asarray(centerline["z"], dtype=float),
-        ]
-    )
-    if centers.ndim != 2 or centers.shape[0] < 3:
-        raise ValueError("centerline must contain at least three points")
+    _, centers = _validated_centerline_arrays(centerline)
 
     tangent = np.gradient(centers, axis=0)
     tangent_norm = np.linalg.norm(tangent, axis=1, keepdims=True)

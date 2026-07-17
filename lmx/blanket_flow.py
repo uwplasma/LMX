@@ -21,6 +21,7 @@ import numpy as np
 from .blanket_geometry import WhamBlanketLoop, build_wham_blanket_centerline, tube_surface_from_centerline
 from .blanket_geometry import _set_equal_3d
 from .field_models import sample_wham_mirror_field
+from .mesh import _validated_centerline_arrays
 
 
 @dataclass(frozen=True)
@@ -81,8 +82,7 @@ def solve_wham_blanket_reduced_flow(
     props = properties or LiquidMetalProperties()
     opts = settings or BlanketFlowSettings()
     route = centerline or build_wham_blanket_centerline(spec)
-    points = _centerline_points(route)
-    station = np.asarray(route["station"], dtype=float)
+    station, points = _validated_centerline_arrays(route)
     tangent = _centerline_tangent(points)
     curvature = _centerline_curvature(points, station)
     field = _sample_blanket_field(
@@ -466,11 +466,11 @@ def wham_blanket_pressure_drop_history(
     opts = settings or BlanketFlowSettings()
     params = dict(coil_parameters or {})
     route = centerline or build_wham_blanket_centerline(spec)
-    points_np = _centerline_points(route)
-    station = jnp.asarray(route["station"], dtype=jnp.float32)
+    station_np, points_np = _validated_centerline_arrays(route)
+    station = jnp.asarray(station_np, dtype=jnp.float32)
     points = jnp.asarray(points_np, dtype=jnp.float32)
     tangent = jnp.asarray(_centerline_tangent(points_np), dtype=jnp.float32)
-    curvature = jnp.asarray(_centerline_curvature(points_np, np.asarray(route["station"], dtype=float)), dtype=jnp.float32)
+    curvature = jnp.asarray(_centerline_curvature(points_np, station_np), dtype=jnp.float32)
     separation = jnp.asarray(
         spec.coil_separation if coil_separation is None else coil_separation,
         dtype=jnp.float32,
@@ -1038,19 +1038,6 @@ def _sample_blanket_field(
     if field.shape != points.shape:
         raise ValueError("field_sampler must return an array with shape (station_count, 3)")
     return settings.field_scale * field
-
-
-def _centerline_points(centerline: dict[str, np.ndarray]) -> np.ndarray:
-    points = np.column_stack(
-        [
-            np.asarray(centerline["x"], dtype=float),
-            np.asarray(centerline["y"], dtype=float),
-            np.asarray(centerline["z"], dtype=float),
-        ]
-    )
-    if points.shape[0] < 3:
-        raise ValueError("centerline must contain at least three points")
-    return points
 
 
 def _centerline_tangent(points: np.ndarray) -> np.ndarray:

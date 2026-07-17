@@ -2077,26 +2077,6 @@ def test_projection_solver_can_break_early_with_loose_tolerance():
     assert solution.validation.max_residual <= 10.0
 
 
-def test_solve_extruded_inductionless_projection_returns_finite_layered_bundle():
-    problem = build_layered_duct_extruded_problem(
-        ha_peak=8.0,
-        nx_stations=4,
-        ny=4,
-        nz=4,
-        wall_cells=1,
-        insulator_cells=1,
-    )
-
-    solution = solve_extruded_inductionless(problem)
-
-    assert solution.bundle.u.shape[0] == 4
-    assert solution.bundle.geometry_kind == "layered_duct"
-    assert jnp.isfinite(solution.bundle.u).all()
-    assert jnp.isfinite(solution.bundle.phi).all()
-    assert solution.validation.max_charge_balance_residual < 1.0e-4
-    assert solution.validation.net_boundary_current_residual == pytest.approx(0.0)
-
-
 def test_layered_projection_keeps_throughput_span_bounded_on_heavier_case():
     problem = build_layered_duct_extruded_problem(
         ha_peak=20.0,
@@ -2119,6 +2099,8 @@ def test_layered_projection_keeps_throughput_span_bounded_on_heavier_case():
 
     solution = solve_extruded_inductionless(problem)
 
+    assert jnp.isfinite(solution.bundle.u).all()
+    assert jnp.isfinite(solution.bundle.phi).all()
     assert solution.validation.volumetric_flow_rate_span < 5.0e-3
     # Mean throughput is constrained nearly stationwise; its correlation with
     # field strength is not a physical braking metric. Peak/profile response is
@@ -2129,6 +2111,7 @@ def test_layered_projection_keeps_throughput_span_bounded_on_heavier_case():
     assert solution.validation.axial_current_mirror_residual < 1.0e-3
     assert solution.validation.pressure_span_mirror_residual < 1.0e-3
     assert abs(solution.validation.center_axial_current) < 1.0e-4
+    assert solution.validation.net_boundary_current_residual == pytest.approx(0.0)
 
 
 def test_solve_extruded_inductionless_projection_returns_finite_pipe_bundle():
