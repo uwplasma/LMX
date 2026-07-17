@@ -106,6 +106,20 @@ def _materialize_exact(
             os.replace(candidate, path)
 
 
+def _write_optional_scaling_plots(
+    records: list[dict[str, object]], out_dir: Path,
+) -> list[Path]:
+    """Keep machine evidence usable when the optional plotting extra is absent."""
+
+    try:
+        return write_strong_scaling_plots(
+            records, out_dir, case_title="LMX fixed-work scaling evidence")
+    except ModuleNotFoundError as error:
+        if error.name != "matplotlib":
+            raise
+        return []
+
+
 def _cpu_times(cpus: tuple[int, ...]) -> dict[int, tuple[int, int]]:
     """Return total and idle Linux scheduler ticks for selected CPUs."""
 
@@ -1022,9 +1036,7 @@ def run_strong_scaling_demo(
         )
 
     diagnostics = summarize_strong_scaling_records(records)
-    plots = write_strong_scaling_plots(
-        records, out_dir, case_title="LMX fixed-work scaling evidence"
-    )
+    plots = _write_optional_scaling_plots(records, out_dir)
     table_path = write_strong_scaling_summary_table(
         records, out_dir / "strong_scaling_table.csv"
     )

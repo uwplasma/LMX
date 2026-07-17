@@ -302,8 +302,7 @@ def test_sustained_ladders_collect_each_rung_and_pass_cpu_affinity(
 
 def test_remote_python_preflight_fails_before_timing(monkeypatch: pytest.MonkeyPatch):
     error = subprocess.CalledProcessError(1, ["ssh"], stderr="SOLVAX 0.6.0 is outside")
-    monkeypatch.setattr(strong_scaling_demo.subprocess, "run",
-        lambda *args, **kwargs: (_ for _ in ()).throw(error))
+    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", lambda *args, **kwargs: (_ for _ in ()).throw(error))
     with pytest.raises(RuntimeError, match="Remote Python.*SOLVAX 0.6.0"):
         strong_scaling_demo._validate_remote_python("office", "/tmp/lmx", "python3")
 
@@ -343,8 +342,7 @@ def test_remote_scaling_retrieves_failed_worker_evidence(
         )
 
     evidence = tmp_path / "gpu_1.json"
-    assert json.loads(evidence.read_text()) == record | {
-        "resource_environment_verified": False}
+    assert json.loads(evidence.read_text()) == record | {"resource_environment_verified": False}
     assert commands[-1] == ["scp", "office:/tmp/lmx/artifacts/strong_scaling/gpu_1.json", str(evidence)]
     assert isinstance(caught.value.__cause__, subprocess.CalledProcessError)
 
@@ -420,8 +418,8 @@ def _sustained_ladder(counts, backend="cpu"):
                 "verified": True, "raw_sha256": "a" * 64, "source_fingerprint": "source",
                 "sample_period_seconds": 2.0, "max_sample_gap_seconds": 2.0,
                 "monitored_worker_seconds": monitored, "monitor_started_unix_seconds": 99.0,
-                "worker_started_unix_seconds": 100.0, "worker_ended_unix_seconds": 100.0 + monitored,
-                "monitor_ended_unix_seconds": 115.0 + monitored, "postflight_seconds": 15.0, "violation_count": 0},
+                "worker_started_unix_seconds": 100.0, "worker_ended_unix_seconds": 100.01 + monitored,
+                "monitor_ended_unix_seconds": 115.01 + monitored, "postflight_seconds": 15.0, "violation_count": 0},
             "requested_duration_passed": True, "sustained_duration_passed": True,
             "sustained_timing_eligible": True, "timed_signature_excluded": True})
     return records
@@ -482,6 +480,9 @@ def test_scaling_worker_command_forwards_restart(tmp_path: Path, monkeypatch) ->
         strong_scaling_demo._materialize_exact(derived, Path.write_text, data="same")
     with pytest.raises(ValueError, match="differs"):
         strong_scaling_demo._materialize_exact(derived, Path.write_text, data="changed")
+    missing_plot = ModuleNotFoundError(name="matplotlib")
+    monkeypatch.setattr(strong_scaling_demo, "write_strong_scaling_plots", lambda *args, **kwargs: (_ for _ in ()).throw(missing_plot))
+    assert strong_scaling_demo._write_optional_scaling_plots([], tmp_path) == []
 
 
 def test_cpu_monitor_emits_fast_fail_closed_evidence(tmp_path: Path, monkeypatch) -> None:
@@ -558,10 +559,8 @@ def test_sustained_scaling_requires_predeclared_multiminute_samples():
 
 
 def test_write_scaling_report_writes_json(tmp_path: Path):
-    record = benchmark_sharded_extruded_operator(nx=16, ny=8, nz=8,
-        iterations=2, repeats=1, num_devices=1)
-    assert '"num_devices": 1' in write_scaling_report(
-        [record], tmp_path / "scaling.json").read_text()
+    record = benchmark_sharded_extruded_operator(nx=16, ny=8, nz=8, iterations=2, repeats=1, num_devices=1)
+    assert '"num_devices": 1' in write_scaling_report([record], tmp_path / "scaling.json").read_text()
 
 
 def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path):

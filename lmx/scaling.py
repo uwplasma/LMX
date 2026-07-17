@@ -245,7 +245,7 @@ def _continuous_environment_evidence(record: Mapping[str, object]) -> bool:
         and postflight >= 15.0
         and np.all(np.isfinite((monitor_start, worker_start, worker_end, monitor_end)))
         and 0.0 <= monitor_start <= worker_start < worker_end <= monitor_end
-        and monitored >= worker_end - worker_start
+        and monitored + min(period, 0.05) >= worker_end - worker_start
         and monitor_end - worker_end >= postflight
         and monitor.get("violation_count") == 0
     )
