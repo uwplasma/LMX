@@ -119,6 +119,12 @@ and electric communication experiments therefore stop on released SOLVAX;
 their retained transverse line systems are the measured cost and the required
 convergence mechanism.
 
+Fusing the three eager `u x B` arrays into the existing electromagnetic JIT
+kernels is also rejected. The exact-signature and restart screen regresses the
+warm median from 1.840 to 2.000 seconds and lowers observed host RSS by only
+1.2 MB, far below the frozen 16 MiB memory threshold. It does not advance to a
+sustained ladder.
+
 A separate released-SOLVAX `block_thomas_factor_fn` prototype generated B1
 retained-modal factors without materializing the quadratic axial action tuple.
 It is algebraically and JVP exact, but at `7 x 9 x 16` and `11 x 17 x 32` it is

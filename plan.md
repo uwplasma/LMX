@@ -125,7 +125,7 @@ shared without removing cases or assertions.
 | package modules | 35 | no new module | 35 |
 | package lines | 34,310 | stay below 34,311 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 21,004 | no new file; next test change must reduce lines | 31 / 21,100 |
+| test files / lines | 30 / 20,983 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
 | tracked checkout | 4,574,225 bytes | stay below 4,574,226 without hiding direct visuals | 4,718,592 bytes |
@@ -137,6 +137,9 @@ variable-field validation fail closed on nonfinite velocity, folded two
 duplicate solve tests into stronger physics owners, and removed Q2D's duplicate
 coordinate-edge helper without changing rendered output. The direct B1 gate
 remains, and B2 reuses complete checkpoints.
+Three Q2D modal plot checks now reuse their validated 48-square trajectories,
+removing 21 test lines and three duplicate solves without dropping any physics,
+energy-budget, or artifact assertion.
 Five Q2D builder wrappers are now compatibility aliases to their documented
 frozen dataclass owners, deleting another 126 package lines while preserving
 every current keyword call, default, result type, solver, plot, and movie path.
