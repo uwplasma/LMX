@@ -1,5 +1,5 @@
 {
-  "schema_version": 9,
+  "schema_version": 10,
   "date": "2026-07-16",
   "baseline_commit": "aaa41b19c2e22f16b7bdbf1029f6c2c4b5b24e49",
   "optimized_commit": "14376199f84bb1fc0116e2928809a67da2f09c17",
@@ -401,31 +401,31 @@
     "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa",
     "classification": "current-source preflight-admitted multi-minute Docker CPU-allocation calibration; continuous host monitoring, exact M4 host-core placement, steady convergence, and B2 solution acceptance remain open"
   },
-  "current_monitored_cpu_diagnostic": {
-    "source_commit": "59549cb44f76e195a8efce6c7002486cbff83d94",
+  "current_monitored_cpu_scaling": {
+    "source_commit": "a98a658c36ddba7c5ff2e6f5de7535008ed0fdd8",
     "source_fingerprint": "7c7bb4f291769333d120b84f17b3be67c113cb8eeb221e8ebb8c0f8b9a145982",
     "shape": [256, 67, 67],
     "total_cells": 1149184,
-    "updates_per_trajectory": 24,
-    "cell_updates_per_trajectory": 27580416,
+    "updates_per_trajectory": 32,
+    "cell_updates_per_trajectory": 36773888,
     "repeats": 4,
     "minimum_warm_seconds": 120.0,
     "runtime": "native ARM64 Docker with 2/4/8-CPU taskset masks for 1/2/4 JAX devices",
     "environment": {"python": "3.12.13", "jax": "0.10.2", "jaxlib": "0.10.2", "solvax": "0.8.4", "precision": "float64", "memory_limit_bytes": 7864320000},
     "runs": {
-      "1": {"allocated_cpus": 2, "warm_samples_seconds": [228.2898830209997, 190.32577812900035, 193.23395121399972], "warm_median_seconds": 193.23395121399972, "warm_cv": 0.08458886978023203, "speedup": 1.0, "parallel_efficiency": 1.0, "peak_host_rss_bytes": 4806807552, "duration_passed": true, "monitor_verified": true, "monitor_rows": 937, "max_monitor_gap_seconds": 1.0158957499997996},
-      "2": {"allocated_cpus": 4, "warm_samples_seconds": [132.96173122799973, 132.82820776899916, 137.32329802100048], "warm_median_seconds": 132.96173122799973, "warm_cv": 0.015540886362836173, "speedup": 1.45330501813824, "parallel_efficiency": 0.726652509069119, "peak_host_rss_bytes": 5295071232, "duration_passed": true, "monitor_verified": false, "monitor_rows": 649, "monitor_violation": "179 swapout pages observed across 98 samples", "max_monitor_gap_seconds": 1.0104069580002033},
-      "4": {"allocated_cpus": 8, "warm_samples_seconds": [117.9406314279995, 160.93286723899928, 133.753264768], "warm_median_seconds": 133.753264768, "warm_cv": 0.12908629028811835, "speedup": 1.4447045576732, "parallel_efficiency": 0.3611761394183, "peak_host_rss_bytes": 5454491648, "duration_passed": false, "monitor_verified": true, "monitor_rows": 636, "max_monitor_gap_seconds": 1.0130410420006228}
+      "1": {"allocated_cpus": 2, "cold_seconds": 257.123151576, "warm_samples_seconds": [248.88165515499998, 249.64004373700004, 248.8413746550001], "warm_median_seconds": 248.88165515499998, "warm_cv": 0.0014746657543324132, "speedup": 1.0, "parallel_efficiency": 1.0, "peak_host_rss_bytes": 4794630144, "duration_passed": true, "monitor_verified": true, "monitor_rows": 1157, "max_monitor_gap_seconds": 1.0159834179999052},
+      "2": {"allocated_cpus": 4, "cold_seconds": 181.11350649999986, "warm_samples_seconds": [174.344332247, 174.12751424599992, 174.04646845399998], "warm_median_seconds": 174.12751424599992, "warm_cv": 0.0007219430236137352, "speedup": 1.4293068860064848, "parallel_efficiency": 0.7146534430032424, "peak_host_rss_bytes": 5330169856, "duration_passed": true, "monitor_verified": true, "monitor_rows": 821, "max_monitor_gap_seconds": 1.0161059170000044},
+      "4": {"allocated_cpus": 8, "cold_seconds": 157.05662136399997, "warm_samples_seconds": [150.69969348600034, 150.14370185899998, 150.8733402779999], "warm_median_seconds": 150.69969348600034, "warm_cv": 0.0020668331301235735, "speedup": 1.6515073746856725, "parallel_efficiency": 0.41287684367141814, "peak_host_rss_bytes": 5536268288, "duration_passed": true, "monitor_verified": true, "monitor_rows": 720, "max_monitor_gap_seconds": 1.011455042000307}
     },
     "equivalence": {"pressure_solves_converged": true, "repeat_signatures_exact": true, "restart_replay_exact": true, "schema6_anderson": true, "placement": true, "cross_topology_within_tolerance": true},
-    "gates": {"complete_topology": true, "fixed_work_identity": true, "minimum_duration": false, "timing_stability": false, "schema6_and_physics": true, "placement": true, "memory_recorded": true, "continuous_environment_verified": false, "environment_verified": false, "sustained_strong_scaling": false},
-    "input_sha256": "0a80cc1b0410f947c73da44659a2ed03c7222a068d5471914e93262e17c139d7",
+    "gates": {"complete_topology": true, "fixed_work_identity": true, "minimum_duration": true, "timing_stability": true, "schema6_and_physics": true, "placement": true, "memory_recorded": true, "continuous_environment_verified": true, "environment_verified": true, "sustained_strong_scaling": true},
+    "input_sha256": "bf61afda96beb7e1feeec4cbb7406ed35047329a19ec31c0a93d819cfbb2108e",
     "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa",
-    "admission_sha256": {"1": "f7f52f7a9f6e32bcba9c07eaee222879c347587908157e7c4e2a68afb1741121", "2": "572f7afcecadd4e3e89f6e128f5e62dc5664497566795aa01f5756170b92a7da", "4": "6c6651b898f053c6cd681a278a20007a23a068bea80c5105fbcefad2852d4048"},
-    "worker_sha256": {"1": "cf3d181a378b5383ba002d35ced984128a6b6cb26a6c72c8af16ae048e7f3052", "2": "d730a1d903e76cb656dcb0f4edc7fb25dc61a0221b23c14fd9cb02aabb2eac72", "4": "5dfe87f4647b49a1b7067c59859b3fc7b2927979a2c6158bd144b79522729eb5"},
-    "monitor_sha256": {"1": "c6694c7adf4bee72e17443e306b36a1accbd061f0b6b6e1e07dfe374a06157da", "2": "a7abd0999ffd9a84924f2527ea585526edff5ad757bf596aa4381f5ecb64179a", "4": "1b16b71bb1587983163e3faee1efbd38d84f56578ddd2db69331eff64564a061"},
-    "failure_evidence_note": "The rejected four-device worker predates 505cf34 and therefore stores its valid admission only in the standalone admission asset; the monitor and worker JSON are complete.",
-    "classification": "Current-source continuously monitored 24-update CPU diagnostic; numerics and placement pass, but timing stability, minimum duration, and clean-environment gates fail, so no strong-scaling promotion is authorized."
+    "admission_sha256": {"1": "a415823ca076afdf10efbc9b655f145bc027bfa658adcd50c35d68625e0d4319", "2": "dceed35fbac1a93e9466ad8964a78a55cf371a8ecc010baf64f8ceed8be4e8ba", "4": "a9fe54ea49bc51b1dae102a6c3c2643835cda084fcb0538cff96db7397edd431"},
+    "worker_sha256": {"1": "569712171ff6a3db58975247f3739c0a638a3c5c22ea6a923df24e0918e3e3c2", "2": "731a30242e245a0f185bbb5da1043248af04d281c7ec93e3e4d27fff8345d6d2", "4": "9661099eeec82fd6da5a1e832e0d6c166ea6f584578eeaa26a791948d5f8f288"},
+    "monitor_sha256": {"1": "b1c8ccf036f479a9f00849c9a74d7c291cb7b88e2e940532463d935342d66b38", "2": "42321a428891995a848c7b6f2f203e140e30a5dfde54aae9594f21a649e83fab", "4": "ef91ae637fb171b37a5d73e8c8437a55085f63f881eddb400bc5f26128674f9e"},
+    "rejected_24_update_diagnostic": {"source_commit": "59549cb44f76e195a8efce6c7002486cbff83d94", "warm_medians_seconds": [193.23395121399972, 132.96173122799973, 133.753264768], "warm_cv": [0.08458886978023203, 0.015540886362836173, 0.12908629028811835], "reason": "one/four-device timing instability, 179 two-device swapout pages, and one 117.941-second sample"},
+    "classification": "accepted continuously monitored multi-minute Docker CPU-allocation strong scaling; exact M4 physical-core mapping, steady-state convergence, and B2 solution acceptance remain open"
   },
   "post_profile_decisions": {
     "axial_mean_omission": {
@@ -470,14 +470,14 @@
   },
   "claim_limits": {
     "production_sharding_correctness": true,
-    "strong_scaling_claim": false,
+    "strong_scaling_claim": "monitored Docker CPU-allocation scaling",
     "steady_state_evidence": false,
     "physical_core_scaling": false,
-    "docker_cpu_allocation_scaling": "historical preflight-admitted calibration plus rejected current-source continuous-monitor diagnostic",
-    "reason": "The continuously monitored 24-update ladder preserves numerical and placement equivalence but fails stability at one/four devices, records swapout activity at two devices, and has one four-device sample below 120 seconds. The earlier 32-update trajectories pass duration and stability under the superseded static-preflight protocol only. A fresh clean 32-update continuous/postflight ladder is required; exact M4 host-core placement, steady-state convergence, and solution acceptance also remain open."
+    "docker_cpu_allocation_scaling": "accepted continuously monitored 32-update ladder",
+    "reason": "The current 32-update ladder passes fixed-work, duration, stability, numerical, placement, memory, fresh-admission, continuous-monitor, and postflight gates. It establishes scaling across 2/4/8 Docker guest CPUs allocated to 1/2/4 JAX devices, not exact Apple M4 P/E-core scaling. Steady convergence, B2 solution acceptance, and idle-host GPU scaling remain open."
   },
   "raw_assets": {
-    "location": "ignored artifacts/{schema6,global-coarse}-{topology,scaling}-20260716, artifacts/docker-physical-core-schema6-{128,sustained-256}, artifacts/current-source-sustained-cpu-20260716, and artifacts/current-sustained-cpu-59549cb-24-r1; publish only as checksummed release assets if needed",
+    "location": "ignored artifacts/{schema6,global-coarse}-{topology,scaling}-20260716, artifacts/docker-physical-core-schema6-{128,sustained-256}, artifacts/current-source-sustained-cpu-20260716, artifacts/current-sustained-cpu-59549cb-24-r1, and artifacts/current-sustained-cpu-a98a658-32-r1; publish only as checksummed release assets if needed",
     "input_sha256": {"topology": "5382c1d68d9fb3508a408bb20befe6675ade77b852e6a80204781debab3aab2a", "scaling": "4721eb114966e55e08928098f944abbd0b07ed94a6c7fed0de82f707ccdd5978", "physical_core_pilot": "1aa490a56bbbd56dcaa2b7b7aa1b117efc10c5a0799eade47de38cb6ab3190b3", "physical_core_sustained": "1c7aba8ad0691898333116814c8be3ba235e714065b1b49603ca80e668023186"},
     "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa",
     "summary_sha256": {"baseline_topology": "dccd2bf1d8b5ad375daa32189c3affeb1850b699846588983381608b2b39c1ef", "baseline_scaling": "9fa2c4e4654a40e3f8f604d018467c5ebdc47fbd9d066f5fddcb39a1571635d5", "optimized_topology": "f85ec4b55f147e2285be66bcb6fc099345f69e4abba797f5d0ee9ae9e987bc57", "optimized_scaling": "ad70bdb17c06120a154c2cffb2a8521e1c929a0345af4307713bc62580990818"},

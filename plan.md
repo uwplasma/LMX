@@ -7,12 +7,12 @@ velocity-map gain, so fixed relaxation 2 remains the B2 control. The current
 coarse B2 trajectory passes linear, conservation, restart, and placement gates
 but misses steady acceptance; no continuation is authorized.
 
-Historical fixed-`256 x 67 x 67` CPU/GPU calibrations reached apparent
-1.684x/1.626x speedups but lacked a clean continuous CPU/GPU environment. A
-current 24-update CPU ladder completed with real 118--228-second samples and
-exact numerics/placement, then failed closed on one/four-device CV, one
-sub-120-second sample, and a two-device swapout. GPU admission remains blocked
-by foreign contexts. No authoritative scaling claim exists.
+The current monitored `256 x 67 x 67`, 32-update CPU ladder passes every frozen
+Docker-allocation gate. Its 249/174/151-second medians give 1.429x/1.652x
+two/four-device speedups, CV below 0.21%, exact numerics/restart, correct
+placement, and clean admission/runtime/postflight traces. Exact M4 P/E-core
+mapping remains open. The 1.626x two-A4000 calibration remains non-authoritative
+because foreign contexts block GPU admission.
 
 The `--sustained` preset keeps 32 CPU or 96 GPU updates, one cold plus three
 warm trajectories, a 120-second warm minimum, an 1800-second ceiling, and
@@ -122,10 +122,10 @@ shared without removing cases or assertions.
 | package modules | 35 | no new module | 35 |
 | package lines | 34,526 | stay below 34,527 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 21,019 | no new file; next test change must reduce lines | 31 / 21,100 |
+| test files / lines | 30 / 21,018 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,558,699 bytes | next tranche must reduce bytes without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,555,831 bytes | next tranche must reduce bytes without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -184,14 +184,13 @@ physical-core claim or reason to add an 8-device rung.
 Rejected small probes stay in checksummed evidence. Physical-core claims need
 verifiable affinity; forced macOS devices prove topology only.
 
-The historical 32-update CPU calibration passes numerical/topology gates at
-246.702/187.307/146.524-second medians and 1.317x/1.684x speedup, but used only
-a static preflight. The monitored 24-update ladder measured
-193.234/132.962/133.753 seconds and apparent 1.453x/1.445x speedup. Reject it:
-one/four-device CVs are 8.46%/12.91%, the two-device trace records swapout, and
-one four-device sample is 117.941 seconds. Repeat the unchanged 32-update
-ladder from a fresh output directory on an idle host; do not trim outliers or
-retry individual rungs.
+The historical 32-update CPU calibration used only static preflight. A later
+24-update ladder was correctly rejected for one/four-device instability,
+two-device swapout, and one 117.941-second sample. The unchanged monitored
+32-update rerun now passes: 248.882/174.128/150.700-second medians,
+1.429x/1.652x speedups, CV below 0.21%, and clean continuous/postflight traces.
+This closes Docker CPU-allocation scaling only; do not relabel it physical-core
+scaling.
 The sustained CPU launcher now records one-second host samples through the
 worker plus a 15-second postflight and binds the ignored JSONL digest to the
 source fingerprint; any probe, affinity, swapout, foreign-work, or gap violation
@@ -227,8 +226,8 @@ not checkpoint duplicated `nx+1` arrays. Optimize only a profiled bottleneck on
 the physics-valid path.
 
 Exit: portable tests stay below ten minutes; CPU/GPU topology and replay remain
-exact; a clean continuously monitored sustained CPU/GPU ladder is published.
-Exact M4 core mapping and idle-host GPU timing remain open until then.
+exact; Docker CPU-allocation scaling is published. Exact M4 core mapping and
+idle-host GPU timing remain open.
 
 ## Priority 3: canonical B2 validation
 
