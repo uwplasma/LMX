@@ -10,8 +10,8 @@ external solvers, long physics campaigns, and hardware scaling.
 ```
 
 The driver runs the full suite with branch coverage, a minimum coverage of 95%,
-and a hard ten-minute timeout. The current Apple M4 record is 859 passed,
-8 expected external-data skips, 95.40% combined line/branch coverage, and 146.7
+and a hard ten-minute timeout. The current Apple M4 record is 855 passed,
+5 expected external-data skips, 95.38% combined line/branch coverage, and 164.9
 seconds end to end with six workers. It remains below the 300-second engineering
 target and leaves more than five minutes of hard-budget headroom. The compact
 record keeps the previous slowest-node profile until a fresh profile explains

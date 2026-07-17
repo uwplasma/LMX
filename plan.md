@@ -22,9 +22,12 @@ momentum, with full-volume gathers inside GMRES. The 2-update and 32-update
 ladders give essentially the same four-device speedup, and doubling axial
 length does not improve it, so insufficient duration and axial size are ruled
 out. Larger transverse sections only improve the compute/communication ratio.
-Exact M4 P/E-core mapping remains open. Stage A of the stencil-owner refactor is
-complete; the next action is the deletion-producing shared-setup Stage B below,
-not another sustained ladder.
+Exact M4 P/E-core mapping remains open. Stages A and B of the stencil-owner
+refactor are complete. The proposed Stage C compact-boundary topology is
+rejected and reverted: it preserved the exact gates but did not improve the
+four-CPU screen. The next action is a fresh phase profile of the Stage-B
+baseline and an ownership audit of communication inside the SOLVAX Krylov path,
+not another halo implementation or sustained ladder.
 
 A composed momentum/projection JIT is rejected before sustained timing: its
 four-device medium screen improves only 3.6%, raises peak RSS 15.4%, and fails
@@ -143,12 +146,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 34 | no new module | 34 |
-| package lines | 34,051 | Stage B must finish at or below 34,037 | 34,950 |
+| package lines | 33,778 | reduce to at most 33,750 with the test-only builder deletion | 34,950 |
 | maintained-core lines | 7,614 | stay below 7,615 | 7,800 |
-| test files / lines | 30 / 20,888 | no new file; stay below 20,889 | 30 / 20,900 |
+| test files / lines | 30 / 20,663 | no new file; stay below 20,664 | 30 / 20,900 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 185 | no new file without retiring another owner | 186 |
-| tracked checkout | 4,598,201 bytes | stay below 4,598,202 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,583,844 bytes | stay below 4,583,845 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets come from ownership deletion and shared helpers, never unreadable
 formatting or arbitrary test merging. Recent moves delete 190 builder lines and
@@ -187,9 +190,11 @@ fringing diagnostic now follow the linear contract. The fringing replacement
 is a real 113-line, roughly seven-second run with an `8.19e-16` charge residual;
 its tranche removes 240 tracked lines and 112 mock-test lines. The example-only
 `lmx.example_runner`, variable-field builder, and specialized autodiff plot
-writer are deleted. Next make pipe and FreeMHD construction explicit and delete
-one-use convenience builders once no caller
-remains. The 1,238-line
+writer are deleted. The pipe comparison is now a 160-line explicit, editable
+research-stage workflow; its tranche deletes 285 tracked lines and the package
+reference-data wrappers rather than hiding geometry and CSV handling behind a
+one-use API. Next make FreeMHD construction explicit and delete one-use
+convenience builders once no caller remains. The 1,238-line
 strong-scaling program is operational orchestration, not a pedagogical example:
 consolidate its reusable admission/monitor/worker logic into the existing
 scaling owner and leave only a short editable scaling workflow, or classify the
@@ -204,9 +209,18 @@ cannot find its NPZ file, and the documented Hartmann restart paths disagree.
 Keep one copy-paste TOML schema in documentation only if TOML remains a supported
 CLI input.
 
-Slim source by ownership, not by arbitrary splitting. The first audit targets
-`fringing.py` (8,242 lines after the bounded Stage A interface, including the
-large extruded solve), then
+Slim source by ownership, not by arbitrary splitting. `fringing.py` remains the
+first target. Stage B brought the package to 34,036 lines before the pipe
+tranche. Commit `b111813` then removed the confirmed dead station fallback,
+obsolete wrapper branch and solver hook: 199 package and 194 test lines. The
+clean current tree is 33,778 package lines and `fringing.py` is 8,028 lines.
+Next move the three test-only variable-field builders into their tests,
+deleting another 136 package lines for only about 20--30 test lines; later fold the one-use
+`build_square_duct_fringing_benchmark` for another 15--25 package lines. Keep 34
+modules, add no file, and after this group ratchet `fringing.py` to at most 8,000
+lines, the package to 33,750, and tests to 20,800. Split
+`_solve_extruded_projection` into same-module pipe and duct owners only after
+those deletions establish the smaller ownership surface. Subsequent audits are
 `plotting.py`, `external_validation.py`, `solvers.py`, `wall_study.py`,
 `blanket_flow.py`, `autodiff.py`, `q2d.py`, `freemhd.py`, and `validation.py`.
 For each file, inventory public contracts and call sites; delete one-use example
@@ -221,10 +235,9 @@ Each tranche must reduce package or example lines and tracked files, preserve
 all public functionality that remains claimed, and pass focused numerical and
 physics tests in under two minutes before commit and push. Run the complete
 portable gate once after a coherent structural/source group and before the next
-algorithmic stage. The completed Stage A interface is the only temporary source
-exception: it adds exactly 13 package lines, while Stage B must bring the
-cumulative production count below the 34,038-line pre-Stage-A baseline. Do not
-combine a structural move with a numerical algorithm change.
+algorithmic stage. Stages A and B finish at 34,036 package lines, below the
+34,038-line pre-Stage-A baseline; the pipe and dead-fallback tranches lower the
+clean tree to 33,778. Do not combine a structural move with a numerical algorithm change.
 
 Exit: every example satisfies the shared workflow contract; the broken and
 opaque case/catalog layer is gone; no source file remains thousands of lines
@@ -258,15 +271,15 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
-The current complete gate after `725f132` passes 859 tests with 8 expected
-skips and 95.40% combined coverage in 146.7 seconds. It remains below both the
+The current complete gate after `2df2336` passes 855 tests with 5 expected
+skips and 95.38% combined coverage in 164.9 seconds. It remains below both the
 300-second engineering target and 600-second hard limit. Keep the six-worker
 setting unless a fresh slow-node profile finds a node above 45 seconds or the
 gate materially regresses; example/mock deletion and the new axial-injection
 gate account for the changed test count.
 Merging identical magnetic-obstacle checks preserves 33 assertions, removes two
 solves and 28 lines, and cuts focused wall time 5.86 -> 4.52 seconds. The current
-suite is 20,888 lines; its next change remains a net deletion. Across the
+suite is 20,663 lines; its next change remains a net deletion. Across the
 editable-example, runner-deletion, autodiff-slimming, and steady-media-gate
 tranches, package and test lines remain net lower than the prior baseline.
 
@@ -343,13 +356,15 @@ full scalar-field gathers. Pressure PCG uses only 5,120-byte axial-mean gathers;
 the electric coarse modal gather is 173,056 bytes. Insufficient duration and
 axial size are ruled out, and the communication-defect gate passes.
 
-Fix the implicit-momentum neighbor and convection concatenations first by
-making their sharding and nonperiodic halo ownership explicit. Then reassess
-transverse modal correction, axial-mean preconditioning, and PCG reduction
-counts. Preserve restricted-grid pressure conditioning; the global modal
-correction cannot be deleted merely because it communicates. Docker verifies
-guest affinity but exposes opaque vCPUs, so exact mapping to the M4's four
-performance and six efficiency cores remains open.
+Profile the accepted Stage-B implementation phase by phase before changing its
+topology again. Attribute full-volume exchange, reductions, and iteration work
+to LMX setup, SOLVAX Krylov/operator ownership, projection, and transverse modal
+correction. In particular, determine whether Krylov can own compact sharded
+operator communication without duplicating LMX's physics algebra. Preserve
+restricted-grid pressure conditioning; the global modal correction cannot be
+deleted merely because it communicates. Docker verifies guest affinity but
+exposes opaque vCPUs, so exact mapping to the M4's four performance and six
+efficiency cores remains open.
 
 Use three performance gates. A tiny exact gate checks signatures, linear
 histories, interface current, restart, placement, and gradients. A bounded
@@ -385,30 +400,30 @@ A proposed two-compact-gather successor is rejected before timing on the source
 slimming gate. It compiles and passes a real four-shard `8 x 4 x 3` momentum
 solve at `1.18e-11`, but adds 344 net solver lines by duplicating limited
 gradients, weights, stress, diffusion, and convection. Do not compress or keep a
-second algebra path for speed. First refactor the existing stencil primitives
-to accept precomputed axial neighbors and compact face ownership, with a net
-source reduction or at most 100 candidate lines; only then reconsider this HLO
-topology under the unchanged numerical and performance gates.
+second algebra path for speed. The prerequisite shared-owner refactor was later
+completed, and the resulting Stage C compact-boundary candidate is separately
+rejected below; this topology path is now closed.
 
-The authorized replacement is a three-stage shared-owner refactor, not another
-fast path. Stage A is complete at `725f132`: optional cell-aligned `(west,
-east)` injection now belongs to the existing gradient, limiter, stress,
-diffusion, and convection primitives for exactly 13 net source lines. The
-unchanged path retains its existing exact physics/autodiff oracles; injected
-primal, JVP, and VJP paths agree at floating-point roundoff, including a
-deliberately distinct east boundary and nonzero axial traction.
+The shared-owner refactor completed two useful deletion-producing stages.
+Stage A at `725f132` added optional cell-aligned `(west,east)` injection to the
+existing gradient, limiter, stress, diffusion, and convection primitives for 13
+net source lines while preserving primal, JVP, and VJP oracles. Stage B at
+`592b8b5` packs `(u,v,w,q)` gradients and gives solver and post-projection defect
+one frozen setup owner and one transport action. It preserves affine-inlet
+arithmetic and the distinct defect state and finishes at 34,036 package lines,
+below the pre-Stage-A baseline.
 
-Stage B now vectorizes packed `(u,v,w,q)` gradients and replaces duplicate
-solver/defect setup with one frozen momentum owner plus one shared transport
-action. It must preserve affine inlet arithmetic and post-projection defect
-state, add no file, delete at least 14 production lines, and finish at or below
-34,037 package lines. Only then may Stage C add two compact boundary-slab
-gathers, with cumulative production growth at most 60 lines (expected about
-35). Before timing, HLO must contain zero
-full-volume axial gathers, zero setup face-data permutation, at most two compact
-setup gathers below 0.28/0.35 MB, and exactly two iterative vector-plane
-permutations. The existing numerical and 25%/15%/8%/5% promotion gates remain
-unchanged.
+The proposed Stage C compact-boundary candidate is rejected and fully reverted.
+After fixing its affine-inlet boundary-action bug, exact signatures, histories,
+restart, conservation, gradients, and placement pass; one- versus four-device
+results differ only at floating-point roundoff. Its production compact gathers
+are 278,784 and 348,480 bytes, with the intended removal of full-volume setup
+payloads. Nevertheless, on the frozen `128 x 35 x 35`, six-step four-CPU screen,
+its 2.192642-second median is 0.03% slower than the Stage-B 2.191924-second
+median, far short of the required 10% medium-screen gain. No multi-minute run
+was launched. This topology is cancelled: do not restore it, relax the gate, or
+try another arrangement of the same boundary slabs without a new profile and a
+materially different communication owner.
 
 Keep the GPU diagnosis separate. Its existing trace spends only about 9% of
 device-active time in collectives and about 75% in transverse SOLVAX line work,
@@ -417,10 +432,12 @@ placement. Do not impose a CPU communication remedy on the GPU path without a
 new GPU trace. The authoritative two-A4000 ladder still waits for clean host
 admission.
 
-Exit order: finish Stage B, admit Stage C only after the cumulative slimming
-gate, pass the HLO and bounded four-device profile gates, pass the medium CPU
-screen, then run the multi-minute local CPU ladder with exact M4 core mapping.
-Optimize the separately profiled GPU compute path and rerun its
+Exit order: finish the test-only builder source-slimming group, capture a fresh
+Stage-B phase and HLO profile, and decide communication ownership with SOLVAX's
+Krylov/operator layer before authorizing another topology implementation. A new
+candidate must first pass exact/HLO and bounded four-device gates, then the
+fixed-work medium CPU gate, and only then the multi-minute local CPU ladder with
+exact M4 core mapping. Optimize the separately profiled GPU compute path and rerun its
 multi-minute ladder only after clean office-host admission. Portable tests stay
 below ten minutes and all topology, replay, numerical, and restart gates remain
 exact; seconds-scale runs remain debug screens.
@@ -668,24 +685,30 @@ the terminal metric, first-passing step/time, source-frame hash, and compressed
 duration in the manifest.
 
 The shared animation writer enforces at most 7.000 seconds and tests encoded
-WebP duration, not just frame count. The blanket derivative is complete: its
-`3.00e-14 <= 2e-3` relative-update gate first passes at step 57 (`t=2.85 s`),
-the visible trajectory stops at the first stored state after that pass (step
-58, `t=2.90 s`), plays for exactly 7.000 seconds, and is 62,522 bytes.
-Hunt/Shercliff
-runs exactly 7.000 seconds but has no recorded terminal residual. The shared
-velocity, linear, and potential predicate now stops snapshot generation at its
-first full pass and fails publication at the ceiling; robust volume-weighted CG
-passes the bounded backend gate while legacy CG does not. The old 200-update
-asset is explicitly labelled as a transient. Calibrate the physical horizon,
-then regenerate serially only after clean host admission and record the terminal
-triplet and source hashes.
-Q2D runs 7.014 seconds, covers only 0.331 turnover times, and ends with energy
-and enstrophy still changing substantially. Its current unforced decay cannot
-be called statistically steady at nonzero energy: either run it to a
-precommitted quiescent endpoint or replace it with an explicitly forced case
-that passes rolling energy, enstrophy, and RMS-drift gates after at least three
-turnovers. Calibrate coarsely first, then run one production trajectory.
+WebP duration, not just frame count. The blanket trajectory is physically
+accepted: its 18-update gate first passes at step 57 (`t=2.85 s`) with
+`1.860420834008e-3 <= 2e-3`; the visible trajectory stops at step 58
+(`t=2.90 s`) with `1.676904288502e-3`, plays for exactly 7.000 seconds, and is
+62,522 bytes. The `3.000354787140735e-14` metric belongs only to the full
+15-second source. Commit `2df2336` links the displayed derivative, accepted
+window, source hash, and historical scalar records in the manifest and docs;
+do not rerun it.
+
+The current Hunt/Shercliff loop is unaccepted even though it plays for exactly
+7.000 seconds: it has no recorded terminal residual. The shared velocity,
+linear, and potential predicate now stops snapshot generation at its first full
+pass and fails publication at the ceiling; robust volume-weighted CG passes the
+bounded backend gate while legacy CG does not. Keep the old 200-update asset
+explicitly labelled transient. Calibrate the physical horizon, then regenerate
+serially only after clean host admission and record the terminal triplet and
+source hashes.
+
+The current weakly forced Q2D loop is also unaccepted: it plays for 7.014
+seconds, covers only 0.331 turnover times, and ends with energy and enstrophy
+still changing substantially. Replace it only with an explicitly forced
+trajectory that lasts at most 7.000 display seconds and passes precommitted
+rolling energy, enstrophy, and RMS-drift gates after at least three turnover
+times. Calibrate coarsely first, then run one production trajectory.
 
 Do not create
 a B2 movie from bounded or rejected trajectories, relabel mapped-pipe profiles as ALEX-B1
