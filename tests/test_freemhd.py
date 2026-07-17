@@ -58,6 +58,19 @@ def _test_artifact_sha256(path: Path, kind: str) -> str:
     return digest.hexdigest()
 
 
+def test_matched_b2_direct_can_exclude_optional_checkpoint_callback(monkeypatch):
+    calls = []
+    bundle = SimpleNamespace(**{name: np.zeros(1) for name in ("u", "p", "phi")})
+    def solve(problem, **options):
+        calls.append(options)
+        return SimpleNamespace(bundle=bundle)
+    monkeypatch.setattr("lmx.fringing.solve_extruded_inductionless", solve)
+    problem = SimpleNamespace(case=SimpleNamespace(time_stepper=SimpleNamespace(max_steps=4)))
+    checkpoint, _ = run_freemhd_parity_suite._run_matched_b2_lmx_direct(
+        problem, num_devices=1, capture_checkpoint=False)
+    assert checkpoint is None and calls == [{"num_devices": 1}]
+
+
 def _matched_b_record(root: Path, case_id: str, *, role: str | None = None) -> dict[str, object]:
     role = role or ("b1-production" if case_id.startswith("B1") else "b2-production")
     manifest = canonical_matched_b_contract(load_benchmark_b_spec(case_id), role)

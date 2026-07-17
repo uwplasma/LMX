@@ -27,7 +27,7 @@ or command, observable, and acceptance limit or uncertainty.
 | exact restart/replay | direct-versus-resumed state comparison | complete |
 | custom fields and mapped geometry | field response and geometry panels | complete |
 | differentiable design | checked sensitivity and bounded design trace | complete |
-| CPU/GPU parallelism | monitored sustained CPU scaling plus multi-minute shared-host GPU calibration | Docker CPU-allocation scaling complete; exact host-core and idle-host GPU claims open |
+| CPU/GPU parallelism | monitored multi-minute CPU/GPU calibration | callback-free CPU rerun and idle-host GPU timing open |
 | mapped-pipe external profiles | visible FreeMHD-profile mismatch | complete; not ALEX-B1 acceptance |
 | Samper high-Ha literature ladder | frozen eight-row acceptance composite | complete |
 | Q2D, obstacle, and blanket studies | loops, detailed diagnostic composites, and strict Votyakov mismatch | complete; quantitative parity remains open |

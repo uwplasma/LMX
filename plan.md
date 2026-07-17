@@ -7,14 +7,14 @@ velocity-map gain, so fixed relaxation 2 remains the B2 control. The current
 coarse B2 trajectory passes linear, conservation, restart, and placement gates
 but misses steady acceptance; no continuation is authorized.
 
-The current monitored `256 x 67 x 67`, 32-update CPU ladder passes every frozen
-Docker-allocation gate. Source/evaluator `cbf4358` gives
+The recorded `256 x 67 x 67`, 32-update CPU ladder at source/evaluator `cbf4358`
+gives
 246.691/172.410/147.465-second medians, 1.431x/1.673x two/four-device speedups,
-4.934/5.150/5.485 GB peak RSS, and 0.359% maximum CV. Large-work, numerics, restart,
-placement, and admission/runtime/postflight traces pass. Exact M4 P/E-core
-mapping remains open, and step-limit trajectories are not steady-state
-evidence. The 1.626x two-A4000 calibration remains non-authoritative because
-foreign contexts block GPU admission.
+and 0.359% maximum CV, but its timed repeats retained a midpoint checkpoint.
+Numerics and monitoring pass; promotion awaits a callback-free rerun with
+pre-audit memory. Exact M4 P/E-core mapping and steady-state evidence remain
+open. The 1.626x two-A4000 calibration remains non-authoritative because foreign
+contexts block GPU admission.
 
 A composed momentum/projection JIT is rejected before sustained timing: its
 four-device medium screen improves only 3.6%, raises peak RSS 15.4%, and fails
@@ -131,10 +131,10 @@ shared without removing cases or assertions.
 | package modules | 35 | no new module | 35 |
 | package lines | 34,246 | stay below 34,247 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 21,075 | no new file; next test change must reduce lines | 31 / 21,100 |
+| test files / lines | 30 / 21,070 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,609,604 bytes | stay below 4,609,605 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,610,993 bytes | stay below 4,610,994 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets come from ownership deletion and shared helpers, never unreadable
 formatting or arbitrary test merging. Recent moves delete 190 builder lines and
@@ -179,7 +179,7 @@ The current gate passes 867 tests with 8 expected skips and 95.41% combined
 coverage in 121.5 seconds.
 Merging identical magnetic-obstacle checks preserves 33 assertions, removes two
 solves and 28 lines, and cuts focused wall time 5.86 -> 4.52 seconds. The current
-suite is 21,075 lines; its next change remains a net deletion.
+suite is 21,070 lines; its next change remains a net deletion.
 
 ### Canonical sharding and performance
 
@@ -199,13 +199,12 @@ use focused gates; seconds-scale results remain topology/debug evidence.
 
 The historical 32-update CPU calibration used only static preflight. A later
 24-update ladder was correctly rejected for one/four-device instability,
-two-device swapout, and one 117.941-second sample. The fresh monitored
-evaluation at source/evaluator `cbf4358` passes:
+two-device swapout, and one 117.941-second sample. The monitored evaluation at
+source/evaluator `cbf4358` records
 246.691/172.410/147.465-second medians, 1.431x/1.673x speedups,
 4.934/5.150/5.485 GB peak RSS, 0.359% maximum CV, and clean
-continuous/postflight traces. This closes Docker CPU-allocation scaling only;
-do not relabel it physical-core scaling or steady-state evidence because every
-trajectory ends at the fixed 32-update step limit.
+continuous/postflight traces. A later audit found its timed repeats retained a
+midpoint checkpoint; it is calibration until the callback-free ladder passes.
 The sustained CPU launcher now records one-second host samples through the
 worker plus a 15-second postflight and binds the ignored JSONL digest to the
 source fingerprint; any probe, affinity, swapout, foreign-work, or gap violation
@@ -248,8 +247,8 @@ not checkpoint duplicated `nx+1` arrays. Optimize only a profiled bottleneck on
 the physics-valid path.
 
 Exit: portable tests stay below ten minutes; CPU/GPU topology and replay remain
-exact; Docker CPU-allocation scaling is published. Exact M4 core mapping and
-idle-host GPU timing remain open.
+exact; callback-free Docker CPU-allocation and idle-host GPU timing pass. Exact
+M4 core mapping remains open.
 
 ## Priority 3: canonical B2 validation
 

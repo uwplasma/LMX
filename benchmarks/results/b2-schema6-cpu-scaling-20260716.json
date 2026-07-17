@@ -1,5 +1,5 @@
 {
-  "schema_version": 11,
+  "schema_version": 12,
   "date": "2026-07-17",
   "baseline_commit": "aaa41b19c2e22f16b7bdbf1029f6c2c4b5b24e49",
   "optimized_commit": "14376199f84bb1fc0116e2928809a67da2f09c17",
@@ -427,7 +427,8 @@
     "worker_sha256": {"1": "8efdb524b29aef16d4bafe6c572333c16caeb09fd7d5c7bdf6471848f7c997a6", "2": "6d96fbf587b149885f55388b9bba0152b74620986dc125372ac7845b5de9c114", "4": "b1bb56f73d045734c1df8c253f33467746354c972caac32d8d10d18ab828cbb0"},
     "monitor_sha256": {"1": "356a10dfc0593d9abb95f0ef3e375ae6a77bec71b1cd3ff208b029e5a58a6831", "2": "0d15d9f22490289366728343cd550aedb74c24de1f6c85bb6761a599c5132815", "4": "bf188aff469dde41b279c8ed40bb880f8b2cf1987ba60cc4f276b8fd502cd96d"},
     "rejected_24_update_diagnostic": {"source_commit": "59549cb44f76e195a8efce6c7002486cbff83d94", "warm_medians_seconds": [193.23395121399972, 132.96173122799973, 133.753264768], "warm_cv": [0.08458886978023203, 0.015540886362836173, 0.12908629028811835], "reason": "one/four-device timing instability, 179 two-device swapout pages, and one 117.941-second sample"},
-    "classification": "accepted continuously monitored multi-minute Docker CPU-allocation strong scaling; exact M4 physical-core mapping, steady-state convergence, and B2 solution acceptance remain open"
+    "measurement_boundary_audit": {"date": "2026-07-17", "timed_midpoint_checkpoint_retained": true, "promotion_retained": false, "replacement": "callback-free repeats with pre-audit memory and one untimed restart audit"},
+    "classification": "historical monitored multi-minute Docker CPU-allocation calibration; callback-free replacement pending"
   },
   "post_profile_decisions": {
     "axial_mean_omission": {
@@ -485,11 +486,11 @@
   },
   "claim_limits": {
     "production_sharding_correctness": true,
-    "strong_scaling_claim": "monitored Docker CPU-allocation scaling",
+    "strong_scaling_claim": "pending callback-free rerun",
     "steady_state_evidence": false,
     "physical_core_scaling": false,
-    "docker_cpu_allocation_scaling": "accepted continuously monitored 32-update ladder",
-    "reason": "The current 32-update ladder passes fixed-work, duration, stability, numerical, placement, memory, fresh-admission, continuous-monitor, and postflight gates. It establishes scaling across 2/4/8 Docker guest CPUs allocated to 1/2/4 JAX devices, not exact Apple M4 P/E-core scaling. Steady convergence, B2 solution acceptance, and idle-host GPU scaling remain open."
+    "docker_cpu_allocation_scaling": "historical callback-inclusive calibration",
+    "reason": "The recorded ladder passes numerical and monitoring gates, but timed repeats retained a midpoint checkpoint. A callback-free rerun with pre-audit memory is required before promotion."
   },
   "raw_assets": {
     "location": "ignored artifacts/{schema6,global-coarse}-{topology,scaling}-20260716, artifacts/docker-physical-core-schema6-{128,sustained-256}, artifacts/current-source-sustained-cpu-20260716, artifacts/current-sustained-cpu-59549cb-24-r1, and artifacts/current-sustained-cpu-a98a658-32-r1; publish only as checksummed release assets if needed",

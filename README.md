@@ -134,9 +134,9 @@ validation remain open.
 
 ![Multi-minute strong scaling](docs/_static/strong_scaling.webp)
 
-Fixed `256 × 67 × 67` results: CPU (32 updates, three warm/rung) takes
+Historical `256 × 67 × 67` CPU timings (32 updates, three warm/rung) are
 246.691/172.410/147.465 s, reaching **1.431×/1.673×** on 2/4 JAX devices; this is
-Docker allocation, not physical-core or steady-state evidence. GPU (96 updates)
+being rerun without the discovered timed checkpoint observer. GPU (96 updates)
 takes 159–259 s, reaching 1.626× on two A4000s; foreign contexts make it
 shared-host calibration.
 [Protocol and results →](https://lmx.readthedocs.io/en/latest/performance.html)

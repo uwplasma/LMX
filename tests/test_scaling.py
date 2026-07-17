@@ -936,24 +936,6 @@ def test_two_axis_mesh_and_sharding_covers_multi_axis_and_flattened_partitions(
     assert sharding1.spec == scaling.P("x", "y", None)
     assert mesh2.axis_names == ("x", "y")
     assert sharding2.spec == scaling.P(("x", "y"), None, None)
-
-
-def test_two_axis_mesh_and_sharding_rejects_incompatible_multi_axis_shape(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    class FakeMesh:
-        def __init__(self, *args, **kwargs):
-            self.args = args
-            self.kwargs = kwargs
-
-    class FakeSharding:
-        def __init__(self, mesh, spec):
-            self.mesh = mesh
-            self.spec = spec
-
-    monkeypatch.setattr(scaling, "Mesh", FakeMesh)
-    monkeypatch.setattr(scaling, "NamedSharding", FakeSharding)
-
     with pytest.raises(ValueError, match="not compatible"):
         _two_axis_mesh_and_sharding(
             [object(), object(), object(), object()], num_devices=4, shape=(3, 5, 2)

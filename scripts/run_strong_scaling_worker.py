@@ -56,6 +56,8 @@ _B2_TIMING_CONTRACT = {
     "warm_samples_exclude_compilation": True,
     "synchronization": "jax.block_until_ready",
     "timed_observers_excluded": True,
+    "optional_progress_callbacks_excluded": True,
+    "restart_audit_excluded": True,
 }
 _B2_FIELD_NAMES = (
     "u", "v", "w", "p", "phi", "jx", "jy", "jz", "rho_phi_plus", "rho_phi_inlet"
@@ -463,15 +465,15 @@ def _matched_b2_smoke_benchmark(
         )
     if minimum_warm_seconds < 0.0:
         raise ValueError("minimum_warm_seconds must be nonnegative")
-    timings, signatures, checkpoint, direct = [], [], None, None
+    timings, signatures, timed_direct = [], [], None
     for _ in range(repeats):
         started = time.perf_counter()
-        checkpoint, direct = _run_matched_b2_lmx_direct(
-            problem, num_devices=num_devices
+        _, timed_direct = _run_matched_b2_lmx_direct(
+            problem, num_devices=num_devices, capture_checkpoint=False
         )
-        jax.block_until_ready(_b2_ready_arrays(direct))
+        jax.block_until_ready(_b2_ready_arrays(timed_direct))
         timings.append(time.perf_counter() - started)
-        signatures.append(_b2_repeat_signature(direct))
+        signatures.append(_b2_repeat_signature(timed_direct))
     profiled = profile_signature = None
     if profile_dir is not None:
         profile_dir.mkdir(parents=True, exist_ok=True)
@@ -483,7 +485,9 @@ def _matched_b2_smoke_benchmark(
             str(profile_dir), create_perfetto_trace=True, profiler_options=options
         )
         try:
-            _, profiled = _run_matched_b2_lmx_direct(problem, num_devices=num_devices)
+            _, profiled = _run_matched_b2_lmx_direct(
+                problem, num_devices=num_devices, capture_checkpoint=False
+            )
             jax.block_until_ready(_b2_ready_arrays(profiled))
         finally:
             jax.profiler.stop_trace()
@@ -493,7 +497,7 @@ def _matched_b2_smoke_benchmark(
     profile_signature_passed = (None if profile_signature is None else bool(np.allclose(
         profile_signature, signatures[0], rtol=_B2_REPEAT_RTOL, atol=_B2_REPEAT_ATOL)))
     profile_histories = (() if profiled is None else tuple((
-        np.asarray(getattr(profiled, name)), np.asarray(getattr(direct, name)), offset)
+        np.asarray(getattr(profiled, name)), np.asarray(getattr(timed_direct, name)), offset)
         for name, offset in (("iteration_pressure_linear_history", 2),
             ("iteration_electric_linear_history", 3))))
     profile_history_shapes_passed = all(left.shape == right.shape
@@ -507,6 +511,35 @@ def _matched_b2_smoke_benchmark(
         and profile_linear_iteration_max_abs <= _B2_PROFILE_ITERATION_ATOL
         and all(np.array_equal(left[:, offset + 1:], right[:, offset + 1:])
             for left, right, offset in profile_histories)))
+    timed_peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    timed_peak_rss_bytes = int(
+        timed_peak_rss if sys.platform == "darwin" else 1024 * timed_peak_rss
+    )
+    timed_device_memory = []
+    for device in jax.devices()[:num_devices]:
+        stats = device.memory_stats() or {}
+        timed_device_memory.append({"device": str(device), **{
+            key: int(value) for key, value in stats.items()
+            if "byte" in key.lower() and isinstance(value, (int, np.integer))}})
+
+    # Restart validation is intentionally outside timing and memory measurement.
+    checkpoint, direct = _run_matched_b2_lmx_direct(
+        problem, num_devices=num_devices
+    )
+    captured_signature_passed = bool(np.allclose(
+        _b2_repeat_signature(direct), signatures[0],
+        rtol=_B2_REPEAT_RTOL, atol=_B2_REPEAT_ATOL,
+    ))
+    captured_histories = tuple((
+        np.asarray(getattr(direct, name)), np.asarray(getattr(timed_direct, name)))
+        for name in (
+            "iteration_pressure_linear_history",
+            "iteration_electric_linear_history",
+        ))
+    captured_linear_history_passed = bool(all(
+        left.shape == right.shape and np.array_equal(left, right)
+        for left, right in captured_histories
+    ))
     if direct.u.shape == (8, 7, 7) and executed_steps == 2:
         acceptance_role = "harness-smoke"
     elif minimum_warm_seconds >= _SUSTAINED_WARM_SECONDS:
@@ -546,6 +579,10 @@ def _matched_b2_smoke_benchmark(
             "timing_contract": _B2_TIMING_CONTRACT,
             "warm_samples_seconds": warm.tolist(),
             "warm_seconds": float(np.median(warm)), "validation_passed": False,
+            "captured_signature_passed": captured_signature_passed,
+            "captured_linear_history_passed": captured_linear_history_passed,
+            "peak_host_rss_bytes": timed_peak_rss_bytes,
+            "device_memory": timed_device_memory,
             "sustained_minimum_warm_seconds": _SUSTAINED_WARM_SECONDS,
             "sustained_duration_passed": sustained,
             "large_fixed_work_passed": large_work,
@@ -596,6 +633,8 @@ def _matched_b2_smoke_benchmark(
         and repeat_signature_passed
         and profile_signature_passed is not False
         and profile_linear_history_passed is not False
+        and captured_signature_passed
+        and captured_linear_history_passed
         and anderson["anderson_validation_passed"]
         and all(sample >= minimum_warm_seconds for sample in timings[1:])
     )
@@ -609,13 +648,6 @@ def _matched_b2_smoke_benchmark(
         for name in ("u", "v", "w"))))
     current_l2 = float(np.sqrt(sum(np.linalg.norm(np.asarray(getattr(direct, name))) ** 2
         for name in ("jx", "jy", "jz"))))
-    peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    device_memory = []
-    for device in jax.devices()[:num_devices]:
-        stats = device.memory_stats() or {}
-        device_memory.append({"device": str(device), **{
-            key: int(value) for key, value in stats.items()
-            if "byte" in key.lower() and isinstance(value, (int, np.integer))}})
     return {
         "benchmark_kind": "matched_b2_smoke", "operator_path": "solve_extruded_inductionless",
         "acceptance_role": acceptance_role,
@@ -626,6 +658,8 @@ def _matched_b2_smoke_benchmark(
         "timed_signature_excluded": True,
         "timing_contract": _B2_TIMING_CONTRACT,
         "cold_seconds": timings[0],
+        "captured_signature_passed": captured_signature_passed,
+        "captured_linear_history_passed": captured_linear_history_passed,
         "warm_seconds": float(np.median(warm)), "mean_seconds": float(np.mean(timings)),
         "warm_samples_seconds": warm.tolist(), "warm_std_seconds": float(np.std(warm)),
         "warm_cv": float(np.std(warm) / max(np.mean(warm), 1.0e-30)),
@@ -645,8 +679,8 @@ def _matched_b2_smoke_benchmark(
         "velocity_l2": velocity_l2, "potential_l2": float(np.linalg.norm(np.asarray(direct.phi))),
         "current_l2": current_l2,
         "memory_bytes_estimate": _bundle_memory_bytes(direct),
-        "peak_host_rss_bytes": int(peak_rss if sys.platform == "darwin" else 1024 * peak_rss),
-        "device_memory": device_memory, "placement": placement,
+        "peak_host_rss_bytes": timed_peak_rss_bytes,
+        "device_memory": timed_device_memory, "placement": placement,
         "spatially_sharded": num_devices > 1, "global_shard_count": num_devices,
         "validation_passed": validation_passed, "steady_state_passed": False,
         **pressure_diagnostics,

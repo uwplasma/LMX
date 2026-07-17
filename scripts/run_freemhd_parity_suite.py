@@ -896,8 +896,10 @@ def materialize_matched_b2_preflight(
     return summary
 
 
-def _run_matched_b2_lmx_direct(problem, *, num_devices: int):
-    """Run the fixed-work path and return its deterministic midpoint checkpoint."""
+def _run_matched_b2_lmx_direct(
+    problem, *, num_devices: int, capture_checkpoint: bool = True
+):
+    """Run fixed work, optionally retaining its deterministic midpoint checkpoint."""
 
     import jax
     from lmx.fringing import solve_extruded_inductionless
@@ -905,20 +907,27 @@ def _run_matched_b2_lmx_direct(problem, *, num_devices: int):
     requested_steps = int(problem.case.time_stepper.max_steps)
     checkpoint_step = (requested_steps + 1) // 2
     progress = []
+    progress_options = (
+        {"progress_callback": progress.append, "checkpoint_interval": checkpoint_step}
+        if capture_checkpoint
+        else {}
+    )
     direct = solve_extruded_inductionless(
         problem,
         num_devices=num_devices,
-        progress_callback=progress.append,
-        checkpoint_interval=checkpoint_step,
+        **progress_options,
     )
-    checkpoints = [item.checkpoint for item in progress
-        if item.step == checkpoint_step and item.checkpoint is not None]
-    if len(progress) != requested_steps or len(checkpoints) != 1:
-        raise ValueError("LMX B2 direct path did not emit its midpoint checkpoint")
+    checkpoint = None
+    if capture_checkpoint:
+        checkpoints = [item.checkpoint for item in progress
+            if item.step == checkpoint_step and item.checkpoint is not None]
+        if len(progress) != requested_steps or len(checkpoints) != 1:
+            raise ValueError("LMX B2 direct path did not emit its midpoint checkpoint")
+        checkpoint = checkpoints[0]
     jax.block_until_ready((direct.bundle.u, direct.bundle.p, direct.bundle.phi))
     if direct.bundle.u.dtype != np.float64:
         raise ValueError("LMX B2 smoke requires float64 execution")
-    return checkpoints[0], direct.bundle
+    return checkpoint, direct.bundle
 
 
 def _resume_matched_b2_lmx(problem, checkpoint, *, num_devices: int):
