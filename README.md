@@ -143,7 +143,7 @@ shared-host calibration.
 
 ## Quality and citation
 
-Portable gate: **863 tests**, **95.42% line/branch coverage**, **124.7 s** on six
+Portable gate: **864 tests**, **95.42% line/branch coverage**, **122.8 s** on six
 Apple-Silicon workers.
 [Testing](https://lmx.readthedocs.io/en/latest/testing.html) ·
 [Theory](https://lmx.readthedocs.io/en/latest/theory.html) ·

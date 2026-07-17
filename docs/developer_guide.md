@@ -224,8 +224,8 @@ The latest local evidence pass on this workstation shows:
 
 - Python 3.10 compatibility lane: the complete battery without coverage
   instrumentation, under the 10-minute wall-clock target
-- Reference coverage lane: 863 tests pass with 95.42% combined line/branch
-  coverage over `lmx/` in 124.7 seconds; workflow behavior is exercised by the
+- Reference coverage lane: 864 tests pass with 95.42% combined line/branch
+  coverage over `lmx/` in 122.8 seconds; workflow behavior is exercised by the
   same suite
 
 The hard rule for routine CI/CD is that the parallel workflow must stay under

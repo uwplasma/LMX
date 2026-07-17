@@ -1,7 +1,7 @@
 {
-  "schema_version": 36,
+  "schema_version": 37,
   "date": "2026-07-17",
-  "commit": "876a751417685a203858324d3f7caff6d9ce62ee",
+  "commit": "30d19ebcd85dc302e468bb97719c876a77346722",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -20,20 +20,20 @@
   },
   "result": {
     "test_files": 30,
-    "test_lines": 21005,
-    "passed": 863,
+    "test_lines": 21004,
+    "passed": 864,
     "skipped": 8,
-    "pytest_seconds": 124.35,
-    "gate_seconds": 124.7,
-    "covered_lines": 13959,
-    "total_lines": 14363,
+    "pytest_seconds": 122.44,
+    "gate_seconds": 122.8,
+    "covered_lines": 13954,
+    "total_lines": 14358,
     "covered_branches": 2551,
     "total_branches": 2940,
-    "combined_line_branch_coverage_percent": 95.41697971450037,
+    "combined_line_branch_coverage_percent": 95.41565498901608,
     "passed_gate": true
   },
   "artifacts": {
-    "coverage_xml_sha256": "02301d01ab3c39aa86a9067aaeea3c3c8d3e664c8d27a7bcf2a17c17fd07c0c9",
+    "coverage_xml_sha256": "a554ac03d5b87ae88057edf6ead79d7aec16be66d3253bf183fef2fb8d684d37",
     "junit_xml_sha256": null
   },
   "duration_note": "Current wrapper and pytest durations are exact; the wrapper emitted coverage XML but no JUnit. Slowest-node timings below remain the prior comparable six-worker JUnit evidence.",
@@ -50,26 +50,26 @@
     {"seconds": 11.468, "nodeid": "tests.test_fringing::test_solve_extruded_inductionless_supports_layered_analytic_variable_field"}
   ],
   "comparison": {
-    "previous_gate_seconds": 121.5,
-    "previous_pytest_seconds": 121.20,
-    "wall_time_change_percent": 2.633744855967078,
-    "pytest_seconds_change_percent": 2.599009900990097,
-    "budget_fraction": 0.20783333333333334,
-    "engineering_target_fraction": 0.4156666666666667,
+    "previous_gate_seconds": 124.7,
+    "previous_pytest_seconds": 124.35,
+    "wall_time_change_percent": -1.5236567762630358,
+    "pytest_seconds_change_percent": -1.5359871330920762,
+    "budget_fraction": 0.20466666666666666,
+    "engineering_target_fraction": 0.4093333333333333,
     "latest_slimming": {
-      "source_commit_before": "5edbe4c6904a047fbdc0195f48657a10bdb7bf59",
-      "source_commit_after": "876a751417685a203858324d3f7caff6d9ce62ee",
-      "package_lines_before": 34446,
-      "package_lines_after": 34436,
-      "source_lines_removed": 10,
-      "test_lines_before": 21005,
-      "test_lines_after": 21005,
-      "test_lines_removed": 0,
+      "source_commit_before": "3835d446b1d639d8779b20ceea132e11cf0165af",
+      "source_commit_after": "30d19ebcd85dc302e468bb97719c876a77346722",
+      "package_lines_before": 34436,
+      "package_lines_after": 34310,
+      "source_lines_removed": 126,
+      "test_lines_before": 20985,
+      "test_lines_after": 21004,
+      "test_lines_added": 19,
       "test_cases_before": 871,
-      "test_cases_after": 871,
-      "test_cases_removed": 0
+      "test_cases_after": 872,
+      "test_cases_added": 1
     },
-    "interpretation": "Shared coordinate-edge ownership removes 10 package lines with no test or behavior loss. The clean portable gate varies by 2.63% and remains at 21% of the hard budget."
+    "interpretation": "Q2D dataclass ownership removes 126 net package lines; the native S3 admission workflow adds one test and remains one test line below the prior full-gate tree. The clean gate improves by 1.52% and remains at 20% of the hard budget."
   },
   "scheduling_probe": {
     "evidence_scope": "historical",
@@ -83,12 +83,12 @@
     "decision": "retain six workers; the 3.4% change is below the promotion threshold, and module grouping would imbalance fringing and autodiff owners"
   },
   "architecture": {
-    "source_commit": "876a751417685a203858324d3f7caff6d9ce62ee",
+    "source_commit": "30d19ebcd85dc302e468bb97719c876a77346722",
     "package_modules": 35,
-    "package_lines": 34436,
+    "package_lines": 34310,
     "maintained_core_lines": 7869,
     "maintenance_scripts": 13,
-    "tracked_checkout_bytes": 4571085,
+    "tracked_checkout_bytes": 4574159,
     "stable_root_exports": 30,
     "curated_examples": 11
   },
