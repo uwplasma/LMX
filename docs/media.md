@@ -20,7 +20,7 @@ or command, observable, and acceptance limit or uncertainty.
 
 | Workflow or claim | Documentation visual | Coverage |
 |---|---|---|
-| Hartmann CLI/Python and Shercliff/Hunt cases | analytical profiles and side-by-side startup dynamics | complete |
+| Hartmann CLI/Python and Shercliff/Hunt cases | analytical profiles and side-by-side startup dynamics | analytical profiles complete; steady-gated movie pending |
 | manufactured operators | observed-order convergence | complete |
 | FreeMHD closed-channel parity | analytical validation ladder plus accepted observable comparison | complete |
 | portable fringing workflow | bounded solver-family response and B2 panel | complete; research-stage |
@@ -55,7 +55,7 @@ SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 | manufactured operators | 41,120 | 1,600 × 624 WebP | bounded example; orders 2.00/1.94/1.91; `test_repository.py` / `test_plotting.py` |
 | Samper Benchmark A | 74,438 | 1,405 × 913 WebP | accepted aggregate `9f94ea15...`; eight rows; JSON-only writer/test |
 | B2 schema-6 scaling evidence | 73,040 | 1,400 × 1,285 WebP | current-source callback-free multi-minute CPU scaling plus calibration-only multi-minute shared-host GPU scaling; authoritative GPU idle-host claim remains open |
-| Hunt/Shercliff startup | 75,998 | 800 × 260 animated WebP, 7 s | 35 physical samples from current-source Hunt `934c9aea...` and Shercliff `3188bd21...` GIFs; no interpolation |
+| Hunt/Shercliff startup | 75,998 | 800 × 260 animated WebP, 7.000 s | legacy 200-update transient; new shared velocity/linear/potential gate rejects it before publication; replacement pending |
 | checked sensitivities | 32,612 | compressed WebP | released derivative `f2add9fe...` |
 | geometry gallery | 61,600 | compressed WebP | released derivative `e844f069...` |
 | variable-field response | 41,648 | compressed WebP | released derivative `5d4b593c...` |
@@ -79,8 +79,11 @@ first stored state after its existing 18-update steady gate passes: the source
 history first satisfies `max(relative update) <= 2e-3` at step 57 (2.85 s), and
 source frame 21 is step 58 (2.90 s). It replaces the former 15-second physical
 tail without a solver rerun. No solver or motion interpolation is involved.
-Hunt/Shercliff likewise samples 35 paired physical frames at 5 fps. Full-quality
-MP4s and source GIFs remain in the release or ignored artifacts.
+The paired writer supports 35 synchronized timing slots at 5 fps. The existing
+Hunt/Shercliff asset predates the shared steady gate and remains labelled as a
+legacy transient; a current-grid replacement must stop at its first full gate
+pass and record terminal residuals. Full-quality MP4s and source GIFs remain in
+the release or ignored artifacts.
 
 ## Release-source provenance
 

@@ -1722,6 +1722,28 @@ def _fully_developed_case_step(
     )
 
 
+def _fully_developed_converged(
+    case: CaseSpec,
+    *,
+    velocity_residual: float,
+    linear_residual: float,
+    potential_residual: float,
+) -> bool:
+    """Apply the fully developed velocity, linear, and potential stop gate."""
+
+    potential_gate = case.time_stepper.steady_potential_tolerance
+    if potential_gate is None:
+        potential_gate = case.time_stepper.potential_tolerance
+    if potential_gate is None:
+        potential_gate = case.time_stepper.steady_tolerance
+    return bool(
+        velocity_residual <= float(case.time_stepper.steady_tolerance)
+        and linear_residual
+        <= max(float(case.time_stepper.steady_tolerance), _LINEAR_RESIDUAL_FLOOR)
+        and potential_residual <= float(potential_gate)
+    )
+
+
 def _solve_fully_developed(
     case: CaseSpec,
     logger=None,
@@ -1951,19 +1973,14 @@ def _solve_fully_developed(
             linear_initial_residual=float(linear_initial_residual),
         )
         step_count = step_index + 1
-        potential_gate = case.time_stepper.steady_potential_tolerance
-        if potential_gate is None:
-            potential_gate = case.time_stepper.potential_tolerance
-        if potential_gate is None:
-            potential_gate = case.time_stepper.steady_tolerance
-        linear_gate = max(
-            float(case.time_stepper.steady_tolerance), _LINEAR_RESIDUAL_FLOOR
-        )
         if (
             steady_mode
-            and residual_value <= float(case.time_stepper.steady_tolerance)
-            and float(linear_residual) <= linear_gate
-            and float(potential_residual) <= float(potential_gate)
+            and _fully_developed_converged(
+                case,
+                velocity_residual=residual_value,
+                linear_residual=float(linear_residual),
+                potential_residual=float(potential_residual),
+            )
         ):
             break
 

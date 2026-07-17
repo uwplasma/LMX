@@ -317,6 +317,17 @@ def test_animated_webp_is_bounded_and_preserves_motion(tmp_path: Path) -> None:
         animation.seek(animation.n_frames - 1)
         assert animation.getpixel((0, 0))[0] < 120
 
+    paired = write_animated_webp(
+        source,
+        tmp_path / "paired.webp",
+        seconds=1.0,
+        fps=2,
+        width=24,
+        right_source=source,
+    )
+    with Image.open(paired) as animation:
+        assert animation.size == (24, 8)
+
     with pytest.raises(ValueError, match="duration"):
         write_animated_webp(source, tmp_path / "too-long.webp", seconds=7.01)
 

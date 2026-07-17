@@ -26,6 +26,10 @@ current-closure, and power-closure gates; no solver was rerun for presentation.
   <img src="_static/readme-hunt-startup.webp" alt="Seven-second Hunt and Shercliff startup comparison" width="82%">
 </p>
 
+This legacy bounded transient is not a steady-state claim. The shared solver
+gate now blocks publication at a velocity, linear, or potential ceiling; a
+replacement awaits an idle-host run with recorded terminal residuals.
+
 ## Accepted
 
 - Hartmann, Shercliff, and Hunt fully developed inductionless duct cases have

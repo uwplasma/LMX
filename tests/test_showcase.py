@@ -135,6 +135,7 @@ def test_write_closed_channel_startup_movies_dispatches_to_movie_writer(
     def fake_solve_case_snapshots(case, frame_count=1):
         captured["solver_mode"] = case.solver.mode
         captured["current_reconstruction"] = case.time_stepper.current_reconstruction
+        captured["potential_solver"] = case.time_stepper.potential_solver
         captured["frame_count"] = frame_count
         return [
             {
@@ -174,6 +175,7 @@ def test_write_closed_channel_startup_movies_dispatches_to_movie_writer(
 
     assert captured["solver_mode"] == "transient"
     assert captured["current_reconstruction"] == "face_averaged"
+    assert captured["potential_solver"] == "cg_volume"
     assert (captured["frame_count"], captured["include_3d"]) == (2, False)
     assert (tmp_path / "shercliff_startup_2d.gif") in outputs
     assert (tmp_path / "shercliff_startup_2d.gif").exists()
@@ -189,19 +191,24 @@ def test_solve_case_snapshots_records_fully_developed_frames(
         time_stepper=replace(case.time_stepper, t_final=0.003, max_steps=3),
     )
 
+    calls = []
+
     def fake_step(**kwargs):
-        updated = np.asarray(kwargs["u_previous"]) + 0.1
+        calls.append(None)
+        update = 0.1 if len(calls) == 1 else 1.0e-10
+        updated = np.asarray(kwargs["u_previous"]) + update
         zeros = np.zeros_like(updated)
+        residual = 1.0e-6 if len(calls) == 1 else 1.0e-10
         return (
             updated,
             zeros,
             zeros,
             zeros,
             zeros,
-            1.0e-6,
-            1.0e-6,
+            residual,
+            residual,
             2,
-            1.0e-6,
+            residual,
             3,
             0.2,
             0.1,
@@ -214,9 +221,24 @@ def test_solve_case_snapshots_records_fully_developed_frames(
 
     monkeypatch.setattr(showcase.solvers, "_fully_developed_case_step", fake_step)
     frames = showcase.solve_case_snapshots(case, frame_count=3)
-    assert len(frames) == 4
+    assert len(frames) == 3
     assert frames[-1]["time"] > frames[0]["time"]
-    assert {"pressure_proxy", "face_lorentz_max"} <= frames[0].keys()
+    assert {
+        "pressure_proxy",
+        "face_lorentz_max",
+        "linear_residual",
+        "coupling_residual",
+    } <= frames[0].keys()
+    assert (
+        frames[-1]["step"],
+        frames[-1]["steady_streak"],
+        frames[-1]["converged"],
+    ) == (2, 1, True)
+
+    calls.clear()
+    capped = replace(case, time_stepper=replace(case.time_stepper, max_steps=1))
+    with pytest.raises(RuntimeError, match="steady-state ceiling"):
+        showcase.solve_case_snapshots(capped, frame_count=1)
 
 
 def test_write_closed_channel_startup_movies_rejects_unsupported_case(tmp_path: Path):

@@ -76,6 +76,7 @@ observables pass the 1% finite-grid gate.
 
 <p align="center">
   <img src="docs/_static/readme-hunt-startup.webp" alt="Hunt/Shercliff startup movie" width="82%">
+  <br><em>Legacy bounded transient; a steady-gated replacement is pending an idle-host run.</em>
 </p>
 
 [Validation evidence →](https://lmx.readthedocs.io/en/latest/validation_report.html)

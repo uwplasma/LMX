@@ -305,8 +305,9 @@ def write_animated_webp(
     quality: int = 50,
     sampling_power: float = 1.0,
     last_frame: int | None = None,
+    right_source: Path | None = None,
 ) -> Path:
-    """Downsample up to an inclusive source frame into a seven-second WebP."""
+    """Downsample one animation, or a synchronized pair, into a bounded WebP."""
 
     from PIL import Image
 
@@ -317,21 +318,47 @@ def write_animated_webp(
     if fps <= 0:
         raise ValueError("fps must be positive")
     with Image.open(source) as image:
+        right = Image.open(right_source) if right_source is not None else None
         frame_count = max(2, round(seconds * fps))
         terminal = image.n_frames - 1 if last_frame is None else int(last_frame)
         if not 1 <= terminal < image.n_frames:
             raise ValueError("last_frame must select at least two available source frames")
-        indices = [
-            round((index / (frame_count - 1)) ** sampling_power * terminal)
-            for index in range(frame_count)
-        ]
-        height = round(image.height * width / image.width)
-        frames = []
-        for index in indices:
-            image.seek(index)
-            frames.append(
-                image.convert("RGB").resize((width, height), Image.Resampling.LANCZOS)
-            )
+        if right is not None and right.n_frames < 2:
+            raise ValueError("right_source must contain at least two frames")
+        try:
+            frames = []
+            for index in range(frame_count):
+                fraction = (index / (frame_count - 1)) ** sampling_power
+                sources = ((image, terminal),) if right is None else (
+                    (image, terminal),
+                    (right, right.n_frames - 1),
+                )
+                parts = []
+                for side, (animation, end) in enumerate(sources):
+                    animation.seek(round(fraction * end))
+                    part_width = (
+                        width if right is None else width // 2 + side * (width % 2)
+                    )
+                    height = round(animation.height * part_width / animation.width)
+                    parts.append(
+                        animation.convert("RGB").resize(
+                            (part_width, height), Image.Resampling.LANCZOS
+                        )
+                    )
+                if right is None:
+                    frames.append(parts[0])
+                else:
+                    canvas = Image.new(
+                        "RGB", (width, max(part.height for part in parts)), "white"
+                    )
+                    x = 0
+                    for part in parts:
+                        canvas.paste(part, (x, (canvas.height - part.height) // 2))
+                        x += part.width
+                    frames.append(canvas)
+        finally:
+            if right is not None:
+                right.close()
     total_duration_ms = min(round(1000 * seconds), 7000)
     duration_ms, longer_frames = divmod(total_duration_ms, frame_count)
     durations = [
@@ -398,6 +425,12 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="inclusive terminal source frame for a converged animation",
     )
+    parser.add_argument(
+        "--right-source",
+        type=Path,
+        default=None,
+        help="optional second animation to display beside SOURCE",
+    )
     args = parser.parse_args(argv)
     if args.write_static_webp:
         source, output = args.write_static_webp
@@ -414,6 +447,7 @@ def main(argv: list[str] | None = None) -> int:
             quality=args.quality,
             sampling_power=args.sampling_power,
             last_frame=args.last_frame,
+            right_source=args.right_source,
         )
         print(f"Animated WebP: {output}")
     elif args.write_benchmark_a_plot:

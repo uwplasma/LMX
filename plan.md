@@ -144,12 +144,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 34 | no new module | 34 |
-| package lines | 34,152 | stay below 34,153 | 34,950 |
-| maintained-core lines | 7,597 | stay below 7,598 | 7,800 |
-| test files / lines | 30 / 20,871 | no new file; next test change must reduce lines | 30 / 20,900 |
+| package lines | 34,084 | stay below 34,085 | 34,950 |
+| maintained-core lines | 7,614 | stay below 7,615 | 7,800 |
+| test files / lines | 30 / 20,888 | no new file; next test change must reduce lines | 30 / 20,900 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 185 | no new file without retiring another owner | 186 |
-| tracked checkout | 4,595,219 bytes | stay below 4,595,220 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,598,958 bytes | stay below 4,598,959 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets come from ownership deletion and shared helpers, never unreadable
 formatting or arbitrary test merging. Recent moves delete 190 builder lines and
@@ -257,7 +257,9 @@ the 300-second engineering target and 600-second hard limit; investigate the
 thermal/system-state increase before changing worker count.
 Merging identical magnetic-obstacle checks preserves 33 assertions, removes two
 solves and 28 lines, and cuts focused wall time 5.86 -> 4.52 seconds. The current
-suite is 20,871 lines; its next change remains a net deletion.
+suite is 20,888 lines; its next change remains a net deletion. Across the
+editable-example, runner-deletion, autodiff-slimming, and steady-media-gate
+tranches, package and test lines remain net lower than the prior baseline.
 
 ### Canonical sharding and performance
 
@@ -639,9 +641,13 @@ current blanket source has a valid `3.00e-14 <= 2e-3` relative-update gate, but
 its derivative runs 7.014 seconds and continues from its first sustained pass
 at step 57, `t=2.85 s`, to `t=15 s`. Trim through the first stored state after
 that pass (step 58, `t=2.90 s`) without rerunning, then recompress. Hunt/Shercliff
-runs exactly 7.000 seconds but has no recorded terminal residual or early-stop
-gate; reuse the solver's velocity, linear, and potential convergence predicate,
-stop at its first full pass, and fail publication if the ceiling is reached.
+runs exactly 7.000 seconds but has no recorded terminal residual. The shared
+velocity, linear, and potential predicate now stops snapshot generation at its
+first full pass and fails publication at the ceiling; robust volume-weighted CG
+passes the bounded backend gate while legacy CG does not. The old 200-update
+asset is explicitly labelled as a transient. Calibrate the physical horizon,
+then regenerate serially only after clean host admission and record the terminal
+triplet and source hashes.
 Q2D runs 7.014 seconds, covers only 0.331 turnover times, and ends with energy
 and enstrophy still changing substantially. Its current unforced decay cannot
 be called statistically steady at nonzero energy: either run it to a

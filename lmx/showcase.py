@@ -52,7 +52,7 @@ def solve_case_snapshots(
     *,
     frame_count: int = 12,
 ) -> list[dict[str, object]]:
-    """Advance a fully developed case and retain evenly spaced movie frames."""
+    """Retain bounded frames through the first fully developed steady pass."""
 
     mesh = solvers._build_mesh(case)
     materials = build_material_fields(case, mesh)
@@ -60,7 +60,7 @@ def solve_case_snapshots(
     potential_solver = solvers._resolve_potential_solver(
         case.time_stepper.potential_solver, materials.fluid_mask
     )
-    interpolate_direct_fluid_walls = not bool(materials.fluid_mask.all())
+    interpolate_direct_fluid_walls = case.geometry.kind == "rect_duct"
     (
         initial_u,
         initial_phi,
@@ -99,6 +99,8 @@ def solve_case_snapshots(
             "lorentz_x": initial_lorentz,
             "fluid_mask": materials.fluid_mask,
             "residual": 0.0,
+            "coupling_residual": 0.0,
+            "linear_residual": 0.0,
             "potential_residual": 0.0,
             "potential_iterations": 0.0,
             "face_current_max": 0.0,
@@ -107,10 +109,15 @@ def solve_case_snapshots(
             "mean_velocity": initial_mean_velocity,
             "applied_forcing": float(case.forcing),
             "pressure_proxy": float(case.forcing),
+            "step": 0,
+            "steady_streak": 0,
+            "converged": False,
             "mesh": mesh,
         }
     )
     u = initial_u
+    converged = False
+    steady_streak = 0
     for step_index in range(steps):
         step_time = float(start_time + (step_index + 1) * dt)
         if case.solver.kind != "fully_developed_inductionless":
@@ -122,16 +129,17 @@ def solve_case_snapshots(
             if case.solver.linear_solver == "auto"
             else case.solver.linear_solver
         )
+        previous_u = u
         (
             u,
             phi,
             jy,
             jz,
             lorentz,
-            residual,
+            coupling_residual,
             potential_residual,
             potential_iteration_count,
-            _linear_residual,
+            linear_residual,
             _linear_iteration_count,
             face_current_max,
             emf_max,
@@ -144,7 +152,7 @@ def solve_case_snapshots(
             case=case,
             mesh=mesh,
             materials=materials,
-            u_previous=u,
+            u_previous=previous_u,
             step_time=step_time,
             potential_solver=potential_solver,
             target_mean_velocity=target_mean_velocity,
@@ -153,7 +161,15 @@ def solve_case_snapshots(
             coupling_iterations=case.solver.coupling_iterations,
             coupling_tolerance=case.solver.coupling_tolerance,
         )
-        if step_index % stride == 0 or step_index == steps - 1:
+        velocity_residual = float(jnp.max(jnp.abs(u - previous_u)))
+        converged = solvers._fully_developed_converged(
+            case,
+            velocity_residual=velocity_residual,
+            linear_residual=float(linear_residual),
+            potential_residual=float(potential_residual),
+        )
+        steady_streak = steady_streak + 1 if converged else 0
+        if step_index % stride == 0 or step_index == steps - 1 or converged:
             frames.append(
                 {
                     "time": step_time,
@@ -164,7 +180,9 @@ def solve_case_snapshots(
                     "jz": jz,
                     "lorentz_x": lorentz,
                     "fluid_mask": materials.fluid_mask,
-                    "residual": float(residual),
+                    "residual": velocity_residual,
+                    "coupling_residual": float(coupling_residual),
+                    "linear_residual": float(linear_residual),
                     "potential_residual": float(potential_residual),
                     "potential_iterations": float(potential_iteration_count),
                     "face_current_max": float(face_current_max),
@@ -173,9 +191,22 @@ def solve_case_snapshots(
                     "mean_velocity": float(mean_velocity),
                     "applied_forcing": float(applied_forcing),
                     "pressure_proxy": float(applied_forcing),
+                    "step": step_index + 1,
+                    "steady_streak": steady_streak,
+                    "converged": converged,
                     "mesh": mesh,
                 }
             )
+        if converged:
+            break
+    if not converged:
+        terminal = frames[-1]
+        raise RuntimeError(
+            "startup movie reached its steady-state ceiling without a full pass: "
+            f"step={steps}, velocity={terminal['residual']:.3e}, "
+            f"linear={terminal['linear_residual']:.3e}, "
+            f"potential={terminal['potential_residual']:.3e}"
+        )
     return frames
 
 
@@ -754,8 +785,8 @@ def write_closed_channel_startup_movies(
     t_final: float = 2.0e-3,
     coupling_iterations: int = 6,
     potential_iterations: int = 48,
-    frame_count: int = 42,
-    fps: int = 6,
+    frame_count: int = 35,
+    fps: int = 5,
     include_3d: bool = True,
 ) -> list[Path]:
     """Solve every startup step and render a bounded sample of physical states."""
@@ -801,6 +832,7 @@ def write_closed_channel_startup_movies(
             potential_iterations=potential_iterations,
             potential_tolerance=1.0e-8,
             potential_relaxation=1.0,
+            potential_solver="cg_volume",
             current_reconstruction="face_averaged",
         ),
         initial_velocity=1.0,
