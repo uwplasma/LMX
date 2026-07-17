@@ -621,8 +621,14 @@
     },
     {
       "accepted": false,
-      "duration_ms": 7014,
+      "duration_ms": 7000,
       "path": "docs/_static/readme-q2d-turbulence.webp",
+      "presentation_retime": {
+        "encoded_frame_count": 42,
+        "encoded_frame_payloads_unchanged": true,
+        "prior_derivative_sha256": "56a89dca6f64d5f0e22600cbbc9473671f0faed6355f7fd223727819519831e5",
+        "prior_duration_ms": 7014
+      },
       "status": "legacy_non_statistically_steady"
     }
   ],
@@ -717,7 +723,7 @@
       {
         "bytes": 117102,
         "path": "docs/_static/readme-q2d-turbulence.webp",
-        "sha256": "56a89dca6f64d5f0e22600cbbc9473671f0faed6355f7fd223727819519831e5"
+        "sha256": "ef145c0f914a9838be152cdb59027d8040df22bff7baaf30c638d66fedfa4239"
       },
       {
         "bytes": 41648,

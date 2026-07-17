@@ -186,7 +186,7 @@ keeps inertial wake/recirculation physics research-stage.
 
 ![Seven-second nonlinear Q2D research workflow](_static/readme-q2d-turbulence.webp)
 
-This legacy 7.014 s asset is a **weakly forced** transient, not an unforced
+This legacy 7.000 s asset is a **weakly forced** transient, not an unforced
 decay and not a statistically steady turbulence result. Its replacement must
 pass a predeclared statistical-stationarity gate before publication.
 

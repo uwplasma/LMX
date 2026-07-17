@@ -304,11 +304,14 @@ def test_tracked_release_asset_manifest_matches_sources() -> None:
     }
     for path, metadata in animations.items():
         assert _animated_webp_duration_ms(Path(path)) == metadata["duration_ms"]
+        assert 0 < metadata["duration_ms"] <= 7000
     hunt = animations["docs/_static/readme-hunt-startup.webp"]
     q2d = animations["docs/_static/readme-q2d-turbulence.webp"]
     assert not hunt["accepted"] and hunt["status"] == "legacy_transient"
     assert not q2d["accepted"] and q2d["status"] == "legacy_non_statistically_steady"
-    assert q2d["duration_ms"] == 7014
+    assert q2d["duration_ms"] == 7000
+    assert q2d["presentation_retime"]["encoded_frame_payloads_unchanged"]
+    assert len(q2d["presentation_retime"]["prior_derivative_sha256"]) == 64
     blanket = animations["docs/_static/readme-blanket-flow.webp"]
     assert blanket["accepted"] and blanket["status"] == "steady_window_accepted"
     acceptance = blanket["animation_acceptance"]
