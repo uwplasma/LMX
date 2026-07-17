@@ -19,6 +19,8 @@ foreign contexts block GPU admission.
 A composed momentum/projection JIT is rejected before sustained timing: its
 four-device medium screen improves only 3.6%, raises peak RSS 15.4%, and fails
 the frozen interface-current gate. Do not spend a multi-minute rung on it.
+A one-transfer projection guard is also rejected: its exact 3.23% gain misses
+the 5% gate; RSS falls 1.68%.
 
 The `--sustained` preset keeps 32 CPU or 96 GPU updates, one cold plus three
 warm trajectories, a 120-second warm minimum, an 1800-second ceiling, and
@@ -132,24 +134,12 @@ shared without removing cases or assertions.
 | test files / lines | 30 / 21,075 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,609,889 bytes | stay below 4,609,890 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,609,604 bytes | stay below 4,609,605 without hiding direct visuals | 4,718,592 bytes |
 
-These ratchets must come from ownership deletion, shared helpers, or removal of
-superseded behavior—not unreadable formatting or arbitrary test merging.
-The latest audits unified route-axis and centerline validation ownership, made
-variable-field validation fail closed on nonfinite velocity, folded two
-duplicate solve tests into stronger physics owners, and removed Q2D's duplicate
-coordinate-edge helper without changing rendered output. The direct B1 gate
-remains, and B2 reuses complete checkpoints.
-Three Q2D modal plot checks now reuse their validated 48-square trajectories,
-removing 21 test lines and three duplicate solves without dropping any physics,
-energy-budget, or artifact assertion.
-Five Q2D builder wrappers are now compatibility aliases to their documented
-frozen dataclass owners, deleting another 126 package lines while preserving
-every current keyword call, default, result type, solver, plot, and movie path.
-Variable-field and bent-pipe builders now retain canonical base problems and
-replace only real field/geometry/name differences, deleting 64 production lines
-with exact rich-nondefault and full-solve equivalence.
+These ratchets come from ownership deletion and shared helpers, never unreadable
+formatting or arbitrary test merging. Recent moves delete 190 builder lines and
+reuse three validated Q2D trajectories; exact nondefault/full-solve, physics,
+energy, and artifact gates remain. B1 stays direct and B2 reuses checkpoints.
 The remaining result records, 13 scripts, and distinct Python/TOML examples
 retain current provenance, CI, or runnable-workflow ownership; do not merge
 them unless the replacement deletes code without weakening those contracts.
@@ -186,14 +176,7 @@ parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
 The current gate passes 867 tests with 8 expected skips and 95.41% combined
-coverage in 121.5 seconds. Shared centerline validation removes 20 source lines;
-the layered-flow consolidation removes 17 test lines and one redundant
-6.894-second solve while retaining finite-field, current, and physics gates.
-Shared figure-pair assertions subsequently remove another 20 test lines while
-preserving all five ordered output and existence contracts; focused Q2D and
-repository gates pass.
-The safety-reviewed native S3 harness raised the suite to 21,099 lines without
-a new test file; consolidating optional-field skip ownership recovered 12 lines.
+coverage in 121.5 seconds.
 Merging identical magnetic-obstacle checks preserves 33 assertions, removes two
 solves and 28 lines, and cuts focused wall time 5.86 -> 4.52 seconds. The current
 suite is 21,075 lines; its next change remains a net deletion.
@@ -230,9 +213,9 @@ blocks promotion. Worker records and final summaries independently rederive
 the three-sample, two-minute, finite, 5%-CV timing gate. The remote GPU
 supervisor additionally binds UUID/PCI
 identity, worker contexts, utilization, and safe own-PID timeout cleanup.
-Each multi-minute rung now collects and atomically publishes fresh admission
-evidence immediately before launch, applies its admitted CPU affinity, and
-keeps the local interpreter separate from a preflighted remote interpreter.
+Each rung collects fresh admission immediately before launch, applies CPU
+affinity, and separates local/remote interpreters. Per-rung paths preserve every
+raw 1/2/4-CPU and 1/2-GPU observation.
 
 Compact CPU evidence is
 `benchmarks/results/b2-schema6-cpu-scaling-20260716.json`; raw worker JSON and
@@ -240,11 +223,10 @@ plots remain ignored. The worker fingerprint must include package-owned frozen
 specifications before any cross-host comparison is accepted.
 
 GPU topology/replay is exact on 1/2 A4000s. The recorded-source `78858f5`
-96-update calibration
-reports 258.913/159.234 seconds and 1.626x speedup, but foreign contexts block
-an authoritative timing claim. The latest audit found five foreign contexts on
-each GPU, including a CPU-heavy VMEC-JAX process, so no new timing was launched.
-A fresh audit also found two host processes above the admission CPU threshold.
+96-update calibration reports 258.913/159.234 seconds and 1.626x speedup, but
+foreign contexts block an authoritative timing claim. The latest audit found
+four gunicorn CUDA contexts on each GPU and a `pop-upgrade` daemon near 99% CPU,
+so no new timing was launched.
 A dedicated JAX/CUDA 0.6.2 and SOLVAX 0.8.4 benchmark environment now passes
 the two-device import check. Preserve the calibrated `256 x 67 x 67`, 96-update
 workload and rerun its one-cold-plus-three-warm ladder only after clean admission.

@@ -170,11 +170,10 @@ and two halo permutations per electric PCG iteration. Each contributes under
 This misses the 3% trigger for an anchored-gauge prototype; the remaining local
 gap is compute/scheduling dominated rather than a single communication defect.
 
-Composing momentum and pressure projection into one sharded JIT is also
-rejected. On the `128 x 35 x 35`, four-update screen its 1.543 s median is only
-3.6% below the 1.601 s control, while peak RSS rises 15.4% and interface-current
-balance exceeds the frozen harness limit. The candidate was reverted without a
-multi-minute rerun.
+Composing momentum and projection gains only 3.6%, raises RSS 15.4%, and fails
+interface-current balance. Combining seven exact projection guards into one
+host transfer gains 3.23% and lowers RSS 1.68%, but misses the 5% gate. Both
+`128 x 35 x 35` candidates were reverted without a multi-minute rerun.
 
 The usual macOS single-thread XLA flags also fail as a core-control method:
 default and flagged one-device profiles both use 11 HLO worker threads and take
@@ -370,10 +369,11 @@ GPU interpreter.
 The CPU lane still runs inside a Linux Docker allocation exposing eight CPUs;
 the example applies nested `taskset` masks that provide
 2/4/8 guest CPUs for 1/2/4 JAX shards and establish CPU-allocation scaling, not
-exact M4 P/E-core placement. Its built-in collector atomically replaces the
+exact M4 P/E-core placement. Its built-in collector writes distinct per-rung
 evidence after each 60-second clean observation. New timing evidence also needs
-a checksummed host-side continuous monitor through every rung and a clean postflight; the static
-preflight alone cannot detect work that starts later. Sustained runs create an
+a checksummed continuous monitor through every rung and a clean postflight; the
+CPU monitor covers the Docker guest allocation, not the macOS host, while the
+GPU monitor covers the remote host. Sustained runs create an
 ignored `<backend>_N.monitor.jsonl` automatically; keep promoted raw traces as
 release artifacts. Each worker record must carry compact schema-2
 `resource_monitoring` evidence: matching backend/device count, a raw SHA-256,

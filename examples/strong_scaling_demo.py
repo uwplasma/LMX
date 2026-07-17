@@ -498,6 +498,8 @@ def run_local_cpu_scaling(
         sustained = minimum_warm_seconds >= 120.0
         evidence_path = environment_evidence or out_dir / "cpu-admission.json"
         if sustained:
+            evidence_path = evidence_path.with_name(
+                f"{evidence_path.stem}-{count}{evidence_path.suffix}")
             _collect_cpu_admission(
                 evidence_path, num_devices=count, source_commit=source_commit or ""
             )
@@ -832,6 +834,8 @@ def run_remote_gpu_scaling(
         sustained = minimum_warm_seconds >= 120.0
         evidence_path = environment_evidence or out_dir / "gpu-admission.json"
         if sustained:
+            evidence_path = evidence_path.with_name(
+                f"{evidence_path.stem}-{count}{evidence_path.suffix}")
             _collect_gpu_admission(evidence_path, remote_host=remote_host,
                 visible_devices=visible_devices, num_devices=count,
                 source_commit=source_commit or "")

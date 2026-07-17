@@ -468,6 +468,19 @@
       "iterations_and_outputs_identical": true,
       "candidate_source_fingerprint": "4bfafeb829cb105dc25e65cd633eb0dddbdbc786180ae8ca78e729979c74d12f",
       "decision": "reject before the large rung; insufficient end-to-end benefit for the added fast path"
+    },
+    "projection_guard_single_transfer": {
+      "shape": [128, 35, 35],
+      "updates": 6,
+      "devices": 4,
+      "baseline_warm_median_seconds": 2.059882958,
+      "candidate_warm_median_seconds": 1.993330292,
+      "relative_improvement": 0.032309,
+      "peak_rss_change": -0.016836,
+      "numerics_restart_placement_and_physics_exact": true,
+      "baseline_raw_sha256": "244ea4ecb174fde49e68c6045fbfbfb6a1749fac7d69a9f3dadbbe9b22664255",
+      "candidate_raw_sha256": "836efc435332e3cefd26872bb36d9391a86ef052e74a976856a46b4668e0ddd8",
+      "decision": "reject before sustained timing; improvement is below 5%"
     }
   },
   "claim_limits": {

@@ -254,11 +254,10 @@ def test_builtin_admission_collectors_atomically_write_bound_evidence(
 
 
 def test_sustained_ladders_collect_each_rung_and_pass_cpu_affinity(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     collected, launched = [], []
     monkeypatch.setattr(strong_scaling_demo, "_collect_cpu_admission",
-        lambda path, **kwargs: collected.append(kwargs["num_devices"]))
+        lambda path, **kwargs: collected.append((kwargs["num_devices"], Path(path).name)))
     def environment(path, *, backend, num_devices, **kwargs):
         if backend == "gpu":
             return {"resource_environment_verified": True,
@@ -276,8 +275,8 @@ def test_sustained_ladders_collect_each_rung_and_pass_cpu_affinity(
     strong_scaling_demo.run_local_cpu_scaling(repo_root=tmp_path, out_dir=tmp_path,
         device_counts=(1, 2, 4), benchmark_kind="extruded3d", nx=8, ny=7, nz=7,
         iterations=1, repeats=4, python_executable="python", source_commit="abc",
-        minimum_warm_seconds=120.0)
-    assert collected == [1, 2, 4]
+        minimum_warm_seconds=120.0, environment_evidence=tmp_path / "custom-admission.json")
+    assert collected == [(n, f"custom-admission-{n}.json") for n in (1, 2, 4)]
     assert launched == [list(range(2)), list(range(4)), list(range(8))]
     gpu_collected = []
     monkeypatch.setattr(strong_scaling_demo, "_sync_repo_to_remote", lambda **kwargs: None)
@@ -286,7 +285,7 @@ def test_sustained_ladders_collect_each_rung_and_pass_cpu_affinity(
         lambda host, count: "1" if count == 1 else "0,1")
     monkeypatch.setattr(strong_scaling_demo, "_collect_gpu_admission",
         lambda path, **kwargs: gpu_collected.append(
-            (kwargs["num_devices"], kwargs["visible_devices"])))
+            (kwargs["num_devices"], kwargs["visible_devices"], Path(path).name)))
     monkeypatch.setattr(strong_scaling_demo, "_run_monitored_gpu_worker",
         lambda *args, **kwargs: (0, {}, False))
     def copy_record(command, **kwargs):
@@ -297,7 +296,8 @@ def test_sustained_ladders_collect_each_rung_and_pass_cpu_affinity(
         remote_host="office", remote_dir="/tmp/lmx", device_counts=(1, 2),
         benchmark_kind="extruded3d", nx=8, ny=7, nz=7, iterations=1, repeats=4,
         source_commit="abc", minimum_warm_seconds=120.0)
-    assert gpu_collected == [(1, "1"), (2, "0,1")]
+    assert gpu_collected == [(1, "1", "gpu-admission-1.json"),
+        (2, "0,1", "gpu-admission-2.json")]
 
 
 def test_remote_python_preflight_fails_before_timing(monkeypatch: pytest.MonkeyPatch):
