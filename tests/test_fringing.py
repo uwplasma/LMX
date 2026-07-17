@@ -848,26 +848,23 @@ def test_explicit_deviatoric_stress_matches_independent_finite_volume_oracle():
 
 
 def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp():
-    shape = (3, 2, 2)
-    widths = tuple(jnp.full(size, value) for size, value in zip(shape, (0.2, 0.3, 0.4)))
+    shape = (3, 3, 3)
+    widths = tuple(map(jnp.asarray, ([0.2, 0.2, 0.2], [0.3, 0.25, 0.35],
+                                     [0.4, 0.3, 0.5])))
     velocity = jnp.arange(np.prod((*shape, 3)), dtype=float).reshape((*shape, 3)) / 17.0
     zero_y = jnp.zeros((shape[0], shape[2], 3))
     zero_z = jnp.zeros((shape[0], shape[1], 3))
     patches = (velocity[0] - 0.3, velocity[-1] + 0.4, zero_y, zero_y, zero_z, zero_z)
     fluxes = (
         jnp.linspace(0.2, 1.0, (shape[0] + 1) * shape[1] * shape[2]).reshape(
-            (shape[0] + 1, shape[1], shape[2])
-        ),
+            (shape[0] + 1, shape[1], shape[2])),
         jnp.zeros((shape[0], shape[1] + 1, shape[2])),
-        jnp.zeros((shape[0], shape[1], shape[2] + 1)),
-    )
+        jnp.zeros((shape[0], shape[1], shape[2] + 1)))
 
     def assert_equivalent(default, injected, cotangent, atol=0.0):
-        pairs = (
-            (default(1.0), injected(1.0)),
+        pairs = ((default(1.0), injected(1.0)),
             (jax.jvp(default, (1.0,), (1.0,))[1], jax.jvp(injected, (1.0,), (1.0,))[1]),
-            (jax.vjp(default, 1.0)[1](cotangent)[0], jax.vjp(injected, 1.0)[1](cotangent)[0]),
-        )
+            (jax.vjp(default, 1.0)[1](cotangent)[0], jax.vjp(injected, 1.0)[1](cotangent)[0]))
         for observed, expected in pairs:
             jax.tree.map(lambda a, b: np.testing.assert_allclose(
                 a, b, rtol=3.0e-14, atol=atol), observed, expected)
@@ -875,15 +872,12 @@ def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp():
     def diffusion(scale, inject):
         conductivity = scale * (1.0 + jnp.arange(np.prod(shape)).reshape(shape) / 20.0)
         values = fringing_impl._variable_diffusion_coefficients_3d(
-            conductivity, dx=0.2, dy=widths[1], dz=widths[2], validated_spacing=True
-        )
+            conductivity, dx=0.2, dy=widths[1], dz=widths[2], validated_spacing=True)
         return fringing_impl._variable_diffusion_coefficients_3d(
             conductivity, dx=0.2, dy=widths[1], dz=widths[2], validated_spacing=True,
-            axial_coefficients=values[:2],
-        ) if inject else values
+            axial_coefficients=values[:2]) if inject else values
 
-    assert_equivalent(
-        lambda scale: diffusion(scale, False),
+    assert_equivalent(lambda scale: diffusion(scale, False),
         lambda scale: diffusion(scale, True),
         tuple(jnp.ones_like(value) for value in diffusion(1.0, False)))
 
@@ -893,16 +887,12 @@ def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp():
         scaled_fluxes = tuple(scale * value for value in fluxes)
         q = jnp.sum(state**2, axis=-1)
         q_patches = tuple(jnp.sum(value**2, axis=-1) for value in boundaries)
-        axial_q = (
-            jnp.concatenate((q_patches[0][None], q[:-1])),
-            jnp.concatenate((q[1:], q_patches[1][None])),
-        )
+        axial_q = (jnp.concatenate((q_patches[0][None], q[:-1])),
+                   jnp.concatenate((q[1:], q_patches[1][None])))
         gradient = fringing_impl._cell_limited_least_squares_gradient_duct(
-            q, q_patches, widths, axial_neighbours=axial_q if inject else None
-        )
+            q, q_patches, widths, axial_neighbours=axial_q if inject else None)
         weights = fringing_impl._limited_linear_vector_face_weights_duct(
-            state, scaled_fluxes, boundaries, widths, gradient=gradient if inject else None
-        )
+            state, scaled_fluxes, boundaries, widths, gradient=gradient if inject else None)
         kwargs = {}
         if inject:
             kwargs = {
@@ -917,31 +907,41 @@ def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp():
                 ),
             }
         return fringing_impl._limited_linear_convection_matrix_action_duct(
-            state, scaled_fluxes, weights, boundaries, widths, **kwargs
-        )
+            state, scaled_fluxes, weights, boundaries, widths, **kwargs)
 
     assert_equivalent(
         lambda scale: transport(scale, False),
         lambda scale: transport(scale, True),
         jnp.ones_like(velocity), atol=1.0e-14)
 
-    def stress(scale, inject):
+    def momentum_setup(scale, packed):
         state = scale * velocity
         boundaries = tuple(scale * value for value in patches)
-        gradient = None
-        if inject:
-            gradient = jnp.stack(
-                tuple(jnp.stack(fringing_impl._cell_limited_least_squares_gradient_duct(
-                    state[..., component], tuple(value[..., component] for value in boundaries),
-                    widths), axis=-1) for component in range(3)), axis=-1)
-        return fringing_impl._explicit_deviatoric_stress_duct(
-            state, jnp.full(shape, 0.7), boundaries, widths, gradient=gradient
-        )
-
+        scaled_fluxes = tuple(scale * value for value in fluxes)
+        q, q_patches = jnp.sum(state**2, axis=-1), tuple(
+            jnp.sum(value**2, axis=-1) for value in boundaries)
+        fields = (*tuple(state[..., component] for component in range(3)), q)
+        boundary_fields = (*tuple(tuple(value[..., component] for value in boundaries)
+                                  for component in range(3)), q_patches)
+        scalar = tuple(fringing_impl._cell_limited_least_squares_gradient_duct(
+            field, boundary, widths) for field, boundary in zip(
+                fields, boundary_fields, strict=True))
+        gradient = jnp.stack(tuple(jnp.stack(value, axis=-1) for value in scalar[:3]), axis=-1)
+        weights = fringing_impl._limited_linear_vector_face_weights_duct(
+            state, scaled_fluxes, boundaries, widths, gradient=scalar[3])
+        if packed:
+            setup = fringing_impl._frozen_duct_momentum_setup(
+                state, jnp.ones(shape), jnp.full(shape, 0.7), scaled_fluxes,
+                boundaries, widths, dx=widths[0][0])
+            weights, gradient = setup[-2:]
+        stress = fringing_impl._explicit_deviatoric_stress_duct(
+            state, jnp.full(shape, 0.7), boundaries, widths, gradient=gradient)
+        return gradient, weights, stress
+    assert momentum_setup(1.0, True)[0].shape == (*shape, 3, 3)
     assert_equivalent(
-        lambda scale: stress(scale, False),
-        lambda scale: stress(scale, True),
-        jnp.ones_like(velocity), atol=2.0e-14)
+        lambda scale: momentum_setup(scale, False),
+        lambda scale: momentum_setup(scale, True),
+        jax.tree.map(jnp.ones_like, momentum_setup(1.0, False)), atol=2.0e-14)
     west, east = jnp.full_like(velocity, -0.2), jnp.full_like(velocity, 0.3)
     def traction(scale, inject):
         boundaries = tuple(scale * value for value in patches)

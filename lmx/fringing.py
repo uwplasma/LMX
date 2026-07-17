@@ -1489,37 +1489,6 @@ def _solvax_pressure_poisson_duct(
     )
 
 
-def _duct_diffusion_data(
-    density: jnp.ndarray,
-    viscosity: jnp.ndarray,
-    widths: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
-    *,
-    dx: float,
-    prescribed_inlet: bool,
-) -> tuple[jnp.ndarray, tuple[jnp.ndarray, ...], jnp.ndarray, jnp.ndarray]:
-    """Return viscosity coefficients and affine duct-boundary sinks."""
-
-    _, dy_widths, dz_widths = widths
-    dynamic_viscosity = density * viscosity
-    coefficients = _variable_diffusion_coefficients_3d(dynamic_viscosity,
-        dx=dx, dy=dy_widths, dz=dz_widths, validated_spacing=True)
-    wall_sink = jnp.zeros_like(density)
-    for axis, width in ((1, dy_widths), (2, dz_widths)):
-        for index in (0, -1):
-            cells = [slice(None)] * 3
-            cells[axis] = index
-            cells = tuple(cells)
-            wall_sink = wall_sink.at[cells].add(
-                dynamic_viscosity[cells] / (0.5 * width[index] ** 2))
-    inlet_cells = jnp.arange(density.shape[0])[:, None, None] == 0
-    inlet_sink = (
-        jnp.where(inlet_cells, 2.0 * dynamic_viscosity[0] / dx**2, 0.0)
-        if prescribed_inlet
-        else jnp.zeros_like(density)
-    )
-    return dynamic_viscosity, coefficients, wall_sink, inlet_sink
-
-
 def _solvax_implicit_momentum_duct(
     velocity: jnp.ndarray,
     force: jnp.ndarray,
@@ -1535,6 +1504,7 @@ def _solvax_implicit_momentum_duct(
     iterations: int,
     tolerance: float,
     prescribed_inlet: bool = True,
+    frozen_setup=None,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Solve one frozen, conservative three-component momentum system.
 
@@ -1550,38 +1520,21 @@ def _solvax_implicit_momentum_duct(
     dz_widths = _coerce_spacing_vector(dz, shape[2], dtype=velocity.dtype)
     dx_widths = jnp.full((shape[0],), dx, dtype=velocity.dtype)
     volume = dx_widths[:, None, None] * dy_widths[None, :, None] * dz_widths[None, None, :]
-    _, coefficients, wall_sink, inlet_sink = _duct_diffusion_data(
-        density,
-        viscosity,
-        (dx_widths, dy_widths, dz_widths),
-        dx=dx,
-        prescribed_inlet=prescribed_inlet,
-    )
-    inlet_cells = jnp.arange(shape[0])[:, None, None] == 0
-    diffusion_sink = wall_sink + inlet_sink
     widths = (dx_widths, dy_widths, dz_widths)
-    weights = _limited_linear_vector_face_weights_duct(
-        velocity, rho_phi, boundary_velocity, widths
-    )
+    setup = frozen_setup or _frozen_duct_momentum_setup(
+        velocity, density, viscosity, rho_phi, boundary_velocity, widths,
+        dx=dx, prescribed_inlet=prescribed_inlet)
+    _, coefficients, diffusion_sink, inlet_sink, weights, _ = setup
+    inlet_cells = jnp.arange(shape[0])[:, None, None] == 0
     zero_patches = tuple(jnp.zeros_like(value) for value in boundary_velocity)
     prescribed_patches = (boundary_velocity[0], zero_patches[1], *boundary_velocity[2:])
-    boundary_action = _limited_linear_convection_matrix_action_duct(
-        jnp.zeros_like(velocity), rho_phi, weights, prescribed_patches, widths
-    )
+    boundary_action, _ = _duct_momentum_transport(jnp.zeros_like(velocity), rho_phi,
+        weights, prescribed_patches, widths, coefficients, diffusion_sink)
 
     def matvec(field: jnp.ndarray) -> jnp.ndarray:
-        neighbours = _neighbor_fields(
-            field,
-            mode_x="neumann",
-            mode_y="neumann",
-            mode_z="neumann",
-        )
-        diffusion = sum(c[..., None] * (n - field) for c, n in zip(
-            coefficients, neighbours, strict=True)) - diffusion_sink[..., None] * field
         homogeneous_patches = (zero_patches[0], field[-1], *zero_patches[2:])
-        convection = _limited_linear_convection_matrix_action_duct(
-            field, rho_phi, weights, homogeneous_patches, widths
-        )
+        convection, diffusion = _duct_momentum_transport(field, rho_phi, weights,
+            homogeneous_patches, widths, coefficients, diffusion_sink)
         return volume[..., None] * (density[..., None] * field + dt * (convection - diffusion))
 
     diagonal = volume * (density + dt * (sum(coefficients) + diffusion_sink))
@@ -1630,11 +1583,12 @@ def _cell_limited_least_squares_gradient_duct(
             lo = jnp.concatenate((boundary_values[2 * axis][None], values[:-1]))
             hi = jnp.concatenate((values[1:], boundary_values[2 * axis + 1][None]))
         centers = 0.5 * (width[:-1] + width[1:])
-        dm = jnp.concatenate((0.5 * width[:1], centers))[:, None, None]
-        dp = jnp.concatenate((centers, 0.5 * width[-1:]))[:, None, None]
+        trailing = (None,) * (values.ndim - 1)
+        dm = jnp.concatenate((0.5 * width[:1], centers))[(slice(None), *trailing)]
+        dp = jnp.concatenate((centers, 0.5 * width[-1:]))[(slice(None), *trailing)]
         fraction = width[1:] / (width[:-1] + width[1:])
-        lo_weight = jnp.concatenate((jnp.ones(1), fraction))[:, None, None]
-        hi_weight = jnp.concatenate((1.0 - fraction, jnp.ones(1)))[:, None, None]
+        lo_weight = jnp.concatenate((jnp.ones(1), fraction))[(slice(None), *trailing)]
+        hi_weight = jnp.concatenate((1.0 - fraction, jnp.ones(1)))[(slice(None), *trailing)]
         gradient = (lo_weight * (values - lo) / dm + hi_weight * (hi - values) / dp) / (
             lo_weight + hi_weight
         )
@@ -1644,7 +1598,7 @@ def _cell_limited_least_squares_gradient_duct(
     minimum, maximum = jnp.min(local, axis=0), jnp.max(local, axis=0)
     limiter = jnp.ones_like(field)
     for axis, (gradient, width) in enumerate(zip(gradients, widths, strict=True)):
-        shape = [1, 1, 1]
+        shape = [1] * field.ndim
         shape[axis] = field.shape[axis]
         half_step = 0.5 * width.reshape(shape) * gradient
         for extrapolate in (-half_step, half_step):
@@ -1665,16 +1619,10 @@ def _explicit_deviatoric_stress_duct(
     *, gradient: jnp.ndarray | None = None,
     axial_tractions: tuple[jnp.ndarray, jnp.ndarray] | None = None,
 ) -> jnp.ndarray:
-    """Return lagged ``div(mu*dev2(T(grad(U))))`` with limited gradients.
-    Injected gradients and axial tractions are cell-aligned; constant-mu only.
-    """
+    """Return limited ``div(mu*dev2(T(grad(U))))``; injections are cell-aligned."""
     if gradient is None:
-        component_gradients = (_cell_limited_least_squares_gradient_duct(
-            velocity[..., component],
-            tuple(patch[..., component] for patch in boundary_velocity), widths)
-            for component in range(3))
-        gradient = jnp.stack(
-            tuple(jnp.stack(value, axis=-1) for value in component_gradients), axis=-1)
+        gradient = jnp.stack(_cell_limited_least_squares_gradient_duct(
+            velocity, boundary_velocity, widths), axis=-2)
     identity = jnp.eye(3, dtype=velocity.dtype)
 
     def traction(value, coefficient, axis):
@@ -1780,6 +1728,49 @@ def _limited_linear_convection_matrix_action_duct(
         divergence = jnp.diff(jnp.moveaxis(face_flux, axis, 0)[..., None] * faces, axis=0)
         action += jnp.moveaxis(divergence, 0, axis) / volume[..., None]
     return action
+
+
+def _frozen_duct_momentum_setup(
+    velocity, density, viscosity, rho_phi, boundary_velocity, widths, *, dx,
+    prescribed_inlet=True,
+):
+    """Own frozen diffusion, limiter, and packed velocity/q gradients."""
+    q = jnp.sum(velocity**2, axis=-1)
+    packed = jnp.concatenate((velocity, q[..., None]), axis=-1)
+    packed_patches = tuple(jnp.concatenate((patch,
+        jnp.sum(patch**2, axis=-1, keepdims=True)), axis=-1) for patch in boundary_velocity)
+    gradients = _cell_limited_least_squares_gradient_duct(packed, packed_patches, widths)
+    dynamic_viscosity = density * viscosity
+    coefficients = _variable_diffusion_coefficients_3d(dynamic_viscosity, dx=dx,
+        dy=widths[1], dz=widths[2], validated_spacing=True)
+    wall_sink = jnp.zeros_like(density)
+    for axis, width in ((1, widths[1]), (2, widths[2])):
+        for index in (0, -1):
+            cells = [slice(None)] * 3
+            cells[axis] = index
+            cells = tuple(cells)
+            wall_sink = wall_sink.at[cells].add(dynamic_viscosity[cells]
+                / (0.5 * width[index] ** 2))
+    inlet_cells = jnp.arange(density.shape[0])[:, None, None] == 0
+    inlet_sink = (jnp.where(inlet_cells, 2.0 * dynamic_viscosity[0] / dx**2, 0.0)
+        if prescribed_inlet else jnp.zeros_like(density))
+    weights = _limited_linear_vector_face_weights_duct(velocity, rho_phi,
+        boundary_velocity, widths,
+        gradient=tuple(value[..., 3] for value in gradients))
+    velocity_gradient = jnp.stack(gradients, axis=-2)[..., :3]
+    return (dynamic_viscosity, coefficients, wall_sink + inlet_sink, inlet_sink,
+        weights, velocity_gradient)
+
+
+def _duct_momentum_transport(field, rho_phi, weights, boundary_values, widths,
+                             coefficients, diffusion_sink):
+    """Return the shared frozen convection and homogeneous diffusion actions."""
+    neighbours = _neighbor_fields(field, mode_x="neumann", mode_y="neumann", mode_z="neumann")
+    diffusion = sum(c[..., None] * (n - field) for c, n in zip(
+        coefficients, neighbours, strict=True)) - diffusion_sink[..., None] * field
+    convection = _limited_linear_convection_matrix_action_duct(
+        field, rho_phi, weights, boundary_values, widths)
+    return convection, diffusion
 
 
 def _unpack_duct_mass_flux(rho_phi_plus, rho_phi_inlet):
@@ -2063,26 +2054,16 @@ def _duct_momentum_defect(
         jnp.zeros_like(velocity[:, :, 0]))
     boundary_velocity = (inlet_patch, velocity[-1], zero_y, zero_y, zero_z, zero_z)
     rho_phi = _unpack_duct_mass_flux(rho_phi_plus, rho_phi_inlet)
-    weights = _limited_linear_vector_face_weights_duct(
-        velocity, rho_phi, boundary_velocity, widths
-    )
-    convection = _limited_linear_convection_matrix_action_duct(
-        velocity, rho_phi, weights, boundary_velocity, widths
-    )
-    dynamic_viscosity, coefficients, wall_sink, inlet_sink = (
-        _duct_diffusion_data(density, viscosity, widths, dx=dx,
-            prescribed_inlet=True))
-    neighbours = _neighbor_fields(velocity, mode_x="neumann", mode_y="neumann",
-        mode_z="neumann")
+    setup = _frozen_duct_momentum_setup(velocity, density, viscosity, rho_phi,
+        boundary_velocity, widths, dx=dx)
+    dynamic_viscosity, coefficients, diffusion_sink, inlet_sink, weights, gradient = setup
+    convection, diffusion = _duct_momentum_transport(velocity, rho_phi, weights,
+        boundary_velocity, widths, coefficients, diffusion_sink)
     inlet_cells = jnp.arange(shape[0])[:, None, None] == 0
     inlet_velocity = jnp.where(inlet_cells[..., None], inlet_patch, 0.0)
-    diffusion = sum(
-        coefficient[..., None] * (neighbour - velocity)
-        for coefficient, neighbour in zip(coefficients, neighbours, strict=True)
-    ) - (wall_sink + inlet_sink)[..., None] * velocity
     diffusion += inlet_sink[..., None] * inlet_velocity
     deviatoric_stress = _explicit_deviatoric_stress_duct(
-        velocity, dynamic_viscosity, boundary_velocity, widths)
+        velocity, dynamic_viscosity, boundary_velocity, widths, gradient=gradient)
 
     mobility = dt / jnp.maximum(density, 1.0e-20)
     correction_x, correction_y, correction_z = _duct_pressure_face_corrections(
@@ -7166,14 +7147,18 @@ def _solve_extruded_projection(
                 jnp.zeros_like(local_velocity[:, :, 0]))
             boundary_velocity = (inlet_patch, local_velocity[-1],
                 zero_y, zero_y, zero_z, zero_z)
+            widths = (jnp.full((nx,), dx), local_dy, local_dz)
+            rho_phi = _unpack_duct_mass_flux(rho_phi_plus, rho_phi_inlet)
+            setup = _frozen_duct_momentum_setup(local_velocity, local_density,
+                local_viscosity, rho_phi, boundary_velocity, widths, dx=dx)
             local_force = force[:, y0:y1, z0:z1] + _explicit_deviatoric_stress_duct(
-                local_velocity, local_density * local_viscosity, boundary_velocity,
-                (jnp.full((nx,), dx), local_dy, local_dz))
+                local_velocity, setup[0], boundary_velocity, widths, gradient=setup[-1])
             return _solvax_implicit_momentum_duct(
                 local_velocity, local_force, local_density, local_viscosity,
-                _unpack_duct_mass_flux(rho_phi_plus, rho_phi_inlet), boundary_velocity,
+                rho_phi, boundary_velocity,
                 dt=dt, dx=dx, dy=local_dy, dz=local_dz,
                 iterations=momentum_iterations, tolerance=momentum_tolerance,
+                frozen_setup=setup,
             )
 
         def momentum_defect(velocity, lorentz_force, density, viscosity,
