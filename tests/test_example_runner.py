@@ -32,130 +32,18 @@ def _load_example_module(filename: str):
     return module
 
 
-def test_fringing_benchmark_demo_writes_extruded_bundle_summary(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
-    module = _load_example_module("fringing_benchmark_demo.py")
-
-    monkeypatch.setattr(
-        module,
-        "build_square_duct_extruded_problem",
-        lambda **kwargs: SimpleNamespace(
-            case=SimpleNamespace(
-                name="fringing_case",
-                solver=SimpleNamespace(kind="extruded_inductionless"),
-            ),
-            profile=SimpleNamespace(
-                x=np.array([0.0, 1.0]), field_scale=np.array([0.0, 1.0]), axis="z"
-            ),
-        ),
-    )
-    monkeypatch.setattr(
-        module,
-        "build_layered_duct_extruded_problem",
-        lambda **kwargs: SimpleNamespace(
-            case=SimpleNamespace(
-                name="fringing_case_layered",
-                solver=SimpleNamespace(kind="extruded_inductionless"),
-            ),
-            profile=SimpleNamespace(
-                x=np.array([0.0, 1.0]), field_scale=np.array([0.0, 1.0]), axis="z"
-            ),
-        ),
-    )
-    monkeypatch.setattr(
-        module,
-        "build_pipe_ogrid_extruded_problem",
-        lambda **kwargs: SimpleNamespace(
-            case=SimpleNamespace(
-                name="fringing_case_pipe",
-                solver=SimpleNamespace(kind="extruded_inductionless"),
-            ),
-            profile=SimpleNamespace(
-                x=np.array([0.0, 1.0]), field_scale=np.array([0.0, 1.0]), axis="z"
-            ),
-        ),
-    )
-    monkeypatch.setattr(
-        module,
-        "solve_extruded_inductionless",
-        lambda *args, **kwargs: SimpleNamespace(
-            station_history=(
-                {
-                    "x": 0.0,
-                    "field_scale": 0.0,
-                    "mean_velocity": 1.0,
-                    "u_max": 1.1,
-                    "pressure_span": 0.3,
-                    "axial_current": 0.01,
-                    "current_scaled_pressure_proxy": 0.2,
-                },
-                {
-                    "x": 1.0,
-                    "field_scale": 1.0,
-                    "mean_velocity": 0.8,
-                    "u_max": 0.9,
-                    "pressure_span": 0.2,
-                    "axial_current": 0.015,
-                    "current_scaled_pressure_proxy": 0.25,
-                },
-            ),
-            bundle=SimpleNamespace(
-                x=np.array([0.0, 1.0]),
-                y=np.array([-1.0, 1.0]),
-                z=np.array([-1.0, 1.0]),
-                field_scale=np.array([0.0, 1.0]),
-                u=np.ones((2, 2, 2)),
-                charge_balance_residual=np.array([1.0e-7, 2.0e-7]),
-                wall_current_leakage=np.array([1.0e-8, 2.0e-8]),
-                axial_current=np.array([0.01, 0.015]),
-            ),
-            validation=SimpleNamespace(
-                station_count=2,
-                max_residual=1.0e-6,
-                max_charge_balance_residual=2.0e-7,
-                mean_velocity_span=0.2,
-                volumetric_flow_rate_span=0.1,
-                axial_current_span=0.01,
-                peak_velocity_span=0.03,
-                pressure_span_range=0.04,
-                max_wall_current_leakage=2.0e-8,
-                net_boundary_current_residual=3.0e-8,
-                field_mean_velocity_correlation=0.9,
-            ),
-        ),
-    )
-
-    summary = module.run_fringing_benchmark_demo(
-        out_dir=tmp_path, nx_stations=2, ny=4, nz=4
-    )
-    assert summary["case"] == "fringing_case"
-    assert "extruded_bundle" in summary
-    assert "validation" in summary
-    assert "pressure_span" in summary["extruded_bundle"]
-    assert "u_peak" in summary["extruded_bundle"]
-    assert (tmp_path / "fringing_benchmark.png").exists()
-    assert (tmp_path / "fringing_benchmark_summary.json").exists()
-
-    summary_layered = module.run_fringing_benchmark_demo(
-        out_dir=tmp_path / "layered",
-        geometry_kind="layered_duct",
-        nx_stations=2,
-        ny=4,
-        nz=4,
-    )
-    assert summary_layered["case"] == "fringing_case_layered"
-    assert summary_layered["geometry_kind"] == "layered_duct"
-
-    summary_pipe = module.run_fringing_benchmark_demo(
-        out_dir=tmp_path / "pipe",
-        geometry_kind="pipe_ogrid",
-        nx_stations=2,
-        ny=4,
-        nz=4,
-    )
-    assert summary_pipe["case"] == "fringing_case_pipe"
-    assert summary_pipe["geometry_kind"] == "pipe_ogrid"
+def test_fringing_benchmark_demo_runs_real_bounded_diagnostic(tmp_path: Path):
+    script = Path(__file__).resolve().parents[1] / "examples/fringing_benchmark_demo.py"
+    subprocess.run([sys.executable, script], cwd=tmp_path, timeout=30, check=True)
+    summary_path = next((tmp_path / "artifacts").rglob("fringing_benchmark_summary.json"))
+    summary = json.loads(summary_path.read_text())
+    assert summary["status"] == "research-stage internal diagnostic"
+    assert summary["geometry_kind"] == "rect_duct"
+    assert summary["shape"] == [7, 8, 8]
+    assert summary["validation"]["station_count"] == 7
+    assert summary["validation"]["max_charge_balance_residual"] < 1.0e-10
+    assert len(summary["mean_velocity"]) == len(summary["field_scale"]) == 7
+    assert all((summary_path.parent / name).is_file() for name in summary["plots"])
 
 
 def test_variable_field_extruded_demo_writes_summary(tmp_path: Path):

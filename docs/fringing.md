@@ -13,11 +13,14 @@ lmx examples/cases/fringing/fringing_layered_case.toml
 lmx examples/cases/fringing/fringing_pipe_case.toml
 ```
 
-Or run the benchmark-oriented Python workflow:
+For an editable rectangular-duct workflow, change the input block at the top of:
 
 ```bash
-python examples/fringing_benchmark_demo.py --help
+python examples/fringing_benchmark_demo.py
 ```
+
+Its bounded default checks internal response and conservation trends. It is not
+an ALEX/FreeMHD comparison, a steady result, or a mesh-converged validation.
 
 The paired restart input is
 `examples/cases/fringing/fringing_layered_restart_case.toml`; a minimal Python

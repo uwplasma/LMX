@@ -67,12 +67,15 @@ Frozen specifications and digitized references are:
 - `lmx/data/benchmarks/references/alex-b1-pipe.csv`
 - `lmx/data/benchmarks/references/alex-b2-square.csv`
 
-The portable example exercises construction, current closure, restart, and
-observable extraction:
+The portable example exercises explicit rectangular-case construction, current
+closure, and observable extraction:
 
 ```bash
-python examples/fringing_benchmark_demo.py --help
+python examples/fringing_benchmark_demo.py
 ```
+
+Its small default is an internal diagnostic, not B1/B2 acceptance. Restart is
+covered separately by `examples/extruded_restart_demo.py`.
 
 B2 has exact-parity axial sharding on 1/2/4 forced CPU devices and current
 1/2-RTX-A4000 repeat, restart, conservation, and equivalence gates. B1 now uses its

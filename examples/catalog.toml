@@ -51,7 +51,7 @@ path = "examples/fringing_benchmark_demo.py"
 command = "python examples/fringing_benchmark_demo.py"
 status = "research-stage"
 runtime = "portable"
-outputs = ["summary", "station history", "plots"]
+outputs = ["internal conservation summary", "field/flow plots"]
 docs = "docs/fringing.md"
 
 [[example]]

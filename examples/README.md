@@ -11,7 +11,7 @@ tested, and labels its validation status honestly. Generated files go under
 | Hunt duct | `python examples/hunt_example.py` | stable | [cookbook](../docs/case_cookbook.md) |
 | Operator verification | `python examples/operator_verification_demo.py` | stable | [convergence plot](../docs/numerics.md#manufactured-solution-verification) |
 | FreeMHD comparison | `python -m examples.freemhd_closed_channel_observable_parity` | external data | [external benchmarks](../docs/external_benchmarks.md) |
-| Fringing field | `python examples/fringing_benchmark_demo.py` | research-stage | [fringing evidence](../docs/fringing.md) |
+| Editable rectangular fringe | `python examples/fringing_benchmark_demo.py` | research-stage internal diagnostic | [fringing evidence](../docs/fringing.md) |
 | Restart | `python examples/extruded_restart_demo.py` | research-stage | [cookbook](../docs/case_cookbook.md) |
 | Custom field | `python examples/variable_field_extruded_demo.py` | research-stage | [geometry and fields](../docs/geometry.md) |
 | Differentiable design | `python examples/autodiff_design_demo.py` | research-stage | [checked sensitivities](../docs/autodiff.md) |

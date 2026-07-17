@@ -45,11 +45,12 @@ test run.
 lmx examples/cases/fringing/fringing_rect_case.toml
 lmx examples/cases/fringing/fringing_layered_case.toml
 lmx examples/cases/fringing/fringing_pipe_case.toml
-python examples/fringing_benchmark_demo.py --help
+python examples/fringing_benchmark_demo.py
 ```
 
-These workflows are research-stage. Begin with the rectangular case, then add
-layers, mapped geometry, or tabulated fields one change at a time.
+These workflows are research-stage. The Python file exposes the rectangular
+geometry, material, fringe envelope, and solver controls at its top; its default
+is a bounded internal diagnostic, not experimental or FreeMHD validation.
 
 ## Blanket research workflow
 

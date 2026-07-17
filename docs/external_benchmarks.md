@@ -154,10 +154,12 @@ Use:
 
 ```bash
 .venv/bin/python examples/pipe_reference_comparison_demo.py --help
-.venv/bin/python examples/fringing_benchmark_demo.py --help
+.venv/bin/python examples/fringing_benchmark_demo.py
 ```
 
-These cases remain research-stage until experimental observable, mesh/time,
+The pipe workflow uses optional external data. The rectangular fringing script
+is only an internal diagnostic; neither grants experimental acceptance. These
+cases remain research-stage until experimental observable, mesh/time,
 conservation, and steady-convergence gates pass together.
 
 ### Mapped-pipe FreeMHD-profile diagnostic
