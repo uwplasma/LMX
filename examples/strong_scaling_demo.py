@@ -27,6 +27,7 @@ from lmx.scaling import (
 
 _MONITOR_SAMPLE_SECONDS, _MONITOR_POSTFLIGHT_SECONDS = 1.0, 15.0
 _ADMISSION_MAX_AGE_SECONDS = 120.0
+_ADMISSION_COMMAND_TIMEOUT_SECONDS = 180.0
 
 
 def _resource_environment(
@@ -74,6 +75,36 @@ def _resource_environment(
         "resource_environment_sha256": hashlib.sha256(raw).hexdigest(),
         "resource_environment": rung,
     }
+
+
+def _refresh_environment_evidence(
+    command_template: str | None, path: Path | None, *, backend: str,
+    num_devices: int, host: str, source_commit: str | None,
+    visible_devices: str = "",
+) -> None:
+    """Run a shell-free per-rung admission command and require new evidence."""
+
+    if command_template is None:
+        return
+    if path is None:
+        raise ValueError(f"{backend} admission command requires an evidence path")
+    before = path.read_bytes() if path.exists() else None
+    values = {
+        "evidence": str(path.resolve()), "backend": backend,
+        "num_devices": str(num_devices), "host": host,
+        "source_commit": source_commit or "", "visible_devices": visible_devices,
+    }
+    try:
+        command = [part.format_map(values) for part in shlex.split(command_template)]
+    except KeyError as error:
+        raise ValueError(f"Unknown admission-command placeholder: {error.args[0]}") from error
+    if not command:
+        raise ValueError("Admission command must not be empty")
+    subprocess.run(command, check=True, timeout=_ADMISSION_COMMAND_TIMEOUT_SECONDS)
+    if not path.is_file() or path.read_bytes() == before:
+        raise RuntimeError(
+            f"{backend} admission command did not replace {path} with new evidence"
+        )
 
 
 def _run_monitored_cpu_worker(
@@ -324,11 +355,17 @@ def run_local_cpu_scaling(
     evaluator: Path | None = None,
     source_commit: str | None = None,
     environment_evidence: Path | None = None,
+    admission_command: str | None = None,
     timeout_seconds: float | None = None,
     minimum_warm_seconds: float = 0.0,
 ) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
     for count in device_counts:
+        _refresh_environment_evidence(
+            admission_command, environment_evidence, backend="cpu",
+            num_devices=count, host=os.uname().nodename,
+            source_commit=source_commit,
+        )
         environment = _resource_environment(
             environment_evidence, backend="cpu", num_devices=count,
             host=os.uname().nodename, source_commit=source_commit,
@@ -431,6 +468,34 @@ def _query_remote_gpu_indices(remote_host: str) -> list[str]:
         text=True,
     )
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def _validate_remote_python(
+    remote_host: str, remote_dir: str, python_executable: str
+) -> None:
+    """Fail before timing when the remote interpreter cannot load synced LMX."""
+
+    probe = (
+        "import jax,lmx,solvax;"
+        "v=tuple(map(int,solvax.__version__.split('.')[:3]));"
+        "assert (0,8,4)<=v<(1,0,0),f'SOLVAX {solvax.__version__} is outside >=0.8.4,<1';"
+        "print(jax.__version__,solvax.__version__)"
+    )
+    command = (
+        f"cd {shlex.quote(remote_dir)} && env PYTHONPATH={shlex.quote(remote_dir)} "
+        f"{shlex.quote(python_executable)} -c {shlex.quote(probe)}"
+    )
+    try:
+        subprocess.run(
+            ["ssh", remote_host, command], check=True, capture_output=True, text=True,
+            timeout=30.0,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        stderr = getattr(error, "stderr", "") or ""
+        detail = stderr.strip().splitlines()[-1] if stderr.strip() else str(error)
+        raise RuntimeError(
+            f"Remote Python {python_executable!r} cannot load synchronized LMX: {detail}"
+        ) from error
 
 
 def _default_visible_devices(remote_host: str, count: int) -> str:
@@ -602,12 +667,14 @@ def run_remote_gpu_scaling(
     evaluator: Path | None = None,
     source_commit: str | None = None,
     environment_evidence: Path | None = None,
+    admission_command: str | None = None,
     timeout_seconds: float = 1800.0,
     minimum_warm_seconds: float = 0.0,
 ) -> list[dict[str, object]]:
     _sync_repo_to_remote(
         repo_root=repo_root, remote_host=remote_host, remote_dir=remote_dir
     )
+    _validate_remote_python(remote_host, remote_dir, python_executable)
     remote_restart = None
     if restart_path is not None:
         remote_restart = f"{remote_dir}/initial_restart.npz"
@@ -629,6 +696,11 @@ def run_remote_gpu_scaling(
     local_records: list[dict[str, object]] = []
     for count in device_counts:
         visible_devices = _default_visible_devices(remote_host, count)
+        _refresh_environment_evidence(
+            admission_command, environment_evidence, backend="gpu",
+            num_devices=count, host=remote_host, source_commit=source_commit,
+            visible_devices=visible_devices,
+        )
         environment = _resource_environment(
             environment_evidence, backend="gpu", num_devices=count,
             host=remote_host, source_commit=source_commit,
@@ -730,6 +802,7 @@ def run_strong_scaling_demo(
     gpu_iterations: int = 2048,
     repeats: int = 2,
     python_executable: str = sys.executable,
+    remote_python_executable: str = "python3",
     remote_host: str | None = None,
     remote_dir: str = "/home/rjorge/tmp/lmx_scaling_repo",
     profile_dir: Path | None = None,
@@ -739,6 +812,8 @@ def run_strong_scaling_demo(
     minimum_warm_seconds: float = 0.0,
     cpu_environment_evidence: Path | None = None,
     gpu_environment_evidence: Path | None = None,
+    cpu_admission_command: str | None = None,
+    gpu_admission_command: str | None = None,
     source_commit: str | None = None,
 ) -> dict[str, object]:
     repo_root = Path(__file__).resolve().parents[1]
@@ -803,6 +878,7 @@ def run_strong_scaling_demo(
         evaluator=evaluator,
         source_commit=source_commit,
         environment_evidence=cpu_environment_evidence,
+        admission_command=cpu_admission_command,
         timeout_seconds=timeout_seconds,
         minimum_warm_seconds=minimum_warm_seconds,
     )
@@ -820,13 +896,14 @@ def run_strong_scaling_demo(
                 nz=gpu_problem[2],
                 iterations=gpu_iterations,
                 repeats=repeats,
-                python_executable=python_executable,
+                python_executable=remote_python_executable,
                 profile_dir=profile_dir,
                 restart_path=gpu_restart_path,
                 matched_input=gpu_matched_input,
                 evaluator=evaluator,
                 source_commit=source_commit,
                 environment_evidence=gpu_environment_evidence,
+                admission_command=gpu_admission_command,
                 timeout_seconds=(1800.0 if timeout_seconds is None else timeout_seconds),
                 minimum_warm_seconds=minimum_warm_seconds,
             )
@@ -862,7 +939,14 @@ def main(argv: list[str] | None = None) -> int:
         choices=("extruded3d", "extruded_solve", "matched_b2_smoke"),
         default="extruded3d",
     )
-    parser.add_argument("--python", type=str, default=sys.executable)
+    parser.add_argument(
+        "--python", type=str, default=sys.executable,
+        help="Local CPU Python executable (default: current interpreter).",
+    )
+    parser.add_argument(
+        "--remote-python", type=str, default="python3",
+        help="Remote GPU Python executable; validated before timing.",
+    )
     parser.add_argument("--remote-host", type=str, default=None)
     parser.add_argument(
         "--remote-dir", type=str, default="/home/rjorge/tmp/lmx_scaling_repo"
@@ -896,6 +980,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--cpu-environment-evidence", type=Path)
     parser.add_argument("--gpu-environment-evidence", type=Path)
+    parser.add_argument(
+        "--cpu-admission-command",
+        help="Command template that atomically refreshes CPU evidence before each rung.",
+    )
+    parser.add_argument(
+        "--gpu-admission-command",
+        help="Command template that atomically refreshes GPU evidence before each rung.",
+    )
     parser.add_argument(
         "--source-commit", help="Commit represented by this source tree."
     )
@@ -981,6 +1073,7 @@ def main(argv: list[str] | None = None) -> int:
         cpu_iterations=cpu_iterations,
         gpu_iterations=gpu_iterations,
         python_executable=args.python,
+        remote_python_executable=args.remote_python,
         remote_host=args.remote_host,
         remote_dir=args.remote_dir,
         repeats=repeats,
@@ -992,6 +1085,8 @@ def main(argv: list[str] | None = None) -> int:
         minimum_warm_seconds=minimum_warm_seconds,
         cpu_environment_evidence=args.cpu_environment_evidence,
         gpu_environment_evidence=args.gpu_environment_evidence,
+        cpu_admission_command=args.cpu_admission_command,
+        gpu_admission_command=args.gpu_admission_command,
         source_commit=args.source_commit,
     )
     return 0

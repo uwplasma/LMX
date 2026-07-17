@@ -207,6 +207,44 @@ def test_sustained_environment_evidence_is_fresh_bound_and_physical(tmp_path, mo
         owner[field] = original
 
 
+def test_admission_command_refreshes_each_rung_and_fails_on_unchanged_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+):
+    evidence, commands = tmp_path / "admission.json", []
+
+    def refresh(command, **kwargs):
+        commands.append(command)
+        evidence.write_text(str(len(commands)))
+
+    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", refresh)
+    template = (
+        "probe --output {evidence} --backend {backend} --count {num_devices} "
+        "--host {host} --commit {source_commit} --devices {visible_devices}"
+    )
+    for count in (1, 2):
+        strong_scaling_demo._refresh_environment_evidence(
+            template, evidence, backend="gpu", num_devices=count,
+            host="office", source_commit="abc", visible_devices="0,1",
+        )
+    assert [command[command.index("--count") + 1] for command in commands] == ["1", "2"]
+    assert commands[-1][commands[-1].index("--output") + 1] == str(evidence.resolve())
+    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", lambda *args, **kwargs: None)
+    with pytest.raises(RuntimeError, match="did not replace"):
+        strong_scaling_demo._refresh_environment_evidence(
+            template, evidence, backend="gpu", num_devices=2,
+            host="office", source_commit="abc", visible_devices="0,1",
+        )
+
+
+def test_remote_python_preflight_fails_before_timing(monkeypatch: pytest.MonkeyPatch):
+    error = subprocess.CalledProcessError(1, ["ssh"], stderr="SOLVAX 0.6.0 is outside")
+    monkeypatch.setattr(
+        strong_scaling_demo.subprocess, "run", lambda *args, **kwargs: (_ for _ in ()).throw(error)
+    )
+    with pytest.raises(RuntimeError, match="Remote Python.*SOLVAX 0.6.0"):
+        strong_scaling_demo._validate_remote_python("office", "/tmp/lmx", "python3")
+
+
 @pytest.mark.parametrize(
     ("record", "expected"),
     [
@@ -222,6 +260,7 @@ def test_remote_scaling_retrieves_failed_worker_evidence(
 ):
     commands = []
     monkeypatch.setattr(strong_scaling_demo, "_sync_repo_to_remote", lambda **kwargs: None)
+    monkeypatch.setattr(strong_scaling_demo, "_validate_remote_python", lambda *args: None)
     monkeypatch.setattr(strong_scaling_demo, "_default_visible_devices", lambda *args: "0")
 
     def fake_run(command, **kwargs):
@@ -257,6 +296,8 @@ def test_strong_scaling_demo_supports_direct_help(tmp_path: Path):
 
     assert completed.returncode == 0, completed.stderr
     assert "matched_b2_smoke" in completed.stdout
+    assert "--cpu-admission-command" in completed.stdout
+    assert "--remote-python" in completed.stdout
 
 
 pytestmark = pytest.mark.unit

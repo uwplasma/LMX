@@ -367,6 +367,13 @@ GPU `host` is the exact `--remote-host` value. CPU rungs also bind the exact
 zero foreign compute processes, and at most 5% utilization. Missing, stale, or
 mismatched evidence stops before the multi-minute solve.
 
+For a multi-rung ladder, pass `--cpu-admission-command` or
+`--gpu-admission-command` to regenerate the evidence atomically before every
+rung. Templates accept `{evidence}`, `{backend}`, `{num_devices}`, `{host}`,
+`{source_commit}`, and `{visible_devices}`; an unchanged file fails closed.
+`--python` selects the local CPU interpreter, while `--remote-python` selects
+and preflights the remote GPU interpreter.
+
 The CPU lane still runs inside the affinity-controlled Docker allocation; the
 example does not create that container. Its nested `cpuset` masks provide
 2/4/8 guest CPUs for 1/2/4 JAX shards and establish CPU-allocation scaling, not
