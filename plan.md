@@ -135,7 +135,7 @@ large reusable artifacts go in checksummed releases.
 | Matched B2 harness | deterministic inputs, pinned sources, independent observers, and native two-update LMX/FreeMHD execution pass every frozen schema-3 smoke gate | production acceptance and mesh convergence remain open |
 | Differentiation | selected objectives pass finite-difference or independent-transpose checks | no blanket end-to-end claim for every workflow |
 | README/docs | concise feature-led README, sourced comparison table, feature-specific visuals, steady-gated seven-second blanket loop, and Li/AlN convergence | replace legacy Hunt/Shercliff and Q2D loops only after their physical terminal gates pass; refresh B2/scaling only from accepted records |
-| SOLVAX | released 0.8.6 owns generic algebra, Anderson weights, and the additive tridiagonal line preconditioner; LMX consumes the compatible `>=0.8.5,<1` API | add profiling ownership in SOLVAX's Krylov layer before another scaling algorithm change |
+| SOLVAX | released 0.8.6 owns generic algebra, Anderson weights, and additive line preconditioning; main `6005d01` additionally reuses CPU Thomas factors while LMX keeps the compatible `>=0.8.5,<1` API | combine the unreleased absolute-speed gain with a communication- or iteration-reducing candidate before release or sustained scaling |
 | Distribution | lean installed wheel loads all frozen A/B references and runs a tiny solve without Matplotlib/Pillow; plotting is an explicit extra; source artifact excludes repository tests | bump 1.1.3 before publication; hosted release gate must be green |
 
 Current structure reflects completed ownership moves: frozen resources are
@@ -461,6 +461,33 @@ CV. Only then run the one-cold-plus-three-warm, multi-minute sustained ladder.
 A larger transverse section may confirm asymptotic behavior after the
 algorithmic candidate passes; increasing runtime or axial length alone is not a
 remedy. Never run rungs concurrently on the same Mac.
+
+The ownership audit now rules out a SOLVAX transverse-line collective bug.
+Post-SPMD HLO for the four-CPU `128 x 35 x 35` action contains no collective in
+the retained `y/z` additive line solves; LMX's intentional global axial-mean
+correction owns the single `f64[128,5]` all-gather. A distributed interface
+tridiagonal solve would shrink that 5 KiB payload but retain one fixed-latency
+collective per PCG application while adding roughly 120--180 generic source
+lines, so it is a no-go until a materially different synchronization owner is
+identified. Removing the global correction remains rejected because it worsens
+CPU wall time and raises GPU pressure work from roughly 34 to 180 iterations.
+
+SOLVAX main commit `6005d01` instead reuses coefficient-only CPU Thomas factors
+across repeated nonperiodic additive line applications; its public API and
+fused accelerator path are unchanged. Sixty-six SOLVAX tridiagonal and
+preconditioner tests plus three LMX Poisson/autodiff integration gates pass.
+The exact four-shard line microbenchmark improves 40.850 -> 30.657 ms (24.95%)
+over its stable window. In the unchanged LMX bounded screen, signatures,
+151/155 pressure histories, restart, placement, and iterations are exact and
+RSS falls 0.65%; the six-update median improves 2.254 -> 2.041 seconds (9.46%).
+The separate synchronized diagnostic improves projection 18.1%, electric
+9.8%, combined elliptic work 14.15%, and total wall 10.4%. This is a useful
+generic absolute-speed optimization, but the electric/combined phase misses
+the 15% gate and the medium wall gain misses 10% by 0.54 percentage points.
+Do not publish a SOLVAX release or launch a multi-minute ladder from this result
+alone. Retain the commit on SOLVAX main, then pair it with a new
+communication-avoiding or iteration-reducing candidate and repeat the exact
+and medium gates.
 
 The first explicit-halo momentum candidate is rejected and reverted. It removes
 all six full-vector gathers from GMRES, improves the affected phase 20.23%, wall
