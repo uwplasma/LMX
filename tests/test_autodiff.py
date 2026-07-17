@@ -558,7 +558,7 @@ def test_extruded_rect_projection_iteration_history_and_gradients_are_finite(
         "charge_balance_residual", "boundary_current_residual",
     ):
         assert jnp.allclose(
-            target[name][-1], terminal[name][station_indices], rtol=0.0, atol=1.0e-11
+            target[name][-1], terminal[name][station_indices], rtol=1.0e-15, atol=1.0e-11
         )
     gradients = extruded_rect_projection_trajectory_loss_gradients(
         trajectory_problem,

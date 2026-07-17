@@ -120,12 +120,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,526 | stay below 34,527 | 35,100 |
+| package lines | 34,454 | stay below 34,455 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 21,018 | no new file; next test change must reduce lines | 31 / 21,100 |
+| test files / lines | 30 / 21,007 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,555,789 bytes | next tranche must reduce bytes without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,552,868 bytes | next tranche must reduce bytes without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.

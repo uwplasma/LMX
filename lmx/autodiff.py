@@ -9,6 +9,12 @@ import jax
 import jax.numpy as jnp
 
 from .field_models import wham_mirror_station_scale
+from .fringing import (
+    _conservative_current_fluxes_3d as _canonical_current_fluxes_3d,
+    _conservative_emf_rhs_3d as _extruded_conservative_emf_rhs,
+    _enforce_velocity_bc_3d as _extruded_enforce_velocity_bc,
+    _neighbor_fields,
+)
 from .linear import solve_poisson_jacobi_state
 from .mesh import StructuredMesh, generate_rect_duct_mesh
 from .operators import gradient_scalar
@@ -19,6 +25,8 @@ from .solvers import (
     _potential_coefficients,
     _velocity_system_coefficients,
 )
+
+_extruded_conservative_current_fluxes = _canonical_current_fluxes_3d
 
 
 @dataclass(frozen=True)
@@ -274,18 +282,10 @@ def _extruded_rect_projection_history_from_field_scale(
     }
 
 
-def _extruded_neighbor_fields(field: jnp.ndarray) -> tuple[jnp.ndarray, ...]:
-    x_west = jnp.concatenate([field[:1], field[:-1]], axis=0)
-    x_east = jnp.concatenate([field[1:], field[-1:]], axis=0)
-    y_south = jnp.concatenate([jnp.zeros_like(field[:, :1, :]), field[:, :-1, :]], axis=1)
-    y_north = jnp.concatenate([field[:, 1:, :], jnp.zeros_like(field[:, -1:, :])], axis=1)
-    z_bottom = jnp.concatenate([jnp.zeros_like(field[:, :, :1]), field[:, :, :-1]], axis=2)
-    z_top = jnp.concatenate([field[:, :, 1:], jnp.zeros_like(field[:, :, -1:])], axis=2)
-    return x_west, x_east, y_south, y_north, z_bottom, z_top
-
-
 def _extruded_gradient(field: jnp.ndarray, *, dx: float, dy: float, dz: float) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    x_west, x_east, y_south, y_north, z_bottom, z_top = _extruded_neighbor_fields(field)
+    x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
+        field, mode_x="neumann", mode_y="dirichlet", mode_z="dirichlet"
+    )
     d_dx = (x_east - x_west) / max(2.0 * dx, 1.0e-12)
     d_dy = (y_north - y_south) / max(2.0 * dy, 1.0e-12)
     d_dz = (z_top - z_bottom) / max(2.0 * dz, 1.0e-12)
@@ -293,7 +293,9 @@ def _extruded_gradient(field: jnp.ndarray, *, dx: float, dy: float, dz: float) -
 
 
 def _extruded_laplacian(field: jnp.ndarray, *, dx: float, dy: float, dz: float) -> jnp.ndarray:
-    x_west, x_east, y_south, y_north, z_bottom, z_top = _extruded_neighbor_fields(field)
+    x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
+        field, mode_x="neumann", mode_y="dirichlet", mode_z="dirichlet"
+    )
     return (
         (x_west - 2.0 * field + x_east) / max(dx**2, 1.0e-12)
         + (y_south - 2.0 * field + y_north) / max(dy**2, 1.0e-12)
@@ -301,22 +303,14 @@ def _extruded_laplacian(field: jnp.ndarray, *, dx: float, dy: float, dz: float) 
     )
 
 
-def _extruded_enforce_velocity_bc(field: jnp.ndarray) -> jnp.ndarray:
-    bounded = field.at[:, 0, :].set(0.0)
-    bounded = bounded.at[:, -1, :].set(0.0)
-    bounded = bounded.at[:, :, 0].set(0.0)
-    bounded = bounded.at[:, :, -1].set(0.0)
-    bounded = bounded.at[0, :, :].set(bounded[1, :, :]) if bounded.shape[0] > 1 else bounded
-    bounded = bounded.at[-1, :, :].set(bounded[-2, :, :]) if bounded.shape[0] > 1 else bounded
-    return bounded
-
-
 def _extruded_poisson_jacobi(rhs: jnp.ndarray, *, dx: float, dy: float, dz: float, iterations: int) -> jnp.ndarray:
     rhs_compatible = rhs - jnp.mean(rhs)
     diagonal = 2.0 / max(dx**2, 1.0e-12) + 2.0 / max(dy**2, 1.0e-12) + 2.0 / max(dz**2, 1.0e-12)
 
     def body_fun(_, field):
-        x_west, x_east, y_south, y_north, z_bottom, z_top = _extruded_neighbor_fields(field)
+        x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
+            field, mode_x="neumann", mode_y="dirichlet", mode_z="dirichlet"
+        )
         updated = (
             (x_west + x_east) / max(dx**2, 1.0e-12)
             + (y_south + y_north) / max(dy**2, 1.0e-12)
@@ -326,72 +320,6 @@ def _extruded_poisson_jacobi(rhs: jnp.ndarray, *, dx: float, dy: float, dz: floa
         return updated - jnp.mean(updated)
 
     return jax.lax.fori_loop(0, iterations, body_fun, jnp.zeros_like(rhs_compatible))
-
-
-def _extruded_harmonic_mean(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
-    denom = jnp.maximum(a + b, 1.0e-20)
-    return 2.0 * a * b / denom
-
-
-def _extruded_conservative_current_fluxes(
-    sigma: jnp.ndarray,
-    phi: jnp.ndarray,
-    uxb_x: jnp.ndarray,
-    uxb_y: jnp.ndarray,
-    uxb_z: jnp.ndarray,
-    *,
-    dx: float,
-    dy: float,
-    dz: float,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    nx, ny, nz = phi.shape
-    fx = jnp.zeros((nx + 1, ny, nz), dtype=phi.dtype)
-    fy = jnp.zeros((nx, ny + 1, nz), dtype=phi.dtype)
-    fz = jnp.zeros((nx, ny, nz + 1), dtype=phi.dtype)
-
-    sigma_x = _extruded_harmonic_mean(sigma[1:], sigma[:-1])
-    phi_grad_x = (phi[1:] - phi[:-1]) / max(dx, 1.0e-12)
-    uxb_face_x = 0.5 * (uxb_x[1:] + uxb_x[:-1])
-    fx = fx.at[1:-1].set(sigma_x * (-phi_grad_x + uxb_face_x))
-
-    sigma_y = _extruded_harmonic_mean(sigma[:, 1:, :], sigma[:, :-1, :])
-    phi_grad_y = (phi[:, 1:, :] - phi[:, :-1, :]) / max(dy, 1.0e-12)
-    uxb_face_y = 0.5 * (uxb_y[:, 1:, :] + uxb_y[:, :-1, :])
-    fy = fy.at[:, 1:-1, :].set(sigma_y * (-phi_grad_y + uxb_face_y))
-
-    sigma_z = _extruded_harmonic_mean(sigma[:, :, 1:], sigma[:, :, :-1])
-    phi_grad_z = (phi[:, :, 1:] - phi[:, :, :-1]) / max(dz, 1.0e-12)
-    uxb_face_z = 0.5 * (uxb_z[:, :, 1:] + uxb_z[:, :, :-1])
-    fz = fz.at[:, :, 1:-1].set(sigma_z * (-phi_grad_z + uxb_face_z))
-    return fx, fy, fz
-
-
-def _extruded_conservative_emf_rhs(
-    sigma: jnp.ndarray,
-    uxb_x: jnp.ndarray,
-    uxb_y: jnp.ndarray,
-    uxb_z: jnp.ndarray,
-    *,
-    dx: float,
-    dy: float,
-    dz: float,
-) -> jnp.ndarray:
-    zeros = jnp.zeros_like(uxb_x)
-    fx, fy, fz = _extruded_conservative_current_fluxes(
-        sigma,
-        zeros,
-        uxb_x,
-        uxb_y,
-        uxb_z,
-        dx=dx,
-        dy=dy,
-        dz=dz,
-    )
-    return (
-        (fx[1:] - fx[:-1]) / max(dx, 1.0e-12)
-        + (fy[:, 1:, :] - fy[:, :-1, :]) / max(dy, 1.0e-12)
-        + (fz[:, :, 1:] - fz[:, :, :-1]) / max(dz, 1.0e-12)
-    )
 
 
 def _solve_velocity_jacobi_state(

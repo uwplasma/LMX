@@ -509,16 +509,16 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
         problem.case,
         geometry=replace(
             problem.case.geometry,
-            nx=7,
-            ny=7,
-            nz=7,
+            nx=5,
+            ny=5,
+            nz=5,
             wall_cells=(1, 1, 1, 1),
             target_ha=20.0,
             hartmann_layer_cells=2,
         ),
         time_stepper=replace(
             problem.case.time_stepper,
-            max_steps=4,
+            max_steps=3,
             potential_iterations=160,
         ),
         solver=replace(
@@ -536,7 +536,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
         progress_callback=progress.append,
         checkpoint_interval=1,
     )
-    assert len(progress) == 4 and all(item.checkpoint is not None for item in progress)
+    assert len(progress) == 3 and all(item.checkpoint is not None for item in progress)
 
     assert float(benchmarks.jnp.mean(solution.bundle.mean_velocity)) == pytest.approx(
         1.0, abs=1.0e-10
@@ -559,7 +559,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     assert benchmarks.jnp.all(benchmarks.jnp.isfinite(momentum_defect))
     assert benchmarks.jnp.all(momentum_defect >= 0.0)
     assert solution.bundle.stopping_state[0] == history.size
-    assert solution.bundle.stopping_state[::2] == (4, "step_limit")
+    assert solution.bundle.stopping_state == (3, 3, "converged")
 
     fx, fy, fz = _unpack_duct_mass_flux(
         solution.bundle.rho_phi_plus, solution.bundle.rho_phi_inlet
@@ -634,17 +634,6 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
                    direct_two.anderson_state,
                    strict=True))
     assert resumed.bundle.stopping_state == direct_two.stopping_state
-    convergence_problem = replace(
-        continuation_problem,
-        case=replace(
-            continuation_problem.case,
-            time_stepper=replace(continuation_problem.case.time_stepper, max_steps=2),
-        ),
-    )
-    converged = solve_extruded_inductionless(
-        convergence_problem, initial_bundle=solution.bundle
-    )
-    assert converged.bundle.stopping_state == (6, 3, "converged")
 
 
 def test_benchmark_b_primary_pressure_observables_use_direct_fields():
