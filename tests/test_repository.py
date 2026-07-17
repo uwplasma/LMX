@@ -178,7 +178,12 @@ def test_curated_examples_use_submodules_and_linear_scripts_are_editable() -> No
         assert root_imports <= stable, (
             f"{path} imports legacy root APIs: {root_imports - stable}"
         )
-        if path.name in {"hartmann_example.py", "hunt_example.py", "operator_verification_demo.py"}:
+        if path.name in {
+            "autodiff_design_demo.py",
+            "hartmann_example.py",
+            "hunt_example.py",
+            "operator_verification_demo.py",
+        }:
             assert ast.get_docstring(tree)
             assert "# Inputs:" in source and "# Run" in source and len(source.splitlines()) <= 160
             functions = (node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef))
@@ -200,6 +205,14 @@ def test_curated_examples_declare_user_facing_contracts(tmp_path: Path) -> None:
     subprocess.run([sys.executable, script], cwd=tmp_path, timeout=30, check=True)
     summary = next((tmp_path / "artifacts").rglob("operator_verification_summary.json"))
     assert json.loads(summary.read_text())["observed_order"]["gradient_y"] > 1.8
+
+    autodiff = Path(__file__).resolve().parents[1] / "examples/autodiff_design_demo.py"
+    subprocess.run([sys.executable, autodiff], cwd=tmp_path, timeout=30, check=True)
+    design_path = next((tmp_path / "artifacts").rglob("autodiff_summary.json"))
+    design = json.loads(design_path.read_text())
+    assert design["recovered"]["forcing"] == pytest.approx(1.0, abs=0.02)
+    assert design["recovered"]["loss"] < design["optimization_history"][0]["loss"] * 1.0e-3
+    assert all((design_path.parent / name).is_file() for name in design["plots"])
 
 
 def test_benchmark_provenance_is_current() -> None:

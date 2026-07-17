@@ -95,7 +95,7 @@ Production field volumes belong in release or user storage, not Git.
 ## Differentiable design
 
 ```bash
-python examples/autodiff_design_demo.py --help
+python examples/autodiff_design_demo.py
 ```
 
 Always compare the automatic derivative against a finite difference or

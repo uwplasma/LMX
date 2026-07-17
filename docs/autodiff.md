@@ -9,12 +9,13 @@ first gate: gradients must also be accurate, converged, and affordable.
 ## Run the bounded example
 
 ```bash
-python examples/autodiff_design_demo.py --help
+python examples/autodiff_design_demo.py
 ```
 
-The example evaluates Hartmann-number sensitivities with `jax.grad` and performs
-a short bounded inverse-design update. Independent finite-difference checks
-remain in the test suite. Outputs go under `artifacts/`.
+Edit the mesh, scan, and design inputs at the top of the file. The example
+constructs its public problem and objectives explicitly, evaluates
+Hartmann-number sensitivities with `jax.grad`, and performs bounded inverse
+design. Independent finite-difference checks remain in the test suite.
 
 ## Solver backends
 

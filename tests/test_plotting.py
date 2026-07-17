@@ -17,7 +17,6 @@ from lmx.plotting import (
     _prepare_plot_output,
     _preferred_animation_writer,
     _save_figure_pair,
-    write_autodiff_plots,
     write_bent_pipe_overview_plots,
     write_case_overview_plots,
     write_cross_section_field_plots,
@@ -522,26 +521,6 @@ def test_write_strong_scaling_plots_writes_png_and_pdf(tmp_path: Path):
     )
 
     _assert_figure_pair(outputs, tmp_path, "strong_scaling")
-
-
-def test_write_autodiff_plots_writes_png_and_pdf(tmp_path: Path):
-    sensitivity_scan = [
-        {"hartmann_number": 2.0, "mean_velocity": 0.4, "d_mean_velocity_d_ha": -0.03},
-        {"hartmann_number": 10.0, "mean_velocity": 0.2, "d_mean_velocity_d_ha": -0.01},
-    ]
-    optimization_history = [
-        {"iteration": 0.0, "hartmann_number": 4.0, "loss": 1.0e-1, "gradient": -0.02},
-        {"iteration": 1.0, "hartmann_number": 6.0, "loss": 2.0e-2, "gradient": -0.01},
-    ]
-    outputs = write_autodiff_plots(
-        sensitivity_scan,
-        optimization_history,
-        tmp_path,
-        case_title="Autodiff",
-        target_parameter=8.0,
-    )
-
-    _assert_figure_pair(outputs, tmp_path, "autodiff_summary")
 
 
 def test_write_operator_verification_plots_writes_png_and_pdf(tmp_path: Path):
