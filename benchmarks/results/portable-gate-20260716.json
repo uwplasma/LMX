@@ -1,7 +1,7 @@
 {
-  "schema_version": 40,
+  "schema_version": 41,
   "date": "2026-07-17",
-  "commit": "75d167b41fad58328aac5a4493976d0a1596ae88",
+  "commit": "28d931779750cc7454d2346c7c4159e0a1a0cf17",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -20,23 +20,23 @@
   },
   "result": {
     "test_files": 30,
-    "test_lines": 21094,
-    "passed": 868,
+    "test_lines": 21075,
+    "passed": 867,
     "skipped": 8,
-    "pytest_seconds": 122.84,
-    "gate_seconds": 123.2,
-    "covered_lines": 13951,
-    "total_lines": 14355,
+    "pytest_seconds": 121.17,
+    "gate_seconds": 121.5,
+    "covered_lines": 13950,
+    "total_lines": 14354,
     "covered_branches": 2551,
     "total_branches": 2940,
-    "combined_line_branch_coverage_percent": 95.41485978606534,
+    "combined_line_branch_coverage_percent": 95.4145946571065,
     "passed_gate": true
   },
   "artifacts": {
-    "coverage_xml_sha256": "b4b3b774f4de07d31ccef8306e9c094eff29d07183460aec4958f61e73478942",
-    "junit_xml_sha256": "0f383171d036a5473fa27dd397d378de2dd0f23ad9a53b1ef8370e8112c3c90e"
+    "coverage_xml_sha256": "c350a028d48a3ef08123aa9061a7acc7bc55657e590aeaae3a1af9ec88575f08"
   },
-  "duration_note": "Current wrapper, pytest, coverage, JUnit, and slowest-node records come from the same six-worker gate.",
+  "duration_note": "Current wrapper, pytest, and coverage records come from one six-worker gate; the slowest-node profile below is the preceding same-environment gate.",
+  "slowest_tests_source_commit": "75d167b41fad58328aac5a4493976d0a1596ae88",
   "slowest_tests": [
     {"seconds": 34.279, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
     {"seconds": 23.538, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
@@ -50,26 +50,26 @@
     {"seconds": 12.130, "nodeid": "tests.test_fringing::test_solve_extruded_inductionless_supports_layered_analytic_variable_field"}
   ],
   "comparison": {
-    "previous_gate_seconds": 123.7,
-    "previous_pytest_seconds": 123.35,
-    "wall_time_change_percent": -0.40420371867421184,
-    "pytest_seconds_change_percent": -0.41345764085933595,
-    "budget_fraction": 0.20533333333333334,
-    "engineering_target_fraction": 0.4106666666666667,
+    "previous_gate_seconds": 123.2,
+    "previous_pytest_seconds": 122.84,
+    "wall_time_change_percent": -1.3798701298701297,
+    "pytest_seconds_change_percent": -1.3594910452621329,
+    "budget_fraction": 0.2025,
+    "engineering_target_fraction": 0.405,
     "latest_slimming": {
-      "source_commit_before": "c7f4321c5a8726c19eebe18bf4fa2cf567c0f4cd",
-      "source_commit_after": "75d167b41fad58328aac5a4493976d0a1596ae88",
-      "package_lines_before": 34310,
-      "package_lines_after": 34273,
-      "source_lines_removed": 37,
-      "test_lines_before": 21099,
-      "test_lines_after": 21094,
-      "test_lines_removed": 5,
+      "source_commit_before": "75d167b41fad58328aac5a4493976d0a1596ae88",
+      "source_commit_after": "28d931779750cc7454d2346c7c4159e0a1a0cf17",
+      "package_lines_before": 34273,
+      "package_lines_after": 34246,
+      "source_lines_removed": 27,
+      "test_lines_before": 21094,
+      "test_lines_after": 21075,
+      "test_lines_removed": 19,
       "test_cases_before": 876,
-      "test_cases_after": 876,
-      "test_cases_removed": 0
+      "test_cases_after": 875,
+      "test_cases_removed": 1
     },
-    "interpretation": "Canonical base builders now own layered, pipe, and obstacle problem setup, deleting 37 package lines; optional-field skip consolidation and startup-pacing coverage leave five fewer test lines overall. The gate is slightly faster, remains below 21% of the hard budget, and preserves 95.41% combined coverage."
+    "interpretation": "The bent-pipe builder now reuses canonical pipe setup, deleting 27 package lines; merged magnetic-obstacle checks and the repaired FreeMHD example CLI leave 19 fewer test lines overall. The gate is 1.4% faster, remains near 20% of the hard budget, and preserves 95.41% combined coverage."
   },
   "scheduling_probe": {
     "evidence_scope": "historical",
@@ -83,12 +83,12 @@
     "decision": "retain six workers; the 3.4% change is below the promotion threshold, and module grouping would imbalance fringing and autodiff owners"
   },
   "architecture": {
-    "source_commit": "75d167b41fad58328aac5a4493976d0a1596ae88",
+    "source_commit": "28d931779750cc7454d2346c7c4159e0a1a0cf17",
     "package_modules": 35,
-    "package_lines": 34273,
+    "package_lines": 34246,
     "maintained_core_lines": 7869,
     "maintenance_scripts": 13,
-    "tracked_checkout_bytes": 4609979,
+    "tracked_checkout_bytes": 4609907,
     "stable_root_exports": 30,
     "curated_examples": 11
   },
