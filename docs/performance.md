@@ -196,6 +196,17 @@ callback-free, and the untimed exact-restart audit plus continuous/postflight
 monitoring pass. This establishes Docker CPU-allocation scaling, not exact Apple
 M4 P/E-core scaling.
 
+A controlled current-source Docker/HLO profile isolates why four-device scaling
+flattens. All numerical, restart, conservation, and placement checks pass, but
+momentum contains twelve full `128 x 33 x 33 x 3` all-gathers (3.35 MB each),
+six inside GMRES loops. Collectives occupy 70.8% of the captured projection
+slice and 52.9% of momentum. Runtime and axial-size screens do not improve
+efficiency, while a larger transverse section only hides some overhead. The
+next bounded candidate therefore makes momentum halo and convection assembly
+sharding-aware; another multi-minute ladder is allowed only after the candidate
+reduces collective time by 25%, the affected phase by 15%, and two-update wall
+time by 8% with unchanged physics and less than 5% RSS growth.
+
 Superseded pilots and rejected ladders remain auditable in
 `benchmarks/results/b2-schema6-cpu-scaling-20260716.json`.
 

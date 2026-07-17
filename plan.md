@@ -320,25 +320,24 @@ plus one replicated inlet plane; exchange nonperiodic halos explicitly and do
 not checkpoint duplicated `nx+1` arrays. Optimize only a profiled bottleneck on
 the physics-valid path.
 
-The current native four-device CPU profile at `128 x 35 x 35` is diagnostic
-only, but profile-versus-timed signatures, linear histories, and placement
-agree. Across device-active intervals, mixed projection spends 0.135 of 0.280
-seconds in collectives (48.1%) and momentum spends 0.036 of 0.074 seconds
-(48.3%). The projection trace attributes about 66.6 ms to permutes, 37.4 ms to
-all-gathers, and 31.2 ms to all-reduces; repeated PCG reductions and replicated
-transverse or axial coarse corrections dominate the cadence. An earlier
-controlled gauge trace estimated only about 5.4% combined collective activity,
-so first reproduce the current source inside the immutable Docker environment
-with nested 1/2/4-device affinity, dump HLO, and record collective operand bytes,
-rendezvous/pending time, solver iteration counts, local line-solve time, shard
-bytes, replicated coarse bytes, and actual host P/E-core mapping.
+The controlled Docker/HLO profile at `128 x 35 x 35` now reproduces the
+communication defect with nested eight-vCPU affinity. Profile-versus-timed
+signatures and linear histories, exact restart state/flux/history, Anderson,
+conservation, and four real shards all pass. The captured projection slice
+spends 0.288 of 0.407 seconds in collectives (70.8%); momentum spends 0.045 of
+0.084 seconds (52.9%). HLO contains twelve full `128 x 33 x 33 x 3` velocity
+all-gathers of 3,345,408 bytes, including six inside GMRES loops, plus eleven
+full scalar-field gathers. Pressure PCG uses only 5,120-byte axial-mean gathers;
+the electric coarse modal gather is 173,056 bytes. Insufficient duration and
+axial size are ruled out, and the communication-defect gate passes.
 
-Audit HLO shapes and owners in this order: implicit-momentum neighbor halos,
-transverse modal correction, axial-mean preconditioning, then PCG reduction
-count. A full-volume all-gather per Krylov iteration or at least 20% controlled
-collective-plus-rendezvous occupancy establishes a communication defect.
-Preserve nonperiodic halo semantics and restricted-grid pressure conditioning;
-the global modal correction cannot be deleted merely because it communicates.
+Fix the implicit-momentum neighbor and convection concatenations first by
+making their sharding and nonperiodic halo ownership explicit. Then reassess
+transverse modal correction, axial-mean preconditioning, and PCG reduction
+counts. Preserve restricted-grid pressure conditioning; the global modal
+correction cannot be deleted merely because it communicates. Docker verifies
+guest affinity but exposes opaque vCPUs, so exact mapping to the M4's four
+performance and six efficiency cores remains open.
 
 Use three performance gates. A tiny exact gate checks signatures, linear
 histories, interface current, restart, placement, and gradients. A bounded

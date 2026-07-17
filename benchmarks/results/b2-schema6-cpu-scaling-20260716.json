@@ -345,6 +345,62 @@
     "table_sha256": "68c45c3eededef99f1cc53814e6d87a6ce70360fdb3576e09347e95731c7e838",
     "classification": "accepted current-source, callback-free, continuously monitored, multi-minute Docker CPU-allocation strong scaling; exact M4 physical-core mapping and steady-state convergence remain open"
   },
+  "current_source_controlled_profile": {
+    "source_commit": "1e7356b3ba67f2311da9eea8fc35f38187249fa0",
+    "source_fingerprint": "7436e3abe14b725038704e46ed6410b8f49d7cd0f367bc5d2c93996b7d9e077e",
+    "shape": [128, 35, 35],
+    "updates": 2,
+    "devices": 4,
+    "affinity_cpus": [0, 1, 2, 3, 4, 5, 6, 7],
+    "warm_median_seconds": 1.654,
+    "warm_cv": 0.0375,
+    "trace_event_ceiling": 1000000,
+    "phase_slice": {
+      "projection_active_seconds": 0.4065,
+      "projection_collective_union_seconds": 0.2878,
+      "projection_collective_fraction": 0.708,
+      "projection_collective_milliseconds": {
+        "collective_permute": 119.2,
+        "all_reduce": 108.5,
+        "all_gather": 74.8
+      },
+      "momentum_active_seconds": 0.0844,
+      "momentum_collective_union_seconds": 0.0446,
+      "momentum_collective_fraction": 0.529
+    },
+    "hlo": {
+      "momentum_vector_all_gather_static_sites": 12,
+      "momentum_vector_all_gather_gmres_sites": 6,
+      "momentum_vector_all_gather_shape": [128, 33, 33, 3],
+      "momentum_vector_all_gather_bytes": 3345408,
+      "scalar_full_field_all_gather_static_sites": 11,
+      "scalar_full_field_all_gather_shape": [128, 33, 33],
+      "scalar_full_field_all_gather_bytes": 1115136,
+      "pressure_axial_mean_all_gather_bytes": 5120,
+      "electric_modal_coarse_all_gather_shape": [128, 13, 13],
+      "electric_modal_coarse_all_gather_bytes": 173056
+    },
+    "gates": {
+      "validation": true,
+      "profile_timed_signatures_exact": true,
+      "profile_timed_linear_histories_exact": true,
+      "restart_state_flux_and_history_exact": true,
+      "anderson": true,
+      "conservation": true,
+      "four_real_shards": true,
+      "communication_defect": true,
+      "host_physical_core_mapping_verified": false
+    },
+    "raw_artifacts": {
+      "location": "/private/tmp/lmx-docker-hlo-current-20260717-092242",
+      "result_sha256_prefix": "754a5bb1",
+      "trace_sha256_prefix": "0d0794c6",
+      "momentum_hlo_sha256_prefix": "9cd5f0fd",
+      "projection_hlo_sha256_prefix": "8a110703",
+      "electric_hlo_sha256_prefix": "8dba8714"
+    },
+    "classification": "controlled Docker diagnostic; full-volume momentum gathers and greater than 20% collective occupancy require a sharding-aware momentum fix before another sustained ladder"
+  },
   "post_profile_decisions": {
     "axial_mean_omission": {
       "shape": [128, 35, 35],
