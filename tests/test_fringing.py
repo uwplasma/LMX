@@ -6,7 +6,6 @@ from dataclasses import replace
 from types import SimpleNamespace
 
 import lmx.fringing as fringing_impl
-from solvax import block_thomas_solve
 
 from lmx.field_models import (
     make_divergence_free_cross_section_field,
@@ -1325,18 +1324,10 @@ def test_pipe_face_gradient_divergence_is_compatible_symmetric_and_jittable():
 
 
 @pytest.mark.timeout(300)
-@pytest.mark.parametrize(
-    "modal_stabilization",
-    [False, True],
-    ids=("base", "weighted-modal-rhie-chow"),
-)
-def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
-    modal_stabilization,
-):
+def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow():
     nx, nr, ntheta = 5, 3, 8
     r_faces = jnp.asarray([0.0, 0.2, 0.55, 1.0])
     r_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
-    wall_width = jnp.diff(r_faces)[-1]
     dtheta = 2.0 * jnp.pi / ntheta
     # This tiny manufactured system reaches the strict gates within 32 steps;
     # a larger budget only lengthens compilation in routine coverage runs.
@@ -1367,21 +1358,6 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
             tolerance=1.0e-10,
         )[0]
 
-    def modal_inverse(rhs):
-        return _solvax_diffusion_pipe(
-            rhs,
-            viscosity,
-            dt=None,
-            dx=0.5,
-            r_faces=r_faces,
-            r_centers=r_centers,
-            dtheta=dtheta,
-            iterations=inner_iterations,
-            tolerance=1.0e-10,
-            decouple_axial=True,
-        )[0]
-
-    modal_key = ("test_retained_modal_blocks",) if modal_stabilization else None
     unit_response = inverse(jnp.ones(shape))
 
     def steady_project(**kwargs):
@@ -1405,49 +1381,16 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow(
             apply_momentum_inverse_components=lambda forces: jnp.stack(
                 tuple(inverse(force) for force in forces)
             ),
-            apply_modal_momentum_inverse=(
-                modal_inverse if modal_stabilization else None
-            ),
-            modal_stabilization=modal_stabilization,
             physical_tolerance=1.0e-7,
             **kwargs,
         )
 
-    steady_result = steady_project(modal_factor_key=modal_key)
+    steady_result = steady_project()
     assert steady_result[-3] < 1.0e-7
     assert steady_result[-2] < 1.0e-7
     assert bool(steady_result[-1].converged)
-
-    if modal_stabilization:
-        coefficients = _pipe_variable_diffusion_coefficients_3d(
-            viscosity,
-            dx=0.5,
-            r_faces=r_faces,
-            r_centers=r_centers,
-            dtheta=dtheta,
-        )
-        wall_sink = (
-            jnp.zeros(shape)
-            .at[:, -1, :]
-            .set(0.07 * r_faces[-1] / (r_centers[-1] * 0.5 * wall_width**2))
-        )
-        retained = fringing_impl._pipe_retained_modal_factors(
-            jnp.ones(shape),
-            jnp.maximum(unit_response, jnp.mean(unit_response) * 1.0e-8),
-            cell_area,
-            coefficients,
-            wall_sink,
-            dx=0.5,
-            r_faces=r_faces,
-            r_centers=r_centers,
-            dtheta=dtheta,
-            modes=(2,),
-        )
-        probed = fringing_impl._FRINGING_MODAL_FACTOR_CACHE.pop(modal_key)
-        trial = jnp.arange(nx * (3 * nr - 1), dtype=float).reshape(nx, 3 * nr - 1)
-        assert fringing_impl._solve_pipe_retained_modal_factors(
-            retained, trial
-        ) == pytest.approx(block_thomas_solve(probed, trial), rel=1.0e-10, abs=1.0e-10)
+    with pytest.raises(ValueError, match="retained-modal coefficients"):
+        steady_project(modal_stabilization=True)
 
 
 def test_pipe_face_projection_uses_fluid_wall_face():

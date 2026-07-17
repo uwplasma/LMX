@@ -3301,7 +3301,6 @@ def _steady_stokes_projection_pipe(
     pressure_preconditioner_mobility: jnp.ndarray | None = None,
     apply_momentum_inverse_components: Callable[[jnp.ndarray], jnp.ndarray]
     | None = None,
-    apply_modal_momentum_inverse: Callable[[jnp.ndarray], jnp.ndarray] | None = None,
     modal_momentum_coefficients: tuple[jnp.ndarray, ...] | None = None,
     modal_momentum_sink: jnp.ndarray | None = None,
     modal_stabilization: bool = False,
@@ -3353,9 +3352,7 @@ def _steady_stokes_projection_pipe(
             return transformed[:, :-1].reshape(-1)
         return field.reshape((u.shape[0], cross_section_size))[:, :-1].reshape(-1)
 
-    def velocity_response(
-        state, *, use_component_inverse=True, use_modal_inverse=False
-    ):
+    def velocity_response(state):
         pressure = unpack_pressure(state[:pressure_size])
         pressure_loss = state[pressure_size:]
         face_force = _pipe_pressure_face_correction(
@@ -3368,16 +3365,9 @@ def _steady_stokes_projection_pipe(
         force_u, force_v, force_w = _pipe_face_velocity_cells(*face_force)
         force_u = force_u + pressure_loss[:, None, None] * mobility
         forces = jnp.stack((force_u, force_v, force_w))
-        momentum_inverse = (
-            apply_modal_momentum_inverse
-            if use_modal_inverse and apply_modal_momentum_inverse is not None
-            else apply_momentum_inverse
-        )
         responses = (
-            jnp.stack(tuple(momentum_inverse(force) for force in forces))
+            jnp.stack(tuple(apply_momentum_inverse(force) for force in forces))
             if apply_momentum_inverse_components is None
-            or not use_component_inverse
-            or use_modal_inverse
             else apply_momentum_inverse_components(forces)
         )
         return tuple(responses)
@@ -3437,12 +3427,8 @@ def _steady_stokes_projection_pipe(
     base_constraints = constraints(u, v, w)
     rhs = -base_constraints.at[pressure_size:].add(-target_flow_rate)
 
-    def schur(state, *, use_component_inverse=True, use_modal_inverse=False):
-        response = velocity_response(
-            state,
-            use_component_inverse=use_component_inverse,
-            use_modal_inverse=use_modal_inverse,
-        )
+    def schur(state):
+        response = velocity_response(state)
         if not modal_stabilization:
             return constraints(*response)
         pressure = unpack_pressure(state[:pressure_size])
@@ -3470,12 +3456,13 @@ def _steady_stokes_projection_pipe(
         return jnp.concatenate((reduce_field(pressure), pressure_loss))
 
     if modal_stabilization:
+        if modal_momentum_coefficients is None or modal_momentum_sink is None:
+            raise ValueError(
+                "modal stabilization requires retained-modal coefficients and sink"
+            )
         radial_weights = jnp.sum(cell_area, axis=2)
         coarse_pressure_size = u.shape[0] * (u.shape[1] - 1)
-        use_direct_modal_factors = (
-            modal_momentum_coefficients is not None and modal_momentum_sink is not None
-        )
-        modal_modes = (1, 2, 3, 4) if use_direct_modal_factors else (2,)
+        modal_modes = (1, 2, 3, 4)
         mode_size = 2 * len(modal_modes) * u.shape[0] * u.shape[1]
         coarse_size = coarse_pressure_size + mode_size + u.shape[0]
         theta = jnp.arange(u.shape[2], dtype=u.dtype) * dtheta
@@ -3527,24 +3514,6 @@ def _steady_stokes_projection_pipe(
                 )
             )
 
-        local_size = u.shape[1] - 1 + 2 * len(modal_modes) * u.shape[1]
-        local_basis = jnp.eye(local_size, dtype=u.dtype)
-
-        def station_prolong(station, local):
-            coarse = jnp.zeros((coarse_size,), dtype=u.dtype)
-            radial = coarse[:coarse_pressure_size].reshape((u.shape[0], u.shape[1] - 1))
-            radial = radial.at[station].set(local[: u.shape[1] - 1])
-            coarse = coarse.at[:coarse_pressure_size].set(radial.reshape(-1))
-            offset = coarse_pressure_size
-            modes = coarse[offset : offset + mode_size].reshape(
-                (2, len(modal_modes), u.shape[0], u.shape[1])
-            )
-            modes = modes.at[:, :, station].set(
-                local[u.shape[1] - 1 :].reshape((2, len(modal_modes), u.shape[1]))
-            )
-            coarse = coarse.at[offset : offset + mode_size].set(modes.reshape(-1))
-            return prolong(coarse)
-
         def modal_restrict(residual):
             coarse = restrict(residual)
             radial = coarse[:coarse_pressure_size].reshape((u.shape[0], u.shape[1] - 1))
@@ -3556,69 +3525,19 @@ def _steady_stokes_projection_pipe(
                 axis=1,
             )
 
-        stations = jnp.arange(u.shape[0])
-
         def build_modal_factors():
-            if use_direct_modal_factors:
-                return _pipe_retained_modal_factors(
-                    mobility,
-                    pressure_mobility,
-                    cell_area,
-                    modal_momentum_coefficients,
-                    modal_momentum_sink,
-                    dx=dx,
-                    r_faces=r_faces,
-                    r_centers=r_centers,
-                    dtheta=dtheta,
-                    modes=modal_modes,
-                )
-
-            def modal_action(source, basis):
-                return modal_restrict(
-                    schur(
-                        station_prolong(source, basis),
-                        use_component_inverse=False,
-                        use_modal_inverse=True,
-                    )
-                )
-
-            if apply_modal_momentum_inverse is None:
-                modal_actions = jax.vmap(
-                    lambda source: jax.vmap(lambda basis: modal_action(source, basis))(
-                        local_basis
-                    )
-                )(stations)
-            else:
-                modal_actions = jnp.stack(
-                    tuple(
-                        jnp.stack(
-                            tuple(modal_action(source, basis) for basis in local_basis)
-                        )
-                        for source in stations
-                    )
-                )
-            diagonal = jax.vmap(
-                lambda station: modal_actions[station, :, station, :].T
-            )(stations)
-            lower = (
-                jnp.zeros_like(diagonal)
-                .at[1:]
-                .set(
-                    jax.vmap(lambda target: modal_actions[target - 1, :, target, :].T)(
-                        stations[1:]
-                    )
-                )
+            return _pipe_retained_modal_factors(
+                mobility,
+                pressure_mobility,
+                cell_area,
+                modal_momentum_coefficients,
+                modal_momentum_sink,
+                dx=dx,
+                r_faces=r_faces,
+                r_centers=r_centers,
+                dtheta=dtheta,
+                modes=modal_modes,
             )
-            upper = (
-                jnp.zeros_like(diagonal)
-                .at[:-1]
-                .set(
-                    jax.vmap(lambda target: modal_actions[target + 1, :, target, :].T)(
-                        stations[:-1]
-                    )
-                )
-            )
-            return block_thomas_factor(lower, diagonal, upper)
 
         modal_factors = (
             build_modal_factors()
@@ -3642,10 +3561,8 @@ def _steady_stokes_projection_pipe(
         def precondition(residual):
             local = local_precondition(residual)
             modal_residual = modal_restrict(residual - schur(local))
-            modal_correction = (
-                _solve_pipe_retained_modal_factors(modal_factors, modal_residual)
-                if use_direct_modal_factors
-                else block_thomas_solve(modal_factors, modal_residual)
+            modal_correction = _solve_pipe_retained_modal_factors(
+                modal_factors, modal_residual
             )
             candidate = local + modal_prolong(modal_correction)
             flow_residual = (residual - schur(candidate))[pressure_size:]
@@ -6456,33 +6373,6 @@ def _solve_extruded_projection(
                     ),
                     jax.jit(momentum_solve),
                 )
-
-                def modal_momentum_solve(rhs):
-                    return _solvax_diffusion_pipe(
-                        rhs,
-                        momentum_viscosity,
-                        dt=None,
-                        dx=dx,
-                        r_faces=faces,
-                        r_centers=centers,
-                        dtheta=dtheta,
-                        iterations=momentum_iterations,
-                        tolerance=momentum_tolerance,
-                        reaction=steady_reaction,
-                        decouple_axial=True,
-                    )[0]
-
-                modal_momentum_solve = _reuse_fringing_jit(
-                    (
-                        "b1_modal_momentum",
-                        jax.default_backend(),
-                        kernel_key,
-                        _array_fingerprint(momentum_viscosity, steady_reaction),
-                    ),
-                    jax.jit(modal_momentum_solve),
-                )
-            else:
-                modal_momentum_solve = None
             response_rhs = (1.0 if use_compatible_steady_b1 else dt) / rho[:, :count, :]
             response_fluid, _, _ = momentum_solve(
                 response_rhs, jnp.zeros_like(response_rhs)
@@ -6627,7 +6517,6 @@ def _solve_extruded_projection(
                         pressure_preconditioner_mobility=(
                             pressure_preconditioner_mobility
                         ),
-                        apply_modal_momentum_inverse=modal_momentum_solve,
                         modal_momentum_coefficients=steady_coefficients,
                         modal_momentum_sink=wall_sink + steady_reaction,
                         modal_stabilization=True,
