@@ -122,12 +122,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,563 | stay below 34,575 | 35,100 |
+| package lines | 34,545 | stay below 34,546 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 21,024 | no new file; stay below 21,025 | 31 / 21,100 |
+| test files / lines | 30 / 21,065 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,540,826 bytes | stay below 4,545,000 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,548,084 bytes | next tranche must reduce bytes without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -168,6 +168,12 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
+The current gate passes 866 tests with 8 expected skips and 95.40% combined
+coverage in 135.4 seconds. Fused loss/gradient evaluation removes 38 redundant
+primal solves, while shared validation serialization deletes 18 package lines.
+The admission and remote-runtime tests added for valid multi-minute ladders use
+the remaining test-line headroom; the next test change must be a net deletion.
+
 ### Canonical sharding and performance
 
 The schema-6 `8 x 7 x 7` 1/2/4-device gate proves exact topology, restart,
@@ -189,6 +195,9 @@ worker plus a 15-second postflight and binds the ignored JSONL digest to the
 source fingerprint; any probe, affinity, swapout, foreign-work, or gap violation
 blocks promotion. The remote GPU supervisor additionally binds UUID/PCI
 identity, worker contexts, utilization, and safe own-PID timeout cleanup.
+Each multi-minute rung now runs a shell-free admission command immediately
+before launch, rejects unchanged evidence, and preflights its local or remote
+Python separately; one stale admission file can no longer authorize a ladder.
 
 Compact CPU evidence is
 `benchmarks/results/b2-schema6-cpu-scaling-20260716.json`; raw worker JSON and
