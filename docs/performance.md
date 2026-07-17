@@ -16,7 +16,7 @@ calibration until idle-host admission passes.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 867 pass, 8 skip, 95.41% combined line/branch coverage, 117.7 s | 39% of the five-minute target and 20% of the ten-minute budget |
+| portable test gate | Apple M4, six workers | 859 pass, 8 skip, 95.40% combined line/branch coverage, 146.7 s | 49% of the five-minute target and 24% of the ten-minute budget |
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | B2 monitored CPU scaling | `256 x 67 x 67`, 32 updates, 2/4/8 guest CPUs, 1/2/4 JAX devices, three warm trajectories per topology | 244.763/173.033/158.354 s; 1.415x/1.546x; CV at most 2.318% | accepted CPU-allocation scaling at source `3339e95`; observer exclusion, exact restart, numerics, placement, memory, and continuous/postflight monitoring pass |
 | B2 multi-minute GPU calibration | `256 x 67 x 67`, 1/2 RTX A4000, 96 updates, three warm trajectories per topology | 258.913/159.234 s; 1.626x; peak device memory 2.50 GB vs 1.41/1.31 GB; CV below 0.29% | recorded source `78858f5`; numerical/duration gates pass, but persistent foreign contexts block an authoritative timing claim |
