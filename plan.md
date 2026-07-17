@@ -125,7 +125,7 @@ shared without removing cases or assertions.
 | test files / lines | 30 / 21,018 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,555,831 bytes | next tranche must reduce bytes without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,555,789 bytes | next tranche must reduce bytes without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -166,8 +166,8 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
-The current gate passes 866 tests with 8 expected skips and 95.40% combined
-coverage in 124.2 seconds. Fused loss/gradient evaluation removes 38 redundant
+The current gate passes 865 tests with 8 expected skips and 95.40% combined
+coverage in 131.5 seconds. Fused loss/gradient evaluation removes 38 redundant
 primal solves; shared validation and Q2D serialization delete 37 package lines.
 Scaling-admission coverage is included while shared fixtures keep the suite four
 lines below its prior test-line ratchet; the next test change remains a net deletion.

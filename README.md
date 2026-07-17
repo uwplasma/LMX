@@ -147,8 +147,8 @@ two-A4000 result reaches 1.626× but remains a shared-host calibration.
 
 ## Quality and citation
 
-The portable gate records **866 passing tests**, **95.40% combined line/branch
-coverage**, and **124.2 s** on six Apple-Silicon workers.
+The portable gate records **865 passing tests**, **95.40% combined line/branch
+coverage**, and **131.5 s** on six Apple-Silicon workers.
 [Testing](https://lmx.readthedocs.io/en/latest/testing.html) ·
 [Theory](https://lmx.readthedocs.io/en/latest/theory.html) ·
 [Numerics](https://lmx.readthedocs.io/en/latest/numerics.html) ·
