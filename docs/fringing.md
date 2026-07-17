@@ -133,8 +133,8 @@ observables and exact restart on one, two, and four CPU devices. The
 pre-schema-6 replacement passed exact 1/2-GPU repeat/restart, conservation,
 placement, and equivalence gates. Current schema-6 topology, placement, and
 exact serialized replay pass on one and two GPUs. The callback-free
-`256 x 67 x 67`, 32-update CPU ladder has 244.923/172.521/148.460-second
-medians and 1.420x/1.650x speedups on one/two/four devices; exact restart,
+`256 x 67 x 67`, 32-update CPU ladder has 244.763/173.033/158.354-second
+medians and 1.415x/1.546x speedups on one/two/four devices; exact restart,
 placement, memory, and continuous monitoring pass. This establishes Docker
 CPU-allocation scaling, not steady-production scaling or exact M4 core mapping.
 The current 96-update `256 x 67 x 67` GPU ladder has multi-minute warm medians

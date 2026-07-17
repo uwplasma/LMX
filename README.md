@@ -137,8 +137,8 @@ validation remain open.
 ![Multi-minute CPU scaling and GPU calibration](docs/_static/strong_scaling.webp)
 
 The callback-free `256 × 67 × 67` CPU ladder (32 updates, three warm/rung) takes
-244.923/172.521/148.460 s, reaching **1.420×/1.650×** on 2/4 JAX devices with
-0.219% maximum CV. Observer exclusion, exact restart, and continuous monitoring
+244.763/173.033/158.354 s, reaching **1.415×/1.546×** on 2/4 JAX devices with
+2.318% maximum CV. Observer exclusion, exact restart, and continuous monitoring
 pass. A multi-minute 1/2-GPU ladder reaches 1.626× on two A4000s, but foreign
 contexts keep that result a shared-host calibration.
 [Protocol and results →](https://lmx.readthedocs.io/en/latest/performance.html)

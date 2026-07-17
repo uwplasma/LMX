@@ -8,8 +8,8 @@ coarse B2 trajectory passes linear, conservation, restart, and placement gates
 but misses steady acceptance; no continuation is authorized.
 
 The accepted callback-free `256 x 67 x 67`, 32-update CPU ladder at source
-`8f9c189` gives 244.923/172.521/148.460-second medians, 1.420x/1.650x
-two/four-device speedups, and 0.219% maximum CV. Observer exclusion, exact
+`3339e95` gives 244.763/173.033/158.354-second medians, 1.415x/1.546x
+two/four-device speedups, and 2.318% maximum CV. Observer exclusion, exact
 restart, numerics, placement, memory, and continuous/postflight monitoring pass.
 This establishes Docker CPU-allocation scaling; exact M4 P/E-core mapping and
 steady-state evidence remain open. The multi-minute 1.626x two-A4000
@@ -133,12 +133,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,246 | stay below 34,247 | 35,100 |
+| package lines | 34,248 | stay below 34,249 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 21,073 | no new file; next test change must reduce lines | 31 / 21,100 |
+| test files / lines | 30 / 21,076 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,579,750 bytes | stay below 4,579,751 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,592,161 bytes | stay below 4,592,162 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets come from ownership deletion and shared helpers, never unreadable
 formatting or arbitrary test merging. Recent moves delete 190 builder lines and
@@ -203,8 +203,8 @@ use focused gates; seconds-scale results remain topology/debug evidence.
 
 Rejected earlier ladders used static preflight, retained a timed checkpoint, or
 failed stability, swapout, and duration gates. The authoritative callback-free
-ladder at source `8f9c189` records 244.923/172.521/148.460-second medians,
-1.420x/1.650x speedups, 4.42/4.18/4.48 GiB peak RSS, 0.219% maximum CV, exact
+ladder at source `3339e95` records 244.763/173.033/158.354-second medians,
+1.415x/1.546x speedups, 4.15/4.33/4.48 GiB peak RSS, 2.318% maximum CV, exact
 restart, and clean continuous/postflight traces. The sustained CPU launcher
 records one-second host samples through the worker plus a 15-second postflight
 and binds the ignored JSONL digest to the source fingerprint; any probe,

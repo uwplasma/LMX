@@ -17,11 +17,11 @@ exports and the curated catalog contains 11 workflows. Lightweight import is
 about 19 ms on the audited development machine. Advanced APIs import from their
 owning submodules; see the [migration guide](migration.md).
 
-The current tracked checkout is 4,579,089 bytes, below its 4.5 MiB hard cap.
+The current tracked checkout is 4,592,161 bytes, below its 4.5 MiB hard cap.
 Sixty-five generated files larger than 128 KiB were bundled in the versioned release
 indexed by [`release-assets.json`](release-assets.json)
 and removed only after a fresh download passed archive membership, size, and
-SHA-256 verification. Twenty compressed web derivatives (1,253,324 bytes total)
+SHA-256 verification. Twenty compressed web derivatives (1,265,096 bytes total)
 remain in `docs/_static/` for direct README and documentation display; full-resolution media and
 field bundles remain release assets and never enter the wheel.
 

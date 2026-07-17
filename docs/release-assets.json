@@ -572,7 +572,7 @@
   },
   "schema_version": 2,
   "showcase": {
-    "bytes": 1253324,
+    "bytes": 1265096,
     "files": [
       {
         "bytes": 71620,
@@ -665,9 +665,9 @@
         "sha256": "c21b3385220a89da03321284dd14a3525a37bb37d592ab7dfc9354112895c21f"
       },
       {
-        "bytes": 61268,
+        "bytes": 73040,
         "path": "docs/_static/strong_scaling.webp",
-        "sha256": "e1047e88a27b1e3142b12f34a79c5f8dc2e3b7127bbf1b1dd84301b37a2d92ca"
+        "sha256": "cc46640a2f7a349e1e15c48fb5b01a403596ea09d691ff585c46769b0cc6fe73"
       },
       {
         "bytes": 89356,
