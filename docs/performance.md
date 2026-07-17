@@ -6,11 +6,10 @@ devices alone is not evidence of parallel execution.
 
 ![Monitored multi-minute CPU scaling and shared-host GPU calibration](_static/strong_scaling.webp)
 
-The upper row is the historical continuously monitored fixed-work ladder on
-2/4/8 Docker guest CPUs for 1/2/4 JAX devices. The lower row is a multi-minute
-one/two-GPU shared-host calibration; foreign contexts still fail its idle gate.
-The CPU timing is being rerun after a timed checkpoint observer was found;
-short timings and the GPU result remain calibration.
+The upper row is the accepted callback-free fixed-work ladder on 2/4/8 Docker
+guest CPUs for 1/2/4 JAX devices. The lower row is a multi-minute one/two-GPU
+shared-host calibration; foreign contexts still fail its idle gate. Short
+timings and the GPU result remain calibration.
 
 ## Current evidence
 
@@ -18,7 +17,7 @@ short timings and the GPU result remain calibration.
 |---|---|---|---|
 | portable test gate | Apple M4, six workers | 867 pass, 8 skip, 95.41% combined line/branch coverage, 121.5 s | 41% of the five-minute target and 20% of the ten-minute budget |
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
-| B2 monitored CPU scaling | `256 x 67 x 67`, 32 updates, 2/4/8 guest CPUs, 1/2/4 JAX devices, three warm trajectories per topology | 246.691/172.410/147.465 s; 1.431x/1.673x; CV at most 0.359% | historical calibration: numerics/environment pass, but callback-free timing and pre-audit memory are being rerun |
+| B2 monitored CPU scaling | `256 x 67 x 67`, 32 updates, 2/4/8 guest CPUs, 1/2/4 JAX devices, three warm trajectories per topology | 244.923/172.521/148.460 s; 1.420x/1.650x; CV at most 0.219% | accepted CPU-allocation scaling at source `8f9c189`; observer exclusion, exact restart, numerics, placement, memory, and continuous/postflight monitoring pass |
 | B2 multi-minute GPU calibration | `256 x 67 x 67`, 1/2 RTX A4000, 96 updates, three warm trajectories per topology | 258.913/159.234 s; 1.626x; peak device memory 2.50 GB vs 1.41/1.31 GB; CV below 0.29% | recorded source `78858f5`; numerical/duration gates pass, but persistent foreign contexts block an authoritative timing claim |
 | B2 pseudo-time gate | Apple M4, corrected warm `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x/32x/16x map-rate spread 0.0768%; raw updates halve; exact restart | 64x refrozen; versioned stopping threshold open |
 | B2 physical-residual probe | Apple M4, `7 x 7 x 7` | residual 0.03870 at step 90; omitted reconstruction force is 0.0880 at step 4 | diagnostic has a plausible coarse split floor; never a stopping gate |
@@ -188,13 +187,12 @@ solve only 0.85% (`0.7437` to `0.7374` seconds). That fast path is rejected
 before the large rung. These results remain forced-device sharding evidence,
 not physical-core strong scaling.
 
-The 32-update evaluation at source/evaluator `cbf4358` gives
-246.691/172.410/147.465 s medians and
-1.431x/1.673x speedups; peak RSS is 4.934/5.150/5.485 GB and the maximum warm
-CV is 0.359%. Its timed path retained a restart checkpoint, so it no longer
-closes the observer-excluded gate. The worker now times callback-free runs,
-snapshots memory, then performs one untimed restart audit. Docker still does not
-expose exact Apple M4 P/E-core placement.
+The accepted 32-update evaluation at source `8f9c189` gives
+244.923/172.521/148.460 s medians and 1.420x/1.650x speedups; peak RSS is
+4.42/4.18/4.48 GiB and the maximum warm CV is 0.219%. Timed trajectories are
+callback-free, and the untimed exact-restart audit plus continuous/postflight
+monitoring pass. This establishes Docker CPU-allocation scaling, not exact Apple
+M4 P/E-core scaling.
 
 Superseded pilots and rejected ladders remain auditable in
 `benchmarks/results/b2-schema6-cpu-scaling-20260716.json`.

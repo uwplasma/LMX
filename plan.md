@@ -7,14 +7,13 @@ velocity-map gain, so fixed relaxation 2 remains the B2 control. The current
 coarse B2 trajectory passes linear, conservation, restart, and placement gates
 but misses steady acceptance; no continuation is authorized.
 
-The recorded `256 x 67 x 67`, 32-update CPU ladder at source/evaluator `cbf4358`
-gives
-246.691/172.410/147.465-second medians, 1.431x/1.673x two/four-device speedups,
-and 0.359% maximum CV, but its timed repeats retained a midpoint checkpoint.
-Numerics and monitoring pass; promotion awaits a callback-free rerun with
-pre-audit memory. Exact M4 P/E-core mapping and steady-state evidence remain
-open. The 1.626x two-A4000 calibration remains non-authoritative because foreign
-contexts block GPU admission.
+The accepted callback-free `256 x 67 x 67`, 32-update CPU ladder at source
+`8f9c189` gives 244.923/172.521/148.460-second medians, 1.420x/1.650x
+two/four-device speedups, and 0.219% maximum CV. Observer exclusion, exact
+restart, numerics, placement, memory, and continuous/postflight monitoring pass.
+This establishes Docker CPU-allocation scaling; exact M4 P/E-core mapping and
+steady-state evidence remain open. The 1.626x two-A4000 calibration remains
+non-authoritative because foreign contexts block GPU admission.
 
 A composed momentum/projection JIT is rejected before sustained timing: its
 four-device medium screen improves only 3.6%, raises peak RSS 15.4%, and fails
@@ -135,10 +134,10 @@ shared without removing cases or assertions.
 | package modules | 35 | no new module | 35 |
 | package lines | 34,246 | stay below 34,247 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 21,070 | no new file; next test change must reduce lines | 31 / 21,100 |
+| test files / lines | 30 / 21,073 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,610,993 bytes | stay below 4,610,994 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,579,114 bytes | stay below 4,579,115 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets come from ownership deletion and shared helpers, never unreadable
 formatting or arbitrary test merging. Recent moves delete 190 builder lines and
@@ -201,19 +200,16 @@ Apply the operating contract's multi-minute ladder after the next
 performance-affecting solver or sharding change. Bitwise-equivalent refactors
 use focused gates; seconds-scale results remain topology/debug evidence.
 
-The historical 32-update CPU calibration used only static preflight. A later
-24-update ladder was correctly rejected for one/four-device instability,
-two-device swapout, and one 117.941-second sample. The monitored evaluation at
-source/evaluator `cbf4358` records
-246.691/172.410/147.465-second medians, 1.431x/1.673x speedups,
-4.934/5.150/5.485 GB peak RSS, 0.359% maximum CV, and clean
-continuous/postflight traces. A later audit found its timed repeats retained a
-midpoint checkpoint; it is calibration until the callback-free ladder passes.
-The sustained CPU launcher now records one-second host samples through the
-worker plus a 15-second postflight and binds the ignored JSONL digest to the
-source fingerprint; any probe, affinity, swapout, foreign-work, or gap violation
-blocks promotion. Worker records and final summaries independently rederive
-the three-sample, two-minute, finite, 5%-CV timing gate. The remote GPU
+Rejected earlier ladders used static preflight, retained a timed checkpoint, or
+failed stability, swapout, and duration gates. The authoritative callback-free
+ladder at source `8f9c189` records 244.923/172.521/148.460-second medians,
+1.420x/1.650x speedups, 4.42/4.18/4.48 GiB peak RSS, 0.219% maximum CV, exact
+restart, and clean continuous/postflight traces. The sustained CPU launcher
+records one-second host samples through the worker plus a 15-second postflight
+and binds the ignored JSONL digest to the source fingerprint; any probe,
+affinity, swapout, foreign-work, or gap violation blocks promotion. Worker
+records and final summaries independently rederive the three-sample,
+two-minute, finite, 5%-CV timing gate. The remote GPU
 supervisor additionally binds UUID/PCI
 identity, worker contexts, utilization, and safe own-PID timeout cleanup.
 Each rung collects fresh admission immediately before launch, applies CPU
@@ -251,8 +247,8 @@ not checkpoint duplicated `nx+1` arrays. Optimize only a profiled bottleneck on
 the physics-valid path.
 
 Exit: portable tests stay below ten minutes; CPU/GPU topology and replay remain
-exact; callback-free Docker CPU-allocation and idle-host GPU timing pass. Exact
-M4 core mapping remains open.
+exact; callback-free Docker CPU-allocation scaling remains passing. Next obtain
+idle-host GPU timing, then exact M4 core mapping; both remain open.
 
 ## Priority 3: canonical B2 validation
 

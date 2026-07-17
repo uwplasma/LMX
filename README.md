@@ -134,10 +134,10 @@ validation remain open.
 
 ![Multi-minute strong scaling](docs/_static/strong_scaling.webp)
 
-Historical `256 × 67 × 67` CPU timings (32 updates, three warm/rung) are
-246.691/172.410/147.465 s, reaching **1.431×/1.673×** on 2/4 JAX devices; this is
-being rerun without the discovered timed checkpoint observer. GPU (96 updates)
-takes 159–259 s, reaching 1.626× on two A4000s; foreign contexts make it
+The callback-free `256 × 67 × 67` CPU ladder (32 updates, three warm/rung) takes
+244.923/172.521/148.460 s, reaching **1.420×/1.650×** on 2/4 JAX devices with
+0.219% maximum CV. Observer exclusion, exact restart, and continuous monitoring
+pass. GPU reaches 1.626× on two A4000s, but foreign contexts keep that result a
 shared-host calibration.
 [Protocol and results →](https://lmx.readthedocs.io/en/latest/performance.html)
 
