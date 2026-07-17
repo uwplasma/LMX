@@ -7,6 +7,7 @@ from dataclasses import replace
 from functools import lru_cache, partial
 import hashlib
 import math
+from time import perf_counter
 
 import jax
 import jax.numpy as jnp
@@ -5520,6 +5521,28 @@ def _emit_iteration_progress(
     )
 
 
+def _synchronized_phase(
+    function: Callable,
+    name: str,
+    callback: Callable[[str, float], None] | None,
+) -> Callable:
+    """Wrap one diagnostic phase with a completion barrier and wall timer."""
+
+    if callback is None:
+        return function
+
+    def measured(*args):
+        # Do not charge queued producer work to the named phase.
+        jax.block_until_ready(args)
+        started = perf_counter()
+        result = function(*args)
+        jax.block_until_ready(result)
+        callback(name, perf_counter() - started)
+        return result
+
+    return measured
+
+
 @lru_cache(maxsize=None)
 def _axial_field_sharding(num_devices: int) -> NamedSharding:
     """Return one process-stable axial mesh for compilation and repeat reuse."""
@@ -5539,6 +5562,7 @@ def _solve_extruded_projection(
     initial_bundle: ExtrudedFieldBundle | None = None,
     num_devices: int | None = None,
     progress_callback: Callable[[ExtrudedIterationProgress], None] | None = None,
+    phase_timing_callback: Callable[[str, float], None] | None = None,
     checkpoint_interval: int | None = None,
 ) -> ExtrudedFieldBundle:
     case = problem.case
@@ -7154,6 +7178,27 @@ def _solve_extruded_projection(
                     ("anderson", mix_anderson),
                 )
             )
+        momentum_solve = _synchronized_phase(
+            momentum_solve, "momentum", phase_timing_callback
+        )
+        momentum_defect = _synchronized_phase(
+            momentum_defect, "momentum_defect", phase_timing_callback
+        )
+        mixed_boundary_projection = _synchronized_phase(
+            mixed_boundary_projection, "projection", phase_timing_callback
+        )
+        electric_solve = _synchronized_phase(
+            electric_solve, "electric", phase_timing_callback
+        )
+        emf_operator = _synchronized_phase(
+            emf_operator, "emf", phase_timing_callback
+        )
+        reconstruct_electric = _synchronized_phase(
+            reconstruct_electric, "reconstruction", phase_timing_callback
+        )
+        mix_anderson = _synchronized_phase(
+            mix_anderson, "anderson", phase_timing_callback
+        )
 
     stop_step = completed_steps + outer_steps
     for step in range(completed_steps, stop_step):
@@ -7806,6 +7851,7 @@ def solve_extruded_inductionless(
     initial_bundle: ExtrudedFieldBundle | None = None,
     num_devices: int | None = None,
     progress_callback: Callable[[ExtrudedIterationProgress], None] | None = None,
+    phase_timing_callback: Callable[[str, float], None] | None = None,
     checkpoint_interval: int | None = None,
 ) -> ExtrudedInductionlessSolution:
     """Solve an extruded problem with optional sharding and progress checkpoints.
@@ -7813,6 +7859,10 @@ def solve_extruded_inductionless(
     ``progress_callback`` is called after every outer iteration. Its progress
     object contains a restart-capable bundle at ``checkpoint_interval`` steps
     and on convergence; no checkpoint arrays are materialized otherwise.
+
+    ``phase_timing_callback`` is a diagnostic hook that inserts completion
+    barriers around B2 solver phases and reports ``(name, wall_seconds)``.
+    Leave it unset for ordinary asynchronous execution and scaling timings.
     """
 
     if checkpoint_interval is not None and checkpoint_interval <= 0:
@@ -7821,6 +7871,7 @@ def solve_extruded_inductionless(
     projection_kwargs = {
         "initial_bundle": initial_bundle,
         "progress_callback": progress_callback,
+        "phase_timing_callback": phase_timing_callback,
         "checkpoint_interval": checkpoint_interval,
     }
     if num_devices is not None:

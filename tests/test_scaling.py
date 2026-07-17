@@ -11,6 +11,7 @@ import pytest
 from jax.sharding import Mesh, NamedSharding
 
 import lmx.scaling as scaling
+import lmx.fringing as fringing
 from examples import strong_scaling_demo
 from lmx.scaling import (
     StrongScalingRecord,
@@ -30,6 +31,29 @@ from lmx.scaling import (
 )
 from examples.strong_scaling_demo import _default_visible_devices
 from scripts import run_freemhd_parity_suite, run_strong_scaling_worker
+
+
+def test_synchronized_phase_timer_is_opt_in_and_times_completed_work(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    def function(value):
+        return value + 1
+
+    assert fringing._synchronized_phase(function, "solve", None) is function
+
+    clock = iter((4.0, 4.25))
+    blocked, samples = [], []
+    monkeypatch.setattr(fringing, "perf_counter", lambda: next(clock))
+    monkeypatch.setattr(
+        fringing.jax, "block_until_ready", lambda value: blocked.append(value)
+    )
+    measured = fringing._synchronized_phase(
+        function, "solve", lambda *sample: samples.append(sample)
+    )
+
+    assert measured(2) == 3
+    assert blocked == [(2,), 3]
+    assert samples == [("solve", 0.25)]
 
 
 def test_b2_repeat_signature_ignores_gauge_and_detects_shard_changes():
@@ -1045,6 +1069,7 @@ def test_scaling_worker_covers_solver_faithful_branch(
         "--evaluator", str(tmp_path / "evaluator.json"), "--repeats", "4",
         "--iterations", "6", "--minimum-warm-seconds", "120",
         "--num-devices", "1", "--profile-dir", str(tmp_path / "profile"),
+        "--phase-timing",
         "--output", str(output_path)]) == 0
     matched = json.loads(output_path.read_text())
     assert matched["validation_passed"]
@@ -1053,7 +1078,7 @@ def test_scaling_worker_covers_solver_faithful_branch(
     assert (input_path.name, evaluator.name) == ("input.json", "evaluator.json")
     assert options == {
         "repeats": 4, "num_devices": 1, "profile_dir": tmp_path / "profile",
-        "iterations": 6, "minimum_warm_seconds": 120.0,
+        "iterations": 6, "minimum_warm_seconds": 120.0, "phase_timing": True,
     }
     assert run_strong_scaling_worker.main([
         "--benchmark-kind", "matched_b2_smoke", "--repeats", "4",
@@ -1063,7 +1088,13 @@ def test_scaling_worker_covers_solver_faithful_branch(
     default_options = matched_calls.pop()[2]
     assert default_options["iterations"] is None
     assert default_options["minimum_warm_seconds"] == 0.0
+    assert default_options["phase_timing"] is False
     assert matched_calls == []
+    with pytest.raises(SystemExit, match="2"):
+        run_strong_scaling_worker.main([
+            "--phase-timing", "--num-devices", "1",
+            "--output", str(output_path),
+        ])
     monkeypatch.setattr(run_strong_scaling_worker, "_matched_b2_smoke_benchmark",
         lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("stopped")))
     assert run_strong_scaling_worker.main([

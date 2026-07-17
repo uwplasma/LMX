@@ -147,12 +147,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 34 | no new module | 34 |
-| package lines | 33,434 | do not exceed 33,434 in the next source tranche | 34,950 |
+| package lines | 33,485 | diagnostic ceiling; next source tranche must return below 33,434 | 34,950 |
 | maintained-core lines | 7,614 | stay below 7,615 | 7,800 |
-| test files / lines | 30 / 20,445 | no new file; the next tranche must be a net deletion | 30 / 20,900 |
+| test files / lines | 30 / 20,476 | no new file; the next tranche must be a net deletion | 30 / 20,900 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 185 | no new file without retiring another owner | 186 |
-| tracked checkout | 4,566,798 bytes | stay below 4,566,799 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,574,914 bytes | diagnostic ceiling; next source tranche below 4,566,798 | 4,718,592 bytes |
 
 These ratchets come from ownership deletion and shared helpers, never unreadable
 formatting or arbitrary test merging. Recent moves delete 190 builder lines and
@@ -232,8 +232,9 @@ package lines. Finally `05e754a` transferred the duplicate additive line
 preconditioner to released SOLVAX, deleting 35 package and 30 test lines while
 retaining bitwise primal/JIT/JVP/VJP, coefficient-gradient, and four-shard
 placement gates. After phase annotations and the FreeMHD ownership deletion,
-the current tree is 33,434 package lines, `fringing.py` is 7,838 lines, and
-tests are 20,445 lines. Keep 34 modules and add
+the phase-timing diagnostic brings the current tree to 33,485 package lines,
+`fringing.py` to 7,889 lines, and tests to 20,476 lines. The next source
+deletion must recover the 51 diagnostic lines and return below 33,434. Keep 34 modules and add
 no file. Split
 `_solve_extruded_projection` into same-module pipe and duct owners only after
 the FreeMHD deletion tranche establishes the next smaller ownership surface.
@@ -396,14 +397,29 @@ problem alone. The profiled trace has 28.9% overhead relative to the best
 ordinary warm sample, so these shares establish ownership but do not replace
 throughput measurements.
 
-Before another algorithm change, add opt-in synchronized phase timers to the
-scaling worker only. Block one representative result after momentum,
-projection, electric, and defect, record phase wall and iteration counts, and
-retain an unbarriered control. Run the same fixed case at 1/2/4 devices; do not
-launch a sustained ladder. A successor should target the per-iteration
+Before another algorithm change, use the opt-in synchronized phase timers in
+the scaling worker only. They synchronize inputs and outputs around momentum,
+projection, electric, reconstruction, and defect while retaining an unbarriered
+control. A successor should target the per-iteration
 preconditioner all-gather or a distributed/transversely owned line solve, then
 reduce PCG iterations or synchronization. Larger transverse workloads may
 improve compute/communication ratio but cannot remove the measured fixed costs.
+
+That synchronized screen is complete. The diagnostic is a separate excluded
+trajectory; disabled execution retains the original compiled functions and
+ordinary asynchronous schedule. At `128 x 35 x 35`, two updates, the 1/2/4
+ordinary warm medians are 1.3409/1.1654/1.0023 seconds, or only 1.151x/1.338x
+speedup, with 6.5--9.6% CV. Synchronized totals are
+1.3413/1.2673/1.1927 seconds. Projection improves only
+0.5955 -> 0.5687 -> 0.4828 seconds and electric only
+0.5104 -> 0.4720 -> 0.4252, while momentum regresses at four devices from
+0.1438 to 0.1756 seconds. Every rung preserves its ordinary-run signature and
+linear history; all ten production fields have the requested placement. The
+four-device rung misses the frozen interface-current gate at `1.0298e-3`, and
+all timing CVs exceed 5%, so this is diagnostic evidence only. It confirms
+that a larger problem may improve ratios but will not repair the weak scaling
+of the pressure/electric solvers. No sustained ladder is authorized before a
+profile-gated solver candidate.
 
 The existing evidence already narrows ownership: momentum is only 0.084 seconds
 of the captured active slice versus 0.407 seconds for projection, and the trace
@@ -488,10 +504,11 @@ placement. Do not impose a CPU communication remedy on the GPU path without a
 new GPU trace. The authoritative two-A4000 ladder still waits for clean host
 admission.
 
-Exit order: the builder/SOLVAX source-slimming group is complete. Add profiling
-annotations, capture a fresh Stage-B phase and HLO profile, and decide
-communication ownership with SOLVAX's Krylov/operator layer before authorizing
-another topology implementation. A new
+Exit order: annotations, raw XPlane attribution, and the synchronized Stage-B
+1/2/4 screen are complete. Decide whether SOLVAX's Krylov/operator layer can
+remove the pressure/electric preconditioner all-gather or own a distributed
+line solve without importing LMX physics. Recover the 51 diagnostic source
+lines through the next deletion-producing ownership tranche. A new solver
 candidate must first pass exact/HLO and bounded four-device gates, then the
 fixed-work medium CPU gate, and only then the multi-minute local CPU ladder with
 exact M4 core mapping. Optimize the separately profiled GPU compute path and rerun its

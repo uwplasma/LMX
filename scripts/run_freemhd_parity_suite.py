@@ -897,9 +897,10 @@ def materialize_matched_b2_preflight(
 
 
 def _run_matched_b2_lmx_direct(
-    problem, *, num_devices: int, capture_checkpoint: bool = True
+    problem, *, num_devices: int, capture_checkpoint: bool = True,
+    phase_timing_callback=None,
 ):
-    """Run fixed work, optionally retaining its deterministic midpoint checkpoint."""
+    """Run fixed work with optional checkpoint capture or diagnostic phase timing."""
 
     import jax
     from lmx.fringing import solve_extruded_inductionless
@@ -912,10 +913,16 @@ def _run_matched_b2_lmx_direct(
         if capture_checkpoint
         else {}
     )
+    phase_options = (
+        {"phase_timing_callback": phase_timing_callback}
+        if phase_timing_callback is not None
+        else {}
+    )
     direct = solve_extruded_inductionless(
         problem,
         num_devices=num_devices,
         **progress_options,
+        **phase_options,
     )
     checkpoint = None
     if capture_checkpoint:

@@ -57,6 +57,7 @@ _B2_TIMING_CONTRACT = {
     "synchronization": "jax.block_until_ready",
     "timed_observers_excluded": True,
     "optional_progress_callbacks_excluded": True,
+    "diagnostic_phase_timing_excluded": True,
     "restart_audit_excluded": True,
 }
 _B2_FIELD_NAMES = (
@@ -288,6 +289,30 @@ def _b2_repeat_signature(bundle) -> np.ndarray:
     return np.concatenate(values)
 
 
+def _b2_linear_history_comparison(candidate, control) -> tuple[bool, float]:
+    """Compare synchronized/profiled pressure and electric Krylov histories."""
+
+    histories = tuple((
+        np.asarray(getattr(candidate, name)), np.asarray(getattr(control, name)), offset
+    ) for name, offset in (
+        ("iteration_pressure_linear_history", 2),
+        ("iteration_electric_linear_history", 3),
+    ))
+    shapes_match = all(left.shape == right.shape for left, right, _ in histories)
+    if not shapes_match:
+        return False, float("inf")
+    iteration_max_abs = float(max((
+        np.max(np.abs(left[:, offset] - right[:, offset]))
+        for left, right, offset in histories
+    ), default=0.0))
+    passed = bool(
+        iteration_max_abs <= _B2_PROFILE_ITERATION_ATOL
+        and all(np.array_equal(left[:, offset + 1:], right[:, offset + 1:])
+            for left, right, offset in histories)
+    )
+    return passed, iteration_max_abs
+
+
 def _duct_step_gate(*, nx: int, ny: int, nz: int, iterations: int, num_devices: int):
     """Run one tiny production-faithful compact-flux projection/momentum step."""
 
@@ -439,6 +464,7 @@ def _matched_b2_smoke_benchmark(
     profile_dir: Path | None = None,
     iterations: int | None = None,
     minimum_warm_seconds: float = 0.0,
+    phase_timing: bool = False,
 ) -> dict[str, object]:
     """Time a fixed-work B2 trajectory; replay, I/O, and observation stay untimed."""
 
@@ -496,21 +522,83 @@ def _matched_b2_smoke_benchmark(
         float(np.max(np.abs(profile_signature - signatures[0]))))
     profile_signature_passed = (None if profile_signature is None else bool(np.allclose(
         profile_signature, signatures[0], rtol=_B2_REPEAT_RTOL, atol=_B2_REPEAT_ATOL)))
-    profile_histories = (() if profiled is None else tuple((
-        np.asarray(getattr(profiled, name)), np.asarray(getattr(timed_direct, name)), offset)
-        for name, offset in (("iteration_pressure_linear_history", 2),
-            ("iteration_electric_linear_history", 3))))
-    profile_history_shapes_passed = all(left.shape == right.shape
-        for left, right, _ in profile_histories)
-    profile_linear_iteration_max_abs = (None if profiled is None else float(max(
-        (np.max(np.abs(left[:, offset] - right[:, offset]))
-            for left, right, offset in profile_histories), default=0.0))
-        if profile_history_shapes_passed else float("inf"))
-    profile_linear_history_passed = (None if profiled is None else bool(
-        profile_history_shapes_passed
-        and profile_linear_iteration_max_abs <= _B2_PROFILE_ITERATION_ATOL
-        and all(np.array_equal(left[:, offset + 1:], right[:, offset + 1:])
-            for left, right, offset in profile_histories)))
+    if profiled is None:
+        profile_linear_history_passed = profile_linear_iteration_max_abs = None
+    else:
+        (
+            profile_linear_history_passed,
+            profile_linear_iteration_max_abs,
+        ) = _b2_linear_history_comparison(profiled, timed_direct)
+    phase_timing_payload = None
+    phase_signature_passed = phase_linear_history_passed = None
+    if phase_timing:
+        phase_samples: list[dict[str, object]] = []
+
+        def record_phase(name: str, wall_seconds: float) -> None:
+            occurrence = 1 + sum(item["phase"] == name for item in phase_samples)
+            phase_samples.append({
+                "phase": name,
+                "occurrence": occurrence,
+                "wall_seconds": wall_seconds,
+            })
+
+        phase_started = time.perf_counter()
+        _, phase_direct = _run_matched_b2_lmx_direct(
+            problem,
+            num_devices=num_devices,
+            capture_checkpoint=False,
+            phase_timing_callback=record_phase,
+        )
+        jax.block_until_ready(_b2_ready_arrays(phase_direct))
+        phase_total = time.perf_counter() - phase_started
+        phase_signature = _b2_repeat_signature(phase_direct)
+        phase_signature_max_abs = float(
+            np.max(np.abs(phase_signature - signatures[0]))
+        )
+        phase_signature_passed = bool(np.allclose(
+            phase_signature, signatures[0],
+            rtol=_B2_REPEAT_RTOL, atol=_B2_REPEAT_ATOL,
+        ))
+        (
+            phase_linear_history_passed,
+            phase_linear_iteration_max_abs,
+        ) = _b2_linear_history_comparison(phase_direct, timed_direct)
+        phase_names = tuple(dict.fromkeys(
+            str(item["phase"]) for item in phase_samples
+        ))
+        phase_seconds = {
+            name: float(sum(
+                float(item["wall_seconds"])
+                for item in phase_samples if item["phase"] == name
+            ))
+            for name in phase_names
+        }
+        phase_sum = sum(phase_seconds.values())
+        phase_timing_payload = {
+            "schema_version": 1,
+            "scope": "separate-synchronized-diagnostic",
+            "excluded_from_warm_timing": True,
+            "synchronization": "jax.block_until_ready",
+            "synchronized_total_seconds": phase_total,
+            "named_phase_sum_seconds": phase_sum,
+            "unattributed_seconds": max(0.0, phase_total - phase_sum),
+            "phase_seconds": phase_seconds,
+            "phase_fraction_of_synchronized_total": {
+                name: seconds / max(phase_total, 1.0e-30)
+                for name, seconds in phase_seconds.items()
+            },
+            "samples": phase_samples,
+            "pressure_iterations": np.asarray(
+                phase_direct.iteration_pressure_linear_history
+            )[:, 2].tolist(),
+            "electric_iterations": np.asarray(
+                phase_direct.iteration_electric_linear_history
+            )[:, 3].tolist(),
+            "signature_max_abs": phase_signature_max_abs,
+            "signature_passed": phase_signature_passed,
+            "linear_history_passed": phase_linear_history_passed,
+            "linear_iteration_max_abs": phase_linear_iteration_max_abs,
+        }
     timed_peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     timed_peak_rss_bytes = int(
         timed_peak_rss if sys.platform == "darwin" else 1024 * timed_peak_rss
@@ -633,6 +721,8 @@ def _matched_b2_smoke_benchmark(
         and repeat_signature_passed
         and profile_signature_passed is not False
         and profile_linear_history_passed is not False
+        and phase_signature_passed is not False
+        and phase_linear_history_passed is not False
         and captured_signature_passed
         and captured_linear_history_passed
         and anderson["anderson_validation_passed"]
@@ -687,6 +777,7 @@ def _matched_b2_smoke_benchmark(
         "profile_linear_history_passed": profile_linear_history_passed,
         "profile_linear_iteration_max_abs": profile_linear_iteration_max_abs,
         "profile_linear_iteration_absolute_tolerance": _B2_PROFILE_ITERATION_ATOL,
+        "phase_timing": phase_timing_payload,
         "electric_linear_history": np.asarray(
             direct.iteration_electric_linear_history).tolist(),
         "profile_pressure_linear_history": (None if profiled is None else
@@ -721,6 +812,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--source-commit", type=str, default=None)
     parser.add_argument("--profile-dir", type=Path, default=None)
+    parser.add_argument(
+        "--phase-timing",
+        action="store_true",
+        help="run one extra synchronized B2 phase diagnostic outside timing",
+    )
     parser.add_argument("--matched-input", type=Path, default=None)
     parser.add_argument("--evaluator", type=Path, default=None)
     parser.add_argument(
@@ -736,6 +832,8 @@ def main(argv: list[str] | None = None) -> int:
         help="Verified extruded restart used to initialize solver-faithful timing.",
     )
     args = parser.parse_args(argv)
+    if args.phase_timing and args.benchmark_kind != "matched_b2_smoke":
+        parser.error("--phase-timing requires --benchmark-kind matched_b2_smoke")
 
     if args.benchmark_kind == "matched_b2_smoke":
         if args.matched_input is None or args.evaluator is None:
@@ -746,6 +844,7 @@ def main(argv: list[str] | None = None) -> int:
                 num_devices=args.num_devices, profile_dir=args.profile_dir,
                 iterations=args.iterations,
                 minimum_warm_seconds=args.minimum_warm_seconds,
+                phase_timing=args.phase_timing,
             )
         except Exception as error:
             payload = {
