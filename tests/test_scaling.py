@@ -179,9 +179,11 @@ def test_sustained_environment_evidence_is_fresh_bound_and_physical(tmp_path, mo
     now = 1_721_000_000.0
     monkeypatch.setattr(strong_scaling_demo.time, "time", lambda: now)
     for backend, extra in (
-        ("cpu", {"affinity_cpus": [2, 3, 4, 5], "allocated_cpu_count": 4}),
+        ("cpu", {"affinity_cpus": [2, 3, 4, 5], "allocated_cpu_count": 4,
+            "max_cpu_utilization_percent": 4.0}),
         ("gpu", {"visible_devices": ["0", "1"], "foreign_compute_process_count": 0,
-            "max_gpu_utilization_percent": 4.0, "gpu_identities": [{"uuid": v, "pci_bus_id": v} for v in "ab"]}),
+            "foreign_cpu_process_count": 0, "max_gpu_utilization_percent": 4.0,
+            "gpu_identities": [{"uuid": v, "pci_bus_id": v} for v in "ab"]}),
     ):
         rung = {"num_devices": 2, "verified": True, "admission_ended_unix_seconds": now - 1, **extra}
         payload = {"backend": backend, "host": "host", "source_commit": "commit",
@@ -207,33 +209,91 @@ def test_sustained_environment_evidence_is_fresh_bound_and_physical(tmp_path, mo
         owner[field] = original
 
 
-def test_admission_command_refreshes_each_rung_and_fails_on_unchanged_evidence(
+def test_builtin_admission_collectors_atomically_write_bound_evidence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ):
-    evidence, commands = tmp_path / "admission.json", []
+    monkeypatch.setattr(strong_scaling_demo, "_ADMISSION_SAMPLE_SECONDS", 0.0)
+    replace, published = strong_scaling_demo.os.replace, []
+    def publish(source, target):
+        published.append(Path(target))
+        replace(source, target)
+    monkeypatch.setattr(strong_scaling_demo.os, "replace", publish)
+    monkeypatch.setattr(strong_scaling_demo.os, "sched_getaffinity",
+        lambda _: set(range(8)), raising=False)
+    calls = 0
+    def cpu_times(cpus):
+        nonlocal calls
+        calls += 1
+        return {cpu: (100 * calls, 99 * calls) for cpu in cpus}
+    monkeypatch.setattr(strong_scaling_demo, "_cpu_times", cpu_times)
+    cpu_path = tmp_path / "cpu.json"
+    strong_scaling_demo._collect_cpu_admission(
+        cpu_path, num_devices=2, source_commit="abc")
+    cpu = json.loads(cpu_path.read_text())
+    assert cpu["source_commit"] == "abc"
+    assert cpu["rungs"]["2"]["affinity_cpus"] == [0, 1, 2, 3]
+    identity = [{"uuid": "u0", "pci_bus_id": "p0"}]
+    output = {"text": ("0, u0, p0, 2\n__CONTEXTS__\n"
+        "__PROCESSES__\n10 2.0 python\n")}
+    monkeypatch.setattr(strong_scaling_demo.subprocess, "run",
+        lambda *args, **kwargs: SimpleNamespace(stdout=output["text"]))
+    gpu_path = tmp_path / "gpu.json"
+    strong_scaling_demo._collect_gpu_admission(gpu_path, remote_host="office",
+        visible_devices="0", num_devices=1, source_commit="abc")
+    gpu = json.loads(gpu_path.read_text())
+    assert gpu["host"] == "office" and gpu["rungs"]["1"]["verified"]
+    output["text"] = ("0, u0, p0, 0\n__CONTEXTS__\nu0, 20\n"
+        "__PROCESSES__\n10 40.0 python\n")
+    assert strong_scaling_demo._remote_gpu_snapshot("office", ("0",)) == (
+        identity, 0.0, 1, 1)
+    assert published == [cpu_path, gpu_path]
 
-    def refresh(command, **kwargs):
-        commands.append(command)
-        evidence.write_text(str(len(commands)))
 
-    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", refresh)
-    template = (
-        "probe --output {evidence} --backend {backend} --count {num_devices} "
-        "--host {host} --commit {source_commit} --devices {visible_devices}"
-    )
-    for count in (1, 2):
-        strong_scaling_demo._refresh_environment_evidence(
-            template, evidence, backend="gpu", num_devices=count,
-            host="office", source_commit="abc", visible_devices="0,1",
-        )
-    assert [command[command.index("--count") + 1] for command in commands] == ["1", "2"]
-    assert commands[-1][commands[-1].index("--output") + 1] == str(evidence.resolve())
-    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", lambda *args, **kwargs: None)
-    with pytest.raises(RuntimeError, match="did not replace"):
-        strong_scaling_demo._refresh_environment_evidence(
-            template, evidence, backend="gpu", num_devices=2,
-            host="office", source_commit="abc", visible_devices="0,1",
-        )
+def test_sustained_ladders_collect_each_rung_and_pass_cpu_affinity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+):
+    collected, launched = [], []
+    monkeypatch.setattr(strong_scaling_demo, "_collect_cpu_admission",
+        lambda path, **kwargs: collected.append(kwargs["num_devices"]))
+    def environment(path, *, backend, num_devices, **kwargs):
+        if backend == "gpu":
+            return {"resource_environment_verified": True,
+                "resource_environment": {"visible_devices": (
+                    ["1"] if num_devices == 1 else ["0", "1"])}}
+        affinity = list(range(2 * num_devices))
+        return {"resource_environment_verified": True,
+            "resource_environment": {"affinity_cpus": affinity}}
+    def worker(**kwargs):
+        affinity = list(kwargs["expected_cpu_affinity"])
+        launched.append(affinity)
+        return {"cpu_affinity": affinity, "validation_passed": True}
+    monkeypatch.setattr(strong_scaling_demo, "_resource_environment", environment)
+    monkeypatch.setattr(strong_scaling_demo, "_run_worker", worker)
+    strong_scaling_demo.run_local_cpu_scaling(repo_root=tmp_path, out_dir=tmp_path,
+        device_counts=(1, 2, 4), benchmark_kind="extruded3d", nx=8, ny=7, nz=7,
+        iterations=1, repeats=4, python_executable="python", source_commit="abc",
+        minimum_warm_seconds=120.0)
+    assert collected == [1, 2, 4]
+    assert launched == [list(range(2)), list(range(4)), list(range(8))]
+    gpu_collected = []
+    monkeypatch.setattr(strong_scaling_demo, "_sync_repo_to_remote", lambda **kwargs: None)
+    monkeypatch.setattr(strong_scaling_demo, "_validate_remote_python", lambda *args: None)
+    monkeypatch.setattr(strong_scaling_demo, "_default_visible_devices",
+        lambda host, count: "1" if count == 1 else "0,1")
+    monkeypatch.setattr(strong_scaling_demo, "_collect_gpu_admission",
+        lambda path, **kwargs: gpu_collected.append(
+            (kwargs["num_devices"], kwargs["visible_devices"])))
+    monkeypatch.setattr(strong_scaling_demo, "_run_monitored_gpu_worker",
+        lambda *args, **kwargs: (0, {}, False))
+    def copy_record(command, **kwargs):
+        if command[0] == "scp":
+            Path(command[-1]).write_text("{}")
+    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", copy_record)
+    strong_scaling_demo.run_remote_gpu_scaling(repo_root=tmp_path, out_dir=tmp_path,
+        remote_host="office", remote_dir="/tmp/lmx", device_counts=(1, 2),
+        benchmark_kind="extruded3d", nx=8, ny=7, nz=7, iterations=1, repeats=4,
+        source_commit="abc", minimum_warm_seconds=120.0)
+    assert gpu_collected == [(1, "1"), (2, "0,1")]
 
 
 def test_remote_python_preflight_fails_before_timing(monkeypatch: pytest.MonkeyPatch):
@@ -296,7 +356,6 @@ def test_strong_scaling_demo_supports_direct_help(tmp_path: Path):
 
     assert completed.returncode == 0, completed.stderr
     assert "matched_b2_smoke" in completed.stdout
-    assert "--cpu-admission-command" in completed.stdout
     assert "--remote-python" in completed.stdout
 
 
@@ -403,6 +462,12 @@ def test_scaling_worker_command_forwards_restart(tmp_path: Path, monkeypatch) ->
             str(tmp_path / "input.json"), str(tmp_path / "evaluator.json")}
     assert tuple(commands[1][commands[1].index(flag) + 1] for flag in
         ("--iterations", "--minimum-warm-seconds")) == ("6", "120.0")
+    monkeypatch.setattr(strong_scaling_demo.sys, "platform", "linux")
+    strong_scaling_demo._run_worker(python_executable="python", repo_root=tmp_path,
+        output_path=output, platform="CPU", benchmark_kind="extruded3d", nx=8,
+        num_devices=2, ny=7, nz=7, iterations=1, repeats=1,
+        expected_cpu_affinity=(0, 1, 2, 3))
+    assert commands[2][:3] == ["taskset", "--cpu-list", "0,1,2,3"]
     monkeypatch.setenv("XLA_FLAGS", "--xla_dump_to=/tmp/lmx-safe --xla_cpu_multi_thread_eigen=true")
     env = strong_scaling_demo._forced_cpu_environment(2)
     assert "--xla_dump_to=/tmp/lmx-safe" in env["XLA_FLAGS"]

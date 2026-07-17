@@ -195,9 +195,9 @@ worker plus a 15-second postflight and binds the ignored JSONL digest to the
 source fingerprint; any probe, affinity, swapout, foreign-work, or gap violation
 blocks promotion. The remote GPU supervisor additionally binds UUID/PCI
 identity, worker contexts, utilization, and safe own-PID timeout cleanup.
-Each multi-minute rung now runs a shell-free admission command immediately
-before launch, rejects unchanged evidence, and preflights its local or remote
-Python separately; one stale admission file can no longer authorize a ladder.
+Each multi-minute rung now collects and atomically publishes fresh admission
+evidence immediately before launch, applies its admitted CPU affinity, and
+keeps the local interpreter separate from a preflighted remote interpreter.
 
 Compact CPU evidence is
 `benchmarks/results/b2-schema6-cpu-scaling-20260716.json`; raw worker JSON and

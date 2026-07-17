@@ -353,8 +353,7 @@ minimum, and an 1800-second worker ceiling:
 python examples/strong_scaling_demo.py --benchmark-kind matched_b2_smoke \
   --sustained --remote-host office \
   --source-commit "$(git rev-parse HEAD)" \
-  --cpu-environment-evidence artifacts/cpu-admission.json \
-  --gpu-environment-evidence artifacts/gpu-admission.json
+  --remote-python /path/to/lmx-gpu-venv/bin/python
 ```
 
 Sustained mode rereads a checksummed 60-second admission JSON immediately before
@@ -363,24 +362,23 @@ requested run. The selected rung must match `num_devices`, be verified, and set
 `admission_ended_unix_seconds`; at launch it must satisfy
 `-5 <= now - admission_end <= 120` seconds. CPU `host` is `os.uname().nodename`;
 GPU `host` is the exact `--remote-host` value. CPU rungs also bind the exact
-2/4/8-entry affinity allocation. GPU rungs bind unique visible UUID/PCI pairs,
-zero foreign compute processes, and at most 5% utilization. Missing, stale, or
-mismatched evidence stops before the multi-minute solve.
+2/4/8-entry affinity allocation and require at most 5% full-window utilization
+on every selected CPU. GPU rungs bind unique visible UUID/PCI pairs, zero
+compute contexts, no host process above 25% CPU, and at most 5% utilization.
+Missing, stale, or mismatched evidence stops before the multi-minute solve.
 
-For a multi-rung ladder, pass `--cpu-admission-command` or
-`--gpu-admission-command` to regenerate the evidence atomically before every
-rung. Templates accept `{evidence}`, `{backend}`, `{num_devices}`, `{host}`,
-`{source_commit}`, and `{visible_devices}`; an unchanged file fails closed.
-`--python` selects the local CPU interpreter, while `--remote-python` selects
-and preflights the remote GPU interpreter.
+Sustained mode collects and atomically writes a new 60-second admission before
+every rung; the evidence options only override its output paths. Non-sustained
+smoke runs may instead read a supplied static record. `--python` selects the
+local CPU interpreter, while `--remote-python` selects and preflights the remote
+GPU interpreter.
 
-The CPU lane still runs inside the affinity-controlled Docker allocation; the
-example does not create that container. Its nested `cpuset` masks provide
+The CPU lane still runs inside a Linux Docker allocation exposing eight CPUs;
+the example applies nested `taskset` masks that provide
 2/4/8 guest CPUs for 1/2/4 JAX shards and establish CPU-allocation scaling, not
-exact M4 P/E-core placement. Regenerate and atomically replace the evidence
-after each prior worker's 60-second clean observation; a file prepared once for
-the whole ladder will expire. New timing evidence also needs a checksummed
-host-side continuous monitor through every rung and a clean postflight; the static
+exact M4 P/E-core placement. Its built-in collector atomically replaces the
+evidence after each 60-second clean observation. New timing evidence also needs
+a checksummed host-side continuous monitor through every rung and a clean postflight; the static
 preflight alone cannot detect work that starts later. Sustained runs create an
 ignored `<backend>_N.monitor.jsonl` automatically; keep promoted raw traces as
 release artifacts. Each worker record must carry compact schema-2

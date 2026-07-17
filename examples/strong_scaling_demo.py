@@ -26,8 +26,8 @@ from lmx.scaling import (
 )
 
 _MONITOR_SAMPLE_SECONDS, _MONITOR_POSTFLIGHT_SECONDS = 1.0, 15.0
-_ADMISSION_MAX_AGE_SECONDS = 120.0
-_ADMISSION_COMMAND_TIMEOUT_SECONDS = 180.0
+_ADMISSION_MAX_AGE_SECONDS, _ADMISSION_SAMPLE_SECONDS = 120.0, 60.0
+_ADMISSION_SAMPLE_PERIOD_SECONDS = 1.0
 
 
 def _resource_environment(
@@ -59,6 +59,7 @@ def _resource_environment(
         verified &= bool(
             len(set(affinity)) == len(affinity) == 2 * num_devices
             and rung.get("allocated_cpu_count") == len(affinity)
+            and float(rung.get("max_cpu_utilization_percent", 100.0)) <= 5.0
         )
     else:
         devices, identities = rung.get("visible_devices", []), rung.get("gpu_identities", [])
@@ -66,6 +67,7 @@ def _resource_environment(
         verified &= bool(
             len(devices) == len(identities) == len(physical) == num_devices
             and rung.get("foreign_compute_process_count") == 0
+            and rung.get("foreign_cpu_process_count") == 0
             and float(rung.get("max_gpu_utilization_percent", 100.0)) <= 5.0
         )
     if not verified:
@@ -77,34 +79,113 @@ def _resource_environment(
     }
 
 
-def _refresh_environment_evidence(
-    command_template: str | None, path: Path | None, *, backend: str,
-    num_devices: int, host: str, source_commit: str | None,
-    visible_devices: str = "",
-) -> None:
-    """Run a shell-free per-rung admission command and require new evidence."""
+def _write_admission(path: Path, payload: dict[str, object]) -> None:
+    """Atomically publish one fresh per-rung admission record."""
 
-    if command_template is None:
-        return
-    if path is None:
-        raise ValueError(f"{backend} admission command requires an evidence path")
-    before = path.read_bytes() if path.exists() else None
-    values = {
-        "evidence": str(path.resolve()), "backend": backend,
-        "num_devices": str(num_devices), "host": host,
-        "source_commit": source_commit or "", "visible_devices": visible_devices,
-    }
-    try:
-        command = [part.format_map(values) for part in shlex.split(command_template)]
-    except KeyError as error:
-        raise ValueError(f"Unknown admission-command placeholder: {error.args[0]}") from error
-    if not command:
-        raise ValueError("Admission command must not be empty")
-    subprocess.run(command, check=True, timeout=_ADMISSION_COMMAND_TIMEOUT_SECONDS)
-    if not path.is_file() or path.read_bytes() == before:
-        raise RuntimeError(
-            f"{backend} admission command did not replace {path} with new evidence"
-        )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", dir=path.parent, delete=False) as stream:
+        json.dump(payload, stream, indent=2)
+        temporary = Path(stream.name)
+    os.replace(temporary, path)
+
+
+def _cpu_times(cpus: tuple[int, ...]) -> dict[int, tuple[int, int]]:
+    """Return total and idle Linux scheduler ticks for selected CPUs."""
+
+    rows = {int(parts[0][3:]): tuple(map(int, parts[1:]))
+        for line in Path("/proc/stat").read_text().splitlines()
+        if (parts := line.split()) and parts[0].startswith("cpu") and parts[0][3:].isdigit()}
+    return {cpu: (sum(rows[cpu]), rows[cpu][3] + rows[cpu][4]) for cpu in cpus}
+
+
+def _collect_cpu_admission(
+    path: Path, *, num_devices: int, source_commit: str
+) -> None:
+    """Observe an idle Linux cpuset for 60 seconds before one CPU rung."""
+
+    if not hasattr(os, "sched_getaffinity"):
+        raise RuntimeError("Sustained CPU scaling requires Linux affinity control")
+    available = tuple(sorted(os.sched_getaffinity(0)))
+    affinity = available[:2 * num_devices]
+    if len(affinity) != 2 * num_devices:
+        raise RuntimeError(f"CPU rung {num_devices} requires {2 * num_devices} CPUs")
+    started, before = time.monotonic(), _cpu_times(affinity)
+    time.sleep(_ADMISSION_SAMPLE_SECONDS)
+    after = _cpu_times(affinity)
+    elapsed = time.monotonic() - started
+    utilization = []
+    for cpu in affinity:
+        total = after[cpu][0] - before[cpu][0]
+        idle = after[cpu][1] - before[cpu][1]
+        utilization.append(100.0 * (1.0 - idle / max(total, 1)))
+    maximum = max(utilization)
+    rung = {"num_devices": num_devices, "affinity_cpus": list(affinity),
+        "allocated_cpu_count": len(affinity), "max_cpu_utilization_percent": maximum,
+        "admission_ended_unix_seconds": time.time(), "verified": maximum <= 5.0}
+    _write_admission(path, {"backend": "cpu", "host": os.uname().nodename,
+        "source_commit": source_commit, "sample_seconds": elapsed,
+        "rungs": {str(num_devices): rung}})
+
+
+def _remote_gpu_snapshot(
+    remote_host: str, visible_devices: tuple[str, ...]
+) -> tuple[list[dict[str, str]], float, int, int]:
+    """Read selected GPU identities, utilization, and compute contexts."""
+
+    probe = ("nvidia-smi --query-gpu=index,uuid,pci.bus_id,utilization.gpu "
+        "--format=csv,noheader,nounits; echo __CONTEXTS__; "
+        "nvidia-smi --query-compute-apps=gpu_uuid,pid --format=csv,noheader,nounits; "
+        "echo __PROCESSES__; ps -eo pid=,pcpu=,comm=")
+    output = subprocess.run(["ssh", remote_host, probe], check=True,
+        capture_output=True, text=True, timeout=10.0).stdout
+    gpu_text, remainder = output.split("__CONTEXTS__\n", 1)
+    context_text, process_text = remainder.split("__PROCESSES__\n", 1)
+    rows = {parts[0]: parts for line in gpu_text.splitlines()
+        if len(parts := [item.strip() for item in line.split(",")]) == 4}
+    if any(device not in rows for device in visible_devices):
+        raise RuntimeError("GPU admission could not identify every selected device")
+    identities = [{"uuid": rows[device][1], "pci_bus_id": rows[device][2]}
+        for device in visible_devices]
+    selected = {item["uuid"] for item in identities}
+    contexts = sum(line.split(",", 1)[0].strip() in selected
+        for line in context_text.splitlines() if line.strip())
+    foreign_cpu = sum(float(parts[1]) > 25.0 for line in process_text.splitlines()
+        if len(parts := line.split(maxsplit=2)) == 3)
+    return (identities, max(float(rows[device][3]) for device in visible_devices),
+        contexts, foreign_cpu)
+
+
+def _collect_gpu_admission(
+    path: Path, *, remote_host: str, visible_devices: str,
+    num_devices: int, source_commit: str,
+) -> None:
+    """Observe selected remote GPUs for 60 seconds before one GPU rung."""
+
+    devices = tuple(visible_devices.split(","))
+    started, identities, maximum, contexts, foreign_cpu = (
+        time.monotonic(), None, 0.0, 0, 0)
+    while True:
+        observed, utilization, active, active_cpu = _remote_gpu_snapshot(
+            remote_host, devices)
+        identities = observed if identities is None else identities
+        if observed != identities:
+            raise RuntimeError("GPU identity changed during admission")
+        maximum, contexts = max(maximum, utilization), max(contexts, active)
+        foreign_cpu = max(foreign_cpu, active_cpu)
+        elapsed = time.monotonic() - started
+        if elapsed >= _ADMISSION_SAMPLE_SECONDS:
+            break
+        time.sleep(min(_ADMISSION_SAMPLE_PERIOD_SECONDS,
+            _ADMISSION_SAMPLE_SECONDS - elapsed))
+    rung = {"num_devices": num_devices, "visible_devices": list(devices),
+        "gpu_identities": identities, "foreign_compute_process_count": contexts,
+        "foreign_cpu_process_count": foreign_cpu,
+        "max_gpu_utilization_percent": maximum,
+        "admission_ended_unix_seconds": time.time(),
+        "verified": contexts == foreign_cpu == 0 and maximum <= 5.0}
+    _write_admission(path, {"backend": "gpu", "host": remote_host,
+        "source_commit": source_commit, "sample_seconds": elapsed,
+        "rungs": {str(num_devices): rung}})
 
 
 def _run_monitored_cpu_worker(
@@ -255,6 +336,11 @@ def _run_worker(
         *(["--matched-input", str(matched_input)] if matched_input is not None else []),
         *(["--evaluator", str(evaluator)] if evaluator is not None else []),
     ]
+    if expected_cpu_affinity:
+        if not sys.platform.startswith("linux"):
+            raise RuntimeError("CPU affinity-controlled scaling requires Linux taskset")
+        command = ["taskset", "--cpu-list",
+            ",".join(map(str, expected_cpu_affinity)), *command]
     worker_env = os.environ.copy()
     if env is not None:
         worker_env.update(env)
@@ -355,25 +441,25 @@ def run_local_cpu_scaling(
     evaluator: Path | None = None,
     source_commit: str | None = None,
     environment_evidence: Path | None = None,
-    admission_command: str | None = None,
     timeout_seconds: float | None = None,
     minimum_warm_seconds: float = 0.0,
 ) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
     for count in device_counts:
-        _refresh_environment_evidence(
-            admission_command, environment_evidence, backend="cpu",
-            num_devices=count, host=os.uname().nodename,
-            source_commit=source_commit,
-        )
+        sustained = minimum_warm_seconds >= 120.0
+        evidence_path = environment_evidence or out_dir / "cpu-admission.json"
+        if sustained:
+            _collect_cpu_admission(
+                evidence_path, num_devices=count, source_commit=source_commit or ""
+            )
         environment = _resource_environment(
-            environment_evidence, backend="cpu", num_devices=count,
+            evidence_path if sustained else environment_evidence,
+            backend="cpu", num_devices=count,
             host=os.uname().nodename, source_commit=source_commit,
-            required=minimum_warm_seconds >= 120.0,
+            required=sustained,
         )
         env = _forced_cpu_environment(count)
         output_path = out_dir / f"cpu_{count}.json"
-        sustained = minimum_warm_seconds >= 120.0
         record = _run_worker(
             python_executable=python_executable,
             repo_root=repo_root,
@@ -667,7 +753,6 @@ def run_remote_gpu_scaling(
     evaluator: Path | None = None,
     source_commit: str | None = None,
     environment_evidence: Path | None = None,
-    admission_command: str | None = None,
     timeout_seconds: float = 1800.0,
     minimum_warm_seconds: float = 0.0,
 ) -> list[dict[str, object]]:
@@ -696,15 +781,17 @@ def run_remote_gpu_scaling(
     local_records: list[dict[str, object]] = []
     for count in device_counts:
         visible_devices = _default_visible_devices(remote_host, count)
-        _refresh_environment_evidence(
-            admission_command, environment_evidence, backend="gpu",
-            num_devices=count, host=remote_host, source_commit=source_commit,
-            visible_devices=visible_devices,
-        )
+        sustained = minimum_warm_seconds >= 120.0
+        evidence_path = environment_evidence or out_dir / "gpu-admission.json"
+        if sustained:
+            _collect_gpu_admission(evidence_path, remote_host=remote_host,
+                visible_devices=visible_devices, num_devices=count,
+                source_commit=source_commit or "")
         environment = _resource_environment(
-            environment_evidence, backend="gpu", num_devices=count,
+            evidence_path if sustained else environment_evidence,
+            backend="gpu", num_devices=count,
             host=remote_host, source_commit=source_commit,
-            required=minimum_warm_seconds >= 120.0,
+            required=sustained,
         )
         if environment["resource_environment_verified"] and environment[
             "resource_environment"]["visible_devices"] != visible_devices.split(","):
@@ -732,7 +819,6 @@ def run_remote_gpu_scaling(
             f"{'' if remote_restart is None else f' --restart {shlex.quote(remote_restart)}'}"
             f"{'' if remote_matched is None else f' --matched-input {shlex.quote(remote_matched)} --evaluator {shlex.quote(remote_evaluator)}'}"
         )
-        sustained = minimum_warm_seconds >= 120.0
         remote_pid_path = (f"{remote_dir}/artifacts/strong_scaling/"
             f"gpu_{count}.{os.getpid()}.{time.time_ns()}.pid")
         prefix = f"cd {shlex.quote(remote_dir)} && "
@@ -812,8 +898,6 @@ def run_strong_scaling_demo(
     minimum_warm_seconds: float = 0.0,
     cpu_environment_evidence: Path | None = None,
     gpu_environment_evidence: Path | None = None,
-    cpu_admission_command: str | None = None,
-    gpu_admission_command: str | None = None,
     source_commit: str | None = None,
 ) -> dict[str, object]:
     repo_root = Path(__file__).resolve().parents[1]
@@ -878,7 +962,6 @@ def run_strong_scaling_demo(
         evaluator=evaluator,
         source_commit=source_commit,
         environment_evidence=cpu_environment_evidence,
-        admission_command=cpu_admission_command,
         timeout_seconds=timeout_seconds,
         minimum_warm_seconds=minimum_warm_seconds,
     )
@@ -903,7 +986,6 @@ def run_strong_scaling_demo(
                 evaluator=evaluator,
                 source_commit=source_commit,
                 environment_evidence=gpu_environment_evidence,
-                admission_command=gpu_admission_command,
                 timeout_seconds=(1800.0 if timeout_seconds is None else timeout_seconds),
                 minimum_warm_seconds=minimum_warm_seconds,
             )
@@ -980,14 +1062,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--cpu-environment-evidence", type=Path)
     parser.add_argument("--gpu-environment-evidence", type=Path)
-    parser.add_argument(
-        "--cpu-admission-command",
-        help="Command template that atomically refreshes CPU evidence before each rung.",
-    )
-    parser.add_argument(
-        "--gpu-admission-command",
-        help="Command template that atomically refreshes GPU evidence before each rung.",
-    )
     parser.add_argument(
         "--source-commit", help="Commit represented by this source tree."
     )
@@ -1085,8 +1159,6 @@ def main(argv: list[str] | None = None) -> int:
         minimum_warm_seconds=minimum_warm_seconds,
         cpu_environment_evidence=args.cpu_environment_evidence,
         gpu_environment_evidence=args.gpu_environment_evidence,
-        cpu_admission_command=args.cpu_admission_command,
-        gpu_admission_command=args.gpu_admission_command,
         source_commit=args.source_commit,
     )
     return 0
