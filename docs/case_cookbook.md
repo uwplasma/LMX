@@ -119,8 +119,8 @@ ignored `artifacts/` directories.
 ## Parallel performance
 
 ```bash
-JAX_PLATFORMS=cpu python examples/strong_scaling_demo.py --help
-JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0,1 python scripts/run_strong_scaling_worker.py --help
+python examples/strong_scaling_demo.py
+python scripts/run_strong_scaling_worker.py --campaign --help
 ```
 
 Scaling results must use fixed global physics, include a one-device baseline,

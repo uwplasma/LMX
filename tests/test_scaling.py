@@ -12,7 +12,6 @@ from jax.sharding import Mesh, NamedSharding
 
 import lmx.scaling as scaling
 import lmx.fringing as fringing
-from examples import strong_scaling_demo
 from lmx.scaling import (
     StrongScalingRecord,
     _array_nbytes,
@@ -29,7 +28,6 @@ from lmx.scaling import (
     write_scaling_report,
     write_strong_scaling_summary_table,
 )
-from examples.strong_scaling_demo import _default_visible_devices
 from scripts import run_freemhd_parity_suite, run_strong_scaling_worker
 
 
@@ -119,37 +117,6 @@ def test_schema6_anderson_diagnostics_cover_restart_weights_and_placement():
         assert noisy["anderson_validation_passed"] is expected
 
 
-def test_matched_b2_topology_gate_compares_schema6_gram_and_contract():
-    base = {
-        "validation_passed": True,
-        "source_fingerprint": "source",
-        "input_sha256": "input",
-        "evaluator_sha256": "evaluator",
-        "restart_schema": "b2_diagnostics_v6",
-        "coupling_acceleration": "anderson",
-        "coupling_history_depth": 2,
-        "schema6_active": True,
-        "anderson_validation_passed": True,
-        "anderson_gram": [[2.0, 1.0], [1.0, 2.0]],
-        "anderson_weights": [0.5, 0.5],
-        "velocity_l2": 3.0,
-        "potential_l2": 2.0,
-        "current_l2": 1.0,
-        "observables": {
-            "pressure_observable": [1.0, 2.0],
-            "courant_mean": [1.0e-5, 1.1e-5],
-            "courant_max": [2.0e-5, 2.1e-5],
-        },
-    }
-    strong_scaling_demo._validate_matched_b2_topologies([
-        base, base | {"velocity_l2": 3.0 + 1.0e-10}
-    ])
-    with pytest.raises(RuntimeError, match="anderson_weights"):
-        strong_scaling_demo._validate_matched_b2_topologies([
-            base, base | {"anderson_weights": [0.6, 0.4]}
-        ])
-
-
 def test_scaling_fingerprint_owns_packaged_benchmark_resources(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -170,219 +137,47 @@ def test_scaling_fingerprint_owns_packaged_benchmark_resources(
     assert run_strong_scaling_worker._source_fingerprint() != first
 
 
-def test_remote_scaling_archive_has_one_package_resource_owner(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
-    added = []
-
-    class Archive:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return None
-
-        def add(self, path, *, arcname):
-            added.append((Path(path), arcname))
-
-    monkeypatch.setattr(strong_scaling_demo.tarfile, "open", lambda *args: Archive())
-    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", lambda *args, **kwargs: None)
-
-    strong_scaling_demo._sync_repo_to_remote(
-        repo_root=tmp_path, remote_host="office", remote_dir="/tmp/lmx"
-    )
-
-    assert [arcname for _, arcname in added] == [
-        "lmx", "scripts/run_strong_scaling_worker.py",
-        "scripts/run_freemhd_parity_suite.py",
-    ]
-    assert not any(arcname.startswith("benchmarks/") for _, arcname in added)
-
-
-def test_sustained_environment_evidence_is_fresh_bound_and_physical(tmp_path, monkeypatch):
-    now = 1_721_000_000.0
-    monkeypatch.setattr(strong_scaling_demo.time, "time", lambda: now)
-    for backend, extra in (
-        ("cpu", {"affinity_cpus": [2, 3, 4, 5], "allocated_cpu_count": 4,
-            "max_cpu_utilization_percent": 4.0}),
-        ("gpu", {"visible_devices": ["0", "1"], "foreign_compute_process_count": 0,
-            "foreign_cpu_process_count": 0, "max_gpu_utilization_percent": 4.0,
-            "gpu_identities": [{"uuid": v, "pci_bus_id": v} for v in "ab"]}),
-    ):
-        rung = {"num_devices": 2, "verified": True, "admission_ended_unix_seconds": now - 1, **extra}
-        payload = {"backend": backend, "host": "host", "source_commit": "commit",
-            "sample_seconds": 60, "rungs": {"2": rung}}
-        path = tmp_path / f"{backend}.json"
-        path.write_text(json.dumps(payload))
-        strong_scaling_demo._resource_environment(path, backend=backend, num_devices=2,
-            host="host", source_commit="commit", required=True)
-    for owner, field, invalid in (
-        (payload, "backend", "other"), (payload, "host", "other"),
-        (payload, "source_commit", "other"), (payload, "sample_seconds", 59),
-        (rung, "num_devices", 1), (rung, "verified", False),
-        (rung, "admission_ended_unix_seconds", now - 121),
-        (rung, "admission_ended_unix_seconds", None),
-    ):
-        original = owner.pop(field) if invalid is None else owner.setdefault(field, invalid)
-        if invalid is not None:
-            owner[field] = invalid
-        path.write_text(json.dumps(payload))
-        with pytest.raises(ValueError, match="Invalid"):
-            strong_scaling_demo._resource_environment(path, backend=backend, num_devices=2,
-                host="host", source_commit="commit", required=True)
-        owner[field] = original
-
-
 def test_builtin_admission_collectors_atomically_write_bound_evidence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(strong_scaling_demo, "_ADMISSION_SAMPLE_SECONDS", 0.0)
-    replace, published = strong_scaling_demo.os.replace, []
+    monkeypatch.setattr(run_strong_scaling_worker, "_ADMISSION_SAMPLE_SECONDS", 0.0)
+    replace, published = run_strong_scaling_worker.os.replace, []
     def publish(source, target):
         published.append(Path(target))
         replace(source, target)
-    monkeypatch.setattr(strong_scaling_demo.os, "replace", publish)
-    monkeypatch.setattr(strong_scaling_demo.shutil, "which", lambda name: f"/usr/bin/{name}")
-    monkeypatch.setattr(strong_scaling_demo.os, "sched_getaffinity",
+    monkeypatch.setattr(run_strong_scaling_worker.os, "replace", publish)
+    monkeypatch.setattr(run_strong_scaling_worker.shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(run_strong_scaling_worker.os, "sched_getaffinity",
         lambda _: set(range(8)), raising=False)
     calls = 0
     def cpu_times(cpus):
         nonlocal calls
         calls += 1
         return {cpu: (100 * calls, 99 * calls) for cpu in cpus}
-    monkeypatch.setattr(strong_scaling_demo, "_cpu_times", cpu_times)
+    monkeypatch.setattr(run_strong_scaling_worker, "_cpu_ticks", cpu_times)
     cpu_path = tmp_path / "cpu.json"
-    strong_scaling_demo._collect_cpu_admission(
+    run_strong_scaling_worker._collect_cpu_admission(
         cpu_path, num_devices=2, source_commit="abc")
     cpu = json.loads(cpu_path.read_text())
     assert cpu["source_commit"] == "abc"
     assert cpu["rungs"]["2"]["affinity_cpus"] == [0, 1, 2, 3]
     identity = [{"uuid": "u0", "pci_bus_id": "p0"}]
-    output = {"text": ("0, u0, p0, 2\n__CONTEXTS__\n"
-        "__PROCESSES__\n10 2.0 python\n")}
-    monkeypatch.setattr(strong_scaling_demo.subprocess, "run",
-        lambda *args, **kwargs: SimpleNamespace(stdout=output["text"]))
+    monkeypatch.setattr(
+        run_strong_scaling_worker,
+        "_gpu_snapshot",
+        lambda *args: (identity, 2.0, 0, 0),
+    )
     gpu_path = tmp_path / "gpu.json"
-    strong_scaling_demo._collect_gpu_admission(gpu_path, remote_host="office",
+    run_strong_scaling_worker._collect_gpu_admission(gpu_path,
         visible_devices="0", num_devices=1, source_commit="abc")
     gpu = json.loads(gpu_path.read_text())
-    assert gpu["host"] == "office" and gpu["rungs"]["1"]["verified"]
-    output["text"] = ("0, u0, p0, 0\n__CONTEXTS__\nu0, 20\n"
-        "__PROCESSES__\n10 40.0 python\n")
-    assert strong_scaling_demo._remote_gpu_snapshot("office", ("0",)) == (
-        identity, 0.0, 1, 1)
+    assert gpu["host"] and gpu["rungs"]["1"]["verified"]
     assert published == [cpu_path, gpu_path]
-    monkeypatch.setattr(strong_scaling_demo.shutil, "which", lambda name: None)
+    monkeypatch.setattr(run_strong_scaling_worker.shutil, "which", lambda name: None)
     with pytest.raises(RuntimeError, match="ps, taskset"):
-        strong_scaling_demo._collect_cpu_admission(cpu_path, num_devices=1, source_commit="abc")
-
-
-def test_sustained_ladders_collect_each_rung_and_pass_cpu_affinity(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    collected, launched = [], []
-    monkeypatch.setattr(strong_scaling_demo, "_collect_cpu_admission",
-        lambda path, **kwargs: collected.append((kwargs["num_devices"], Path(path).name)))
-    def environment(path, *, backend, num_devices, **kwargs):
-        if backend == "gpu":
-            return {"resource_environment_verified": True,
-                "resource_environment": {"visible_devices": (
-                    ["1"] if num_devices == 1 else ["0", "1"])}}
-        affinity = list(range(2 * num_devices))
-        return {"resource_environment_verified": True,
-            "resource_environment": {"affinity_cpus": affinity}}
-    def worker(**kwargs):
-        affinity = list(kwargs["expected_cpu_affinity"])
-        launched.append(affinity)
-        return {"cpu_affinity": affinity, "validation_passed": True}
-    monkeypatch.setattr(strong_scaling_demo, "_resource_environment", environment)
-    monkeypatch.setattr(strong_scaling_demo, "_run_worker", worker)
-    strong_scaling_demo.run_local_cpu_scaling(repo_root=tmp_path, out_dir=tmp_path,
-        device_counts=(1, 2, 4), benchmark_kind="extruded3d", nx=8, ny=7, nz=7,
-        iterations=1, repeats=4, python_executable="python", source_commit="abc",
-        minimum_warm_seconds=120.0, environment_evidence=tmp_path / "custom-admission.json")
-    assert collected == [(n, f"custom-admission-{n}.json") for n in (1, 2, 4)]
-    assert launched == [list(range(2)), list(range(4)), list(range(8))]
-    gpu_collected = []
-    monkeypatch.setattr(strong_scaling_demo, "_sync_repo_to_remote", lambda **kwargs: None)
-    monkeypatch.setattr(strong_scaling_demo, "_validate_remote_python", lambda *args: None)
-    monkeypatch.setattr(strong_scaling_demo, "_default_visible_devices",
-        lambda host, count: "1" if count == 1 else "0,1")
-    monkeypatch.setattr(strong_scaling_demo, "_collect_gpu_admission",
-        lambda path, **kwargs: gpu_collected.append(
-            (kwargs["num_devices"], kwargs["visible_devices"], Path(path).name)))
-    monkeypatch.setattr(strong_scaling_demo, "_run_monitored_gpu_worker",
-        lambda *args, **kwargs: (0, {}, False))
-    def copy_record(command, **kwargs):
-        if command[0] == "scp":
-            Path(command[-1]).write_text("{}")
-    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", copy_record)
-    strong_scaling_demo.run_remote_gpu_scaling(repo_root=tmp_path, out_dir=tmp_path,
-        remote_host="office", remote_dir="/tmp/lmx", device_counts=(1, 2),
-        benchmark_kind="extruded3d", nx=8, ny=7, nz=7, iterations=1, repeats=4,
-        source_commit="abc", minimum_warm_seconds=120.0)
-    assert gpu_collected == [(1, "1", "gpu-admission-1.json"),
-        (2, "0,1", "gpu-admission-2.json")]
-
-
-def test_remote_python_preflight_fails_before_timing(monkeypatch: pytest.MonkeyPatch):
-    error = subprocess.CalledProcessError(1, ["ssh"], stderr="SOLVAX 0.6.0 is outside")
-    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", lambda *args, **kwargs: (_ for _ in ()).throw(error))
-    with pytest.raises(RuntimeError, match="Remote Python.*SOLVAX 0.6.0"):
-        strong_scaling_demo._validate_remote_python("office", "/tmp/lmx", "python3")
-
-
-@pytest.mark.parametrize(
-    ("record", "expected"),
-    [
-        ({"validation_passed": False}, "during validation: remote worker exited with status 1"),
-        ({"validation_passed": False, "failure": {
-            "phase": "restart", "message": "schema mismatch",
-        }}, "during restart: schema mismatch"),
-    ],
-)
-def test_remote_scaling_retrieves_failed_worker_evidence(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    record: dict[str, object], expected: str,
-):
-    commands = []
-    monkeypatch.setattr(strong_scaling_demo, "_sync_repo_to_remote", lambda **kwargs: None)
-    monkeypatch.setattr(strong_scaling_demo, "_validate_remote_python", lambda *args: None)
-    monkeypatch.setattr(strong_scaling_demo, "_default_visible_devices", lambda *args: "0")
-
-    def fake_run(command, **kwargs):
-        commands.append(command)
-        if command[0] == "ssh":
-            raise subprocess.CalledProcessError(1, command)
-        Path(command[-1]).write_text(json.dumps(record))
-
-    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", fake_run)
-
-    with pytest.raises(RuntimeError, match=expected) as caught:
-        strong_scaling_demo.run_remote_gpu_scaling(
-            repo_root=tmp_path, out_dir=tmp_path, remote_host="office",
-            remote_dir="/tmp/lmx", device_counts=(1,),
-            benchmark_kind="matched_b2_smoke", nx=None, ny=7, nz=7,
-            iterations=2, repeats=1,
+        run_strong_scaling_worker._collect_cpu_admission(
+            cpu_path, num_devices=1, source_commit="abc"
         )
-
-    evidence = tmp_path / "gpu_1.json"
-    assert json.loads(evidence.read_text()) == record | {"resource_environment_verified": False}
-    assert commands[-1] == ["scp", "office:/tmp/lmx/artifacts/strong_scaling/gpu_1.json", str(evidence)]
-    assert isinstance(caught.value.__cause__, subprocess.CalledProcessError)
-
-
-def test_strong_scaling_demo_supports_direct_help(tmp_path: Path):
-    script = Path(strong_scaling_demo.__file__).resolve()
-    environment = strong_scaling_demo.os.environ.copy()
-    environment["PYTHONPATH"] = ""
-    completed = subprocess.run(
-        [sys.executable, str(script), "--help"], cwd=tmp_path, env=environment,
-        capture_output=True, text=True,
-    )
-
-    assert completed.returncode == 0, completed.stderr
-    assert "matched_b2_smoke" in completed.stdout
-    assert "--remote-python" in completed.stdout
 
 
 pytestmark = pytest.mark.unit
@@ -453,108 +248,67 @@ def _sustained_ladder(counts, backend="cpu"):
     return records
 
 
-def test_scaling_demo_requires_restart_for_production(monkeypatch) -> None:
-    for kind in ("extruded_solve", "matched_b2_smoke"):
-        with pytest.raises(SystemExit):
-            strong_scaling_demo.main(["--benchmark-kind", kind])
-    options = {}
-    monkeypatch.setattr(strong_scaling_demo, "run_strong_scaling_demo", options.update)
-    arguments = ["--benchmark-kind", "matched_b2_smoke", "--repeats", "4",
-        "--cpu-nx", "16", "--worker-timeout", "45", "--source-commit", "abc"]
-    assert strong_scaling_demo.main(arguments) == 0
-    assert (options["cpu_problem"], options["gpu_problem"]) == ((16, 7, 7), (8, 7, 7))
-    assert options["timeout_seconds"] == 45.0 and options["source_commit"] == "abc"
-    assert options["cpu_iterations"] == options["gpu_iterations"] == 2
-    with pytest.raises(SystemExit):
-        strong_scaling_demo.main([*arguments, "--minimum-warm-seconds", "120"])
-    with pytest.raises(SystemExit):
-        strong_scaling_demo.main([
-            "--benchmark-kind", "matched_b2_smoke", "--sustained",
-            "--cpu-nx", "128",
-        ])
-    assert strong_scaling_demo.main(["--benchmark-kind", "matched_b2_smoke", "--sustained"]) == 0
-    assert options["cpu_problem"] == options["gpu_problem"] == (256, 67, 67)
-    assert (options["cpu_iterations"], options["gpu_iterations"], options["repeats"],
-        options["minimum_warm_seconds"], options["timeout_seconds"]) == (32, 96, 4, 120.0, 1800.0)
+def test_campaign_dispatches_fixed_cpu_and_gpu_debug_presets(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(run_freemhd_parity_suite,
+        "materialize_matched_b2_evaluator", lambda path: Path(path).write_text("{}"))
+    monkeypatch.setattr(run_freemhd_parity_suite,
+        "materialize_matched_b2_lmx_input", lambda path, **kwargs: Path(path).write_text("{}"))
+    monkeypatch.setattr(run_strong_scaling_worker, "_run_campaign",
+        lambda **kwargs: calls.append(kwargs) or [])
+    assert run_strong_scaling_worker.main([
+        "--campaign", "--backend", "both", "--output", str(tmp_path),
+    ]) == 0
+    assert [(call["backend"], call["counts"], call["iterations"])
+        for call in calls] == [("cpu", (1, 2, 4), 2), ("gpu", (1, 2), 2)]
 
 
-def test_scaling_worker_command_forwards_restart(tmp_path: Path, monkeypatch) -> None:
-    output = tmp_path / "record.json"
-    output.write_text("{}")
-    commands: list[list[str]] = []
-    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", lambda command, **kwargs: commands.append(command))
-    strong_scaling_demo._run_worker(
-        python_executable="python", repo_root=tmp_path, output_path=output,
-        platform="CPU", benchmark_kind="extruded_solve", nx=8, num_devices=2,
-        ny=6, nz=4, iterations=3, repeats=1, restart_path=tmp_path / "restart.npz")
-    assert commands[0][-2:] == ["--restart", str(tmp_path / "restart.npz")]
-    strong_scaling_demo._run_worker(python_executable="python", repo_root=tmp_path,
-        output_path=output, platform="CPU", benchmark_kind="matched_b2_smoke", nx=None,
-        num_devices=1, ny=7, nz=7, iterations=6, repeats=4,
-        matched_input=tmp_path / "input.json", evaluator=tmp_path / "evaluator.json",
-        minimum_warm_seconds=120.0)
-    assert {commands[1][commands[1].index(flag) + 1] for flag in ("--matched-input", "--evaluator")} == {
-            str(tmp_path / "input.json"), str(tmp_path / "evaluator.json")}
-    assert tuple(commands[1][commands[1].index(flag) + 1] for flag in
-        ("--iterations", "--minimum-warm-seconds")) == ("6", "120.0")
-    monkeypatch.setattr(strong_scaling_demo.sys, "platform", "linux")
-    strong_scaling_demo._run_worker(python_executable="python", repo_root=tmp_path,
-        output_path=output, platform="CPU", benchmark_kind="extruded3d", nx=8,
-        num_devices=2, ny=7, nz=7, iterations=1, repeats=1,
-        expected_cpu_affinity=(0, 1, 2, 3))
-    assert commands[2][:3] == ["taskset", "--cpu-list", "0,1,2,3"]
+def test_campaign_worker_command_and_cpu_environment(monkeypatch) -> None:
+    command = run_strong_scaling_worker._matched_worker_command(
+        python_executable="python", num_devices=2, iterations=6, repeats=4,
+        output="out.json", matched_input="input.json", evaluator="evaluator.json",
+        source_commit="abc", minimum_warm_seconds=120.0, platform_name="CPU")
+    assert {command[command.index(flag) + 1] for flag in
+        ("--matched-input", "--evaluator")} == {"input.json", "evaluator.json"}
     monkeypatch.setenv("XLA_FLAGS", "--xla_dump_to=/tmp/lmx-safe --xla_cpu_multi_thread_eigen=true")
-    env = strong_scaling_demo._forced_cpu_environment(2)
+    env = run_strong_scaling_worker._forced_cpu_environment(2)
     assert "--xla_dump_to=/tmp/lmx-safe" in env["XLA_FLAGS"]
     assert env["XLA_FLAGS"].count("--xla_force_host_platform_device_count=2") == 1
     assert "--xla_cpu_multi_thread_eigen=true" not in env["XLA_FLAGS"]
-    derived = tmp_path / "derived.json"
-    for _ in range(2):
-        strong_scaling_demo._materialize_exact(derived, Path.write_text, data="same")
-    with pytest.raises(ValueError, match="differs"):
-        strong_scaling_demo._materialize_exact(derived, Path.write_text, data="changed")
-    titles = []
-    monkeypatch.setattr(strong_scaling_demo, "write_strong_scaling_plots",
-        lambda *args, **kwargs: titles.append(kwargs["case_title"]) or [])
-    for records in ([], _sustained_ladder((1, 2, 4))):
-        strong_scaling_demo._write_optional_scaling_plots(records, tmp_path)
-    assert titles == ["LMX fixed-work scaling calibration",
-        "LMX sustained multi-minute strong scaling"]
-    missing_plot = ModuleNotFoundError(name="matplotlib")
-    monkeypatch.setattr(strong_scaling_demo, "write_strong_scaling_plots", lambda *args, **kwargs: (_ for _ in ()).throw(missing_plot))
-    assert strong_scaling_demo._write_optional_scaling_plots([], tmp_path) == []
 
 
 def test_cpu_monitor_emits_fast_fail_closed_evidence(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(strong_scaling_demo, "_MONITOR_SAMPLE_SECONDS", 0.005)
-    monkeypatch.setattr(strong_scaling_demo, "_MONITOR_POSTFLIGHT_SECONDS", 0.015)
+    monkeypatch.setattr(run_strong_scaling_worker, "_MONITOR_SAMPLE_SECONDS", 0.005)
+    monkeypatch.setattr(run_strong_scaling_worker, "_MONITOR_POSTFLIGHT_SECONDS", 0.015)
     def probe(command, **kwargs):
-        text = "Swapouts: 0.\n" if command[0] == "vm_stat" else f"{strong_scaling_demo.os.getpid()} 0 0.0 python\n"
+        text = ("Swapouts: 0.\n" if command[0] == "vm_stat" else
+            f"{run_strong_scaling_worker.os.getpid()} 0 0.0 python\n")
         return SimpleNamespace(stdout=text)
-    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", probe)
-    affinity = tuple(sorted(getattr(strong_scaling_demo.os, "sched_getaffinity", lambda _: ())(0)))
+    monkeypatch.setattr(run_strong_scaling_worker.subprocess, "run", probe)
+    affinity = tuple(sorted(getattr(run_strong_scaling_worker.os, "sched_getaffinity", lambda _: ())(0)))
     raw, command = tmp_path / "cpu.monitor.jsonl", [sys.executable, "-c", "import time; time.sleep(.03)"]
-    code, evidence, timed_out = strong_scaling_demo._run_monitored_cpu_worker(command,
+    code, evidence, timed_out = run_strong_scaling_worker._run_monitored_cpu_worker(command,
         cwd=tmp_path, env={}, raw_path=raw, num_devices=1, expected_affinity=affinity, timeout_seconds=1)
     assert code == 0 and not timed_out and evidence["verified"] and raw.stat().st_size
 
 
-def test_gpu_monitor_parses_remote_identity_and_worker_context(tmp_path: Path, monkeypatch) -> None:
-    original, holder = strong_scaling_demo.subprocess.Popen, {}
+def test_gpu_monitor_parses_identity_and_worker_context(tmp_path: Path, monkeypatch) -> None:
+    original, holder = run_strong_scaling_worker.subprocess.Popen, {}
     def popen(*args, **kwargs):
         holder["process"] = original([sys.executable, "-c", "import time; time.sleep(.03)"])
         return holder["process"]
     def probe(*args, **kwargs):
-        context = "uuid-1, 777, python, 100\n" if holder["process"].poll() is None else ""
-        return SimpleNamespace(stdout=("__META__ 777 888\n1, uuid-1, "
+        pid = holder["process"].pid
+        context = f"uuid-1, {pid}, python, 100\n" if holder["process"].poll() is None else ""
+        return SimpleNamespace(stdout=("1, uuid-1, "
             "00000000:65:00.0, 0, 100\n__CONTEXTS__\n" + context
-            + "__PROCESSES__\n777 1 1.0 python\n888 1 0.0 sh\n"))
-    monkeypatch.setattr(strong_scaling_demo.subprocess, "Popen", popen)
-    monkeypatch.setattr(strong_scaling_demo.subprocess, "run", probe)
+            + f"__PROCESSES__\n{pid} 1 1.0 python\n"))
+    monkeypatch.setattr(run_strong_scaling_worker.subprocess, "Popen", popen)
+    monkeypatch.setattr(run_strong_scaling_worker.subprocess, "run", probe)
     for name, value in (("_MONITOR_SAMPLE_SECONDS", 0.005), ("_MONITOR_POSTFLIGHT_SECONDS", 0.015)):
-        monkeypatch.setattr(strong_scaling_demo, name, value)
-    code, evidence, timed_out = strong_scaling_demo._run_monitored_gpu_worker(
-        "office", "worker", remote_pid_path="/tmp/worker.pid",
+        monkeypatch.setattr(run_strong_scaling_worker, name, value)
+    code, evidence, timed_out = run_strong_scaling_worker._run_monitored_gpu_worker(
+        ["worker"], cwd=tmp_path, env={},
         raw_path=tmp_path / "gpu.monitor.jsonl", num_devices=1, timeout_seconds=1,
         environment={"visible_devices": ["1"], "gpu_identities": [{"uuid": "uuid-1", "pci_bus_id": "65:00.0"}]})
     assert code == 0 and not timed_out and evidence["verified"]
@@ -762,11 +516,21 @@ def test_tracked_mac_sharding_record_reports_only_actual_partitions():
 
 @pytest.mark.timeout(110)
 def test_forced_cpu_duct_step_matches_one_and_two_devices(tmp_path: Path):
-    one, two = strong_scaling_demo.run_local_cpu_scaling(
-        repo_root=Path(__file__).resolve().parents[1], out_dir=tmp_path,
-        device_counts=(1, 2), benchmark_kind="duct_step_gate", nx=8, ny=4, nz=3,
-        iterations=192, repeats=1, python_executable=sys.executable,
-        timeout_seconds=50)
+    repo_root = Path(__file__).resolve().parents[1]
+    records = []
+    for count in (1, 2):
+        output = tmp_path / f"cpu_{count}.json"
+        environment = run_strong_scaling_worker._forced_cpu_environment(count)
+        environment["PYTHONPATH"] = str(repo_root)
+        subprocess.run([
+            sys.executable, str(repo_root / "scripts/run_strong_scaling_worker.py"),
+            "--benchmark-kind", "duct_step_gate", "--num-devices", str(count),
+            "--nx", "8", "--ny", "4", "--nz", "3", "--iterations", "192",
+            "--repeats", "1", "--output", str(output),
+        ], cwd=repo_root, env=environment, timeout=50, check=True,
+            capture_output=True)
+        records.append(json.loads(output.read_text()))
+    one, two = records
     np.testing.assert_allclose(one["signature"], two["signature"], rtol=2e-8, atol=2e-9)
     for record in (one, two):
         assert record["momentum_converged"] and record["mixed_pressure_converged"]
@@ -888,18 +652,6 @@ def test_solver_scaling_rejects_failed_conservation(monkeypatch: pytest.MonkeyPa
         benchmark_extruded_inductionless_solve(
             nx=4, ny=4, nz=4, repeats=1, num_devices=1
         )
-
-
-def test_default_visible_devices_uses_highest_indices(monkeypatch: pytest.MonkeyPatch):
-    def fake_run(*args, **kwargs):
-        return subprocess.CompletedProcess(
-            args=args, returncode=0, stdout="0\n1\n", stderr=""
-        )
-
-    monkeypatch.setattr(subprocess, "run", fake_run)
-
-    assert _default_visible_devices("office", 1) == "1"
-    assert _default_visible_devices("office", 2) == "0,1"
 
 
 def test_scaling_problem_builders_return_expected_shapes():

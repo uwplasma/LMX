@@ -10,6 +10,9 @@ import os
 from pathlib import Path
 import platform
 import resource
+import shlex
+import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -43,6 +46,8 @@ from lmx.scaling import (
     benchmark_extruded_inductionless_solve,
     benchmark_sharded_extruded_operator,
     summarize_pressure_linear_history,
+    summarize_strong_scaling_records,
+    write_strong_scaling_summary_table,
 )
 
 _B2_RESTART_FLUX_ATOL = 1.0e-6
@@ -793,7 +798,7 @@ def _matched_b2_smoke_benchmark(
     }
 
 
-def main(argv: list[str] | None = None) -> int:
+def _worker_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Run a single strong-scaling benchmark worker."
     )
@@ -901,6 +906,764 @@ def main(argv: list[str] | None = None) -> int:
     ):
         return 1
     return 0
+
+
+# Campaign orchestration stays beside the fingerprinted worker.  The public
+# example intentionally contains only a small local calibration.
+_MONITOR_SAMPLE_SECONDS = 1.0
+_MONITOR_POSTFLIGHT_SECONDS = 15.0
+_ADMISSION_SAMPLE_SECONDS = 60.0
+
+
+def _atomic_json(path: Path, payload: dict[str, object]) -> None:
+    """Publish one evidence record without exposing a partial JSON file."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", dir=path.parent, delete=False) as stream:
+        json.dump(payload, stream, indent=2)
+        candidate = Path(stream.name)
+    os.replace(candidate, path)
+
+
+def _monitor_summary(
+    *, backend: str, num_devices: int, raw_path: Path,
+    violations: set[str], timed_out: bool, sample_times: list[float],
+    worker_elapsed: float, monitor_start: float, worker_start: float,
+    worker_end: float, monitor_end: float,
+) -> dict[str, object]:
+    """Reduce one raw monitor stream to the compact promotion contract."""
+
+    max_gap = max((b - a for a, b in zip(sample_times, sample_times[1:])), default=0.0)
+    if max_gap > 2.0:
+        violations.add("sampling_gap_above_2_seconds")
+    return {
+        "schema_version": 2, "scope": "continuous-and-postflight",
+        "backend": backend, "num_devices": num_devices,
+        "verified": not violations and not timed_out,
+        "raw_sha256": hashlib.sha256(raw_path.read_bytes()).hexdigest(),
+        "sample_period_seconds": _MONITOR_SAMPLE_SECONDS,
+        "max_sample_gap_seconds": max_gap,
+        "monitored_worker_seconds": worker_elapsed,
+        "postflight_seconds": monitor_end - worker_end,
+        "violation_count": len(violations),
+        "monitor_started_unix_seconds": monitor_start,
+        "worker_started_unix_seconds": worker_start,
+        "worker_ended_unix_seconds": worker_end,
+        "monitor_ended_unix_seconds": monitor_end,
+    }
+
+
+def _environment_record(path: Path, rung: dict[str, object]) -> dict[str, object]:
+    """Bind a freshly collected admission record to the launched worker."""
+
+    raw = path.read_bytes()
+    return {
+        "resource_environment_verified": rung.get("verified") is True,
+        "resource_environment_sha256": hashlib.sha256(raw).hexdigest(),
+        "resource_environment": rung,
+    }
+
+
+def _cpu_ticks(cpus: tuple[int, ...]) -> dict[int, tuple[int, int]]:
+    """Return total and idle Linux scheduler ticks for selected CPUs."""
+
+    rows = {
+        int(parts[0][3:]): tuple(map(int, parts[1:]))
+        for line in Path("/proc/stat").read_text().splitlines()
+        if (parts := line.split())
+        and parts[0].startswith("cpu")
+        and parts[0][3:].isdigit()
+    }
+    return {cpu: (sum(rows[cpu]), rows[cpu][3] + rows[cpu][4]) for cpu in cpus}
+
+
+def _collect_cpu_admission(
+    path: Path, *, num_devices: int, source_commit: str
+) -> dict[str, object]:
+    """Observe an idle Linux cpuset immediately before a sustained rung."""
+
+    missing = [name for name in ("ps", "taskset") if shutil.which(name) is None]
+    if missing or not hasattr(os, "sched_getaffinity"):
+        detail = ", ".join(missing) or "Linux affinity control"
+        raise RuntimeError(f"Sustained CPU scaling requires {detail}")
+    available = tuple(sorted(os.sched_getaffinity(0)))
+    affinity = available[: 2 * num_devices]
+    if len(affinity) != 2 * num_devices:
+        raise RuntimeError(f"CPU rung {num_devices} requires {2 * num_devices} CPUs")
+
+    started, before = time.monotonic(), _cpu_ticks(affinity)
+    time.sleep(_ADMISSION_SAMPLE_SECONDS)
+    after = _cpu_ticks(affinity)
+    utilization = []
+    for cpu in affinity:
+        total = after[cpu][0] - before[cpu][0]
+        idle = after[cpu][1] - before[cpu][1]
+        utilization.append(100.0 * (1.0 - idle / max(total, 1)))
+    maximum = max(utilization)
+    rung = {
+        "num_devices": num_devices,
+        "affinity_cpus": list(affinity),
+        "allocated_cpu_count": len(affinity),
+        "max_cpu_utilization_percent": maximum,
+        "admission_ended_unix_seconds": time.time(),
+        "verified": maximum <= 5.0,
+    }
+    _atomic_json(
+        path,
+        {
+            "backend": "cpu",
+            "host": os.uname().nodename,
+            "source_commit": source_commit,
+            "sample_seconds": time.monotonic() - started,
+            "rungs": {str(num_devices): rung},
+        },
+    )
+    if not rung["verified"]:
+        raise RuntimeError("CPU admission observed more than 5% utilization")
+    return rung
+
+
+def _forced_cpu_environment(count: int) -> dict[str, str]:
+    """Select a bounded CPU device mesh without discarding safe XLA flags."""
+
+    environment = os.environ.copy()
+    excluded = (
+        "--xla_force_host_platform_device_count=",
+        "--xla_cpu_multi_thread_eigen=",
+        "intra_op_parallelism_threads=",
+    )
+    flags = [
+        flag for flag in shlex.split(environment.get("XLA_FLAGS", ""))
+        if not flag.startswith(excluded)
+    ]
+    flags += [f"--xla_force_host_platform_device_count={count}",
+        "--xla_cpu_multi_thread_eigen=false", "intra_op_parallelism_threads=1"]
+    environment.update(
+        JAX_PLATFORMS="cpu",
+        JAX_ENABLE_X64="true",
+        XLA_PYTHON_CLIENT_PREALLOCATE="false",
+        XLA_FLAGS=" ".join(flags),
+        OMP_NUM_THREADS="1",
+        OPENBLAS_NUM_THREADS="1",
+        MKL_NUM_THREADS="1",
+        NUMEXPR_NUM_THREADS="1",
+    )
+    return environment
+
+
+def _run_monitored_cpu_worker(
+    command: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str],
+    raw_path: Path,
+    num_devices: int,
+    expected_affinity: tuple[int, ...],
+    timeout_seconds: float,
+) -> tuple[int, dict[str, object], bool]:
+    """Run a CPU worker while checking affinity, swap, and foreign work."""
+
+    started = time.monotonic()
+    monitor_start = time.time()
+    process = subprocess.Popen(command, cwd=cwd, env=env)
+    worker_start = time.time()
+    violations: set[str] = set()
+    sample_times: list[float] = []
+    baseline_swapouts: int | None = None
+    timed_out = False
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def sample(stream, phase: str) -> None:
+        nonlocal baseline_swapouts
+        now, current = time.monotonic(), []
+        evidence: dict[str, object] = {
+            "unix_seconds": time.time(),
+            "phase": phase,
+            "worker_pid": process.pid,
+        }
+        try:
+            output = subprocess.run(
+                ["ps", "-Ao", "pid=,ppid=,%cpu=,comm="],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            rows = [line.strip().split(maxsplit=3) for line in output.splitlines()]
+            processes = [
+                (int(row[0]), int(row[1]), float(row[2]), row[3])
+                for row in rows
+                if len(row) == 4
+            ]
+            if not processes:
+                raise RuntimeError("empty process probe")
+            owned = {process.pid, os.getpid()}
+            while children := {
+                pid
+                for pid, parent, _, _ in processes
+                if parent in owned and pid not in owned
+            }:
+                owned.update(children)
+            foreign = [
+                (pid, cpu, name)
+                for pid, _, cpu, name in processes
+                if pid not in owned and cpu > 25.0
+            ]
+            evidence["foreign_processes"] = foreign
+            if foreign:
+                current.append("foreign_process_above_25_percent_cpu")
+            if sys.platform == "darwin":
+                vm = subprocess.run(
+                    ["vm_stat"], check=True, capture_output=True, text=True
+                ).stdout
+                row = next(line for line in vm.splitlines() if line.startswith("Swapouts:"))
+                swapouts = int(row.split(":", 1)[1].strip().rstrip("."))
+            else:
+                row = next(
+                    line
+                    for line in Path("/proc/vmstat").read_text().splitlines()
+                    if line.startswith("pswpout ")
+                )
+                swapouts = int(row.split()[1])
+            baseline_swapouts = (
+                swapouts if baseline_swapouts is None else baseline_swapouts
+            )
+            evidence["swapout_increase"] = swapouts - baseline_swapouts
+            if swapouts > baseline_swapouts:
+                current.append("swapout_increase")
+            affinity = None
+            if process.poll() is None and hasattr(os, "sched_getaffinity"):
+                affinity = sorted(os.sched_getaffinity(process.pid))
+                if tuple(affinity) != expected_affinity:
+                    current.append("worker_affinity_escape")
+            evidence["worker_affinity"] = affinity
+        except Exception as error:  # Fail closed on unavailable system evidence.
+            evidence["probe_error"] = f"{type(error).__name__}: {error}"
+            current.append("probe_error")
+        violations.update(current)
+        evidence["violations"] = current
+        stream.write(json.dumps(evidence, sort_keys=True) + "\n")
+        stream.flush()
+        sample_times.append(now)
+
+    with raw_path.open("w") as stream:
+        next_sample = started
+        while process.poll() is None:
+            now = time.monotonic()
+            if now - started >= timeout_seconds:
+                timed_out = True
+                process.kill()
+                process.wait()
+                break
+            if now < next_sample:
+                time.sleep(min(next_sample - now, 0.1))
+                continue
+            sample(stream, "worker")
+            next_sample += _MONITOR_SAMPLE_SECONDS
+        worker_end = time.time()
+        worker_elapsed = time.monotonic() - started
+        postflight_started = time.monotonic()
+        while time.monotonic() - postflight_started < _MONITOR_POSTFLIGHT_SECONDS:
+            sample(stream, "postflight")
+            time.sleep(_MONITOR_SAMPLE_SECONDS)
+    monitor_end = time.time()
+    summary = _monitor_summary(
+        backend="cpu", num_devices=num_devices, raw_path=raw_path,
+        violations=violations, timed_out=timed_out, sample_times=sample_times,
+        worker_elapsed=worker_elapsed, monitor_start=monitor_start,
+        worker_start=worker_start, worker_end=worker_end, monitor_end=monitor_end)
+    return int(process.returncode), summary, timed_out
+
+
+def _gpu_snapshot(
+    visible_devices: tuple[str, ...],
+) -> tuple[list[dict[str, str]], float, int, int]:
+    """Read selected GPU identity, utilization, and foreign process counts."""
+
+    probe = (
+        "nvidia-smi --query-gpu=index,uuid,pci.bus_id,utilization.gpu "
+        "--format=csv,noheader,nounits; echo __CONTEXTS__; "
+        "nvidia-smi --query-compute-apps=gpu_uuid,pid "
+        "--format=csv,noheader,nounits; echo __PROCESSES__; "
+        "ps -eo pid=,pcpu=,comm="
+    )
+    output = subprocess.run(
+        ["sh", "-c", probe],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=10.0,
+    ).stdout
+    gpu_text, context_text = output.split("__CONTEXTS__\n", 1)
+    context_text, process_text = context_text.split("__PROCESSES__\n", 1)
+    rows = [
+        [part.strip() for part in line.split(",")]
+        for line in gpu_text.splitlines()
+        if line.strip()
+    ]
+    selected = [row for row in rows if row[0] in visible_devices]
+    if len(selected) != len(visible_devices):
+        raise RuntimeError("GPU admission could not identify every selected device")
+    identities = [
+        {"uuid": row[1], "pci_bus_id": row[2]} for row in selected
+    ]
+    maximum = max(float(row[3]) for row in selected)
+    selected_uuids = {row[1] for row in selected}
+    contexts = sum(
+        line.split(",", 1)[0].strip() in selected_uuids
+        for line in context_text.splitlines()
+        if line.strip()
+    )
+    foreign_cpu = sum(
+        float(parts[1]) > 25.0
+        for line in process_text.splitlines()
+        if len(parts := line.split(maxsplit=2)) == 3
+    )
+    return identities, maximum, contexts, foreign_cpu
+
+
+def _collect_gpu_admission(
+    path: Path,
+    *,
+    visible_devices: str,
+    num_devices: int,
+    source_commit: str,
+) -> dict[str, object]:
+    """Observe an idle, identity-stable GPU allocation before one rung."""
+
+    devices = tuple(visible_devices.split(","))
+    started = time.monotonic()
+    deadline = started + _ADMISSION_SAMPLE_SECONDS
+    snapshots = []
+    while True:
+        snapshots.append(_gpu_snapshot(devices))
+        if time.monotonic() >= deadline:
+            break
+        time.sleep(min(1.0, deadline - time.monotonic()))
+    identities = snapshots[0][0]
+    if any(snapshot[0] != identities for snapshot in snapshots):
+        raise RuntimeError("GPU identity changed during admission")
+    maximum = max(snapshot[1] for snapshot in snapshots)
+    contexts = max(snapshot[2] for snapshot in snapshots)
+    foreign_cpu = max(snapshot[3] for snapshot in snapshots)
+    rung = {
+        "num_devices": num_devices,
+        "visible_devices": list(devices),
+        "gpu_identities": identities,
+        "foreign_compute_process_count": contexts,
+        "foreign_cpu_process_count": foreign_cpu,
+        "max_gpu_utilization_percent": maximum,
+        "admission_ended_unix_seconds": time.time(),
+        "verified": contexts == foreign_cpu == 0 and maximum <= 5.0,
+    }
+    _atomic_json(
+        path,
+        {
+            "backend": "gpu",
+            "host": os.uname().nodename,
+            "source_commit": source_commit,
+            "sample_seconds": time.monotonic() - started,
+            "rungs": {str(num_devices): rung},
+        },
+    )
+    if not rung["verified"]:
+        raise RuntimeError("GPU admission observed utilization or foreign work")
+    return rung
+
+
+def _run_monitored_gpu_worker(
+    command: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str],
+    raw_path: Path,
+    num_devices: int,
+    environment: dict[str, object],
+    timeout_seconds: float,
+) -> tuple[int, dict[str, object], bool]:
+    """Run a remote worker while rejecting shared-host contamination."""
+
+    def normalize_pci(value: object) -> str:
+        return ":".join(str(value).lower().split(":")[-2:])
+
+    expected = {
+        str(index): (identity["uuid"], normalize_pci(identity["pci_bus_id"]))
+        for index, identity in zip(
+            environment["visible_devices"],
+            environment["gpu_identities"],
+            strict=True,
+        )
+    }
+    selected_uuids = {identity[0] for identity in expected.values()}
+    monitor_start, started = time.time(), time.monotonic()
+    process = subprocess.Popen(command, cwd=cwd, env=env)
+    worker_start = time.time()
+    violations: set[str] = set()
+    sample_times: list[float] = []
+    timed_out = False
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def sample(stream, phase: str) -> None:
+        now, current = time.monotonic(), []
+        evidence: dict[str, object] = {"unix_seconds": time.time(), "phase": phase}
+        probe = (
+            "nvidia-smi --query-gpu=index,uuid,pci.bus_id,utilization.gpu,memory.used "
+            "--format=csv,noheader,nounits; echo __CONTEXTS__; "
+            "nvidia-smi --query-compute-apps=gpu_uuid,pid,process_name,used_gpu_memory "
+            "--format=csv,noheader,nounits; echo __PROCESSES__; "
+            "ps -eo pid=,ppid=,pcpu=,comm="
+        )
+        try:
+            output = subprocess.run(
+                ["sh", "-c", probe],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=1.0,
+            ).stdout
+            gpu_text, context_text = output.split("__CONTEXTS__\n", 1)
+            context_text, process_text = context_text.split("__PROCESSES__\n", 1)
+            lines = gpu_text.splitlines()
+            gpus = [
+                [part.strip() for part in line.split(",")]
+                for line in lines
+                if line.strip()
+            ]
+            observed = {
+                row[0]: (row[1], normalize_pci(row[2])) for row in gpus
+            }
+            if any(observed.get(index) != identity for index, identity in expected.items()):
+                current.append("gpu_identity_remap")
+            process_rows = [
+                (int(row[0]), int(row[1]), float(row[2]), row[3])
+                for line in process_text.splitlines()
+                if len(row := line.strip().split(maxsplit=3)) == 4
+            ]
+            if not process_rows:
+                raise RuntimeError("missing remote worker or process inventory")
+            owned = {process.pid, os.getpid()}
+            while children := {
+                pid
+                for pid, parent, _, _ in process_rows
+                if parent in owned and pid not in owned
+            }:
+                owned.update(children)
+            contexts = [
+                [part.strip() for part in line.split(",", 3)]
+                for line in context_text.splitlines()
+                if line.strip()
+            ]
+            selected = [row for row in contexts if row[0] in selected_uuids]
+            foreign_gpu = [row for row in selected if int(row[1]) not in owned]
+            foreign_cpu = [
+                (pid, cpu, name)
+                for pid, _, cpu, name in process_rows
+                if pid not in owned and cpu > 25.0
+            ]
+            if foreign_gpu or (phase == "postflight" and selected):
+                current.append("foreign_or_postflight_gpu_context")
+            if foreign_cpu:
+                current.append("foreign_process_above_25_percent_cpu")
+            if phase == "postflight" and any(
+                float(row[3]) > 5.0 for row in gpus if row[0] in expected
+            ):
+                current.append("postflight_gpu_utilization_above_5_percent")
+            evidence.update(
+                worker_pid=process.pid,
+                gpus=gpus,
+                selected_contexts=selected,
+                foreign_gpu_contexts=foreign_gpu,
+                foreign_processes=foreign_cpu,
+            )
+        except Exception as error:  # Fail closed on unavailable host evidence.
+            evidence["probe_error"] = f"{type(error).__name__}: {error}"
+            current.append("probe_error")
+        violations.update(current)
+        evidence["violations"] = current
+        stream.write(json.dumps(evidence, sort_keys=True) + "\n")
+        stream.flush()
+        sample_times.append(now)
+
+    with raw_path.open("w") as stream:
+        next_sample = started
+        while process.poll() is None:
+            now = time.monotonic()
+            if now - started >= timeout_seconds:
+                timed_out = True
+                process.terminate()
+                try:
+                    process.wait(timeout=2.0)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
+                break
+            if now < next_sample:
+                time.sleep(min(next_sample - now, 0.1))
+                continue
+            sample(stream, "worker")
+            next_sample += _MONITOR_SAMPLE_SECONDS
+        worker_end = time.time()
+        worker_elapsed = time.monotonic() - started
+        postflight_started = time.monotonic()
+        while time.monotonic() - postflight_started < _MONITOR_POSTFLIGHT_SECONDS:
+            sample(stream, "postflight")
+            time.sleep(_MONITOR_SAMPLE_SECONDS)
+    monitor_end = time.time()
+    summary = _monitor_summary(
+        backend="gpu", num_devices=num_devices, raw_path=raw_path,
+        violations=violations, timed_out=timed_out, sample_times=sample_times,
+        worker_elapsed=worker_elapsed, monitor_start=monitor_start,
+        worker_start=worker_start, worker_end=worker_end, monitor_end=monitor_end)
+    return int(process.returncode), summary, timed_out
+
+
+def _matched_worker_command(
+    *,
+    python_executable: str,
+    num_devices: int,
+    iterations: int,
+    repeats: int,
+    output: str,
+    matched_input: str,
+    evaluator: str,
+    source_commit: str,
+    minimum_warm_seconds: float,
+    platform_name: str,
+) -> list[str]:
+    """Build one isolated matched-B2 worker command."""
+
+    return [
+        python_executable, str(Path(__file__).resolve()),
+        "--benchmark-kind", "matched_b2_smoke",
+        "--platform", platform_name,
+        "--num-devices", str(num_devices),
+        "--iterations", str(iterations),
+        "--repeats", str(repeats),
+        "--minimum-warm-seconds", str(minimum_warm_seconds),
+        "--matched-input", matched_input,
+        "--evaluator", evaluator,
+        "--source-commit", source_commit,
+        "--output", output,
+    ]
+
+
+def _finalize_record(
+    path: Path,
+    environment: dict[str, object],
+    monitoring: dict[str, object] | None,
+) -> dict[str, object]:
+    """Attach admission and monitoring evidence to a worker record."""
+
+    record = json.loads(path.read_text())
+    if monitoring is not None:
+        monitoring["source_fingerprint"] = record.get("source_fingerprint")
+        record["resource_monitoring"] = monitoring
+    record.update(environment)
+    path.write_text(json.dumps(record, indent=2) + "\n")
+    return record
+
+
+def _run_campaign(
+    *,
+    backend: str,
+    repo_root: Path,
+    out_dir: Path,
+    counts: tuple[int, ...],
+    matched_input: Path,
+    evaluator: Path,
+    iterations: int,
+    repeats: int,
+    python_executable: str,
+    source_commit: str,
+    sustained: bool,
+    timeout_seconds: float,
+    admission_base: Path,
+) -> list[dict[str, object]]:
+    """Run one fixed-work CPU or GPU ladder serially on the current host."""
+
+    if backend not in {"cpu", "gpu"}:
+        raise ValueError(f"Unsupported campaign backend: {backend}")
+    available_gpus = []
+    if backend == "gpu":
+        available_gpus = [
+            line.strip()
+            for line in subprocess.run(
+                ["nvidia-smi", "--query-gpu=index", "--format=csv,noheader"],
+                check=True, capture_output=True, text=True,
+            ).stdout.splitlines()
+            if line.strip()
+        ]
+    records = []
+    for count in counts:
+        environment: dict[str, object] = {"resource_environment_verified": False}
+        affinity: tuple[int, ...] = ()
+        monitor_path = None
+        visible = ""
+        if backend == "gpu":
+            if count > len(available_gpus):
+                raise ValueError(
+                    f"Requested {count} GPUs; host exposes {len(available_gpus)}"
+                )
+            visible = ",".join(available_gpus[-count:])
+        if sustained:
+            admission = admission_base.with_name(
+                f"{admission_base.stem}-{count}{admission_base.suffix}"
+            )
+            rung = (
+                _collect_cpu_admission(
+                    admission, num_devices=count, source_commit=source_commit
+                )
+                if backend == "cpu"
+                else _collect_gpu_admission(
+                    admission, visible_devices=visible,
+                    num_devices=count, source_commit=source_commit,
+                )
+            )
+            environment = _environment_record(admission, rung)
+            if backend == "cpu":
+                affinity = tuple(rung["affinity_cpus"])
+            monitor_path = out_dir / f"{backend}_{count}.monitor.jsonl"
+
+        output = out_dir / f"{backend}_{count}.json"
+        command = _matched_worker_command(
+            python_executable=python_executable,
+            num_devices=count,
+            iterations=iterations,
+            repeats=repeats,
+            output=str(output),
+            matched_input=str(matched_input),
+            evaluator=str(evaluator),
+            source_commit=source_commit,
+            minimum_warm_seconds=120.0 if sustained else 0.0,
+            platform_name=backend.upper(),
+        )
+        if affinity:
+            command = ["taskset", "--cpu-list", ",".join(map(str, affinity)), *command]
+        worker_environment = (
+            _forced_cpu_environment(count)
+            if backend == "cpu"
+            else os.environ | {
+                "CUDA_VISIBLE_DEVICES": visible,
+                "JAX_PLATFORMS": "cuda",
+                "JAX_ENABLE_X64": "true",
+                "XLA_PYTHON_CLIENT_PREALLOCATE": "false",
+            }
+        )
+        worker_environment["PYTHONPATH"] = str(repo_root)
+        monitoring = None
+        if monitor_path is None:
+            subprocess.run(
+                command,
+                check=True,
+                cwd=repo_root,
+                env=worker_environment,
+                timeout=timeout_seconds,
+            )
+        else:
+            monitor = (
+                _run_monitored_cpu_worker if backend == "cpu"
+                else _run_monitored_gpu_worker
+            )
+            options = dict(
+                cwd=repo_root, env=worker_environment, raw_path=monitor_path,
+                num_devices=count, timeout_seconds=timeout_seconds,
+            )
+            if backend == "cpu":
+                options["expected_affinity"] = affinity
+            else:
+                options["environment"] = environment["resource_environment"]
+            returncode, monitoring, timed_out = monitor(command, **options)
+            if timed_out:
+                raise subprocess.TimeoutExpired(command, timeout_seconds)
+            if returncode:
+                raise subprocess.CalledProcessError(returncode, command)
+        record = _finalize_record(output, environment, monitoring)
+        records.append(record)
+        if not record.get("validation_passed", False):
+            raise RuntimeError(f"Matched B2 {backend.upper()} gate failed: {output}")
+    rows = summarize_strong_scaling_records(records)["rows"]
+    if not all(row["physics_equivalent"] for row in rows):
+        raise RuntimeError(f"Matched B2 {backend.upper()} topology changed the solution")
+    return records
+
+
+def _campaign_main(argv: list[str]) -> int:
+    """Run the debug or monitored matched-B2 CPU/GPU campaign."""
+
+    parser = argparse.ArgumentParser(description="Run the matched-B2 scaling campaign.")
+    parser.add_argument("--output", type=Path, default=Path("artifacts/strong_scaling"))
+    parser.add_argument("--sustained", action="store_true")
+    parser.add_argument("--backend", choices=("cpu", "gpu", "both"), default="cpu")
+    parser.add_argument("--cpu-counts", default="1,2,4")
+    parser.add_argument("--gpu-counts", default="1,2")
+    parser.add_argument("--python", default=sys.executable)
+    args = parser.parse_args(argv)
+
+    repo_root = Path(__file__).resolve().parents[1]
+    args.output.mkdir(parents=True, exist_ok=True)
+    source_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    shape = (256, 67, 67) if args.sustained else (8, 7, 7)
+    iterations = {"cpu": 32 if args.sustained else 2,
+        "gpu": 96 if args.sustained else 2}
+    timeout = 1800.0 if args.sustained else 180.0
+
+    from scripts.run_freemhd_parity_suite import (
+        materialize_matched_b2_evaluator,
+        materialize_matched_b2_lmx_input,
+    )
+
+    evaluator = args.output / "matched_b2_evaluator.json"
+    materialize_matched_b2_evaluator(evaluator)
+    records: list[dict[str, object]] = []
+    selected = ("cpu", "gpu") if args.backend == "both" else (args.backend,)
+    for backend in selected:
+        matched_input = args.output / f"matched_b2_{backend}_input.json"
+        materialize_matched_b2_lmx_input(
+            matched_input, solver_shape=shape, executed_steps=iterations[backend]
+        )
+        records.extend(
+            _run_campaign(
+                backend=backend, repo_root=repo_root, out_dir=args.output,
+                counts=tuple(map(int, getattr(args, f"{backend}_counts").split(","))),
+                matched_input=matched_input,
+                evaluator=evaluator,
+                iterations=iterations[backend], repeats=4,
+                python_executable=args.python,
+                source_commit=source_commit,
+                sustained=args.sustained,
+                timeout_seconds=timeout,
+                admission_base=args.output / f"{backend}-admission.json",
+            )
+        )
+
+    diagnostics = summarize_strong_scaling_records(records)
+    table = write_strong_scaling_summary_table(
+        records, args.output / "strong_scaling_table.csv"
+    )
+    summary = {
+        "records": records,
+        "table": table.name,
+        "diagnostics": diagnostics,
+        "source_commit": source_commit,
+    }
+    (args.output / "strong_scaling_summary.json").write_text(
+        json.dumps(summary, indent=2) + "\n"
+    )
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Dispatch a single worker or the explicit ``--campaign`` launcher."""
+
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments[:1] == ["--campaign"]:
+        return _campaign_main(arguments[1:])
+    return _worker_main(arguments)
 
 
 if __name__ == "__main__":

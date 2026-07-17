@@ -98,7 +98,7 @@ These commands are intentionally not part of the portable gate:
 python scripts/run_freemhd_parity_suite.py --help
 python scripts/run_convergence_suite.py --help
 python scripts/run_convergence_suite.py --mode time --help
-python scripts/run_strong_scaling_worker.py --help
+python scripts/run_strong_scaling_worker.py --campaign --help
 ```
 
 Each lane must emit a compact JSON or CSV summary with input, source, dependency,

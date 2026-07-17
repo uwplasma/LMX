@@ -357,16 +357,18 @@ Authoritative records:
 
 ## Run a bounded benchmark
 
-The user-facing example works on any available JAX backend:
+The user-facing example is a short local CPU calibration with editable inputs:
 
 ```bash
-python examples/strong_scaling_demo.py --help
+python examples/strong_scaling_demo.py
 ```
 
-For controlled workers and machine-readable records:
+The fingerprinted operational script owns both single workers and the B2
+campaign:
 
 ```bash
 python scripts/run_strong_scaling_worker.py --help
+python scripts/run_strong_scaling_worker.py --campaign --help
 ```
 
 The matched-B2 worker keeps two updates as its fast debug/CI default. Such runs
@@ -379,28 +381,26 @@ paths must still finish identically. The sustained preset uses
 minimum, and an 1800-second worker ceiling:
 
 ```bash
-python examples/strong_scaling_demo.py --benchmark-kind matched_b2_smoke \
-  --sustained --remote-host office \
-  --source-commit "$(git rev-parse HEAD)" \
-  --remote-python /path/to/lmx-gpu-venv/bin/python
+python scripts/run_strong_scaling_worker.py --campaign --backend cpu --sustained
 ```
 
-Sustained mode rereads a checksummed 60-second admission JSON immediately before
-each worker. Top-level `backend`, `host`, and `source_commit` must match the
-requested run. The selected rung must match `num_devices`, be verified, and set
-`admission_ended_unix_seconds`; at launch it must satisfy
-`-5 <= now - admission_end <= 120` seconds. CPU `host` is `os.uname().nodename`;
-GPU `host` is the exact `--remote-host` value. CPU rungs also bind the exact
-2/4/8-entry affinity allocation and require at most 5% full-window utilization
-on every selected CPU. GPU rungs bind unique visible UUID/PCI pairs, zero
-compute contexts, no host process above 25% CPU, and at most 5% utilization.
-Missing, stale, or mismatched evidence stops before the multi-minute solve.
+Run the same fingerprinted campaign directly on the office host so admission,
+worker ownership, and continuous monitoring all observe the actual two-GPU
+machine. Synchronize the committed source first; do not time an uncommitted
+working tree:
 
-Sustained mode collects and atomically writes a new 60-second admission before
-every rung; the evidence options only override its output paths. Non-sustained
-smoke runs may instead read a supplied static record. `--python` selects the
-local CPU interpreter, while `--remote-python` selects and preflights the remote
-GPU interpreter.
+```bash
+git archive HEAD lmx scripts/run_strong_scaling_worker.py \
+  scripts/run_freemhd_parity_suite.py | \
+  ssh office 'rm -rf /tmp/lmx-scaling && mkdir -p /tmp/lmx-scaling && tar -x -C /tmp/lmx-scaling'
+ssh office 'cd /tmp/lmx-scaling && /path/to/lmx-gpu-venv/bin/python \
+  scripts/run_strong_scaling_worker.py --campaign --backend gpu --sustained'
+```
+
+Sustained mode collects and atomically writes a fresh 60-second admission before
+each rung. CPU rungs bind exact 2/4/8-entry affinity allocations; GPU rungs bind
+unique UUID/PCI pairs. Either lane rejects utilization above 5%, foreign work,
+swap activity, monitor gaps, or a contaminated 15-second postflight.
 
 The CPU lane still runs inside a Linux Docker allocation exposing eight CPUs;
 the example applies nested `taskset` masks that provide
@@ -422,23 +422,14 @@ swapout, unstable samples, and one sub-120-second sample. The subsequent
 unchanged 32-update ladder passes every promotion gate. This manual lane stays
 outside portable tests.
 
-The solver-faithful example requires a validated restart matching each timed
-grid; it fails before launching workers when one is missing:
+The low-level worker retains the solver-faithful restart benchmark:
 
 ```bash
-python examples/strong_scaling_demo.py --benchmark-kind extruded_solve \
-  --cpu-restart artifacts/restarts/b2_cpu.npz
+python scripts/run_strong_scaling_worker.py --benchmark-kind extruded_solve \
+  --num-devices 1 --restart artifacts/restarts/b2_cpu.npz --output worker.json
 ```
 
-Use `--gpu-restart` as well when `--remote-host` is set. Cold-start convergence
-belongs outside the timed strong-scaling region.
-
-Select a backend before importing JAX:
-
-```bash
-JAX_PLATFORMS=cpu python examples/strong_scaling_demo.py
-JAX_PLATFORMS=cuda CUDA_VISIBLE_DEVICES=0,1 python examples/strong_scaling_demo.py
-```
+Cold-start convergence belongs outside the timed strong-scaling region.
 
 Production B2 runs accept `num_devices=N`. LMX partitions the axial dimension
 with named JAX sharding, validates the global shard count, and compares velocity,
