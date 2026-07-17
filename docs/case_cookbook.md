@@ -51,6 +51,8 @@ python examples/fringing_benchmark_demo.py --help
 These workflows are research-stage. Begin with the rectangular case, then add
 layers, mapped geometry, or tabulated fields one change at a time.
 
+## Blanket research workflow
+
 <p align="center">
   <img src="_static/readme-blanket-flow.webp" alt="Seven-second reduced blanket-flow research workflow" width="62%">
 </p>

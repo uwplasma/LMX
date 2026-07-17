@@ -75,3 +75,8 @@ belong in `examples/cases/`.
 Shercliff and Hunt cases provide the stable wall-current verification surface.
 More complex Li/AlN and blanket stacks remain research workflows until their
 material data and external reference are frozen.
+
+![Research-stage Li/AlN multilayer convergence](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-li-aln-multilayer-convergence.webp)
+
+At `Ha = 220`, the current Li/AlN ladder changes pressure and current by less
+than 10% per mesh step. It is mesh-step evidence, not experimental validation.

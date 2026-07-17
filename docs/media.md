@@ -39,7 +39,7 @@ serve one claim family.
 
 ## Tracked web set
 
-Twenty files in `docs/_static/` total 1,256,574 bytes. The `showcase` section of
+Twenty files in `docs/_static/` total 1,273,604 bytes. The `showcase` section of
 [`release-assets.json`](release-assets.json) records every byte count and
 SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 
@@ -78,11 +78,12 @@ Hunt/Shercliff comparison likewise samples 35 paired physical frames at 5 fps;
 its frozen 200-step inputs and source hashes are recorded above. Full-quality
 MP4s and source GIFs remain in the release or ignored artifacts.
 
-## Release-hosted README set
+## Release-source provenance
 
-The README embeds every plot and motion derivative directly. Release URLs are
-retained only for full-quality source inspection; the standalone documentation
-does not depend on release authentication.
+The README embeds tracked WebP derivatives with repository-relative paths so
+private checkouts and forks render them without unauthenticated raw URLs. The
+release retains full-quality sources, MP4 alternatives, and the release-only
+Li/AlN derivative.
 
 | Derivative | SHA-256 |
 |---|---|

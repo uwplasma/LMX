@@ -36,7 +36,7 @@ except Exception:  # pragma: no cover - SciPy should be present in shipped envir
     sparse = None
     sparse_spsolve = None
 
-from .cases import _ha_to_b, make_hunt_case, make_shercliff_case
+from .cases import _ha_to_b, make_shercliff_case
 from .core import Solution
 from .field_models import load_tabulated_field, sample_tabulated_field_volume
 from .mesh import (
@@ -4478,8 +4478,8 @@ def build_variable_field_layered_extruded_problem(
         base_bz=base_bz,
         perturbation=perturbation,
     )
-    case = make_hunt_case(
-        ha=1.0,
+    problem = build_layered_duct_extruded_problem(
+        ha_peak=1.0,
         width=width,
         height=height,
         ny=ny,
@@ -4488,39 +4488,22 @@ def build_variable_field_layered_extruded_problem(
         wall_thickness=wall_thickness,
         insulator_cells=insulator_cells,
         insulator_thickness=insulator_thickness,
+        length=length,
+        nx_stations=nx_stations,
+        entry_center=entry_center,
+        exit_center=exit_center,
+        transition_width=transition_width,
     )
     case = replace(
-        case,
+        problem.case,
         name=f"variable_field_layered_bz{int(base_bz)}",
-        geometry=replace(case.geometry, length=length, nx=nx_stations),
         magnetic_field=MagneticFieldSpec(kind="analytic", fn=field_fn),
-        time_stepper=replace(
-            case.time_stepper,
-            max_steps=min(case.time_stepper.max_steps, 80),
-            potential_iterations=min(case.time_stepper.potential_iterations, 80),
-            steady_tolerance=1.0e-6,
-        ),
-        solver=replace(
-            case.solver,
-            kind="extruded_inductionless",
-            coupling_iterations=min(case.solver.coupling_iterations, 8),
-            coupling_tolerance=1.0e-7,
-        ),
         notes=(
             "Layered extruded inductionless solve with analytic divergence-free "
             "cross-sectional magnetic field variation."
         ),
     )
-    profile = smooth_fringing_profile(
-        length=length,
-        nx=nx_stations,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-        peak_scale=1.0,
-        axis="z",
-    )
-    return ExtrudedInductionlessProblem(case=case, profile=profile)
+    return replace(problem, case=case)
 
 
 def build_variable_field_pipe_ogrid_extruded_problem(
@@ -4546,7 +4529,7 @@ def build_variable_field_pipe_ogrid_extruded_problem(
         core_fraction_y=core_fraction_y,
         core_fraction_z=core_fraction_z,
     )
-    case = build_pipe_ogrid_extruded_problem(
+    problem = build_pipe_ogrid_extruded_problem(
         ha_peak=1.0,
         radius=radius,
         nr=nr,
@@ -4556,22 +4539,13 @@ def build_variable_field_pipe_ogrid_extruded_problem(
         entry_center=entry_center,
         exit_center=exit_center,
         transition_width=transition_width,
-    ).case
+    )
     case = replace(
-        case,
+        problem.case,
         name=f"variable_field_pipe_bz{int(base_bz)}",
         magnetic_field=MagneticFieldSpec(kind="analytic", fn=field_fn),
     )
-    profile = smooth_fringing_profile(
-        length=length,
-        nx=nx_stations,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-        peak_scale=1.0,
-        axis="z",
-    )
-    return ExtrudedInductionlessProblem(case=case, profile=profile)
+    return replace(problem, case=case)
 
 
 def build_magnetic_obstacle_rect_extruded_problem(
@@ -4599,40 +4573,29 @@ def build_magnetic_obstacle_rect_extruded_problem(
         core_fraction_y=core_fraction_y,
         core_fraction_z=core_fraction_z,
     )
-    case = make_shercliff_case(ha=1.0, width=width, height=height, ny=ny, nz=nz)
+    problem = build_square_duct_extruded_problem(
+        ha_peak=1.0,
+        width=width,
+        height=height,
+        ny=ny,
+        nz=nz,
+        length=length,
+        nx_stations=nx_stations,
+        entry_center=entry_center,
+        exit_center=exit_center,
+        transition_width=transition_width,
+    )
     case = replace(
-        case,
+        problem.case,
         name=f"magnetic_obstacle_rect_bz{int(base_bz)}",
-        geometry=replace(case.geometry, length=length, nx=nx_stations),
         magnetic_field=MagneticFieldSpec(kind="analytic", fn=field_fn),
-        time_stepper=replace(
-            case.time_stepper,
-            max_steps=min(case.time_stepper.max_steps, 80),
-            potential_iterations=min(case.time_stepper.potential_iterations, 80),
-            steady_tolerance=1.0e-6,
-        ),
-        solver=replace(
-            case.solver,
-            kind="extruded_inductionless",
-            coupling_iterations=min(case.solver.coupling_iterations, 8),
-            coupling_tolerance=1.0e-7,
-        ),
         forcing=forcing,
         notes=(
             "Localized-field magnetic-obstacle baseline on the rectangular "
             "extruded inductionless solver lane."
         ),
     )
-    profile = smooth_fringing_profile(
-        length=length,
-        nx=nx_stations,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-        peak_scale=1.0,
-        axis="z",
-    )
-    return ExtrudedInductionlessProblem(case=case, profile=profile)
+    return replace(problem, case=case)
 
 
 def build_wham_mirror_pipe_extruded_problem(

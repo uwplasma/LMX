@@ -16,7 +16,7 @@ obstacles, Q2D turbulence, blanket models, and extruded flows.
 [Validation](https://lmx.readthedocs.io/en/latest/benchmark_matrix.html) ·
 [Roadmap](https://github.com/uwplasma/LMX/blob/main/plan.md)
 
-![Duct-flow profiles](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/analytic_velocity_profiles.webp)
+![Duct-flow profiles](docs/_static/analytic_velocity_profiles.webp)
 
 ## Install and run
 
@@ -70,12 +70,12 @@ Sources: [FreeMHD paper](https://doi.org/10.1063/5.0230242),
 Eight frozen high-Hartmann rows pass; audited closed-channel FreeMHD
 observables pass the 1% finite-grid gate.
 
-![Samper Benchmark A validation](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/samper_benchmark_a.webp)
+![Samper Benchmark A validation](docs/_static/samper_benchmark_a.webp)
 
-![Analytical duct and FreeMHD parity](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/freemhd_closed_channel_observable_parity.webp)
+![Analytical duct and FreeMHD parity](docs/_static/freemhd_closed_channel_observable_parity.webp)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-hunt-startup.webp" alt="Hunt/Shercliff startup movie" width="82%">
+  <img src="docs/_static/readme-hunt-startup.webp" alt="Hunt/Shercliff startup movie" width="82%">
 </p>
 
 [Validation evidence →](https://lmx.readthedocs.io/en/latest/validation_report.html)
@@ -83,11 +83,11 @@ observables pass the 1% finite-grid gate.
 ## Real geometries and nonuniform fields
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-geometries.webp" alt="LMX geometries" width="48%">
-  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-variable-field.webp" alt="Field response and conservation" width="48%">
+  <img src="docs/_static/readme-geometries.webp" alt="LMX geometries" width="48%">
+  <img src="docs/_static/readme-variable-field.webp" alt="Field response and conservation" width="48%">
 </p>
 
-![B2 fringe-field diagnostics](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-alex-b2-field-pressure.webp)
+![B2 fringe-field diagnostics](docs/_static/readme-alex-b2-field-pressure.webp)
 
 B2 passes exact restart and schema-6 topology gates (1/2/4 CPU; 1/2 GPU).
 Shared-norm acceleration fails; production parity/scaling promotion remain open.
@@ -95,7 +95,7 @@ Shared-norm acceleration fails; production parity/scaling promotion remain open.
 
 ## Follow curved pipes
 
-![Bent-pipe and Dean-vortex gates](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-curved-pipes.webp)
+![Bent-pipe and Dean-vortex gates](docs/_static/readme-curved-pipes.webp)
 
 Mapped pipes have a low-De inductionless baseline; Dean vortices await their
 literature gate. [Geometry status →](https://lmx.readthedocs.io/en/latest/geometry.html)
@@ -109,7 +109,7 @@ step; experiment/blanket validation remain open. [Wall models →](https://lmx.r
 
 ## Differentiate selected workflows
 
-![Sensitivity and inverse design](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-autodiff.webp)
+![Sensitivity and inverse design](docs/_static/readme-autodiff.webp)
 
 Promoted objectives pass finite-difference/independent-transpose checks.
 [Differentiable workflows →](https://lmx.readthedocs.io/en/latest/autodiff.html)
@@ -117,12 +117,12 @@ Promoted objectives pass finite-difference/independent-transpose checks.
 ## Explore research flows
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-magnetic-obstacle.webp" alt="Magnetic-obstacle response" width="48%">
-  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-blanket-flow.webp" alt="Blanket-flow movie" width="48%">
+  <img src="docs/_static/readme-magnetic-obstacle.webp" alt="Magnetic-obstacle response" width="48%">
+  <img src="docs/_static/readme-blanket-flow.webp" alt="Blanket-flow movie" width="48%">
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/readme-q2d-turbulence.webp" alt="Q2D turbulence movie" width="58%">
+  <img src="docs/_static/readme-q2d-turbulence.webp" alt="Q2D turbulence movie" width="58%">
 </p>
 
 Implemented workflows; quantitative turbulent Q2D-MHDfoam parity and blanket
@@ -132,7 +132,7 @@ validation remain open.
 
 ## Scale on CPUs and GPUs
 
-![Multi-minute strong scaling](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/strong_scaling.webp)
+![Multi-minute strong scaling](docs/_static/strong_scaling.webp)
 
 Fixed `256 × 67 × 67` results: CPU (32 updates, three warm/rung) takes
 246.691/172.410/147.465 s, reaching **1.431×/1.673×** on 2/4 JAX devices; this is

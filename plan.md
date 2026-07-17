@@ -127,12 +127,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,310 | stay below 34,311 | 35,100 |
+| package lines | 34,273 | stay below 34,274 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
 | test files / lines | 30 / 21,087 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,601,136 bytes | stay below 4,601,137 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,599,696 bytes | stay below 4,599,697 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -147,6 +147,9 @@ energy-budget, or artifact assertion.
 Five Q2D builder wrappers are now compatibility aliases to their documented
 frozen dataclass owners, deleting another 126 package lines while preserving
 every current keyword call, default, result type, solver, plot, and movie path.
+Variable-field layered, pipe, and magnetic-obstacle builders now retain their
+canonical base problems and replace only their actual field/name differences,
+deleting 37 more production lines with exact nondefault dataclass equivalence.
 The remaining result records, 13 scripts, and distinct Python/TOML examples
 retain current provenance, CI, or runnable-workflow ownership; do not merge
 them unless the replacement deletes code without weakening those contracts.
@@ -189,9 +192,9 @@ the layered-flow consolidation removes 17 test lines and one redundant
 Shared figure-pair assertions subsequently remove another 20 test lines while
 preserving all five ordered output and existence contracts; focused Q2D and
 repository gates pass.
-The native S3 archive workflow adds one 19-line API/CLI mutation test, leaving
-the combined test tranche one line below its 21,005-line starting point.
-The next test change remains a net deletion.
+The safety-reviewed native S3 harness raised the suite to 21,099 lines without
+a new test file; consolidating optional-field skip ownership recovered 12 lines.
+The next test change remains a net deletion from the current 21,087-line suite.
 
 ### Canonical sharding and performance
 
