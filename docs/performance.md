@@ -222,6 +222,12 @@ to a sustained run. The next candidate must remove remaining setup gathers or
 change axial operator/partition ownership, rather than rearranging the same
 halo pair again.
 
+A two-compact-gather draft stops before timing. Although it compiles and passes
+a real four-shard functional solve, it adds 344 net solver lines by duplicating
+five stencil owners. LMX rejects that maintenance cost. The topology can return
+only after the existing gradient, limiter, stress, diffusion, and convection
+primitives share precomputed axial neighbors in a concise refactor.
+
 Superseded pilots and rejected ladders remain auditable in
 `benchmarks/results/b2-schema6-cpu-scaling-20260716.json`.
 

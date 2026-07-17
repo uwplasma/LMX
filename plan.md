@@ -370,6 +370,15 @@ remove the two remaining setup full-vector gathers and scalar setup gathers, or
 change axial operator/partition ownership; further rearrangement of the same
 two directional halos is closed.
 
+A proposed two-compact-gather successor is rejected before timing on the source
+slimming gate. It compiles and passes a real four-shard `8 x 4 x 3` momentum
+solve at `1.18e-11`, but adds 344 net solver lines by duplicating limited
+gradients, weights, stress, diffusion, and convection. Do not compress or keep a
+second algebra path for speed. First refactor the existing stencil primitives
+to accept precomputed axial neighbors and compact face ownership, with a net
+source reduction or at most 100 candidate lines; only then reconsider this HLO
+topology under the unchanged numerical and performance gates.
+
 Keep the GPU diagnosis separate. Its existing trace spends only about 9% of
 device-active time in collectives and about 75% in transverse SOLVAX line work,
 so GPU promotion should optimize or fuse compute kernels while preserving exact

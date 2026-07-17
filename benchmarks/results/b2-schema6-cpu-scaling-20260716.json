@@ -402,6 +402,23 @@
     "classification": "controlled Docker diagnostic; full-volume momentum gathers and greater than 20% collective occupancy require a sharding-aware momentum fix before another sustained ladder"
   },
   "post_profile_decisions": {
+    "compact_setup_halo_draft": {
+      "devices": 4,
+      "functional_shape": [8, 4, 3],
+      "momentum_residual": 1.18e-11,
+      "four_real_shards": true,
+      "full_performance_ab_run": false,
+      "source_diff": {"insertions": 344, "deletions": 25},
+      "maintainability_gate_maximum_net_source_lines": 100,
+      "duplicated_owners": [
+        "limited gradient",
+        "limiter weights",
+        "deviatoric stress",
+        "diffusion",
+        "convection"
+      ],
+      "decision": "reject and revert before timing; first refactor existing stencil primitives to accept precomputed axial neighbors and compact face ownership"
+    },
     "fused_reusable_momentum_halos": {
       "shape": [128, 35, 35],
       "updates": 2,
