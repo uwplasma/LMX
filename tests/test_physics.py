@@ -28,7 +28,10 @@ from lmx.physics import (
     build_material_fields,
     magnetic_field_components,
 )
-from lmx.reference_data import default_closed_channel_reference_root
+from lmx.reference_data import (
+    default_closed_channel_reference_root,
+    load_closed_channel_analytical,
+)
 from lmx.specs import (
     BoundaryCondition,
     CaseSpec,
@@ -37,7 +40,6 @@ from lmx.specs import (
     RegionSpec,
     TimeStepperConfig,
 )
-from lmx.showcase import solve_closed_channel_benchmark
 from lmx.solvers import _build_mesh, solve_steady, solve_transient
 import lmx.solvers as solvers
 from lmx.validation import (
@@ -382,9 +384,8 @@ def test_moderate_ha_rect_duct_mesh_has_strictly_positive_face_spacing():
 @pytest.mark.validation
 @pytest.mark.external
 def test_small_hunt_solution_matches_bundled_reference_profiles():
-    _closed_channel_root_or_skip()
-    _, solution, comparison = solve_closed_channel_benchmark(
-        "hunt",
+    reference_root = _closed_channel_root_or_skip()
+    case = make_hunt_case(
         ha=20.0,
         width=0.2,
         height=0.2,
@@ -397,12 +398,46 @@ def test_small_hunt_solution_matches_bundled_reference_profiles():
         insulating_wall_conductivity=1.0e-12,
         density=1.0,
         viscosity=1.0,
-        coupling_iterations=10,
-        potential_iterations=80,
-        max_steps=60,
-        velocity_update_limit=5.0e-4,
-        current_reconstruction="face_averaged",
-        potential_tolerance=1.0e-8,
+    )
+    case = replace(
+        case,
+        solver=replace(
+            case.solver,
+            coupling_iterations=10,
+            coupling_tolerance=1.0e-9,
+        ),
+        time_stepper=replace(
+            case.time_stepper,
+            max_steps=60,
+            potential_iterations=80,
+            potential_tolerance=1.0e-8,
+            steady_tolerance=1.0e-9,
+            steady_potential_tolerance=1.0e-8,
+            potential_relaxation=1.0,
+            current_reconstruction="face_averaged",
+            velocity_update_limit=5.0e-4,
+        ),
+    )
+    mesh = _build_mesh(case)
+    reference = load_closed_channel_analytical("hunt", 20, reference_root)
+    y_profile = np.interp(mesh.y_centers, reference.coordinate, reference.midplane_y)
+    z_profile = np.interp(mesh.z_centers, reference.coordinate, reference.midplane_z)
+    velocity = np.outer(y_profile, z_profile)
+    velocity /= max(float(np.max(np.abs(velocity))), 1.0e-12)
+    velocity = np.where(np.asarray(mesh.fluid_mask), velocity, 0.0)
+    zeros = jnp.zeros_like(velocity)
+    initial_state = MHDState(
+        u=jnp.asarray(velocity),
+        phi=zeros,
+        jy=zeros,
+        jz=zeros,
+        lorentz_x=zeros,
+        time=0.0,
+        residual=0.0,
+    )
+    solution = solve_steady(case, mesh=mesh, initial_state=initial_state)
+    comparison = closed_channel_validation(
+        solution, "hunt", 20, reference_root=reference_root
     )
     assert solution.diagnostics.potential_residual_history.size > 0
     # This routine gate stays intentionally small; the publication validation

@@ -8,7 +8,9 @@ from pathlib import Path
 import jax.numpy as jnp
 import numpy as np
 
+from lmx.core import MHDState
 from lmx.freemhd import load_benchmark_a_spec
+from lmx.mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
 from lmx.reference_data import (
     default_closed_channel_reference_root,
     extract_processed_profile,
@@ -16,9 +18,17 @@ from lmx.reference_data import (
     load_processed_slice,
     processed_slice_area_mean,
 )
-from lmx.showcase import solve_closed_channel_benchmark
 from lmx.plotting import write_freemhd_observable_parity_plots
-from lmx.solvers import fully_developed_power_balance
+from lmx.solvers import fully_developed_power_balance, solve_steady
+from lmx.specs import (
+    BoundaryCondition,
+    CaseSpec,
+    GeometrySpec,
+    MagneticFieldSpec,
+    RegionSpec,
+    SolverConfig,
+    TimeStepperConfig,
+)
 from lmx.validation import (
     compare_profiles_with_shared_scale,
     duct_layer_resolution_gate,
@@ -295,16 +305,9 @@ def _observable_record(
     case_kind: str,
     *,
     reference_root: Path | None = None,
-    drive_mode: str = DRIVE_MODE,
-    initial_profile: str = INITIAL_PROFILE,
-    flow_rate_target_mean_velocity: float | None = FLOW_RATE_TARGET_MEAN_VELOCITY,
-    case_settings: dict[str, dict[str, object]] | None = None,
-    linear_solver: str = "auto",
 ) -> dict[str, object]:
     reference_root = REFERENCE_ROOT if reference_root is None else Path(reference_root)
-    if case_settings is None:
-        case_settings = CASE_SETTINGS
-    settings = case_settings[case_kind]
+    settings = CASE_SETTINGS[case_kind]
     spec = load_benchmark_a_spec(case_kind)
     geometry = spec["geometry"]
     fluid = spec["fluid"]
@@ -318,36 +321,172 @@ def _observable_record(
         case_kind, ha, x_slice=X_SLICE, reference_root=reference_root
     )
     target_mean_velocity = (
-        float(flow_rate_target_mean_velocity)
-        if flow_rate_target_mean_velocity is not None
+        float(FLOW_RATE_TARGET_MEAN_VELOCITY)
+        if FLOW_RATE_TARGET_MEAN_VELOCITY is not None
         else float(drive["reference_mean_velocity"])
     )
-    case, solution, _comparison = solve_closed_channel_benchmark(
-        case_kind,
-        ha=ha,
-        width=width,
-        height=height,
-        ny=settings["ny"],
-        nz=settings["nz"],
-        wall_cells=int(geometry["wall_cells"]),
-        wall_thickness=float(geometry["wall_thickness"]),
-        fluid_conductivity=float(fluid["conductivity"]),
-        density=float(fluid["density"]),
-        viscosity=float(fluid["kinematic_viscosity"]),
-        conducting_wall_conductivity=float(wall["conducting_wall_conductivity"]),
-        insulating_wall_conductivity=float(wall["insulating_wall_conductivity"]),
-        max_steps=settings["max_steps"],
-        coupling_iterations=settings.get("coupling_iterations", 16),
-        potential_iterations=settings.get("potential_iterations", 160),
-        potential_tolerance=settings.get("potential_tolerance", 1.0e-9),
-        drive_mode=drive_mode,
-        target_mean_velocity=target_mean_velocity,
-        initial_profile=initial_profile,
+    ny, nz = int(settings["ny"]), int(settings["nz"])
+    wall_cells = int(geometry["wall_cells"])
+    wall_thickness = float(geometry["wall_thickness"])
+    field_vector = tuple(float(value) for value in field["vector"])
+    conductivity = float(fluid["conductivity"])
+    density = float(fluid["density"])
+    viscosity = float(fluid["kinematic_viscosity"])
+    potential_iterations = int(settings.get("potential_iterations", 160))
+    potential_tolerance = float(settings.get("potential_tolerance", 1.0e-9))
+    regions = [
+        RegionSpec("fluid", "fluid", conductivity, density, viscosity)
+    ]
+    boundaries = [BoundaryCondition("walls", "no_slip")]
+    if case_kind == "shercliff":
+        case_geometry = GeometrySpec(
+            kind="rect_duct",
+            width=width,
+            height=height,
+            ny=ny,
+            nz=nz,
+            target_ha=ha,
+        )
+        boundaries.append(BoundaryCondition("electric", "insulating"))
+        mesh = generate_rect_duct_mesh(
+            width=width,
+            height=height,
+            ny=ny,
+            nz=nz,
+            target_ha=ha,
+            magnetic_axis="y",
+        )
+        dt, final_time, outer_iterations, relaxation = 0.001, 1.5, 2, 0.1
+    elif case_kind == "hunt":
+        wall_cells_by_side = (wall_cells,) * 4
+        wall_thickness_by_side = (wall_thickness,) * 4
+        case_geometry = GeometrySpec(
+            kind="layered_duct",
+            width=width,
+            height=height,
+            ny=ny,
+            nz=nz,
+            wall_thickness=wall_thickness_by_side,
+            wall_cells=wall_cells_by_side,
+            target_ha=ha,
+        )
+        regions.extend(
+            (
+                RegionSpec(
+                    "conducting_wall",
+                    "solid",
+                    float(wall["conducting_wall_conductivity"]),
+                    density,
+                    viscosity,
+                    wall_thickness,
+                ),
+                RegionSpec(
+                    "insulating_wall",
+                    "solid",
+                    float(wall["insulating_wall_conductivity"]),
+                    density,
+                    viscosity,
+                    wall_thickness,
+                ),
+            )
+        )
+        boundaries.extend(
+            (
+                BoundaryCondition(
+                    "conducting_hartmann_walls",
+                    "conducting_wall",
+                    region="conducting_wall",
+                    side="left_right",
+                ),
+                BoundaryCondition(
+                    "insulating_side_walls",
+                    "insulating",
+                    region="insulating_wall",
+                    side="top_bottom",
+                ),
+            )
+        )
+        mesh = generate_layered_duct_mesh(
+            width=width,
+            height=height,
+            ny=ny,
+            nz=nz,
+            wall_thickness=wall_thickness_by_side,
+            wall_cells=wall_cells_by_side,
+            target_ha=ha,
+            magnetic_axis="y",
+        )
+        dt, final_time, outer_iterations, relaxation = 0.002, 1.0, 6, 0.08
+    else:
+        raise ValueError(f"Unsupported case kind {case_kind!r}")
+
+    time_stepper = TimeStepperConfig(
+        dt=dt,
+        t_final=final_time,
+        max_steps=int(settings["max_steps"]),
+        outer_iterations=outer_iterations,
+        potential_iterations=potential_iterations,
+        potential_tolerance=potential_tolerance,
         current_reconstruction=settings["current_reconstruction"],
-        velocity_update_limit=settings["velocity_update_limit"],
-        linear_solver=linear_solver,
-        reference_root=reference_root,
+        steady_tolerance=1.0e-9,
+        steady_potential_tolerance=potential_tolerance,
+        relaxation=relaxation,
+        velocity_update_limit=float(settings["velocity_update_limit"]),
     )
+
+    boundaries.append(
+        BoundaryCondition(
+            "inlet",
+            "inlet_flow_rate",
+            value=target_mean_velocity * width * height,
+            axis="x",
+        )
+    )
+
+    case = CaseSpec(
+        name=f"{case_kind}_ha{ha}",
+        geometry=case_geometry,
+        regions=tuple(regions),
+        magnetic_field=MagneticFieldSpec(kind="constant", value=field_vector),
+        boundary_conditions=tuple(boundaries),
+        time_stepper=time_stepper,
+        solver=SolverConfig(
+            coupling_iterations=int(settings.get("coupling_iterations", 16)),
+            coupling_tolerance=1.0e-9,
+        ),
+        forcing=0.0,
+        initial_velocity=target_mean_velocity,
+        reference_phi_cell=(mesh.ny // 2, mesh.nz // 2),
+    )
+
+    analytical = load_closed_channel_analytical(case_kind, ha, reference_root)
+    reference_coordinate = np.asarray(analytical.coordinate, dtype=float)
+    y_profile = np.interp(
+        np.asarray(mesh.y_centers, dtype=float),
+        reference_coordinate,
+        np.asarray(analytical.midplane_y, dtype=float),
+    )
+    z_profile = np.interp(
+        np.asarray(mesh.z_centers, dtype=float),
+        reference_coordinate,
+        np.asarray(analytical.midplane_z, dtype=float),
+    )
+    velocity = np.outer(y_profile, z_profile)
+    velocity /= max(float(np.max(np.abs(velocity))), 1.0e-12)
+    if mesh.fluid_mask is not None:
+        velocity = np.where(np.asarray(mesh.fluid_mask, dtype=bool), velocity, 0.0)
+    zeros = np.zeros_like(velocity)
+    initial_state = MHDState(
+        u=jnp.asarray(velocity, dtype=float),
+        phi=jnp.asarray(zeros, dtype=float),
+        jy=jnp.asarray(zeros, dtype=float),
+        jz=jnp.asarray(zeros, dtype=float),
+        lorentz_x=jnp.asarray(zeros, dtype=float),
+        time=0.0,
+        residual=0.0,
+    )
+
+    solution = solve_steady(case, mesh=mesh, initial_state=initial_state)
     magnetic_field = max(abs(float(value)) for value in field["vector"])
     length_scale = float(geometry["length_scale"])
     velocity_scale = float(drive["reference_mean_velocity"])
@@ -503,14 +642,14 @@ def _observable_record(
         "case_kind": case_kind,
         "ha": ha,
         "x_slice": X_SLICE,
-        "initial_profile": initial_profile,
-        "drive_mode": drive_mode,
+        "initial_profile": INITIAL_PROFILE,
+        "drive_mode": DRIVE_MODE,
         "target_mean_velocity": target_mean_velocity
-        if drive_mode == "flow_rate"
+        if DRIVE_MODE == "flow_rate"
         else None,
         "target_mean_velocity_source": (
             "matched_benchmark_spec"
-            if drive_mode == "flow_rate" and flow_rate_target_mean_velocity is None
+            if DRIVE_MODE == "flow_rate" and FLOW_RATE_TARGET_MEAN_VELOCITY is None
             else "configured"
         ),
         "settings": {
