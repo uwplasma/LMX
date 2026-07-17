@@ -1,7 +1,7 @@
 {
-  "schema_version": 30,
+  "schema_version": 31,
   "date": "2026-07-16",
-  "commit": "6b4cd53fd58db09d704beeae3a33cf877053d169",
+  "commit": "93282c40d5af77358db8c620458fc01c76387d32",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -20,54 +20,62 @@
   },
   "result": {
     "test_files": 30,
-    "test_lines": 21065,
+    "test_lines": 21021,
     "passed": 866,
     "skipped": 8,
-    "pytest_seconds": 135.009,
-    "gate_seconds": 135.4,
-    "covered_lines": 14006,
-    "total_lines": 14412,
+    "pytest_seconds": 123.874,
+    "gate_seconds": 124.2,
+    "covered_lines": 14007,
+    "total_lines": 14413,
     "covered_branches": 2553,
     "total_branches": 2946,
-    "combined_line_branch_coverage_percent": 95.39693513077543,
+    "combined_line_branch_coverage_percent": 95.39720029955643,
     "passed_gate": true
   },
   "artifacts": {
-    "coverage_xml_sha256": "e3cd0de4fc86d5422fb142121cb9bf781583e7dd9f2a0a83a46b1438232fbbe0",
-    "junit_xml_sha256": "fdda4c5d18a6d526a4d79e779dffec55394e8fd0e3f60ff7f23d34674bb9f5bb"
+    "coverage_xml_sha256": "7df68a61e96c6cc8fb2252ebb988a662a2cba1ce8fb453703c71b1a29e7917de",
+    "junit_xml_sha256": "5ea32e3d47b24937e77ab3d4a9d22c7425f005b847759fce44f0f7677f72a861"
   },
   "duration_note": "Durations come from the current six-worker JUnit record; concurrent-node times identify CI pressure but are not isolated timings.",
   "slowest_tests": [
-    {"seconds": 41.750, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
-    {"seconds": 24.671, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
-    {"seconds": 17.278, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
-    {"seconds": 17.164, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"},
-    {"seconds": 17.086, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
-    {"seconds": 16.987, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow"},
-    {"seconds": 15.535, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"},
-    {"seconds": 14.757, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
-    {"seconds": 12.944, "nodeid": "tests.test_example_runner::test_variable_field_extruded_demo_writes_summary"},
-    {"seconds": 11.876, "nodeid": "tests.test_fringing::test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradient"}
+    {"seconds": 40.670, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
+    {"seconds": 23.591, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
+    {"seconds": 16.941, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow"},
+    {"seconds": 16.935, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"},
+    {"seconds": 16.717, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
+    {"seconds": 16.616, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
+    {"seconds": 14.348, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"},
+    {"seconds": 14.137, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
+    {"seconds": 13.758, "nodeid": "tests.test_autodiff::test_extruded_rect_projection_field_inverse_design_reduces_loss"},
+    {"seconds": 13.250, "nodeid": "tests.test_example_runner::test_variable_field_extruded_demo_writes_summary"}
   ],
   "comparison": {
-    "previous_gate_seconds": 189.0,
-    "previous_pytest_seconds": 188.66,
-    "wall_time_change_percent": -28.359788359788354,
-    "pytest_seconds_change_percent": -28.437930668928235,
-    "budget_fraction": 0.22566666666666665,
-    "engineering_target_fraction": 0.4513333333333333,
+    "previous_gate_seconds": 135.4,
+    "previous_pytest_seconds": 135.009,
+    "wall_time_change_percent": -8.271787296898081,
+    "pytest_seconds_change_percent": -8.247598308260926,
+    "budget_fraction": 0.207,
+    "engineering_target_fraction": 0.414,
     "removed_obsolete_node_seconds": 64.658,
     "b2_checkpoint_reuse": {"updates_before": 10, "updates_after": 7, "node_seconds_before": 67.516, "node_seconds_after": 56.729},
     "autodiff_value_and_grad": {
       "redundant_primal_evaluations_removed": 38,
       "tracked_nodes_before_seconds": 65.841,
-      "tracked_nodes_after_seconds": 45.739,
-      "tracked_nodes_reduction_fraction": 0.30531128020534315,
-      "response_inverse_seconds": {"before": 28.970, "after": 17.086},
-      "nonrect_target_seconds": {"before": 19.874, "after": 17.278},
-      "field_inverse_seconds": {"before": 16.997, "after": 11.375}
+      "tracked_nodes_after_seconds": 47.091,
+      "tracked_nodes_reduction_fraction": 0.2847769626828267,
+      "response_inverse_seconds": {"before": 28.970, "after": 16.616},
+      "nonrect_target_seconds": {"before": 19.874, "after": 16.717},
+      "field_inverse_seconds": {"before": 16.997, "after": 13.758}
     },
-    "interpretation": "Fusing loss and gradient evaluation removes 38 redundant primal solves; three directly comparable affected nodes fell 30.5% in aggregate. The full gate fell 28.4%, though shared-host scheduling prevents attributing the entire change to one optimization."
+    "latest_slimming": {
+      "package_lines_before": 34545,
+      "package_lines_after": 34526,
+      "test_lines_before": 21065,
+      "test_lines_after": 21021,
+      "b1_updates_before": 4,
+      "b1_updates_after": 3
+    },
+    "interpretation": "The self-contained scaling admission contract and Q2D source slimming remain fully covered while shared fixtures and checkpoint reuse reduce test lines and B1 work. The gate fell another 8.3%; shared-host scheduling still makes small node-level changes approximate."
   },
   "scheduling_probe": {
     "source_commit": "f379f6bab2e25acd8c2785eebe1c88a10ed854a9",
@@ -80,12 +88,12 @@
     "decision": "retain six workers; the 3.4% change is below the promotion threshold, and module grouping would imbalance fringing and autodiff owners"
   },
   "architecture": {
-    "source_commit": "6b4cd53fd58db09d704beeae3a33cf877053d169",
+    "source_commit": "93282c40d5af77358db8c620458fc01c76387d32",
     "package_modules": 35,
-    "package_lines": 34545,
+    "package_lines": 34526,
     "maintained_core_lines": 7869,
     "maintenance_scripts": 13,
-    "tracked_checkout_bytes": 4546620,
+    "tracked_checkout_bytes": 4552263,
     "stable_root_exports": 30,
     "curated_examples": 11
   },

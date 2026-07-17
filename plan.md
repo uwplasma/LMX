@@ -122,12 +122,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,545 | stay below 34,546 | 35,100 |
+| package lines | 34,526 | stay below 34,527 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 21,065 | no new file; next test change must reduce lines | 31 / 21,100 |
+| test files / lines | 30 / 21,021 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,548,084 bytes | next tranche must reduce bytes without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,552,493 bytes | next tranche must reduce bytes without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -169,10 +169,10 @@ parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
 The current gate passes 866 tests with 8 expected skips and 95.40% combined
-coverage in 135.4 seconds. Fused loss/gradient evaluation removes 38 redundant
-primal solves, while shared validation serialization deletes 18 package lines.
-The admission and remote-runtime tests added for valid multi-minute ladders use
-the remaining test-line headroom; the next test change must be a net deletion.
+coverage in 124.2 seconds. Fused loss/gradient evaluation removes 38 redundant
+primal solves; shared validation and Q2D serialization delete 37 package lines.
+Scaling-admission coverage is included while shared fixtures keep the suite four
+lines below its prior test-line ratchet; the next test change remains a net deletion.
 
 ### Canonical sharding and performance
 
