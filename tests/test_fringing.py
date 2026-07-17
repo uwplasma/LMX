@@ -74,7 +74,6 @@ from lmx.fringing import (
     smooth_fringing_profile,
     validate_bent_pipe_low_de_baseline,
     validate_extruded_inductionless_solution,
-    validate_magnetic_obstacle_benchmark,
     validate_magnetic_obstacle_baseline,
     validate_magnetic_obstacle_external_readiness,
     validate_magnetic_obstacle_literature_slice,
@@ -2401,55 +2400,7 @@ def test_magnetic_obstacle_baseline_reports_velocity_deficit():
     assert isinstance(validation["validation_pass"], bool)
 
 
-def test_magnetic_obstacle_benchmark_reports_normalized_response():
-    problem = build_magnetic_obstacle_rect_extruded_problem(
-        base_bz=60.0, nx_stations=9, ny=12, nz=12, forcing=2.0
-    )
-    problem = replace(
-        problem,
-        case=replace(
-            problem.case,
-            time_stepper=replace(
-                problem.case.time_stepper, max_steps=12, potential_iterations=24
-            ),
-            solver=replace(problem.case.solver, coupling_iterations=6),
-        ),
-    )
-    solution = solve_extruded_inductionless(problem)
-    reference_problem = replace(
-        problem,
-        profile=replace(
-            problem.profile, field_scale=jnp.zeros_like(problem.profile.field_scale)
-        ),
-    )
-    reference_solution = solve_extruded_inductionless(reference_problem)
-    validation = validate_magnetic_obstacle_benchmark(
-        solution, reference_solution, field_ny=41, field_nz=41
-    )
-
-    assert solution.bundle.geometry_kind == "rect_duct"
-    assert validation["current_proxy_peak"] > 0.0
-    assert validation["peak_pressure_excess"] >= 0.0
-    assert validation["peak_velocity_deficit_ratio"] >= 0.0
-    assert validation["integrated_velocity_deficit_ratio"] >= 0.0
-    assert validation["peak_centerline_deficit_ratio"] >= 0.0
-    assert validation["peak_centerline_station_deficit_ratio"] >= 0.0
-    assert validation["recovery_station"] >= float(solution.bundle.x[0])
-    assert validation["y_l2_distortion"] > 0.0
-    assert validation["z_l2_distortion"] > 0.0
-    assert validation["y_peak_cut_abs_error"] >= 0.0
-    assert validation["z_peak_cut_abs_error"] >= 0.0
-    assert validation["peak_crosscut_distortion"] == pytest.approx(
-        max(validation["y_l2_distortion"], validation["z_l2_distortion"])
-    )
-    assert validation["reference_kind"] == "matched_no_field_lmx"
-    assert validation["external_reference_available"] is False
-    assert validation["internal_response_pass"] == validation["benchmark_pass"]
-    assert validation["research_grade_validation_pass"] is False
-    assert isinstance(validation["benchmark_pass"], bool)
-
-
-def test_magnetic_obstacle_literature_slice_reports_recovery_metrics():
+def test_magnetic_obstacle_benchmark_and_literature_slice_report_response():
     problem = build_magnetic_obstacle_rect_extruded_problem(
         base_bz=60.0, nx_stations=9, ny=12, nz=12, forcing=2.0
     )
@@ -2478,6 +2429,27 @@ def test_magnetic_obstacle_literature_slice_reports_recovery_metrics():
     readiness = validate_magnetic_obstacle_external_readiness(
         solution, field_ny=41, field_nz=41
     )
+
+    assert solution.bundle.geometry_kind == "rect_duct"
+    assert validation["current_proxy_peak"] > 0.0
+    assert validation["peak_pressure_excess"] >= 0.0
+    assert validation["peak_velocity_deficit_ratio"] >= 0.0
+    assert validation["integrated_velocity_deficit_ratio"] >= 0.0
+    assert validation["peak_centerline_deficit_ratio"] >= 0.0
+    assert validation["peak_centerline_station_deficit_ratio"] >= 0.0
+    assert validation["recovery_station"] >= float(solution.bundle.x[0])
+    assert validation["y_l2_distortion"] > 0.0
+    assert validation["z_l2_distortion"] > 0.0
+    assert validation["y_peak_cut_abs_error"] >= 0.0
+    assert validation["z_peak_cut_abs_error"] >= 0.0
+    assert validation["peak_crosscut_distortion"] == pytest.approx(
+        max(validation["y_l2_distortion"], validation["z_l2_distortion"])
+    )
+    assert validation["reference_kind"] == "matched_no_field_lmx"
+    assert validation["external_reference_available"] is False
+    assert validation["internal_response_pass"] == validation["benchmark_pass"]
+    assert validation["research_grade_validation_pass"] is False
+    assert isinstance(validation["benchmark_pass"], bool)
 
     assert validation["peak_station"] >= float(solution.bundle.x[0])
     assert validation["recovery_distance"] >= 0.0

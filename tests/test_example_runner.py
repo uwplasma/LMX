@@ -330,14 +330,14 @@ def test_extruded_restart_demo_is_state_exact(tmp_path: Path):
 
 
 def test_freemhd_closed_channel_observable_parity_writes_summary(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ):
     module = _load_example_module("freemhd_closed_channel_observable_parity.py")
     module.OUTPUT_DIR = tmp_path
     monkeypatch.setattr(
         module,
         "_observable_record",
-        lambda case_kind: {
+        lambda case_kind, **_kwargs: {
             "case_kind": case_kind,
             "observables": {
                 name: {
@@ -385,6 +385,15 @@ def test_freemhd_closed_channel_observable_parity_writes_summary(
     assert summary["observable_gate"]["missing_observable_count"] == 1
     assert summary["observable_gate"]["research_grade_validation_pass"] is False
     assert (tmp_path / "freemhd_closed_channel_observable_parity_summary.json").exists()
+    cli_output = tmp_path / "cli"
+    assert module.main([
+        "--reference-root", str(tmp_path / "references"),
+        "--output", str(cli_output),
+    ]) == 0
+    assert (cli_output / "freemhd_closed_channel_observable_parity_summary.json").is_file()
+    with pytest.raises(SystemExit, match="0"):
+        module.main(["--help"])
+    assert "--reference-root" in capsys.readouterr().out
 
 
 def test_freemhd_continuum_velocity_audit_keeps_shared_scale_and_endpoint_disclosure(

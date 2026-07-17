@@ -4789,62 +4789,35 @@ def build_bent_pipe_extruded_problem(
     viscosity: float = 1.0,
 ) -> ExtrudedInductionlessProblem:
     arc_length = float(bend_radius * bend_angle)
-    bmag = _ha_to_b(ha_peak, radius, conductivity, density, viscosity)
-    case = CaseSpec(
+    problem = build_pipe_ogrid_extruded_problem(
+        ha_peak=ha_peak,
+        radius=radius,
+        nr=nr,
+        ntheta=ntheta,
+        length=arc_length,
+        nx_stations=nx_stations,
+        entry_center=entry_center_fraction * arc_length,
+        exit_center=exit_center_fraction * arc_length,
+        transition_width=transition_width_fraction * arc_length,
+        conductivity=conductivity,
+        density=density,
+        viscosity=viscosity,
+    )
+    case = replace(
+        problem.case,
         name=f"bent_pipe_fringing_ha{int(ha_peak)}",
-        geometry=GeometrySpec(
+        geometry=replace(
+            problem.case.geometry,
             kind="bent_pipe",
-            width=2.0 * radius,
-            height=2.0 * radius,
-            radius=radius,
             bend_radius=bend_radius,
             bend_angle=bend_angle,
-            length=arc_length,
-            nx=nx_stations,
-            nr=nr,
-            ntheta=ntheta,
         ),
-        regions=(RegionSpec("fluid", "fluid", conductivity, density, viscosity),),
-        magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, 0.0, bmag)),
-        boundary_conditions=(
-            BoundaryCondition("wall", "no_slip"),
-            BoundaryCondition("electric", "insulating"),
-        ),
-        time_stepper=TimeStepperConfig(
-            dt=0.001,
-            t_final=1.0,
-            max_steps=80,
-            potential_iterations=80,
-            steady_tolerance=1.0e-6,
-        ),
-        solver=SolverConfig(
-            kind="extruded_inductionless",
-            mode="steady",
-            linear_solver="auto",
-            preconditioner="jacobi",
-            time_scheme="implicit_euler",
-            coupling_iterations=8,
-            coupling_tolerance=1.0e-7,
-        ),
-        output=OutputSpec(),
-        forcing=1.0,
-        reference_pressure_gradient=-1.0,
-        reference_phi_cell=(max(1, nr // 4), max(1, ntheta // 8)),
         notes=(
             "Curved-centerline inductionless baseline for low-De bent-pipe MHD. "
             "Secondary Dean vortices are not modeled in this lane."
         ),
     )
-    profile = smooth_fringing_profile(
-        length=arc_length,
-        nx=nx_stations,
-        entry_center=entry_center_fraction * arc_length,
-        exit_center=exit_center_fraction * arc_length,
-        transition_width=transition_width_fraction * arc_length,
-        peak_scale=1.0,
-        axis="z",
-    )
-    return ExtrudedInductionlessProblem(case=case, profile=profile)
+    return replace(problem, case=case)
 
 
 def build_variable_field_bent_pipe_extruded_problem(

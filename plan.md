@@ -127,12 +127,12 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,273 | stay below 34,274 | 35,100 |
+| package lines | 34,246 | stay below 34,247 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 21,094 | no new file; next test change must reduce lines | 31 / 21,100 |
+| test files / lines | 30 / 21,075 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,609,959 bytes | stay below 4,609,960 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,609,907 bytes | stay below 4,609,908 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -147,9 +147,9 @@ energy-budget, or artifact assertion.
 Five Q2D builder wrappers are now compatibility aliases to their documented
 frozen dataclass owners, deleting another 126 package lines while preserving
 every current keyword call, default, result type, solver, plot, and movie path.
-Variable-field layered, pipe, and magnetic-obstacle builders now retain their
-canonical base problems and replace only their actual field/name differences,
-deleting 37 more production lines with exact nondefault dataclass equivalence.
+Variable-field and bent-pipe builders now retain canonical base problems and
+replace only real field/geometry/name differences, deleting 64 production lines
+with exact rich-nondefault and full-solve equivalence.
 The remaining result records, 13 scripts, and distinct Python/TOML examples
 retain current provenance, CI, or runnable-workflow ownership; do not merge
 them unless the replacement deletes code without weakening those contracts.
@@ -185,8 +185,8 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
-The current gate passes 868 tests with 8 expected skips and 95.41% combined
-coverage in 123.2 seconds. Shared centerline validation removes 20 source lines;
+The current gate passes 867 tests with 8 expected skips and 95.41% combined
+coverage in 121.5 seconds. Shared centerline validation removes 20 source lines;
 the layered-flow consolidation removes 17 test lines and one redundant
 6.894-second solve while retaining finite-field, current, and physics gates.
 Shared figure-pair assertions subsequently remove another 20 test lines while
@@ -194,7 +194,9 @@ preserving all five ordered output and existence contracts; focused Q2D and
 repository gates pass.
 The safety-reviewed native S3 harness raised the suite to 21,099 lines without
 a new test file; consolidating optional-field skip ownership recovered 12 lines.
-The next test change remains a net deletion from the current 21,094-line suite.
+Merging identical magnetic-obstacle checks preserves 33 assertions, removes two
+solves and 28 lines, and cuts focused wall time 5.86 -> 4.52 seconds. The current
+suite is 21,075 lines; its next change remains a net deletion.
 
 ### Canonical sharding and performance
 
@@ -207,6 +209,10 @@ physical-core claim or reason to add an 8-device rung.
 
 Rejected small probes stay in checksummed evidence. Physical-core claims need
 verifiable affinity; forced macOS devices prove topology only.
+
+Apply the operating contract's multi-minute ladder after the next
+performance-affecting solver or sharding change. Bitwise-equivalent refactors
+use focused gates; seconds-scale results remain topology/debug evidence.
 
 The historical 32-update CPU calibration used only static preflight. A later
 24-update ladder was correctly rejected for one/four-device instability,

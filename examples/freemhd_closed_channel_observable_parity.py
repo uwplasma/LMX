@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import os
 from pathlib import Path
@@ -293,12 +294,14 @@ def _profile_metrics(
 def _observable_record(
     case_kind: str,
     *,
+    reference_root: Path | None = None,
     drive_mode: str = DRIVE_MODE,
     initial_profile: str = INITIAL_PROFILE,
     flow_rate_target_mean_velocity: float | None = FLOW_RATE_TARGET_MEAN_VELOCITY,
     case_settings: dict[str, dict[str, object]] | None = None,
     linear_solver: str = "auto",
 ) -> dict[str, object]:
+    reference_root = REFERENCE_ROOT if reference_root is None else Path(reference_root)
     if case_settings is None:
         case_settings = CASE_SETTINGS
     settings = case_settings[case_kind]
@@ -312,7 +315,7 @@ def _observable_record(
     width = float(geometry["width"])
     height = float(geometry["height"])
     reference = load_processed_slice(
-        case_kind, ha, x_slice=X_SLICE, reference_root=REFERENCE_ROOT
+        case_kind, ha, x_slice=X_SLICE, reference_root=reference_root
     )
     target_mean_velocity = (
         float(flow_rate_target_mean_velocity)
@@ -343,7 +346,7 @@ def _observable_record(
         current_reconstruction=settings["current_reconstruction"],
         velocity_update_limit=settings["velocity_update_limit"],
         linear_solver=linear_solver,
-        reference_root=REFERENCE_ROOT,
+        reference_root=reference_root,
     )
     magnetic_field = max(abs(float(value)) for value in field["vector"])
     length_scale = float(geometry["length_scale"])
@@ -493,7 +496,7 @@ def _observable_record(
         ha=ha,
         length_scale=length_scale,
         velocity_scale=velocity_scale,
-        reference_root=REFERENCE_ROOT,
+        reference_root=reference_root,
     )
 
     return {
@@ -539,12 +542,21 @@ def _observable_record(
     }
 
 
-def run_freemhd_closed_channel_observable_parity() -> dict[str, object]:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    records = [_observable_record("shercliff"), _observable_record("hunt")]
+def run_freemhd_closed_channel_observable_parity(
+    *,
+    out_dir: Path | None = None,
+    reference_root: Path | None = None,
+) -> dict[str, object]:
+    out_dir = OUTPUT_DIR if out_dir is None else Path(out_dir)
+    reference_root = REFERENCE_ROOT if reference_root is None else Path(reference_root)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    records = [
+        _observable_record(case_kind, reference_root=reference_root)
+        for case_kind in ("shercliff", "hunt")
+    ]
     plots = write_freemhd_observable_parity_plots(
         records,
-        OUTPUT_DIR,
+        out_dir,
         case_title=f"LMX vs FreeMHD normalized midplane observables (Ha={HA})",
     )
     summary = {
@@ -585,11 +597,29 @@ def run_freemhd_closed_channel_observable_parity() -> dict[str, object]:
         ),
         "plots": [path.name for path in plots],
     }
-    (OUTPUT_DIR / "freemhd_closed_channel_observable_parity_summary.json").write_text(
+    (out_dir / "freemhd_closed_channel_observable_parity_summary.json").write_text(
         json.dumps(summary, indent=2) + "\n"
     )
     return summary
 
 
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Compare LMX duct observables with processed FreeMHD references."
+    )
+    parser.add_argument(
+        "--reference-root",
+        type=Path,
+        default=REFERENCE_ROOT,
+        help="ClosedChannel directory containing processed FreeMHD profiles.",
+    )
+    parser.add_argument("--output", type=Path, default=OUTPUT_DIR)
+    args = parser.parse_args(argv)
+    run_freemhd_closed_channel_observable_parity(
+        out_dir=args.output, reference_root=args.reference_root
+    )
+    return 0
+
+
 if __name__ == "__main__":
-    run_freemhd_closed_channel_observable_parity()
+    raise SystemExit(main())

@@ -12,9 +12,9 @@ first gate: gradients must also be accurate, converged, and affordable.
 python examples/autodiff_design_demo.py --help
 ```
 
-The example evaluates a pressure/flow objective, compares the automatic
-derivative with a centered finite difference, and performs a short bounded
-design update. Outputs go under `artifacts/`.
+The example evaluates Hartmann-number sensitivities with `jax.grad` and performs
+a short bounded inverse-design update. Independent finite-difference checks
+remain in the test suite. Outputs go under `artifacts/`.
 
 ## Solver backends
 
