@@ -315,7 +315,7 @@ seconds or the gate materially regresses; example/mock deletion and the new axia
 gate account for the changed test count.
 Merging identical magnetic-obstacle checks preserves 33 assertions, removes two
 solves and 28 lines, and cuts focused wall time 5.86 -> 4.52 seconds. The current
-suite is 20,662 lines; its next change remains a net deletion. Across the
+suite is 20,243 lines; its next change remains a net deletion. Across the
 editable-example, runner-deletion, autodiff-slimming, and steady-media-gate
 tranches, package and test lines remain net lower than the prior baseline.
 
@@ -791,9 +791,11 @@ explicitly labelled transient. Calibrate the physical horizon, then regenerate
 serially only after clean host admission and record the terminal triplet and
 source hashes.
 
-The current weakly forced Q2D loop is also unaccepted: it plays for 7.014
-seconds, covers only 0.331 turnover times, and ends with energy and enstrophy
-still changing substantially. Replace it only with an explicitly forced
+The current weakly forced Q2D loop is also unaccepted: its unchanged 42 frames
+were retimed from 7.014 to exactly 7.000 display seconds without altering any
+pixel payload; it covers only 0.331 turnover times and ends with energy and
+enstrophy still changing substantially. Retiming fixed the display contract,
+not the physics evidence. Replace it only with an explicitly forced
 trajectory that lasts at most 7.000 display seconds and passes precommitted
 rolling energy, enstrophy, and RMS-drift gates after at least three turnover
 times. Calibrate coarsely first, then run one production trajectory.
