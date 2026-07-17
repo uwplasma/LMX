@@ -304,17 +304,25 @@ def write_animated_webp(
     fps: int = 8,
     quality: int = 50,
     sampling_power: float = 1.0,
+    last_frame: int | None = None,
 ) -> Path:
-    """Downsample an animation; powers above one emphasize early dynamics."""
+    """Downsample up to an inclusive source frame into a seven-second WebP."""
 
     from PIL import Image
 
     if sampling_power <= 0.0:
         raise ValueError("sampling_power must be positive")
+    if not 0.0 < seconds <= 7.0:
+        raise ValueError("animated WebP duration must be in (0, 7] seconds")
+    if fps <= 0:
+        raise ValueError("fps must be positive")
     with Image.open(source) as image:
         frame_count = max(2, round(seconds * fps))
+        terminal = image.n_frames - 1 if last_frame is None else int(last_frame)
+        if not 1 <= terminal < image.n_frames:
+            raise ValueError("last_frame must select at least two available source frames")
         indices = [
-            round((index / (frame_count - 1)) ** sampling_power * (image.n_frames - 1))
+            round((index / (frame_count - 1)) ** sampling_power * terminal)
             for index in range(frame_count)
         ]
         height = round(image.height * width / image.width)
@@ -324,13 +332,18 @@ def write_animated_webp(
             frames.append(
                 image.convert("RGB").resize((width, height), Image.Resampling.LANCZOS)
             )
+    total_duration_ms = min(round(1000 * seconds), 7000)
+    duration_ms, longer_frames = divmod(total_duration_ms, frame_count)
+    durations = [
+        duration_ms + (index < longer_frames) for index in range(frame_count)
+    ]
     output.parent.mkdir(parents=True, exist_ok=True)
     frames[0].save(
         output,
         format="WEBP",
         save_all=True,
         append_images=frames[1:],
-        duration=round(1000 / fps),
+        duration=durations,
         loop=0,
         quality=quality,
         method=6,
@@ -379,6 +392,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--fps", type=int, default=8)
     parser.add_argument("--quality", type=int, default=50)
     parser.add_argument("--sampling-power", type=float, default=1.0)
+    parser.add_argument(
+        "--last-frame",
+        type=int,
+        default=None,
+        help="inclusive terminal source frame for a converged animation",
+    )
     args = parser.parse_args(argv)
     if args.write_static_webp:
         source, output = args.write_static_webp
@@ -394,6 +413,7 @@ def main(argv: list[str] | None = None) -> int:
             fps=args.fps,
             quality=args.quality,
             sampling_power=args.sampling_power,
+            last_frame=args.last_frame,
         )
         print(f"Animated WebP: {output}")
     elif args.write_benchmark_a_plot:

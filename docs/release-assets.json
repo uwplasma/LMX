@@ -572,7 +572,7 @@
   },
   "schema_version": 2,
   "showcase": {
-    "bytes": 1265096,
+    "bytes": 1256482,
     "files": [
       {
         "bytes": 71620,
@@ -625,9 +625,9 @@
         "sha256": "f2add9fe96a044a082a3b0ca28a3de50b71a0961399ac362caf2ebcaa049aa28"
       },
       {
-        "bytes": 71136,
+        "bytes": 62522,
         "path": "docs/_static/readme-blanket-flow.webp",
-        "sha256": "c67288733a450f2223db51d3ac1a8792b2b4b293e5e3d31d9ce37a4e14425064"
+        "sha256": "338556447bc78d1a0f9f4a52320f6e2bb32dbaa9d92fb07c0dd5960c2ecc162c"
       },
       {
         "bytes": 94236,

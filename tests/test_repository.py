@@ -278,7 +278,27 @@ def test_animated_webp_is_bounded_and_preserves_motion(tmp_path: Path) -> None:
     with Image.open(output) as animation:
         assert animation.size == (24, 16)
         assert animation.n_frames >= 3
+    data = output.read_bytes()
+    offset = 12
+    durations = []
+    while offset + 8 <= len(data):
+        chunk_size = int.from_bytes(data[offset + 4 : offset + 8], "little")
+        payload = data[offset + 8 : offset + 8 + chunk_size]
+        if data[offset : offset + 4] == b"ANMF":
+            durations.append(int.from_bytes(payload[12:15], "little"))
+        offset += 8 + chunk_size + (chunk_size % 2)
+    assert durations and sum(durations) <= 7000
     assert output.stat().st_size < 16_000
+
+    trimmed = write_animated_webp(
+        source, tmp_path / "trimmed.webp", seconds=1.0, fps=2, last_frame=1
+    )
+    with Image.open(trimmed) as animation:
+        animation.seek(animation.n_frames - 1)
+        assert animation.getpixel((0, 0))[0] < 120
+
+    with pytest.raises(ValueError, match="duration"):
+        write_animated_webp(source, tmp_path / "too-long.webp", seconds=7.01)
 
     still = write_static_webp(source, tmp_path / "still.webp", width=6, quality=70)
     with Image.open(still) as image:
