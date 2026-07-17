@@ -152,7 +152,7 @@ shared without removing cases or assertions.
 | test files / lines | 29 / 20,243 | no new file; the next tranche must be a net deletion | 30 / 20,900 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 183 | no new file without retiring another owner | 186 |
-| tracked checkout | 4,542,636 bytes | stay below 4,542,637 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,543,473 bytes | stay below 4,543,474 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets come from ownership deletion and shared helpers, never unreadable
 formatting or arbitrary test merging. Recent moves delete 190 builder lines and
@@ -222,8 +222,8 @@ cannot find its NPZ file, and the documented Hartmann restart paths disagree.
 Keep one copy-paste TOML schema in documentation only if TOML remains a supported
 CLI input.
 
-Slim source by ownership, not by arbitrary splitting. `fringing.py` remains the
-first target. Stage B brought the package to 34,036 lines before the pipe
+Slim source by ownership, not by arbitrary splitting. Stage B brought the
+package to 34,036 lines before the pipe
 tranche. Commit `b111813` removed the confirmed dead station fallback, obsolete
 wrapper branch, and solver hook. Commit `8acf862` then moved three test-only
 variable-field builders into explicit tests, deleting 142 package lines for 29
@@ -236,13 +236,28 @@ the phase-timing diagnostic temporarily brought the tree to 33,485 package
 lines. Removing the orphaned `lmx.showcase` workflow owner and its mock-only
 test file then deleted 697 package and 233 test lines. The current tree is
 32,788 package lines, `fringing.py` is 7,889 lines, and tests are 20,243 lines;
-the diagnostic cost is fully recovered. Keep 33 modules and add no file. Split
-`_solve_extruded_projection` into same-module pipe and duct owners only after
-the FreeMHD deletion tranche establishes the next smaller ownership surface.
-Subsequent audits are
-`plotting.py`, `external_validation.py`, `solvers.py`, `wall_study.py`,
-`blanket_flow.py`, `autodiff.py`, `q2d.py`, `freemhd.py`, and `validation.py`.
-For each file, inventory public contracts and call sites; delete one-use example
+the diagnostic cost is fully recovered. Keep 33 modules and add no file.
+
+The completed hotspot audit sets the next ownership order:
+
+1. reclassify the 1,238-line scaling campaign as operational infrastructure and
+   leave a short linear local scaling example; do not move it unchanged;
+2. decide the 1,936-line Li/AlN `wall_study` leaf: retain reusable wall physics
+   and make its actual workflow visible in one example before retiring wrappers;
+3. keep the computational core of `blanket_flow`, but move one-off JSON, CSV,
+   plot, frame, and movie assembly into a visible blanket example;
+4. keep differentiable objectives and primitives in `autodiff`, while moving
+   host gradient-descent loops and history assembly into the design example;
+5. decide whether NumPy/SciPy `q2d` is ported to JAX with a real example or
+   explicitly demoted from the differentiable core;
+6. only then separate the reviewed duct and mapped-pipe owners inside the
+   7,889-line fringing solver, preserving current public imports during the
+   transition.
+
+`plotting.py` stays one optional visualization owner until orphan writers are
+identified. `external_validation.py`, `solvers.py`, `freemhd.py`, and
+`validation.py` follow after their consumers are explicit. For each file,
+inventory public contracts and call sites; delete one-use example
 builders and duplicate adapters; merge repeated numerical phases; and extract a
 new module only when it creates a stable reusable owner while retiring at least
 as much old surface. Every public function receives a concise contract docstring
@@ -256,8 +271,8 @@ physics tests in under two minutes before commit and push. Run the complete
 portable gate once after a coherent structural/source group and before the next
 algorithmic stage. Stages A and B finish at 34,036 package lines, below the
 34,038-line pre-Stage-A baseline; the pipe, dead-fallback, builder, and SOLVAX
-ownership tranches lower the clean tree to 33,573. Do not combine a structural
-move with a numerical algorithm change.
+ownership tranches plus the FreeMHD/showcase deletions lower the clean tree to
+32,788. Do not combine a structural move with a numerical algorithm change.
 
 Exit: every example satisfies the shared workflow contract; the broken and
 opaque case/catalog layer is gone; no source file remains thousands of lines
