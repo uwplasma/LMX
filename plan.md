@@ -123,19 +123,20 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,425 | stay below 34,426 | 35,100 |
+| package lines | 34,436 | stay below 34,437 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 20,988 | no new file; next test change must reduce lines | 31 / 21,100 |
+| test files / lines | 30 / 21,005 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,550,352 bytes | stay below 4,550,353 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,571,085 bytes | stay below 4,571,086 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
 The latest audits unified route-axis and centerline validation ownership, made
-variable-field validation fail closed on nonfinite velocity, and folded two
-duplicate solve tests into stronger physics owners. The direct B1 gate remains,
-and B2 reuses complete checkpoints.
+variable-field validation fail closed on nonfinite velocity, folded two
+duplicate solve tests into stronger physics owners, and removed Q2D's duplicate
+coordinate-edge helper without changing rendered output. The direct B1 gate
+remains, and B2 reuses complete checkpoints.
 The remaining result records, 13 scripts, and distinct Python/TOML examples
 retain current provenance, CI, or runnable-workflow ownership; do not merge
 them unless the replacement deletes code without weakening those contracts.
@@ -171,8 +172,8 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
-The current gate passes 863 tests with 8 expected skips and 95.40% combined
-coverage in 121.5 seconds. Shared centerline validation removes 20 source lines;
+The current gate passes 863 tests with 8 expected skips and 95.42% combined
+coverage in 124.7 seconds. Shared centerline validation removes 20 source lines;
 the layered-flow consolidation removes 17 test lines and one redundant
 6.894-second solve while retaining finite-field, current, and physics gates.
 The next test change remains a net deletion.
@@ -373,11 +374,27 @@ stable accepted claim.
 
 ## Priority 4: B1 and remaining research functionality
 
-The current FreeMHD harness is B2-only, and the pinned source has no pipe/O-grid
-ALEX case. Do not launch coarse B1 or claim parity. First freeze a solver-free
-B1 input/observer contract; only then authorize a bounded `7 x 7 x 12`,
-two-update Docker harness pilot. Retained-modal results remain numerical
-evidence, not exact-formulation evidence.
+The current FreeMHD harness is B2-only, but the pinned source's public additional
+cases map "Pipe Flow Fringing B" to `S3_Buhler_Ha616.zip` (Drive ID
+`1vrLEVOk2NzH6O_Qv80ze0BPM0kM0rYoF`, 1,930,938,126 bytes, SHA-256
+`6aa165e95275f29fd2d014c6ef3a91e4e8d80b16d82b3040d9d6b90ab74e6091`). Its native
+fluid/conducting-wall O-grid is geometry-compatible with LMX's pipe mapping and
+was prepared for 96 MPI ranks, but the archive does not expose a reuse license
+and its Ha=616 PbLi-like setup is not parameter-identical to frozen ALEX B1 at
+Ha=6600. Never add the 1.93 GB archive or its 8.77 GB expanded mesh to Git.
+First freeze a solver-free, user-supplied-archive preflight keyed by Drive ID,
+exact size, full and selected small-file hashes. It must report the runtime
+property Ha near 573 separately from the mesh-design label near 616 and classify
+the case only as a native-FreeMHD pipe regression. Then freeze coordinates,
+nondimensionalization, and observer mapping before authorizing a reduced-mesh,
+two-update Docker pilot. Retained-modal results remain numerical evidence, not
+exact-formulation parity.
+The supplied 2.62-million-cell archive ran 8.22 hours on 96 ranks, records no
+FreeMHD Git SHA, and its 3.08-second centerline CSV contains a nonfinite row;
+the 2.28-to-3.08-second velocity change is still about 10%. Therefore archived
+outputs are neither pinned-source nor steady acceptance oracles. A fresh reduced
+pinned-source run must own repeat, restart, and conservation evidence, while
+nonfinite archived observers fail closed.
 
 Magnetic obstacles, Q2D turbulence, blanket models, mapped/pipe geometries,
 inverse design, and other research workflows retain bounded portable examples
@@ -391,6 +408,12 @@ LMX remains on the published range `solvax>=0.8.4,<1`. SOLVAX main `d0623a2`
 prepares 0.8.5: 269 tests pass at 98.13% branch coverage, docs/lint pass, and
 the built wheel reports version 0.8.5. No `v0.8.5` tag or PyPI release exists,
 so LMX must not import the new API or use a Git dependency.
+
+A `v0.8.5` tag automatically triggers SOLVAX's trusted PyPI publication, so it
+requires explicit release authority rather than ordinary commit/push authority.
+If publication is authorized after 2026-07-16, first correct the prepared dates
+in SOLVAX's `CITATION.cff` and `CHANGELOG.md`, push and await green checks, then
+tag the exact green commit and wait for PyPI metadata before changing LMX.
 
 After publication, raise the tested minimum to 0.8.5, adopt
 `additive_tridiagonal_line_preconditioner`, and delete LMX's duplicate 3D

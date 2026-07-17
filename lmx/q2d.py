@@ -1384,7 +1384,7 @@ def write_q2d_wall_driven_comparison_plots(
     """Write a publication-facing matched side-wall Q2D comparison panel."""
 
     import matplotlib.pyplot as plt
-    from .plotting import _save_figure_pair
+    from .plotting import _centers_to_edges, _save_figure_pair
 
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1392,8 +1392,8 @@ def write_q2d_wall_driven_comparison_plots(
     uy = np.asarray(solution.uy_frames[-1], dtype=float)
     speed = np.sqrt(ux**2 + uy**2)
     vorticity = np.asarray(solution.vorticity_frames[-1], dtype=float)
-    x_edges = _centers_to_edges_1d(solution.x)
-    y_edges = _centers_to_edges_1d(solution.y)
+    x_edges = _centers_to_edges(solution.x)
+    y_edges = _centers_to_edges(solution.y)
     vmax_speed = max(float(np.max(speed)), 1.0e-12)
     vmax_vort = max(float(np.max(np.abs(vorticity))), 1.0e-12)
 
@@ -1480,14 +1480,15 @@ def write_q2d_turbulence_decay_movie(
 
     from matplotlib import animation
     import matplotlib.pyplot as plt
+    from .plotting import _centers_to_edges
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     frames = np.asarray(solution.frames, dtype=float)
     if frames.ndim != 3:
         raise ValueError("Q2D turbulence-decay movie expects frames with shape (time, nx, ny)")
-    x_edges = _centers_to_edges_1d(solution.x)
-    y_edges = _centers_to_edges_1d(solution.y)
+    x_edges = _centers_to_edges(solution.x)
+    y_edges = _centers_to_edges(solution.y)
     vmax = max(float(np.max(np.abs(frames))), 1.0e-12)
 
     fig, ax = plt.subplots(figsize=(6.0, 5.2), constrained_layout=True)
@@ -1512,18 +1513,6 @@ def write_q2d_turbulence_decay_movie(
     fig.savefig(poster_path, bbox_inches="tight")
     plt.close(fig)
     return [gif_path, poster_path]
-
-
-def _centers_to_edges_1d(values: np.ndarray) -> np.ndarray:
-    data = np.asarray(values, dtype=float)
-    if data.size <= 1:
-        center = float(data[0]) if data.size else 0.0
-        return np.asarray([center - 0.5, center + 0.5], dtype=float)
-    midpoints = 0.5 * (data[1:] + data[:-1])
-    first = data[0] - 0.5 * (data[1] - data[0])
-    last = data[-1] + 0.5 * (data[-1] - data[-2])
-    return np.concatenate([[first], midpoints, [last]])
-
 
 def write_q2d_turbulence_observable_plots(
     field: np.ndarray,

@@ -1134,12 +1134,13 @@ def write_bent_pipe_overview_plots(
 
 
 def _centers_to_edges(values: np.ndarray) -> np.ndarray:
-    if values.size <= 1:
-        delta = 0.5
-        return np.asarray([values[0] - delta, values[0] + delta], dtype=float)
-    midpoints = 0.5 * (values[1:] + values[:-1])
-    first = values[0] - 0.5 * (values[1] - values[0])
-    last = values[-1] + 0.5 * (values[-1] - values[-2])
+    data = np.asarray(values, dtype=float)
+    if data.size <= 1:
+        center = float(data[0]) if data.size else 0.0
+        return np.asarray([center - 0.5, center + 0.5], dtype=float)
+    midpoints = 0.5 * (data[1:] + data[:-1])
+    first = data[0] - 0.5 * (data[1] - data[0])
+    last = data[-1] + 0.5 * (data[-1] - data[-2])
     return np.concatenate([[first], midpoints, [last]])
 
 
