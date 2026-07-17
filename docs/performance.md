@@ -14,12 +14,9 @@ one/two-GPU shared-host calibration; foreign contexts still fail its idle gate.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 865 pass, 8 skip, 95.39% combined line/branch coverage, 125.8 s | 42% of the five-minute target and 21% of the ten-minute budget |
+| portable test gate | Apple M4, six workers | 864 pass, 8 skip, 95.39% combined line/branch coverage, 122.6 s | 41% of the five-minute target and 20% of the ten-minute budget |
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
-| B2 schema-6 CPU calibration | Apple M4, `256 x 67 x 67`, 1/2/4 forced CPU devices | 15.159/12.337/11.146 s; 1.229x/1.360x speedup; exact restart and device equivalence pass | accepted correctness/calibration; four-device promotion gate not met |
-| B2 CPU-allocation confirmation | ARM64 Docker on Apple M4, `256 x 67 x 67`, 2/4/8 affinity-controlled guest CPUs for 1/2/4 devices | 22.894/15.953/14.252 s; 1.435x/1.606x; 95% lower bounds 1.364x/1.548x; efficiency 71.8%/40.2% | repeated two-update calibration; host P/E-core mapping unverified |
-| B2 monitored CPU scaling | same grid/masks, 32 updates, three warm trajectories per topology | 248.882/174.128/150.700 s; 1.429x/1.652x; peak process RSS 4.79/5.33/5.54 GB; CV below 0.21% | accepted Docker CPU-allocation scaling; fresh admission, continuous/postflight environment, numerics, restart, and placement pass; exact host-core mapping remains open |
-| rejected monitored CPU diagnostic | same grid/masks, 24 updates | 193.234/132.962/133.753 s; apparent 1.453x/1.445x; CV 8.46%/1.55%/12.91% | retained rejection audit: one short sample and a two-device swapout |
+| B2 monitored CPU scaling | same grid/masks, 32 updates, three warm trajectories per topology | 250.756/173.993/151.342 s; 1.441x/1.657x; peak process RSS 4.758/5.078/5.578 GB; CV at most 0.631% | accepted Docker CPU-allocation scaling from source `6f89d1a`, evaluated by `6729bdf`; environment, numerics, restart, and placement pass; exact host-core mapping and steady-state acceptance remain open |
 | B2 sustained GPU calibration | 1/2 RTX A4000, same grid, 96 updates, three warm trajectories per topology | 258.913/159.234 s; 1.626x; peak device memory 2.50 GB vs 1.41/1.31 GB; CV below 0.29% | numerical/duration gates pass; persistent foreign contexts block an authoritative timing claim |
 | B2 pseudo-time gate | Apple M4, corrected warm `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x/32x/16x map-rate spread 0.0768%; raw updates halve; exact restart | 64x refrozen; versioned stopping threshold open |
 | B2 physical-residual probe | Apple M4, `7 x 7 x 7` | residual 0.03870 at step 90; omitted reconstruction force is 0.0880 at step 4 | diagnostic has a plausible coarse split floor; never a stopping gate |
@@ -29,12 +26,7 @@ one/two-GPU shared-host calibration; foreign contexts still fail its idle gate.
 | B2 acceleration gates | Apple M4, cold `7 x 7 x 7`, six updates | raw Anderson ends at `0.5281`; bounded fallback ends at `0.114718` vs `0.114466` control; 98.254--99.887% of shared residual energy is potential | both rejected; shared-norm objective is misaligned with velocity convergence |
 | B2 fixed relaxation | canonical `min=max=2` | exact trajectory/restart; prior residual omitted | saves 18.46 MiB at `102 x 77 x 77` and two global dot products/update |
 | B2 GPU smoke | 1/2 RTX A4000 GPUs, `8 x 7 x 7` | current schema-6 placement, replay, conservation, linear, and repeat gates pass; two-GPU state error `2.22e-16`, flux exact | topology correctness only; shared-host timing excluded |
-| B2 scaling calibration | Apple M4, `128 x 31 x 31`, 1/2/4 forced CPU devices | 0.857/0.652/0.633 s; 1.31x/1.35x speedup; exact restart and device equivalence pass | historical pre-terminal-fix calibration; rerun before promotion |
-| B2 GPU calibration | 1/2 RTX A4000 GPUs, `128 x 67 x 67`, default XLA | current medians 2.780/2.400 s; repeat, trace, restart, placement, and equivalence pass | 1.159x misses the 1.2x promotion gate; no scaling claim |
-| B2 doubled-axial calibration | 1/2 RTX A4000 GPUs, `256 x 67 x 67`, default XLA | 8.47/7.53 s; 1.125x speedup; CV below 3.7% | historical pre-terminal-fix calibration below the 1.2x threshold |
 | historical SOLVAX PCG equivalence | Apple M4 CPU and RTX A4000 GPU | 0.8.2 forward, gradient, transpose, memory, and Hartmann gates pass; one-shot GPU warm ratio is 1.184 | archival; PCG is unchanged and no refresh is planned |
-| sharded 3D operator | Apple M4, `516 x 32 x 32` | 1.16x on 2 cores, 1.28x on 4, 0.93x on 6 | actual shard placement verified; surrogate only |
-| B2 axial sharding | 2 x RTX A4000, `102 x 77 x 77` | 36.96 s on one GPU, 22.23 s on two | diagnostic 1.66x result for superseded formulation |
 | legacy B2 medium independence | 2 x RTX A4000, `152 x 113 x 113` | all four numerical variants pass; final confirmations take 34.94--57.64 s | superseded no-inertia/stationwise-flow formulation |
 | legacy B2 fine campaign | 2 x RTX A4000, `202 x 149 x 149` | baseline 457.37 s; iteration and wall confirmations 65.23/62.10 s | superseded formulation; tight-tolerance independence remains open |
 | B1 modal setup | RTX A4000, `11 x 17 x 32` | 57.85 s first, 10.63 s restart | accepted setup optimization |
@@ -177,42 +169,18 @@ solve only 0.85% (`0.7437` to `0.7374` seconds). That fast path is rejected
 before the large rung. These results remain forced-device sharding evidence,
 not physical-core strong scaling.
 
-The first ARM64 Docker probe supplies auditable Linux `cpuset` masks, but its
-tiny real-solver grid is not an acceptable scaling workload. One/two/four
-shards agree within `5.2e-14`, while warm time regresses from 0.530 s to
-0.575/0.693 s and the residual never passes the `5e-5` steady gate. Those
-timings remain rejected. A subsequent current-source `128 x 67 x 67` matched
-schema-6 pilot found that one CPU per JAX device starves the CPU collective
-runtime: two devices on two CPUs hit the 40-second all-reduce rendezvous abort.
-The preflight therefore fixed two guest CPUs per device and reran nested
-2/4/8-CPU masks. Warm medians fall from 7.351 to 5.546/4.574 seconds, giving
-1.325x/1.607x speedups and 66.3%/40.2% efficiency. All affinity, placement,
-restart, repeat, conservation, linear, Anderson, and cross-topology gates pass.
-The six-repeat `256 x 67 x 67` calibration reports 22.894, 15.953, and 14.252
-second warm medians. Its 1.435x/1.606x speedups, 1.364x/1.548x 95% lower bounds,
-and 71.8%/40.2% efficiencies pass the frozen calibration gates, but the runs
-are short. A 20-update duration pilot then failed closed at 95.63–97.51 s.
-The preflight-admitted `a92b4e6` 32-update workload measures 246.702, 187.307, and 146.524 s
-on one/two/four JAX devices allocated 2/4/8 CPUs, with every warm sample above
-120 s. Speedups are 1.317x/1.684x, their empirical 95% lower bounds are
-1.301x/1.661x, and efficiencies are 65.9%/42.1%. CVs remain below 4.45%;
-midpoint restart is exact and all schema-6, physics,
-placement, and cross-topology gates pass. It remains useful multi-minute
-calibration under the superseded static-preflight contract.
+The fresh 32-update evaluation of source `6f89d1a` by `6729bdf` closes the
+Docker-allocation gate. Its 250.756/173.993/151.342 s medians give
+1.441x/1.657x speedups; peak RSS is 4.758/5.078/5.578 GB and the maximum warm
+CV is 0.631%. Fresh admissions, full worker monitoring, 15-second postflights,
+pressure convergence, repeat signatures, restart/replay, placement, and
+topology equivalence all pass. Linux affinity is verified inside Docker;
+Docker Desktop does not expose exact Apple M4 P/E-core placement. Each fixed
+trajectory ends at the 32-update step limit, so this is allocation scaling, not
+a physical-core or steady-state claim.
 
-The current-source 24-update monitored ladder then measured 193.234, 132.962,
-and 133.753 s. It failed closed: one/four-device CVs were 8.46%/12.91%, the
-two-device monitor saw 179 swapout pages, and one four-device sample lasted
-117.941 s. Numerical, restart, pressure-solve, Anderson, and placement checks
-still pass; the apparent 1.453x/1.445x speedups are diagnostic only.
-
-The unchanged 32-update rerun at source `a98a658` closes the Docker-allocation
-gate. Its 248.882/174.128/150.700 s medians give 1.429x/1.652x speedups and
-71.5%/41.3% efficiencies; every warm sample lasts 150–250 s and CV stays below
-0.21%. Fresh admissions, full worker monitoring, 15-second postflights,
-pressure solves, exact repeat/restart signatures, placement, and cross-topology
-equivalence all pass. Linux affinity is verified inside Docker; Docker Desktop
-does not expose the guest-vCPU mapping onto heterogeneous M4 cores.
+Superseded pilots and rejected ladders remain auditable in
+`benchmarks/results/b2-schema6-cpu-scaling-20260716.json`.
 
 The medium B2 tight solve converged across two restart-safe segments and ended
 at residual `2.500e-5`, divergence `1.829e-6`, and charge residual `1.149e-4`.

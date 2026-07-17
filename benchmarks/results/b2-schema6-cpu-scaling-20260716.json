@@ -402,8 +402,8 @@
     "classification": "current-source preflight-admitted multi-minute Docker CPU-allocation calibration; continuous host monitoring, exact M4 host-core placement, steady convergence, and B2 solution acceptance remain open"
   },
   "current_monitored_cpu_scaling": {
-    "source_commit": "a98a658c36ddba7c5ff2e6f5de7535008ed0fdd8",
-    "source_fingerprint": "7c7bb4f291769333d120b84f17b3be67c113cb8eeb221e8ebb8c0f8b9a145982",
+    "source_commit": "6f89d1ac0f3f9e6b5f50d98c21f7f50b94d96847",
+    "source_fingerprint": "5acc040ac5a1807128ea3ee6544f7d85caa9b03dc65abd4436ebc4ebfd642785",
     "shape": [256, 67, 67],
     "total_cells": 1149184,
     "updates_per_trajectory": 32,
@@ -413,17 +413,19 @@
     "runtime": "native ARM64 Docker with 2/4/8-CPU taskset masks for 1/2/4 JAX devices",
     "environment": {"python": "3.12.13", "jax": "0.10.2", "jaxlib": "0.10.2", "solvax": "0.8.4", "precision": "float64", "memory_limit_bytes": 7864320000},
     "runs": {
-      "1": {"allocated_cpus": 2, "cold_seconds": 257.123151576, "warm_samples_seconds": [248.88165515499998, 249.64004373700004, 248.8413746550001], "warm_median_seconds": 248.88165515499998, "warm_cv": 0.0014746657543324132, "speedup": 1.0, "parallel_efficiency": 1.0, "peak_host_rss_bytes": 4794630144, "duration_passed": true, "monitor_verified": true, "monitor_rows": 1157, "max_monitor_gap_seconds": 1.0159834179999052},
-      "2": {"allocated_cpus": 4, "cold_seconds": 181.11350649999986, "warm_samples_seconds": [174.344332247, 174.12751424599992, 174.04646845399998], "warm_median_seconds": 174.12751424599992, "warm_cv": 0.0007219430236137352, "speedup": 1.4293068860064848, "parallel_efficiency": 0.7146534430032424, "peak_host_rss_bytes": 5330169856, "duration_passed": true, "monitor_verified": true, "monitor_rows": 821, "max_monitor_gap_seconds": 1.0161059170000044},
-      "4": {"allocated_cpus": 8, "cold_seconds": 157.05662136399997, "warm_samples_seconds": [150.69969348600034, 150.14370185899998, 150.8733402779999], "warm_median_seconds": 150.69969348600034, "warm_cv": 0.0020668331301235735, "speedup": 1.6515073746856725, "parallel_efficiency": 0.41287684367141814, "peak_host_rss_bytes": 5536268288, "duration_passed": true, "monitor_verified": true, "monitor_rows": 720, "max_monitor_gap_seconds": 1.011455042000307}
+      "1": {"allocated_cpus": 2, "cold_seconds": 258.694775033, "warm_samples_seconds": [253.68801115699995, 250.010527572, 250.75592065600006], "warm_median_seconds": 250.75592065600006, "warm_cv": 0.006311846505092614, "speedup": 1.0, "parallel_efficiency": 1.0, "peak_host_rss_bytes": 4757790720, "duration_passed": true, "admission_max_cpu_utilization_percent": 0.13333333333332975, "monitor_verified": true, "monitor_rows": 1167, "monitored_worker_seconds": 1151.931137481, "monitor_postflight_seconds": 15.140324115753174, "max_monitor_gap_seconds": 1.0154052919999685, "monitor_violation_count": 0},
+      "2": {"allocated_cpus": 4, "cold_seconds": 181.96174045700013, "warm_samples_seconds": [174.95090299699996, 173.99295858000005, 173.74347966200003], "warm_median_seconds": 173.99295858000005, "warm_cv": 0.0029871307638510325, "speedup": 1.4411843025285718, "parallel_efficiency": 0.7205921512642859, "peak_host_rss_bytes": 5077905408, "duration_passed": true, "admission_max_cpu_utilization_percent": 0.11670556852284575, "monitor_verified": true, "monitor_rows": 823, "monitored_worker_seconds": 807.4091119520001, "monitor_postflight_seconds": 15.16207504272461, "max_monitor_gap_seconds": 1.0159911259997898, "monitor_violation_count": 0},
+      "4": {"allocated_cpus": 8, "cold_seconds": 157.262470571, "warm_samples_seconds": [151.3424152360003, 150.58306611099988, 151.69878231899975], "warm_median_seconds": 151.3424152360003, "warm_cv": 0.003077132992972847, "speedup": 1.656878015756365, "parallel_efficiency": 0.41421950393909124, "peak_host_rss_bytes": 5578317824, "duration_passed": true, "admission_max_cpu_utilization_percent": 0.11664722546241846, "monitor_verified": true, "monitor_rows": 718, "monitored_worker_seconds": 702.718934945, "monitor_postflight_seconds": 15.13440465927124, "max_monitor_gap_seconds": 1.0153718339997795, "monitor_violation_count": 0}
     },
-    "equivalence": {"pressure_solves_converged": true, "repeat_signatures_exact": true, "restart_replay_exact": true, "schema6_anderson": true, "placement": true, "cross_topology_within_tolerance": true},
+    "equivalence": {"pressure_solves_converged": true, "repeat_signatures_exact": true, "restart_replay_exact": true, "schema6_anderson": true, "placement": true, "cross_topology_within_tolerance": true, "current_l2_max_relative_difference": 7.928297148972414e-12, "pressure_observable_max_tolerance_ratio": 4.313350703977279e-05, "anderson_weights_max_tolerance_ratio": 0.029944076057241597},
     "gates": {"complete_topology": true, "fixed_work_identity": true, "minimum_duration": true, "timing_stability": true, "schema6_and_physics": true, "placement": true, "memory_recorded": true, "continuous_environment_verified": true, "environment_verified": true, "sustained_strong_scaling": true},
     "input_sha256": "bf61afda96beb7e1feeec4cbb7406ed35047329a19ec31c0a93d819cfbb2108e",
     "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa",
-    "admission_sha256": {"1": "a415823ca076afdf10efbc9b655f145bc027bfa658adcd50c35d68625e0d4319", "2": "dceed35fbac1a93e9466ad8964a78a55cf371a8ecc010baf64f8ceed8be4e8ba", "4": "a9fe54ea49bc51b1dae102a6c3c2643835cda084fcb0538cff96db7397edd431"},
-    "worker_sha256": {"1": "569712171ff6a3db58975247f3739c0a638a3c5c22ea6a923df24e0918e3e3c2", "2": "731a30242e245a0f185bbb5da1043248af04d281c7ec93e3e4d27fff8345d6d2", "4": "9661099eeec82fd6da5a1e832e0d6c166ea6f584578eeaa26a791948d5f8f288"},
-    "monitor_sha256": {"1": "b1c8ccf036f479a9f00849c9a74d7c291cb7b88e2e940532463d935342d66b38", "2": "42321a428891995a848c7b6f2f203e140e30a5dfde54aae9594f21a649e83fab", "4": "ef91ae637fb171b37a5d73e8c8437a55085f63f881eddb400bc5f26128674f9e"},
+    "acceptance_evaluator_commit": "6729bdf61a7eb0a35b80d513b5f4a26b1533d485",
+    "acceptance_evaluator_sha256": "c926597a5bb93ab4a4eeb426c9aad793308ce874a5c1893a754d765c70455859",
+    "admission_sha256": {"1": "f914b7c96f7e426da87679bce8bb0889607e8ff794f882c36c313876455bba45", "2": "0433c82f256e29afa9ca61124f53d224cb11a5d8f04d21aaec9fce63e108e75b", "4": "8604509d9749e69732ad457bf28f0f58a06b256dfbe9d8adc0a4dfe58f5d5d04"},
+    "worker_sha256": {"1": "19d7c4bda3f783fdb8427f94db6d1b7590dd62bcc369c6aed0e72e9204a34530", "2": "55fadd7eb7b7cd76af23f7edd15b1317ba3dc79097d3d3dd5f6844e5d317c82d", "4": "a236afe9385b98f03d70ba3a12ad725c1ab68cf271bb611854b26131ac198f31"},
+    "monitor_sha256": {"1": "559518680ac347867c09ba56cccae01ff898c04591d716e317b1e204207202b7", "2": "93b9a3ad59aacda0e398e14c48417a31b30c3780c9283f2f77a63548871db424", "4": "ea8d32889b9c4904589d0b280117936b0ab5222b485dc2f69e624b72419eabef"},
     "rejected_24_update_diagnostic": {"source_commit": "59549cb44f76e195a8efce6c7002486cbff83d94", "warm_medians_seconds": [193.23395121399972, 132.96173122799973, 133.753264768], "warm_cv": [0.08458886978023203, 0.015540886362836173, 0.12908629028811835], "reason": "one/four-device timing instability, 179 two-device swapout pages, and one 117.941-second sample"},
     "classification": "accepted continuously monitored multi-minute Docker CPU-allocation strong scaling; exact M4 physical-core mapping, steady-state convergence, and B2 solution acceptance remain open"
   },

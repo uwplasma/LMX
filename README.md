@@ -139,16 +139,18 @@ Q2D-MHDfoam parity and blanket validation remain open.
 
 ![Monitored multi-minute CPU scaling and shared-host GPU calibration](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/strong_scaling.webp)
 
-Monitored 32-update CPU trajectories last 151–250 s and reach **1.429×/1.652×**
-on two/four JAX devices, with CV below 0.21% and exact restart/numerics. This is
-Docker CPU-allocation scaling; exact M4-core mapping remains open. The plotted
-two-A4000 result reaches 1.626× but remains a shared-host calibration.
+Monitored 32-update CPU trajectories take 250.756/173.993/151.342 s and reach
+**1.441×/1.657×** on two/four JAX devices, with CV at most 0.631% and exact
+restart/numerics. Source `6f89d1a` was evaluated by `6729bdf`. This is Docker
+CPU-allocation scaling, not physical-core or steady-state evidence; the fixed
+trajectories end at their step limit. The 1.626× two-A4000 result remains a
+shared-host calibration.
 [Protocol and results →](https://lmx.readthedocs.io/en/latest/performance.html)
 
 ## Quality and citation
 
-The portable gate records **865 passing tests**, **95.39% combined line/branch
-coverage**, and **125.8 s** on six Apple-Silicon workers.
+The portable gate records **864 passing tests**, **95.39% combined line/branch
+coverage**, and **122.6 s** on six Apple-Silicon workers.
 [Testing](https://lmx.readthedocs.io/en/latest/testing.html) ·
 [Theory](https://lmx.readthedocs.io/en/latest/theory.html) ·
 [Numerics](https://lmx.readthedocs.io/en/latest/numerics.html) ·

@@ -1,6 +1,6 @@
 # LMX authoritative development plan
 
-Status: 2026-07-16. LMX consumes released SOLVAX 0.8.4. Restart schema 6
+Status: 2026-07-17. LMX consumes released SOLVAX 0.8.4. Restart schema 6
 provides compact, exact one-plus-one replay and correct 1/2/4-CPU plus 1/2-GPU
 placement. Its tested Anderson and bounded affine variants miss the frozen 15%
 velocity-map gain, so fixed relaxation 2 remains the B2 control. The current
@@ -8,11 +8,13 @@ coarse B2 trajectory passes linear, conservation, restart, and placement gates
 but misses steady acceptance; no continuation is authorized.
 
 The current monitored `256 x 67 x 67`, 32-update CPU ladder passes every frozen
-Docker-allocation gate. Its 249/174/151-second medians give 1.429x/1.652x
-two/four-device speedups, CV below 0.21%, exact numerics/restart, correct
-placement, and clean admission/runtime/postflight traces. Exact M4 P/E-core
-mapping remains open. The 1.626x two-A4000 calibration remains non-authoritative
-because foreign contexts block GPU admission.
+Docker-allocation gate. Source `6f89d1a`, evaluated by `6729bdf`, gives
+250.756/173.993/151.342-second medians, 1.441x/1.657x two/four-device speedups,
+4.758/5.078/5.578 GB peak RSS, and 0.631% maximum CV. Numerics, restart,
+placement, and admission/runtime/postflight traces pass. Exact M4 P/E-core
+mapping remains open, and step-limit trajectories are not steady-state
+evidence. The 1.626x two-A4000 calibration remains non-authoritative because
+foreign contexts block GPU admission.
 
 The `--sustained` preset keeps 32 CPU or 96 GPU updates, one cold plus three
 warm trajectories, a 120-second warm minimum, an 1800-second ceiling, and
@@ -120,17 +122,18 @@ shared without removing cases or assertions.
 | Surface | Current | Active ratchet | CI hard ceiling |
 |---|---:|---:|---:|
 | package modules | 35 | no new module | 35 |
-| package lines | 34,454 | stay below 34,455 | 35,100 |
+| package lines | 34,445 | stay below 34,446 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 21,007 | no new file; next test change must reduce lines | 31 / 21,100 |
+| test files / lines | 30 / 21,005 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,553,206 bytes | next tranche must reduce bytes without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,551,170 bytes | stay below 4,551,171 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
-The latest audits unified field/CSV ownership and removed a test-only modal
-fallback; the direct B1 gate remains, and B2 reuses complete checkpoints.
+The latest audits unified WHAM route-axis ownership, made variable-field
+validation fail closed on nonfinite velocity, and removed its duplicate solve
+test. The direct B1 gate remains, and B2 reuses complete checkpoints.
 The remaining result records, 13 scripts, and distinct Python/TOML examples
 retain current provenance, CI, or runnable-workflow ownership; do not merge
 them unless the replacement deletes code without weakening those contracts.
@@ -166,8 +169,8 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
-The current gate passes 865 tests with 8 expected skips and 95.39% combined
-coverage in 125.8 seconds. Canonical finite-volume ownership removes 72 source
+The current gate passes 864 tests with 8 expected skips and 95.39% combined
+coverage in 122.6 seconds. Canonical finite-volume ownership removes 72 source
 lines; the smaller wall-resolved B2 gate retains physics, convergence,
 checkpoint, and exact-restart assertions, cuts its hotspot by 5.94 seconds, and
 deletes 11 test lines. The next test change remains a net deletion.
@@ -186,11 +189,13 @@ verifiable affinity; forced macOS devices prove topology only.
 
 The historical 32-update CPU calibration used only static preflight. A later
 24-update ladder was correctly rejected for one/four-device instability,
-two-device swapout, and one 117.941-second sample. The unchanged monitored
-32-update rerun now passes: 248.882/174.128/150.700-second medians,
-1.429x/1.652x speedups, CV below 0.21%, and clean continuous/postflight traces.
-This closes Docker CPU-allocation scaling only; do not relabel it physical-core
-scaling.
+two-device swapout, and one 117.941-second sample. The fresh monitored
+evaluation of source `6f89d1a` by `6729bdf` passes:
+250.756/173.993/151.342-second medians, 1.441x/1.657x speedups,
+4.758/5.078/5.578 GB peak RSS, 0.631% maximum CV, and clean
+continuous/postflight traces. This closes Docker CPU-allocation scaling only;
+do not relabel it physical-core scaling or steady-state evidence because every
+trajectory ends at the fixed 32-update step limit.
 The sustained CPU launcher now records one-second host samples through the
 worker plus a 15-second postflight and binds the ignored JSONL digest to the
 source fingerprint; any probe, affinity, swapout, foreign-work, or gap violation
