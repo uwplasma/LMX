@@ -9,6 +9,7 @@ import lmx.fringing as fringing_impl
 
 from lmx.field_models import (
     make_divergence_free_cross_section_field,
+    make_localized_divergence_free_obstacle_field,
     make_maxwell_consistent_fringe_field,
     sample_cross_section_field,
     write_tabulated_field_npz,
@@ -33,9 +34,6 @@ from lmx.fringing import (
     build_magnetic_obstacle_rect_extruded_problem,
     build_pipe_ogrid_extruded_problem,
     build_square_duct_extruded_problem,
-    build_variable_field_bent_pipe_extruded_problem,
-    build_variable_field_layered_extruded_problem,
-    build_variable_field_pipe_ogrid_extruded_problem,
     build_wham_mirror_pipe_extruded_problem,
     _cross_section_mesh,
     _pipe_conservative_current_diagnostics_3d,
@@ -81,6 +79,15 @@ from lmx.specs import MagneticFieldSpec, RegionSpec
 
 
 pytestmark = pytest.mark.unit
+
+
+def _with_analytic_field(problem, *, name, field_fn):
+    case = replace(
+        problem.case,
+        name=name,
+        magnetic_field=MagneticFieldSpec(kind="analytic", fn=field_fn),
+    )
+    return replace(problem, case=case)
 
 
 def test_b2_canonical_shell_widths_remove_realization_thickness():
@@ -2224,7 +2231,15 @@ def test_solve_extruded_inductionless_projection_returns_finite_bent_pipe_bundle
 
 
 def test_solve_extruded_inductionless_supports_layered_analytic_variable_field():
-    problem = build_variable_field_layered_extruded_problem(nx_stations=7, ny=10, nz=10)
+    field_fn = make_divergence_free_cross_section_field(
+        width=2.0, height=2.0, base_bz=12.0, perturbation=0.12
+    )
+    problem = build_layered_duct_extruded_problem(
+        ha_peak=1.0, nx_stations=7, ny=10, nz=10
+    )
+    problem = _with_analytic_field(
+        problem, name="variable_field_layered_bz12", field_fn=field_fn
+    )
     solution = solve_extruded_inductionless(problem)
     validation = validate_variable_field_extruded_solution(
         solution, field_ny=41, field_nz=41
@@ -2276,11 +2291,25 @@ def test_solve_extruded_inductionless_supports_tabulated_variable_field(tmp_path
 
 
 def test_solve_extruded_inductionless_supports_variable_field_pipe_and_bent_pipe():
-    straight_problem = build_variable_field_pipe_ogrid_extruded_problem(
-        nx_stations=5, nr=4, ntheta=8
+    field_options = dict(base_bz=12.0, core_fraction_y=0.5, core_fraction_z=0.5)
+    straight_field = make_localized_divergence_free_obstacle_field(
+        width=1.0, height=1.0, **field_options
     )
-    bent_problem = build_variable_field_bent_pipe_extruded_problem(
-        nx_stations=5, nr=4, ntheta=8
+    straight_problem = build_pipe_ogrid_extruded_problem(
+        ha_peak=1.0, radius=0.5, nx_stations=5, nr=4, ntheta=8
+    )
+    straight_problem = _with_analytic_field(
+        straight_problem, name="variable_field_pipe_bz12", field_fn=straight_field
+    )
+    bent_field = make_localized_divergence_free_obstacle_field(
+        width=0.9, height=0.9, **field_options
+    )
+    bent_problem = build_bent_pipe_extruded_problem(
+        ha_peak=1.0, radius=0.45, bend_radius=3.6, bend_angle=1.15,
+        nx_stations=5, nr=4, ntheta=8,
+    )
+    bent_problem = _with_analytic_field(
+        bent_problem, name="variable_field_bent_pipe_bz12", field_fn=bent_field
     )
     straight_solution = solve_extruded_inductionless(straight_problem)
     bent_solution = solve_extruded_inductionless(bent_problem)
