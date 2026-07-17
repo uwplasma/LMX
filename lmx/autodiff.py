@@ -1006,8 +1006,9 @@ def hartmann_profile_loss_gradients(
         hartmann_number=ha_value,
         target_profile=target_profile,
     )
-    loss = objective(forcing, hartmann_number)
-    d_loss_d_forcing, d_loss_d_ha = jax.grad(objective, argnums=(0, 1))(forcing, hartmann_number)
+    loss, (d_loss_d_forcing, d_loss_d_ha) = jax.value_and_grad(
+        objective, argnums=(0, 1)
+    )(forcing, hartmann_number)
     return {
         "loss": loss,
         "d_loss_d_forcing": d_loss_d_forcing,
@@ -1026,8 +1027,7 @@ def _fringing_parameter_loss_gradients(
 ) -> dict[str, jnp.ndarray]:
     """Evaluate one four-control objective and its named gradients."""
 
-    loss = objective(*values)
-    gradients = jax.grad(objective, argnums=(0, 1, 2, 3))(*values)
+    loss, gradients = jax.value_and_grad(objective, argnums=(0, 1, 2, 3))(*values)
     return {"loss": loss, **dict(zip(_FRINGING_GRADIENT_KEYS, gradients, strict=True))}
 
 
