@@ -487,7 +487,8 @@ def _draw_central_cell(ax, spec: WhamBlanketLoop) -> None:
     )
 
 
-def _set_equal_3d(ax, x: np.ndarray, y: np.ndarray, z: np.ndarray, spec: WhamBlanketLoop) -> None:
+def _set_equal_3d(ax, x: np.ndarray, y: np.ndarray, z: np.ndarray,
+                  spec: WhamBlanketLoop, aspect_z: float = 0.70) -> None:
     xlim = (min(float(np.min(x)), -spec.central_cell_radius) - 0.25, max(float(np.max(x)), spec.central_cell_radius) + 0.25)
     ylim = (min(float(np.min(y)), -spec.bend_radius) - 0.35, max(float(np.max(y)), spec.bend_radius) + 0.35)
     zlim = (-0.65 * spec.coil_separation, 0.65 * spec.coil_separation)
@@ -498,7 +499,7 @@ def _set_equal_3d(ax, x: np.ndarray, y: np.ndarray, z: np.ndarray, spec: WhamBla
     ax.set_ylim(centers[1] - radius, centers[1] + radius)
     ax.set_zlim(centers[2] - radius, centers[2] + radius)
     try:
-        ax.set_box_aspect((1.0, 1.0, 0.7))
+        ax.set_box_aspect((1.0, 1.0, aspect_z))
     except Exception:  # pragma: no cover - compatibility with older Matplotlib.
         pass
 

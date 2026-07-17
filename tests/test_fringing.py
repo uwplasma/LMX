@@ -34,7 +34,6 @@ from lmx.fringing import (
     build_pipe_ogrid_extruded_problem,
     build_square_duct_extruded_problem,
     build_square_duct_fringing_benchmark,
-    build_variable_field_duct_extruded_problem,
     build_variable_field_bent_pipe_extruded_problem,
     build_variable_field_layered_extruded_problem,
     build_variable_field_pipe_ogrid_extruded_problem,
@@ -2324,20 +2323,6 @@ def test_solve_extruded_inductionless_projection_returns_finite_bent_pipe_bundle
     assert isinstance(validation["validation_pass"], bool)
 
 
-def test_solve_extruded_inductionless_supports_analytic_variable_field():
-    problem = build_variable_field_duct_extruded_problem(nx_stations=7, ny=10, nz=10)
-    solution = solve_extruded_inductionless(problem)
-    validation = validate_variable_field_extruded_solution(
-        solution, field_ny=41, field_nz=41
-    )
-
-    assert solution.bundle.geometry_kind == "rect_duct"
-    assert jnp.all(jnp.isfinite(solution.bundle.u))
-    assert validation["mean_velocity_change"] > 0.0
-    assert validation["current_proxy_change"] > 0.0
-    assert isinstance(validation["validation_pass"], bool)
-
-
 def test_solve_extruded_inductionless_supports_layered_analytic_variable_field():
     problem = build_variable_field_layered_extruded_problem(nx_stations=7, ny=10, nz=10)
     solution = solve_extruded_inductionless(problem)
@@ -2349,6 +2334,10 @@ def test_solve_extruded_inductionless_supports_layered_analytic_variable_field()
     assert jnp.all(jnp.isfinite(solution.bundle.u))
     assert validation["mean_velocity_change"] > 0.0
     assert isinstance(validation["validation_pass"], bool)
+    bad = replace(solution, bundle=replace(
+        solution.bundle, u=solution.bundle.u.at[0, 0, 0].set(jnp.nan)))
+    invalid = validate_variable_field_extruded_solution(bad, field_ny=5, field_nz=5)
+    assert (invalid["finite_velocity"], invalid["validation_pass"]) == (False, False)
 
 
 def test_solve_extruded_inductionless_supports_tabulated_variable_field(tmp_path):

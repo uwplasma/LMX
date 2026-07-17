@@ -297,8 +297,13 @@ def test_variable_field_extruded_demo_writes_summary(tmp_path: Path):
     module.NZ = 16
     module.NX_STATIONS = 9
     summary = module.run_variable_field_extruded_demo()
+    validation = summary["validation"]
     assert summary["case"] == "variable_field_extruded"
-    assert summary["validation"]["validation_pass"] in {True, False}
+    assert summary["geometry_kind"] == "rect_duct"
+    assert validation["finite_velocity"] is True
+    assert validation["mean_velocity_change"] > 0.0
+    assert validation["current_proxy_change"] > 0.0
+    assert isinstance(validation["validation_pass"], bool)
     assert (tmp_path / "extruded_overview.png").exists()
     assert (tmp_path / "variable_field_extruded_summary.json").exists()
 

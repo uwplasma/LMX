@@ -5079,6 +5079,7 @@ def validate_variable_field_extruded_solution(
         solution, field_ny=field_ny, field_nz=field_nz
     )
     validation = solution.validation
+    finite_velocity = bool(np.isfinite(np.asarray(solution.bundle.u, dtype=float)).all())
     field_scale = np.asarray(solution.bundle.field_scale, dtype=float)
     mean_velocity = np.asarray(solution.bundle.mean_velocity, dtype=float)
     current_proxy = np.asarray(
@@ -5101,7 +5102,8 @@ def validate_variable_field_extruded_solution(
         5.0e-2 if solution.problem.case.geometry.kind == "rect_duct" else 2.0e-1
     )
     validation_pass = bool(
-        field_metrics["rms_divergence"] <= 5.0e-2
+        finite_velocity
+        and field_metrics["rms_divergence"] <= 5.0e-2
         and validation.max_charge_balance_residual <= charge_limit
         and validation.net_boundary_current_residual <= 1.0e-8
         and validation.max_wall_current_leakage <= 1.0e-8
@@ -5111,6 +5113,7 @@ def validate_variable_field_extruded_solution(
     )
     return {
         **field_metrics,
+        "finite_velocity": finite_velocity,
         "field_velocity_correlation": field_velocity_correlation,
         "mean_velocity_change": velocity_change,
         "current_proxy_change": current_proxy_change,

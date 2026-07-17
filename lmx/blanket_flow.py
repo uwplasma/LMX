@@ -19,6 +19,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from .blanket_geometry import WhamBlanketLoop, build_wham_blanket_centerline, tube_surface_from_centerline
+from .blanket_geometry import _set_equal_3d
 from .field_models import sample_wham_mirror_field
 
 
@@ -1286,7 +1287,7 @@ def _plot_flow_route(ax, flow: dict[str, object], *, color_values: np.ndarray, l
     ax.set_zlabel("")
     ax.set_title("Route colored by transverse field")
     ax.view_init(elev=24, azim=-42)
-    _set_route_limits(ax, x, y, z, geometry)
+    _set_equal_3d(ax, x, y, z, geometry, aspect_z=0.72)
     plt.colorbar(collection, ax=ax, shrink=0.60, pad=0.15, label=label)
 
 
@@ -1342,7 +1343,7 @@ def _render_movie_frame(
     ax3d.set_ylabel("y [m]")
     ax3d.set_zlabel("")
     ax3d.view_init(elev=25, azim=-44)
-    _set_route_limits(ax3d, x, y, z, geometry)
+    _set_equal_3d(ax3d, x, y, z, geometry, aspect_z=0.72)
 
     section_flow = {**flow, "velocity_sections": np.asarray(flow["velocity_sections"], dtype=float) * fill_fraction[:, None, None]}
     _plot_velocity_section(ax_section, section_flow, selected_station_index, title=f"s={station[selected_station_index]:.2f} m")
@@ -1418,7 +1419,7 @@ def _render_transient_movie_frame(
     ax3d.set_ylabel("y [m]")
     ax3d.set_zlabel("")
     ax3d.view_init(elev=25, azim=-44)
-    _set_route_limits(ax3d, x, y, z, geometry)
+    _set_equal_3d(ax3d, x, y, z, geometry, aspect_z=0.72)
 
     scale = velocity / max(float(base_flow["settings"].mean_velocity), 1.0e-12)
     section_flow = {**base_flow, "velocity_sections": np.asarray(base_flow["velocity_sections"], dtype=float) * scale[:, None, None]}
@@ -1649,22 +1650,6 @@ def _draw_simple_coils(ax, geometry: WhamBlanketLoop) -> None:
             linewidth=0.8,
             alpha=0.75,
         )
-
-
-def _set_route_limits(ax, x: np.ndarray, y: np.ndarray, z: np.ndarray, geometry: WhamBlanketLoop) -> None:
-    xlim = (min(float(np.min(x)), -geometry.central_cell_radius) - 0.25, max(float(np.max(x)), geometry.central_cell_radius) + 0.25)
-    ylim = (min(float(np.min(y)), -geometry.bend_radius) - 0.35, max(float(np.max(y)), geometry.bend_radius) + 0.35)
-    zlim = (-0.65 * geometry.coil_separation, 0.65 * geometry.coil_separation)
-    ranges = np.array([xlim[1] - xlim[0], ylim[1] - ylim[0], zlim[1] - zlim[0]])
-    centers = np.array([sum(xlim) / 2.0, sum(ylim) / 2.0, sum(zlim) / 2.0])
-    radius = 0.5 * float(np.max(ranges))
-    ax.set_xlim(centers[0] - radius, centers[0] + radius)
-    ax.set_ylim(centers[1] - radius, centers[1] + radius)
-    ax.set_zlim(centers[2] - radius, centers[2] + radius)
-    try:
-        ax.set_box_aspect((1.0, 1.0, 0.72))
-    except Exception:  # pragma: no cover - older Matplotlib.
-        pass
 
 
 def _cumulative_trapezoid(values: np.ndarray, coordinate: np.ndarray) -> np.ndarray:
