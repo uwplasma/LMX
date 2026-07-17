@@ -4310,50 +4310,6 @@ def smooth_fringing_profile(
     return FringingProfile(x=x, field_scale=peak_scale * rise * fall, axis=axis)
 
 
-def build_square_duct_fringing_benchmark(
-    *,
-    ha_peak: float = 20.0,
-    width: float = 2.0,
-    height: float = 2.0,
-    ny: int = 48,
-    nz: int = 48,
-    length: float = 6.0,
-    nx_stations: int = 21,
-    entry_center: float = 1.5,
-    exit_center: float = 4.5,
-    transition_width: float = 0.35,
-) -> tuple[CaseSpec, FringingProfile]:
-    base_case = make_shercliff_case(
-        ha=ha_peak, width=width, height=height, ny=ny, nz=nz
-    )
-    base_case = replace(
-        base_case,
-        geometry=replace(base_case.geometry, length=length, nx=nx_stations),
-        time_stepper=replace(
-            base_case.time_stepper,
-            max_steps=min(base_case.time_stepper.max_steps, 80),
-            potential_iterations=min(base_case.time_stepper.potential_iterations, 80),
-            steady_tolerance=1.0e-6,
-        ),
-        solver=replace(
-            base_case.solver,
-            kind="extruded_inductionless",
-            coupling_iterations=min(base_case.solver.coupling_iterations, 8),
-            coupling_tolerance=1.0e-7,
-        ),
-    )
-    profile = smooth_fringing_profile(
-        length=length,
-        nx=nx_stations,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-        peak_scale=1.0,
-        axis="z",
-    )
-    return base_case, profile
-
-
 def build_square_duct_extruded_problem(
     *,
     ha_peak: float = 20.0,
@@ -4367,17 +4323,33 @@ def build_square_duct_extruded_problem(
     exit_center: float = 4.5,
     transition_width: float = 0.35,
 ) -> ExtrudedInductionlessProblem:
-    case, profile = build_square_duct_fringing_benchmark(
-        ha_peak=ha_peak,
-        width=width,
-        height=height,
-        ny=ny,
-        nz=nz,
+    case = make_shercliff_case(
+        ha=ha_peak, width=width, height=height, ny=ny, nz=nz
+    )
+    case = replace(
+        case,
+        geometry=replace(case.geometry, length=length, nx=nx_stations),
+        time_stepper=replace(
+            case.time_stepper,
+            max_steps=min(case.time_stepper.max_steps, 80),
+            potential_iterations=min(case.time_stepper.potential_iterations, 80),
+            steady_tolerance=1.0e-6,
+        ),
+        solver=replace(
+            case.solver,
+            kind="extruded_inductionless",
+            coupling_iterations=min(case.solver.coupling_iterations, 8),
+            coupling_tolerance=1.0e-7,
+        ),
+    )
+    profile = smooth_fringing_profile(
         length=length,
-        nx_stations=nx_stations,
+        nx=nx_stations,
         entry_center=entry_center,
         exit_center=exit_center,
         transition_width=transition_width,
+        peak_scale=1.0,
+        axis="z",
     )
     return ExtrudedInductionlessProblem(case=case, profile=profile)
 
