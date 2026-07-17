@@ -140,7 +140,7 @@ Q2D-MHDfoam parity and blanket validation remain open.
 ![Monitored multi-minute CPU scaling and shared-host GPU calibration](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/strong_scaling.webp)
 
 On a fixed `256 × 67 × 67` grid, three warm 32-update CPU trajectories per rung
-take 250.756/173.993/151.342 s and reach **1.441×/1.657×** on two/four JAX
+take 244.181/172.682/146.768 s and reach **1.414×/1.664×** on two/four JAX
 devices. This is Docker CPU-allocation scaling, not physical-core or
 steady-state evidence. The 96-update GPU trajectories take 159–259 s and reach
 1.626× on two A4000s, but foreign contexts keep that result a shared-host

@@ -8,9 +8,9 @@ coarse B2 trajectory passes linear, conservation, restart, and placement gates
 but misses steady acceptance; no continuation is authorized.
 
 The current monitored `256 x 67 x 67`, 32-update CPU ladder passes every frozen
-Docker-allocation gate. Source `6f89d1a`, evaluated by `6729bdf`, gives
-250.756/173.993/151.342-second medians, 1.441x/1.657x two/four-device speedups,
-4.758/5.078/5.578 GB peak RSS, and 0.631% maximum CV. Numerics, restart,
+Docker-allocation gate. Source/evaluator `9e49a9b` gives
+244.181/172.682/146.768-second medians, 1.414x/1.664x two/four-device speedups,
+4.709/5.201/5.486 GB peak RSS, and 0.653% maximum CV. Large-work, numerics, restart,
 placement, and admission/runtime/postflight traces pass. Exact M4 P/E-core
 mapping remains open, and step-limit trajectories are not steady-state
 evidence. The 1.626x two-A4000 calibration remains non-authoritative because
@@ -192,9 +192,9 @@ verifiable affinity; forced macOS devices prove topology only.
 The historical 32-update CPU calibration used only static preflight. A later
 24-update ladder was correctly rejected for one/four-device instability,
 two-device swapout, and one 117.941-second sample. The fresh monitored
-evaluation of source `6f89d1a` by `6729bdf` passes:
-250.756/173.993/151.342-second medians, 1.441x/1.657x speedups,
-4.758/5.078/5.578 GB peak RSS, 0.631% maximum CV, and clean
+evaluation at source/evaluator `9e49a9b` passes:
+244.181/172.682/146.768-second medians, 1.414x/1.664x speedups,
+4.709/5.201/5.486 GB peak RSS, 0.653% maximum CV, and clean
 continuous/postflight traces. This closes Docker CPU-allocation scaling only;
 do not relabel it physical-core scaling or steady-state evidence because every
 trajectory ends at the fixed 32-update step limit.
