@@ -16,9 +16,9 @@ are diagnostics, and the GPU timing remains a calibration.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 864 pass, 8 skip, 95.42% combined line/branch coverage, 122.8 s | 41% of the five-minute target and 20% of the ten-minute budget |
+| portable test gate | Apple M4, six workers | 861 pass, 8 skip, 95.42% combined line/branch coverage, 124.1 s | 41% of the five-minute target and 21% of the ten-minute budget |
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
-| B2 monitored CPU scaling | `256 x 67 x 67`, 32 updates, 2/4/8 guest CPUs, 1/2/4 JAX devices, three warm trajectories per topology | 244.181/172.682/146.768 s; 1.414x/1.664x; peak process RSS 4.709/5.201/5.486 GB; CV at most 0.653% | accepted at source/evaluator `9e49a9b`; large-work, environment, numerics, restart, and placement pass; exact host-core mapping and steady-state acceptance remain open |
+| B2 monitored CPU scaling | `256 x 67 x 67`, 32 updates, 2/4/8 guest CPUs, 1/2/4 JAX devices, three warm trajectories per topology | 246.691/172.410/147.465 s; 1.431x/1.673x; peak process RSS 4.934/5.150/5.485 GB; CV at most 0.359% | accepted at source/evaluator `cbf4358`; large-work, environment, numerics, restart, and placement pass; exact host-core mapping and steady-state acceptance remain open |
 | B2 multi-minute GPU calibration | `256 x 67 x 67`, 1/2 RTX A4000, 96 updates, three warm trajectories per topology | 258.913/159.234 s; 1.626x; peak device memory 2.50 GB vs 1.41/1.31 GB; CV below 0.29% | recorded source `78858f5`; numerical/duration gates pass, but persistent foreign contexts block an authoritative timing claim |
 | B2 pseudo-time gate | Apple M4, corrected warm `7 x 7 x 7`, canonical `Ha=2900`, `N=540` equations | 64x/32x/16x map-rate spread 0.0768%; raw updates halve; exact restart | 64x refrozen; versioned stopping threshold open |
 | B2 physical-residual probe | Apple M4, `7 x 7 x 7` | residual 0.03870 at step 90; omitted reconstruction force is 0.0880 at step 4 | diagnostic has a plausible coarse split floor; never a stopping gate |
@@ -178,10 +178,10 @@ solve only 0.85% (`0.7437` to `0.7374` seconds). That fast path is rejected
 before the large rung. These results remain forced-device sharding evidence,
 not physical-core strong scaling.
 
-The 32-update evaluation at source/evaluator `9e49a9b` closes the
-Docker-allocation gate. Its 244.181/172.682/146.768 s medians give
-1.414x/1.664x speedups; peak RSS is 4.709/5.201/5.486 GB and the maximum warm
-CV is 0.653%. Fresh admissions, full worker monitoring, 15-second postflights,
+The 32-update evaluation at source/evaluator `cbf4358` closes the
+Docker-allocation gate. Its 246.691/172.410/147.465 s medians give
+1.431x/1.673x speedups; peak RSS is 4.934/5.150/5.485 GB and the maximum warm
+CV is 0.359%. Fresh admissions, full worker monitoring, 15-second postflights,
 pressure convergence, repeat signatures, restart/replay, placement, and
 topology equivalence all pass. Linux affinity is verified inside Docker;
 Docker Desktop does not expose exact Apple M4 P/E-core placement. Each fixed

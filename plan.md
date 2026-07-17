@@ -8,9 +8,9 @@ coarse B2 trajectory passes linear, conservation, restart, and placement gates
 but misses steady acceptance; no continuation is authorized.
 
 The current monitored `256 x 67 x 67`, 32-update CPU ladder passes every frozen
-Docker-allocation gate. Source/evaluator `9e49a9b` gives
-244.181/172.682/146.768-second medians, 1.414x/1.664x two/four-device speedups,
-4.709/5.201/5.486 GB peak RSS, and 0.653% maximum CV. Large-work, numerics, restart,
+Docker-allocation gate. Source/evaluator `cbf4358` gives
+246.691/172.410/147.465-second medians, 1.431x/1.673x two/four-device speedups,
+4.934/5.150/5.485 GB peak RSS, and 0.359% maximum CV. Large-work, numerics, restart,
 placement, and admission/runtime/postflight traces pass. Exact M4 P/E-core
 mapping remains open, and step-limit trajectories are not steady-state
 evidence. The 1.626x two-A4000 calibration remains non-authoritative because
@@ -128,7 +128,7 @@ shared without removing cases or assertions.
 | test files / lines | 30 / 20,983 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,574,225 bytes | stay below 4,574,226 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,575,563 bytes | stay below 4,575,564 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -178,8 +178,8 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
-The current gate passes 864 tests with 8 expected skips and 95.42% combined
-coverage in 122.8 seconds. Shared centerline validation removes 20 source lines;
+The current gate passes 861 tests with 8 expected skips and 95.42% combined
+coverage in 124.1 seconds. Shared centerline validation removes 20 source lines;
 the layered-flow consolidation removes 17 test lines and one redundant
 6.894-second solve while retaining finite-field, current, and physics gates.
 Shared figure-pair assertions subsequently remove another 20 test lines while
@@ -204,9 +204,9 @@ verifiable affinity; forced macOS devices prove topology only.
 The historical 32-update CPU calibration used only static preflight. A later
 24-update ladder was correctly rejected for one/four-device instability,
 two-device swapout, and one 117.941-second sample. The fresh monitored
-evaluation at source/evaluator `9e49a9b` passes:
-244.181/172.682/146.768-second medians, 1.414x/1.664x speedups,
-4.709/5.201/5.486 GB peak RSS, 0.653% maximum CV, and clean
+evaluation at source/evaluator `cbf4358` passes:
+246.691/172.410/147.465-second medians, 1.431x/1.673x speedups,
+4.934/5.150/5.485 GB peak RSS, 0.359% maximum CV, and clean
 continuous/postflight traces. This closes Docker CPU-allocation scaling only;
 do not relabel it physical-core scaling or steady-state evidence because every
 trajectory ends at the fixed 32-update step limit.

@@ -135,7 +135,7 @@ validation remain open.
 ![Multi-minute strong scaling](https://raw.githubusercontent.com/uwplasma/LMX/main/docs/_static/strong_scaling.webp)
 
 Fixed `256 × 67 × 67` results: CPU (32 updates, three warm/rung) takes
-244.181/172.682/146.768 s, reaching **1.414×/1.664×** on 2/4 JAX devices; this is
+246.691/172.410/147.465 s, reaching **1.431×/1.673×** on 2/4 JAX devices; this is
 Docker allocation, not physical-core or steady-state evidence. GPU (96 updates)
 takes 159–259 s, reaching 1.626× on two A4000s; foreign contexts make it
 shared-host calibration.
@@ -143,7 +143,7 @@ shared-host calibration.
 
 ## Quality and citation
 
-Portable gate: **864 tests**, **95.42% line/branch coverage**, **122.8 s** on six
+Portable gate: **861 tests**, **95.42% line/branch coverage**, **124.1 s** on six
 Apple-Silicon workers.
 [Testing](https://lmx.readthedocs.io/en/latest/testing.html) ·
 [Theory](https://lmx.readthedocs.io/en/latest/theory.html) ·

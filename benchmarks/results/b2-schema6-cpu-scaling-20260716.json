@@ -1,6 +1,6 @@
 {
-  "schema_version": 10,
-  "date": "2026-07-16",
+  "schema_version": 11,
+  "date": "2026-07-17",
   "baseline_commit": "aaa41b19c2e22f16b7bdbf1029f6c2c4b5b24e49",
   "optimized_commit": "14376199f84bb1fc0116e2928809a67da2f09c17",
   "recorded_source_fingerprint": "e6feb1c7f0ece39ba42c67673c4193bacf86e654b6498328a6c401b7a557b090",
@@ -402,8 +402,8 @@
     "classification": "current-source preflight-admitted multi-minute Docker CPU-allocation calibration; continuous host monitoring, exact M4 host-core placement, steady convergence, and B2 solution acceptance remain open"
   },
   "current_monitored_cpu_scaling": {
-    "source_commit": "9e49a9b56c260fa18fc35c9e59e96269a02076d2",
-    "source_fingerprint": "33970eeea043137be5a3789ade8c862227aede7907430519c6053b570a5f7fc3",
+    "source_commit": "cbf4358deb765cee2e82a7b07e2845fb5466e925",
+    "source_fingerprint": "231007891a65c196d192af799a87c9f32b3f40de0329959b2fc3a9aca4d5b086",
     "shape": [256, 67, 67],
     "total_cells": 1149184,
     "updates_per_trajectory": 32,
@@ -413,19 +413,19 @@
     "runtime": "native ARM64 Docker with 2/4/8-CPU taskset masks for 1/2/4 JAX devices",
     "environment": {"python": "3.12.13", "jax": "0.10.2", "jaxlib": "0.10.2", "solvax": "0.8.4", "precision": "float64", "memory_limit_bytes": 7864320000},
     "runs": {
-      "1": {"allocated_cpus": 2, "cold_seconds": 251.608552573, "warm_samples_seconds": [247.547855654, 244.11665023599994, 244.18054023499997], "warm_median_seconds": 244.18054023499997, "warm_cv": 0.006533871505966327, "speedup": 1.0, "parallel_efficiency": 1.0, "peak_host_rss_bytes": 4709371904, "duration_passed": true, "large_fixed_work_passed": true, "measurement_class": "sustained-multiminute", "admission_max_cpu_utilization_percent": 0.08334722453742227, "monitor_verified": true, "monitor_rows": 1138, "monitored_worker_seconds": 1122.710234261, "monitor_postflight_seconds": 15.130239486694336, "max_monitor_gap_seconds": 1.015050416999884, "monitor_violation_count": 0},
-      "2": {"allocated_cpus": 4, "cold_seconds": 178.75868724899988, "warm_samples_seconds": [172.68221983000012, 171.66674524500013, 172.73937662100002], "warm_median_seconds": 172.68221983000012, "warm_cv": 0.0028586457399808717, "speedup": 1.4140456410358144, "parallel_efficiency": 0.7070228205179072, "peak_host_rss_bytes": 5201346560, "duration_passed": true, "large_fixed_work_passed": true, "measurement_class": "sustained-multiminute", "admission_max_cpu_utilization_percent": 0.05001667222407358, "monitor_verified": true, "monitor_rows": 813, "monitored_worker_seconds": 797.1138785730002, "monitor_postflight_seconds": 15.141478538513184, "max_monitor_gap_seconds": 1.0155476249997264, "monitor_violation_count": 0},
-      "4": {"allocated_cpus": 8, "cold_seconds": 153.83424219400013, "warm_samples_seconds": [146.76803331700012, 147.91925919300002, 146.75065281600018], "warm_median_seconds": 146.76803331700012, "warm_cv": 0.0037162804986583006, "speedup": 1.663717464330951, "parallel_efficiency": 0.41592936608273773, "peak_host_rss_bytes": 5485969408, "duration_passed": true, "large_fixed_work_passed": true, "measurement_class": "sustained-multiminute", "admission_max_cpu_utilization_percent": 0.05000833472245114, "monitor_verified": true, "monitor_rows": 701, "monitored_worker_seconds": 685.509662937, "monitor_postflight_seconds": 15.15856647491455, "max_monitor_gap_seconds": 1.0163098760003777, "monitor_violation_count": 0}
+      "1": {"allocated_cpus": 2, "cold_seconds": 254.28422411500003, "warm_samples_seconds": [245.4358141529999, 246.69121436299997, 247.46951215500007], "warm_median_seconds": 246.69121436299997, "warm_cv": 0.0033984805612042824, "speedup": 1.0, "parallel_efficiency": 1.0, "peak_host_rss_bytes": 4934418432, "duration_passed": true, "large_fixed_work_passed": true, "measurement_class": "sustained-multiminute", "admission_max_cpu_utilization_percent": 0.08333333333333526, "monitor_verified": true, "monitor_rows": 1146, "monitored_worker_seconds": 1131.010730099, "monitor_postflight_seconds": 15.155356168746948, "max_monitor_gap_seconds": 1.0151438339999004, "monitor_violation_count": 0},
+      "2": {"allocated_cpus": 4, "cold_seconds": 178.21709441500002, "warm_samples_seconds": [172.30979570399995, 172.41016978699963, 172.50821732900022], "warm_median_seconds": 172.41016978699963, "warm_cv": 0.0004698534301765451, "speedup": 1.4308391127261764, "parallel_efficiency": 0.7154195563630882, "peak_host_rss_bytes": 5150068736, "duration_passed": true, "large_fixed_work_passed": true, "measurement_class": "sustained-multiminute", "admission_max_cpu_utilization_percent": 0.06666666666667043, "monitor_verified": true, "monitor_rows": 813, "monitored_worker_seconds": 797.1138029890003, "monitor_postflight_seconds": 15.190211057662964, "max_monitor_gap_seconds": 1.017518083000141, "monitor_violation_count": 0},
+      "4": {"allocated_cpus": 8, "cold_seconds": 153.27591423700005, "warm_samples_seconds": [147.15996002500015, 147.46529035799995, 148.40669156700005], "warm_median_seconds": 147.46529035799995, "warm_cv": 0.0035929513032555175, "speedup": 1.67287646987376, "parallel_efficiency": 0.41821911746844, "peak_host_rss_bytes": 5485244416, "duration_passed": true, "large_fixed_work_passed": true, "measurement_class": "sustained-multiminute", "admission_max_cpu_utilization_percent": 0.13333333333332975, "monitor_verified": true, "monitor_rows": 713, "monitored_worker_seconds": 698.0017158169999, "monitor_postflight_seconds": 15.143978834152222, "max_monitor_gap_seconds": 1.0147211670000615, "monitor_violation_count": 0}
     },
     "equivalence": {"pressure_solves_converged": true, "repeat_signatures_exact": true, "restart_replay_exact": true, "schema6_anderson": true, "placement": true, "cross_topology_within_tolerance": true, "current_l2_max_relative_difference": 7.928297148972414e-12, "pressure_observable_max_tolerance_ratio": 4.313350703977279e-05, "anderson_weights_max_tolerance_ratio": 0.029944076057241597},
     "gates": {"complete_topology": true, "fixed_work_identity": true, "large_fixed_work": true, "minimum_duration": true, "timing_stability": true, "schema6_and_physics": true, "placement": true, "memory_recorded": true, "continuous_environment_verified": true, "environment_verified": true, "sustained_strong_scaling": true},
     "input_sha256": "bf61afda96beb7e1feeec4cbb7406ed35047329a19ec31c0a93d819cfbb2108e",
     "evaluator_sha256": "5cdd237adcb66cd93c15f4c34fff94efceba565249fb70c23f4fe753b55d03aa",
-    "acceptance_evaluator_commit": "9e49a9b56c260fa18fc35c9e59e96269a02076d2",
+    "acceptance_evaluator_commit": "cbf4358deb765cee2e82a7b07e2845fb5466e925",
     "acceptance_evaluator_sha256": "484523628b0a85e837d87cc375d769a6bf9eddf2423e7f3742df6985c124db54",
-    "admission_sha256": {"1": "061198c43c8c3c88604b67dc4027d9ce239c5b1f5fe712f943a9a5c9a50ef7b0", "2": "90b227191655c3674ed2506d909571ee0db88a32d5cbe70edf5867a2a1486f1a", "4": "9923399f383b71782355bb0a4ab9ebbfffeb342caf2146d4a96b79a50b5bc4f2"},
-    "worker_sha256": {"1": "a83d01c5c93fde044e1410c49a10b3fc7fcbb485bdc37648fa3371bc5a358c54", "2": "b1064c3e36e51fb554c9cfd4a3060d75c64b796686268005de19f2f7173e41f5", "4": "a10ea733f8994a0190b0505e2d3ac08e7079b949da4b09db78a5848931e2036b"},
-    "monitor_sha256": {"1": "b0107b347d0745cecc506bec23ef27d3de59448d950c6c58f3bc957cc34611fb", "2": "887f69eb55048092c0b43b674e6f01af037e05c01e8164bd24c45454e598b28f", "4": "2c967b6bb8eeaf1997989cbef66e79c782da84b904b5306444901a733bbd261e"},
+    "admission_sha256": {"1": "7e04947e2350e525ec1ba46f2f04d7631877c82357c9f4555534e78d5e788a4e", "2": "e887a9c2777c609007f3e24d4d3ff2b52a3c0bc26d807d8e92d8516fa1fa3e7e", "4": "e3116c3f6abe7c2da96ecb2f8e18fbb5751daabd9bfc52a01735043414e90e54"},
+    "worker_sha256": {"1": "8efdb524b29aef16d4bafe6c572333c16caeb09fd7d5c7bdf6471848f7c997a6", "2": "6d96fbf587b149885f55388b9bba0152b74620986dc125372ac7845b5de9c114", "4": "b1bb56f73d045734c1df8c253f33467746354c972caac32d8d10d18ab828cbb0"},
+    "monitor_sha256": {"1": "356a10dfc0593d9abb95f0ef3e375ae6a77bec71b1cd3ff208b029e5a58a6831", "2": "0d15d9f22490289366728343cd550aedb74c24de1f6c85bb6761a599c5132815", "4": "bf188aff469dde41b279c8ed40bb880f8b2cf1987ba60cc4f276b8fd502cd96d"},
     "rejected_24_update_diagnostic": {"source_commit": "59549cb44f76e195a8efce6c7002486cbff83d94", "warm_medians_seconds": [193.23395121399972, 132.96173122799973, 133.753264768], "warm_cv": [0.08458886978023203, 0.015540886362836173, 0.12908629028811835], "reason": "one/four-device timing instability, 179 two-device swapout pages, and one 117.941-second sample"},
     "classification": "accepted continuously monitored multi-minute Docker CPU-allocation strong scaling; exact M4 physical-core mapping, steady-state convergence, and B2 solution acceptance remain open"
   },
