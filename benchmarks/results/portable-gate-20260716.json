@@ -1,7 +1,7 @@
 {
-  "schema_version": 39,
+  "schema_version": 40,
   "date": "2026-07-17",
-  "commit": "c7f4321c5a8726c19eebe18bf4fa2cf567c0f4cd",
+  "commit": "75d167b41fad58328aac5a4493976d0a1596ae88",
   "hardware": {
     "model": "Mac mini (Mac16,10)",
     "chip": "Apple M4",
@@ -20,56 +20,56 @@
   },
   "result": {
     "test_files": 30,
-    "test_lines": 21099,
+    "test_lines": 21094,
     "passed": 868,
     "skipped": 8,
-    "pytest_seconds": 123.35,
-    "gate_seconds": 123.7,
-    "covered_lines": 13954,
-    "total_lines": 14358,
+    "pytest_seconds": 122.84,
+    "gate_seconds": 123.2,
+    "covered_lines": 13951,
+    "total_lines": 14355,
     "covered_branches": 2551,
     "total_branches": 2940,
-    "combined_line_branch_coverage_percent": 95.41565498901608,
+    "combined_line_branch_coverage_percent": 95.41485978606534,
     "passed_gate": true
   },
   "artifacts": {
-    "coverage_xml_sha256": "7f7716913a5d015d6b0178409e61f525ef8cf2cdb3524b035126ec9502181a05",
-    "junit_xml_sha256": "678bfda568da72fa228c5a40e6606184a59ea06612604c26325d42f2cd359494"
+    "coverage_xml_sha256": "b4b3b774f4de07d31ccef8306e9c094eff29d07183460aec4958f61e73478942",
+    "junit_xml_sha256": "0f383171d036a5473fa27dd397d378de2dd0f23ad9a53b1ef8370e8112c3c90e"
   },
   "duration_note": "Current wrapper, pytest, coverage, JUnit, and slowest-node records come from the same six-worker gate.",
   "slowest_tests": [
-    {"seconds": 32.522, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
-    {"seconds": 23.878, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
-    {"seconds": 16.457, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
-    {"seconds": 16.132, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"},
-    {"seconds": 14.882, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
-    {"seconds": 14.364, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
-    {"seconds": 12.867, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"},
-    {"seconds": 12.545, "nodeid": "tests.test_example_runner::test_variable_field_extruded_demo_writes_summary"},
-    {"seconds": 11.762, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow"},
-    {"seconds": 11.258, "nodeid": "tests.test_fringing::test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradient"}
+    {"seconds": 34.279, "nodeid": "tests.test_benchmarks::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"},
+    {"seconds": 23.538, "nodeid": "tests.test_benchmarks::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"},
+    {"seconds": 16.828, "nodeid": "tests.test_fringing::test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow"},
+    {"seconds": 16.352, "nodeid": "tests.test_fringing::test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff"},
+    {"seconds": 16.195, "nodeid": "tests.test_autodiff::test_fringing_response_inverse_design_reduces_loss"},
+    {"seconds": 16.101, "nodeid": "tests.test_autodiff::test_extruded_target_inverse_design_uses_surrogate_for_nonrect_geometry"},
+    {"seconds": 14.084, "nodeid": "tests.test_fringing::test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg"},
+    {"seconds": 12.482, "nodeid": "tests.test_autodiff::test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference"},
+    {"seconds": 12.455, "nodeid": "tests.test_example_runner::test_variable_field_extruded_demo_writes_summary"},
+    {"seconds": 12.130, "nodeid": "tests.test_fringing::test_solve_extruded_inductionless_supports_layered_analytic_variable_field"}
   ],
   "comparison": {
-    "previous_gate_seconds": 124.1,
-    "previous_pytest_seconds": 123.76,
-    "wall_time_change_percent": -0.322320709105564,
-    "pytest_seconds_change_percent": -0.331286360698126,
-    "budget_fraction": 0.20616666666666666,
-    "engineering_target_fraction": 0.41233333333333333,
+    "previous_gate_seconds": 123.7,
+    "previous_pytest_seconds": 123.35,
+    "wall_time_change_percent": -0.40420371867421184,
+    "pytest_seconds_change_percent": -0.41345764085933595,
+    "budget_fraction": 0.20533333333333334,
+    "engineering_target_fraction": 0.4106666666666667,
     "latest_slimming": {
-      "source_commit_before": "6e982f0540412bd7289e7302ee0c2c0f7d52f8b6",
-      "source_commit_after": "c7f4321c5a8726c19eebe18bf4fa2cf567c0f4cd",
+      "source_commit_before": "c7f4321c5a8726c19eebe18bf4fa2cf567c0f4cd",
+      "source_commit_after": "75d167b41fad58328aac5a4493976d0a1596ae88",
       "package_lines_before": 34310,
-      "package_lines_after": 34310,
-      "source_lines_removed": 0,
-      "test_lines_before": 20983,
-      "test_lines_after": 21099,
-      "test_lines_added": 116,
-      "test_cases_before": 869,
+      "package_lines_after": 34273,
+      "source_lines_removed": 37,
+      "test_lines_before": 21099,
+      "test_lines_after": 21094,
+      "test_lines_removed": 5,
+      "test_cases_before": 876,
       "test_cases_after": 876,
-      "test_cases_added": 7
+      "test_cases_removed": 0
     },
-    "interpretation": "The local-only reduced native-S3 harness adds archive safety, immutable-image, provenance, execution-shape, cleanup, and denial tests without a new test file. The suite remains one line below its ceiling, runs slightly faster than the preceding record, and stays at 21% of the hard budget with unchanged 95.42% combined coverage."
+    "interpretation": "Canonical base builders now own layered, pipe, and obstacle problem setup, deleting 37 package lines; optional-field skip consolidation and startup-pacing coverage leave five fewer test lines overall. The gate is slightly faster, remains below 21% of the hard budget, and preserves 95.41% combined coverage."
   },
   "scheduling_probe": {
     "evidence_scope": "historical",
@@ -83,12 +83,12 @@
     "decision": "retain six workers; the 3.4% change is below the promotion threshold, and module grouping would imbalance fringing and autodiff owners"
   },
   "architecture": {
-    "source_commit": "c7f4321c5a8726c19eebe18bf4fa2cf567c0f4cd",
+    "source_commit": "75d167b41fad58328aac5a4493976d0a1596ae88",
     "package_modules": 35,
-    "package_lines": 34310,
+    "package_lines": 34273,
     "maintained_core_lines": 7869,
     "maintenance_scripts": 13,
-    "tracked_checkout_bytes": 4600795,
+    "tracked_checkout_bytes": 4609979,
     "stable_root_exports": 30,
     "curated_examples": 11
   },

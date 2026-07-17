@@ -132,7 +132,7 @@ shared without removing cases or assertions.
 | test files / lines | 30 / 21,094 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,609,979 bytes | stay below 4,609,980 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,609,959 bytes | stay below 4,609,960 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -185,8 +185,8 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
-The current gate passes 868 tests with 8 expected skips and 95.42% combined
-coverage in 123.7 seconds. Shared centerline validation removes 20 source lines;
+The current gate passes 868 tests with 8 expected skips and 95.41% combined
+coverage in 123.2 seconds. Shared centerline validation removes 20 source lines;
 the layered-flow consolidation removes 17 test lines and one redundant
 6.894-second solve while retaining finite-field, current, and physics gates.
 Shared figure-pair assertions subsequently remove another 20 test lines while
