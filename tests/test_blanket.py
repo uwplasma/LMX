@@ -34,12 +34,8 @@ from lmx.mesh import generate_centerline_pipe_mesh
 
 pytestmark = pytest.mark.unit
 
-
-def _skip_without_magpylib_jax() -> None:
-    if importlib.util.find_spec("magpylib_jax") is None:
-        pytest.skip(
-            "magpylib_jax is optional and is not installed in the bounded CI environment"
-        )
+_NO_MAGPY = importlib.util.find_spec("magpylib_jax") is None
+_needs_magpy = pytest.mark.skipif(_NO_MAGPY, reason="magpylib_jax unavailable")
 
 
 def _uniform_field(x, y, z):
@@ -278,8 +274,8 @@ def test_blanket_pressure_budget_is_differentiable():
     assert float(gradient) > 0.0
 
 
+@_needs_magpy
 def test_wham_blanket_pressure_sensitivity_works_with_reduced_coils():
-    _skip_without_magpylib_jax()
     geometry = WhamBlanketLoop(
         pipe_radius=0.06, bend_radius=0.55, entry_length=0.4, central_cell_radius=0.28
     )

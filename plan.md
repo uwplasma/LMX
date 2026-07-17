@@ -16,6 +16,10 @@ mapping remains open, and step-limit trajectories are not steady-state
 evidence. The 1.626x two-A4000 calibration remains non-authoritative because
 foreign contexts block GPU admission.
 
+A composed momentum/projection JIT is rejected before sustained timing: its
+four-device medium screen improves only 3.6%, raises peak RSS 15.4%, and fails
+the frozen interface-current gate. Do not spend a multi-minute rung on it.
+
 The `--sustained` preset keeps 32 CPU or 96 GPU updates, one cold plus three
 warm trajectories, a 120-second warm minimum, an 1800-second ceiling, and
 checksummed per-rung admission plus continuous/postflight monitoring. Every
@@ -125,10 +129,10 @@ shared without removing cases or assertions.
 | package modules | 35 | no new module | 35 |
 | package lines | 34,310 | stay below 34,311 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 21,099 | no new file; next test change must reduce lines | 31 / 21,100 |
+| test files / lines | 30 / 21,087 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,600,907 bytes | stay below 4,600,908 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,601,136 bytes | stay below 4,601,137 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.

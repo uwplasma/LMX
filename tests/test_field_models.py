@@ -41,12 +41,8 @@ from lmx.mesh import generate_centerline_pipe_mesh
 
 pytestmark = pytest.mark.unit
 
-
-def _skip_without_magpylib_jax() -> None:
-    if importlib.util.find_spec("magpylib_jax") is None:
-        pytest.skip(
-            "magpylib_jax is optional and is not installed in the bounded CI environment"
-        )
+_NO_MAGPY = importlib.util.find_spec("magpylib_jax") is None
+_needs_magpy = pytest.mark.skipif(_NO_MAGPY, reason="magpylib_jax unavailable")
 
 
 def _straight_centerline() -> dict[str, np.ndarray]:
@@ -300,8 +296,8 @@ def test_tabulated_field_volume_sampling_supports_3d_npz(tmp_path):
     assert quality["normalized_magnitude_max"] == pytest.approx(1.0)
 
 
+@_needs_magpy
 def test_wham_mirror_axis_profile_is_symmetric():
-    _skip_without_magpylib_jax()
     x = np.linspace(-0.4, 0.4, 9)
     profile = np.asarray(
         sample_wham_mirror_axis_profile(
@@ -314,8 +310,8 @@ def test_wham_mirror_axis_profile_is_symmetric():
     assert profile == pytest.approx(profile[::-1], rel=1.0e-6, abs=1.0e-8)
 
 
+@_needs_magpy
 def test_wham_mirror_station_scale_is_normalized():
-    _skip_without_magpylib_jax()
     x = np.linspace(-0.5, 0.5, 11)
     scale = np.asarray(
         wham_mirror_station_scale(
@@ -328,8 +324,8 @@ def test_wham_mirror_station_scale_is_normalized():
     assert np.min(scale) >= 0.0
 
 
+@_needs_magpy
 def test_write_wham_mirror_field_npz_round_trip(tmp_path):
-    _skip_without_magpylib_jax()
     x = np.linspace(-0.3, 0.3, 5)
     y = np.linspace(-0.1, 0.1, 4)
     z = np.linspace(-0.1, 0.1, 4)

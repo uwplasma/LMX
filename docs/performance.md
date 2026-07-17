@@ -170,6 +170,12 @@ and two halo permutations per electric PCG iteration. Each contributes under
 This misses the 3% trigger for an anchored-gauge prototype; the remaining local
 gap is compute/scheduling dominated rather than a single communication defect.
 
+Composing momentum and pressure projection into one sharded JIT is also
+rejected. On the `128 x 35 x 35`, four-update screen its 1.543 s median is only
+3.6% below the 1.601 s control, while peak RSS rises 15.4% and interface-current
+balance exceeds the frozen harness limit. The candidate was reverted without a
+multi-minute rerun.
+
 The usual macOS single-thread XLA flags also fail as a core-control method:
 default and flagged one-device profiles both use 11 HLO worker threads and take
 1.000 and 0.995 seconds. A subsequent HLO-owned batching probe halved the two

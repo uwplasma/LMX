@@ -41,12 +41,8 @@ from lmx.fringing import (
 
 pytestmark = pytest.mark.unit
 
-
-def _skip_without_magpylib_jax() -> None:
-    if importlib.util.find_spec("magpylib_jax") is None:
-        pytest.skip(
-            "magpylib_jax is optional and is not installed in the bounded CI environment"
-        )
+_NO_MAGPY = importlib.util.find_spec("magpylib_jax") is None
+_needs_magpy = pytest.mark.skipif(_NO_MAGPY, reason="magpylib_jax unavailable")
 
 
 @pytest.fixture(scope="module")
@@ -351,8 +347,8 @@ def test_fringing_response_inverse_design_reduces_loss():
     assert result["history"][-1]["loss"] <= result["history"][0]["loss"]
 
 
+@_needs_magpy
 def test_wham_mirror_pressure_drop_sensitivity_matches_finite_difference():
-    _skip_without_magpylib_jax()
     problem = build_fringing_autodiff_problem(
         nx_stations=9,
         length=1.2,
