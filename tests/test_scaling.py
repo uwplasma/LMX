@@ -441,8 +441,8 @@ def test_scaling_demo_requires_restart_for_production(monkeypatch) -> None:
     assert (options["cpu_problem"], options["gpu_problem"]) == ((16, 7, 7), (8, 7, 7))
     assert options["timeout_seconds"] == 45.0 and options["source_commit"] == "abc"
     assert options["cpu_iterations"] == options["gpu_iterations"] == 2
-    assert strong_scaling_demo.main([*arguments, "--iterations", "6", "--minimum-warm-seconds", "120"]) == 0
-    assert (options["cpu_iterations"], options["gpu_iterations"], options["minimum_warm_seconds"]) == (6, 6, 120.0)
+    with pytest.raises(SystemExit):
+        strong_scaling_demo.main([*arguments, "--minimum-warm-seconds", "120"])
     with pytest.raises(SystemExit):
         strong_scaling_demo.main([
             "--benchmark-kind", "matched_b2_smoke", "--sustained",
@@ -489,6 +489,13 @@ def test_scaling_worker_command_forwards_restart(tmp_path: Path, monkeypatch) ->
         strong_scaling_demo._materialize_exact(derived, Path.write_text, data="same")
     with pytest.raises(ValueError, match="differs"):
         strong_scaling_demo._materialize_exact(derived, Path.write_text, data="changed")
+    plot_options = {}
+    monkeypatch.setattr(strong_scaling_demo, "write_strong_scaling_plots",
+        lambda *args, **kwargs: plot_options.update(kwargs) or [])
+    for records, title in (([], "LMX fixed-work scaling calibration"),
+            (_sustained_ladder((1, 2, 4)), "LMX sustained multi-minute strong scaling")):
+        assert strong_scaling_demo._write_optional_scaling_plots(records, tmp_path) == []
+        assert plot_options["case_title"] == title
     missing_plot = ModuleNotFoundError(name="matplotlib")
     monkeypatch.setattr(strong_scaling_demo, "write_strong_scaling_plots", lambda *args, **kwargs: (_ for _ in ()).throw(missing_plot))
     assert strong_scaling_demo._write_optional_scaling_plots([], tmp_path) == []

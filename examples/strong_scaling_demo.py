@@ -111,11 +111,15 @@ def _materialize_exact(
 def _write_optional_scaling_plots(
     records: list[dict[str, object]], out_dir: Path,
 ) -> list[Path]:
-    """Keep machine evidence usable when the optional plotting extra is absent."""
+    """Label plots as sustained only after the complete claim gate passes."""
 
     try:
-        return write_strong_scaling_plots(
-            records, out_dir, case_title="LMX fixed-work scaling evidence")
+        title = (
+            "LMX sustained multi-minute strong scaling"
+            if summarize_strong_scaling_records(records)["sustained_claim_eligible"]
+            else "LMX fixed-work scaling calibration"
+        )
+        return write_strong_scaling_plots(records, out_dir, case_title=title)
     except ModuleNotFoundError as error:
         if error.name != "matplotlib":
             raise
@@ -1138,6 +1142,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     if args.sustained and minimum_warm_seconds < 120.0:
         parser.error("--sustained requires --minimum-warm-seconds >= 120")
+    if not args.sustained and minimum_warm_seconds >= 120.0:
+        parser.error("--minimum-warm-seconds >= 120 requires --sustained")
     if args.benchmark_kind == "matched_b2_smoke" and repeats < 4:
         parser.error("matched_b2_smoke requires --repeats 4 or greater")
     if args.benchmark_kind == "matched_b2_smoke" and args.profile:

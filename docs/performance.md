@@ -174,6 +174,11 @@ Composing momentum and projection gains only 3.6%, raises RSS 15.4%, and fails
 interface-current balance. Combining seven exact projection guards into one
 host transfer gains 3.23% and lowers RSS 1.68%, but misses the 5% gate. Both
 `128 x 35 x 35` candidates were reverted without a multi-minute rerun.
+Bundling all successful-path B2 scalar diagnostics into one host transfer also
+preserves exact physics, restart, history, and placement gates, but regresses
+the clean four-device warm median from 1.971 to 2.011 seconds (2.06%); an
+independent rerun is slower still. It is reverted without consuming a sustained
+ladder. Small screens remain promotion filters, never scaling evidence.
 
 The usual macOS single-thread XLA flags also fail as a core-control method:
 default and flagged one-device profiles both use 11 HLO worker threads and take

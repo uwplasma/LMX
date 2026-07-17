@@ -21,6 +21,10 @@ four-device medium screen improves only 3.6%, raises peak RSS 15.4%, and fails
 the frozen interface-current gate. Do not spend a multi-minute rung on it.
 A one-transfer projection guard is also rejected: its exact 3.23% gain misses
 the 5% gate; RSS falls 1.68%.
+A broader diagnostic bundle is rejected too: it preserves every numerical,
+restart, history, interface-current, and placement gate, but changes the
+four-device warm median from 1.971 to 2.011 seconds (2.06% slower) in its clean
+screen; an independent rerun regresses further. Do not sustain either variant.
 
 The `--sustained` preset keeps 32 CPU or 96 GPU updates, one cold plus three
 warm trajectories, a 120-second warm minimum, an 1800-second ceiling, and
