@@ -14,6 +14,7 @@ import sys
 import tarfile
 import tempfile
 import time
+from typing import Callable
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -88,6 +89,21 @@ def _write_admission(path: Path, payload: dict[str, object]) -> None:
         json.dump(payload, stream, indent=2)
         temporary = Path(stream.name)
     os.replace(temporary, path)
+
+
+def _materialize_exact(
+    path: Path, writer: Callable[..., object], /, **kwargs: object,
+) -> None:
+    """Atomically create or byte-verify a deterministic derived input."""
+
+    with tempfile.TemporaryDirectory(dir=path.parent) as directory:
+        candidate = Path(directory) / path.name
+        writer(candidate, **kwargs)
+        if path.exists():
+            if path.read_bytes() != candidate.read_bytes():
+                raise ValueError(f"Existing derived input differs: {path}")
+        else:
+            os.replace(candidate, path)
 
 
 def _cpu_times(cpus: tuple[int, ...]) -> dict[int, tuple[int, int]]:
@@ -288,6 +304,20 @@ def _run_monitored_cpu_worker(
     return int(process.returncode), summary, timed_out
 
 
+def _finalize_worker_record(
+    path: Path, *, updates: dict[str, object], monitoring: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Persist admission and monitoring evidence even when a worker fails."""
+
+    record = json.loads(path.read_text())
+    if monitoring is not None:
+        monitoring["source_fingerprint"] = record.get("source_fingerprint")
+        record["resource_monitoring"] = monitoring
+    record.update(updates)
+    path.write_text(json.dumps(record, indent=2))
+    return record
+
+
 def _run_worker(
     *,
     python_executable: str,
@@ -311,6 +341,7 @@ def _run_worker(
     minimum_warm_seconds: float = 0.0,
     resource_monitoring_path: Path | None = None,
     expected_cpu_affinity: tuple[int, ...] = (),
+    record_updates: dict[str, object] | None = None,
 ) -> dict[str, object]:
     command = [
         python_executable,
@@ -357,17 +388,15 @@ def _run_worker(
     if resource_monitoring_path is None:
         subprocess.run(command, check=True, cwd=repo_root, env=worker_env,
             timeout=timeout_seconds)
-        return json.loads(output_path.read_text())
+        return _finalize_worker_record(output_path, updates=record_updates or {})
     returncode, monitoring, timed_out = _run_monitored_cpu_worker(
         command, cwd=repo_root, env=worker_env, raw_path=resource_monitoring_path,
         num_devices=num_devices, expected_affinity=expected_cpu_affinity,
         timeout_seconds=timeout_seconds)
     if timed_out:
         raise subprocess.TimeoutExpired(command, timeout_seconds)
-    record = json.loads(output_path.read_text())
-    monitoring["source_fingerprint"] = record.get("source_fingerprint")
-    record["resource_monitoring"] = monitoring
-    output_path.write_text(json.dumps(record, indent=2))
+    record = _finalize_worker_record(
+        output_path, updates=record_updates or {}, monitoring=monitoring)
     if returncode:
         raise subprocess.CalledProcessError(returncode, command)
     return record
@@ -490,12 +519,11 @@ def run_local_cpu_scaling(
                 out_dir / f"cpu_{count}.monitor.jsonl" if sustained else None),
             expected_cpu_affinity=tuple(environment.get(
                 "resource_environment", {}).get("affinity_cpus", ())),
+            record_updates=environment,
         )
-        record.update(environment)
         if environment["resource_environment_verified"] and record.get(
             "cpu_affinity") != environment["resource_environment"]["affinity_cpus"]:
             raise RuntimeError("Scaling worker escaped its verified CPU affinity")
-        output_path.write_text(json.dumps(record, indent=2))
         records.append(record)
         if benchmark_kind == "matched_b2_smoke" and not record["validation_passed"]:
             raise RuntimeError(f"Matched B2 CPU gate failed; evidence: {output_path}")
@@ -860,18 +888,14 @@ def run_remote_gpu_scaling(
                 f"Remote GPU worker failed for {count} device(s), and its JSON "
                 f"evidence could not be retrieved: {evidence_error}"
             ) from worker_error
-        record = json.loads(local_output.read_text())
-        if monitoring is not None:
-            monitoring["source_fingerprint"] = record.get("source_fingerprint")
-            record["resource_monitoring"] = monitoring
+        record = _finalize_worker_record(
+            local_output, updates=environment, monitoring=monitoring)
         if worker_error is not None:
             phase, message = _remote_worker_failure(record, worker_error)
             raise RuntimeError(
                 f"Remote GPU worker failed for {count} device(s) during {phase}: "
                 f"{message}; evidence: {local_output}"
             ) from worker_error
-        record.update(environment)
-        local_output.write_text(json.dumps(record, indent=2))
         local_records.append(record)
         if benchmark_kind == "matched_b2_smoke" and not record["validation_passed"]:
             raise RuntimeError(f"Matched B2 GPU gate failed; evidence: {local_output}")
@@ -933,19 +957,21 @@ def run_strong_scaling_demo(
             out_dir / f"matched_b2_cpu_{shape_label}_{cpu_iterations}steps.json",
             out_dir / "matched_b2_evaluator.json",
         )
-        materialize_matched_b2_lmx_input(
+        _materialize_exact(
             matched_input,
+            materialize_matched_b2_lmx_input,
             solver_shape=cpu_problem,
             executed_steps=cpu_iterations,
         )
-        materialize_matched_b2_evaluator(evaluator)
+        _materialize_exact(evaluator, materialize_matched_b2_evaluator)
         gpu_label = "x".join(map(str, gpu_problem))
         gpu_matched_input = (
             out_dir / f"matched_b2_gpu_{gpu_label}_{gpu_iterations}steps.json"
         )
         if remote_host is not None:
-            materialize_matched_b2_lmx_input(
+            _materialize_exact(
                 gpu_matched_input,
+                materialize_matched_b2_lmx_input,
                 solver_shape=gpu_problem,
                 executed_steps=gpu_iterations,
             )

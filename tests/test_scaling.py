@@ -302,9 +302,8 @@ def test_sustained_ladders_collect_each_rung_and_pass_cpu_affinity(
 
 def test_remote_python_preflight_fails_before_timing(monkeypatch: pytest.MonkeyPatch):
     error = subprocess.CalledProcessError(1, ["ssh"], stderr="SOLVAX 0.6.0 is outside")
-    monkeypatch.setattr(
-        strong_scaling_demo.subprocess, "run", lambda *args, **kwargs: (_ for _ in ()).throw(error)
-    )
+    monkeypatch.setattr(strong_scaling_demo.subprocess, "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(error))
     with pytest.raises(RuntimeError, match="Remote Python.*SOLVAX 0.6.0"):
         strong_scaling_demo._validate_remote_python("office", "/tmp/lmx", "python3")
 
@@ -344,7 +343,8 @@ def test_remote_scaling_retrieves_failed_worker_evidence(
         )
 
     evidence = tmp_path / "gpu_1.json"
-    assert json.loads(evidence.read_text()) == record
+    assert json.loads(evidence.read_text()) == record | {
+        "resource_environment_verified": False}
     assert commands[-1] == ["scp", "office:/tmp/lmx/artifacts/strong_scaling/gpu_1.json", str(evidence)]
     assert isinstance(caught.value.__cause__, subprocess.CalledProcessError)
 
@@ -477,6 +477,11 @@ def test_scaling_worker_command_forwards_restart(tmp_path: Path, monkeypatch) ->
     assert "--xla_dump_to=/tmp/lmx-safe" in env["XLA_FLAGS"]
     assert env["XLA_FLAGS"].count("--xla_force_host_platform_device_count=2") == 1
     assert "--xla_cpu_multi_thread_eigen=true" not in env["XLA_FLAGS"]
+    derived = tmp_path / "derived.json"
+    for _ in range(2):
+        strong_scaling_demo._materialize_exact(derived, Path.write_text, data="same")
+    with pytest.raises(ValueError, match="differs"):
+        strong_scaling_demo._materialize_exact(derived, Path.write_text, data="changed")
 
 
 def test_cpu_monitor_emits_fast_fail_closed_evidence(tmp_path: Path, monkeypatch) -> None:
@@ -535,18 +540,14 @@ def test_sustained_scaling_requires_predeclared_multiminute_samples():
     assert not classify(120.0, [120.0, 119.999, 121.0])
     assert classify(120.0, [120.0, 121.0, 122.0])
 
-    cpu = json.loads(Path(
-        "benchmarks/results/b2-schema6-cpu-scaling-20260716.json").read_text())
-    cpu_sustained = (cpu["sustained_cpu_allocation"],
-        cpu["current_source_sustained_cpu_allocation"])
-    gpu = json.loads(Path(
-        "benchmarks/results/b2-gpu-scaling-calibration-20260715.json").read_text())
+    cpu = json.loads(Path("benchmarks/results/b2-schema6-cpu-scaling-20260716.json").read_text())
+    cpu_sustained = (cpu["sustained_cpu_allocation"], cpu["current_source_sustained_cpu_allocation"])
+    gpu = json.loads(Path("benchmarks/results/b2-gpu-scaling-calibration-20260715.json").read_text())
     gpu_sustained = gpu["sustained_shared_host_calibration"]
     for record in (*cpu_sustained, gpu_sustained):
         threshold = record.get("promotion_thresholds") or record.get("problem") or record
         assert threshold["minimum_warm_seconds"] >= 120.0
-        assert all(
-            sample >= 120.0 for run in record["runs"].values()
+        assert all(sample >= 120.0 for run in record["runs"].values()
             for sample in run["warm_samples_seconds"])
         assert all(run["peak_host_rss_bytes"] > run.get("solution_bundle_bytes", 0)
             for run in record["runs"].values())
@@ -557,12 +558,10 @@ def test_sustained_scaling_requires_predeclared_multiminute_samples():
 
 
 def test_write_scaling_report_writes_json(tmp_path: Path):
-    record = benchmark_sharded_extruded_operator(
-        nx=16, ny=8, nz=8, iterations=2, repeats=1, num_devices=1
-    )
-    path = write_scaling_report([record], tmp_path / "scaling.json")
-
-    assert '"num_devices": 1' in path.read_text()
+    record = benchmark_sharded_extruded_operator(nx=16, ny=8, nz=8,
+        iterations=2, repeats=1, num_devices=1)
+    assert '"num_devices": 1' in write_scaling_report(
+        [record], tmp_path / "scaling.json").read_text()
 
 
 def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path):
