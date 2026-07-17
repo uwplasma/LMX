@@ -546,6 +546,12 @@ def _matched_b2_smoke_benchmark(
         acceptance_role = "sustained-candidate"
     else:
         acceptance_role = "fixed-work-debug"
+    warm = np.asarray(timings[1:])
+    sustained = _sustained_timing_passed(minimum_warm_seconds, warm)
+    total_cells = int(direct.u.size)
+    cell_updates = executed_steps * total_cells
+    large_work = bool(total_cells >= _SUSTAINED_MIN_CELLS
+        and cell_updates >= _SUSTAINED_MIN_CELL_UPDATES)
     try:
         with tempfile.TemporaryDirectory(prefix="lmx-b2-serialized-restart-") as temporary:
             restart_path = Path(temporary) / "checkpoint.npz"
@@ -560,12 +566,6 @@ def _matched_b2_smoke_benchmark(
                 num_devices=num_devices,
             )
     except Exception as error:
-        warm = np.asarray(timings[1:])
-        sustained = _sustained_timing_passed(minimum_warm_seconds, warm)
-        total_cells = int(direct.u.size)
-        cell_updates = executed_steps * total_cells
-        large_work = bool(total_cells >= _SUSTAINED_MIN_CELLS
-            and cell_updates >= _SUSTAINED_MIN_CELL_UPDATES)
         return {
             "benchmark_kind": "matched_b2_smoke",
             "acceptance_role": acceptance_role,
@@ -638,12 +638,6 @@ def _matched_b2_smoke_benchmark(
         and anderson["anderson_validation_passed"]
         and all(sample >= minimum_warm_seconds for sample in timings[1:])
     )
-    warm = np.asarray(timings[1:])
-    sustained = _sustained_timing_passed(minimum_warm_seconds, warm)
-    total_cells = int(direct.u.size)
-    cell_updates = executed_steps * total_cells
-    large_work = bool(total_cells >= _SUSTAINED_MIN_CELLS
-        and cell_updates >= _SUSTAINED_MIN_CELL_UPDATES)
     velocity_l2 = float(np.sqrt(sum(np.linalg.norm(np.asarray(getattr(direct, name))) ** 2
         for name in ("u", "v", "w"))))
     current_l2 = float(np.sqrt(sum(np.linalg.norm(np.asarray(getattr(direct, name))) ** 2
