@@ -78,6 +78,27 @@ or explicit reuse license, its supplied observer contains nonfinite data, and
 its runtime `Ha ≈ 573` differs from both its design label and ALEX B1. The gate
 therefore never authorizes extraction, archived-output acceptance, or B1 parity.
 
+After a successful identity check, an explicit local invocation may extract only
+the fresh-input allowlist and run a private 3,072-cell, two-rank, two-update
+smoke:
+
+```bash
+.venv/bin/python scripts/run_freemhd_parity_suite.py \
+  --freemhd-s3-smoke /external/S3_Buhler_Ha616.zip \
+  --freemhd-source-repo /external/FreeMHD \
+  --freemhd-image freemhd-install:latest \
+  --output /external/s3-reduced-smoke
+```
+
+The runner resolves the image to an immutable digest, verifies that its embedded
+FreeMHD repository is at `14b54a3`, disables networking and Linux capabilities,
+runs as the host user with bounded resources and a ten-minute ceiling, and
+writes only compact logs and hashes. Its observer requires the exact liquid/wall cell and
+rank counts, two time levels, finite residuals and Courant numbers, and `End`.
+It always denies full-S3 parity, ALEX-B1 equivalence, steady acceptance, archive
+observer acceptance, and redistribution. Extracted inputs, meshes, and outputs
+stay outside Git and release assets.
+
 ## Matched Benchmark B contract
 
 Benchmark-B acceptance no longer trusts a record-supplied

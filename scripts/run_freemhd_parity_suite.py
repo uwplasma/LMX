@@ -63,6 +63,32 @@ _S3_PIPE_ARCHIVE = {
     },
 }
 
+_S3_PIPE_INPUT_MEMBERS = (
+    *(f"0/{name}" for name in ("B0", "U", "alpha.liquidMetal", "p", "p_rgh", "potE")),
+    "constant/g", "constant/regionProperties", "constant/liquid/fvOptions",
+    "constant/liquid/radiationProperties", "constant/liquid/thermophysicalProperties",
+    "constant/liquid/thermophysicalProperties.air", "constant/liquid/thermophysicalProperties.liquidMetal",
+    "constant/liquid/turbulenceProperties", "constant/solidWalls/radiationProperties",
+    "constant/solidWalls/thermophysicalProperties", "system/0/JxB", "system/0/T", "system/blockMeshDict",
+    "system/controlDict", "system/decomposeParDict", "system/fvSchemes", "system/fvSolution",
+    "system/liquid/codeDict",
+    *(f"system/{region}/{name}" for region in ("liquid", "solidWalls") for name in (
+        "changeDictionaryDict", "decomposeParDict", "fvSchemes", "fvSolution", "setExprFieldsDict"
+    )),
+)
+_S3_SOURCE_COMMIT = "14b54a3e8e1a05b6ee4c98331995abaaae96e7a5"
+_S3_RUNTIME_HA = 573.33628803877
+_S3_SMOKE_CLASS = "native-s3-reduced-pipe-harness-smoke"
+_S3_DENIALS = {
+    "full_s3_parity": False, "alex_b1_parity": False, "b1_formulation_match": False,
+    "steady_acceptance": False, "archived_observer_eligible": False,
+}
+_S3_LOCAL_AUTHORITY = {
+    "local_use_only": True, "redistribution_authorized": False,
+    "preflight_extraction_authorized": False,
+    "private_extraction_authority": "explicit local user invocation",
+}
+
 _FREEMHD_SOURCE_NAMES = (
     "momentum", "electric", "limiter", "scheme_macro", "limiter_registration", "nvd", "vector_transform",
 )
@@ -112,13 +138,105 @@ def preflight_freemhd_s3_pipe_archive(archive: str | Path) -> dict[str, object]:
         "failed_checks": failed,
         "classification": "native-freemhd-pipe-regression" if passed else "unverified-user-archive",
         "mesh_design_hartmann_number": 615.4967525064808,
-        "runtime_property_hartmann_number": 573.33628803877,
+        "runtime_property_hartmann_number": _S3_RUNTIME_HA,
         "alex_b1_parity": False,
         "solver_executed": False,
         "source_commit_available": False,
         "archived_observer_eligible": False,
         "extraction_authorized": False,
     }
+
+
+def _extract_s3_pipe_inputs(archive: Path, destination: Path) -> None:
+    """Extract only fresh-run inputs from an already admitted private archive."""
+
+    with zipfile.ZipFile(archive) as zipped:
+        entries: dict[str, zipfile.ZipInfo] = {}
+        for entry in zipped.infolist():
+            name, pure = entry.filename, PurePosixPath(entry.filename)
+            canonical = pure.as_posix() + ("/" if entry.is_dir() else "")
+            mode = (entry.external_attr >> 16) & 0o170000
+            if (
+                not name or pure.is_absolute() or ".." in pure.parts or "\\" in name
+                or name != canonical or mode == 0o120000 or name in entries
+            ):
+                raise ValueError(f"Unsafe or duplicate S3 archive member: {name!r}")
+            entries[name] = entry
+        if missing := sorted(set(_S3_PIPE_INPUT_MEMBERS) - entries.keys()):
+            raise ValueError(f"S3 archive is missing fresh-run inputs: {missing}")
+        destination.mkdir(parents=True)
+        for name in _S3_PIPE_INPUT_MEMBERS:
+            entry, target = entries[name], destination / name
+            if entry.is_dir() or ((entry.external_attr >> 16) & 0o170000) not in {0, 0o100000}:
+                raise ValueError(f"S3 input is not a regular file: {name}")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with zipped.open(entry) as source, target.open("wb") as output:
+                shutil.copyfileobj(source, output)
+
+
+def _reduce_s3_pipe_input(destination: Path) -> None:
+    """Convert admitted S3 inputs into the deterministic 3,072-cell smoke."""
+
+    for name in ("T", "JxB"):
+        source, target = destination / "system/0" / name, destination / "0" / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+        if _replace(target, r"\btype\s+cyclic\s*;", "type calculated;") != 2:
+            raise ValueError(f"S3 {name} template does not have two axial cyclic patches")
+    shutil.rmtree(destination / "system/0")
+    mesh = destination / "system/blockMeshDict"
+    changed = (
+        _replace(mesh, r"\(52\s+52\s+194\)", "(8 8 8)"),
+        _replace(mesh, r"\(194\s+52\s+194\)", "(2 8 8)"),
+        _replace(mesh, r"(?m)^\s*simpleGrading\s+.*$", "    simpleGrading (1 1 1)"),
+    )
+    if changed != (5, 4, 9):
+        raise ValueError(f"S3 nine-block mesh signature differs: {changed}")
+    _write_foam(
+        destination / "system/controlDict",
+        """
+application epotMultiRegionInterFoam; startFrom startTime; startTime 0; stopAt endTime;
+endTime 2e-6; deltaT 1e-6; writeControl timeStep; writeInterval 1; purgeWrite 0;
+writeFormat ascii; writePrecision 16; writeCompression off; timeFormat general; timePrecision 16;
+runTimeModifiable false; adjustTimeStep off; maxCo 0.4; maxAlphaCo 0.3; maxDeltaT 1e-6;
+maxDi 1e10; BtStartTime 0; BtDuration 0; JConservativeForm true;
+OptimisationSwitches { fileHandler collated; maxThreadFileBufferSize 0; }
+functions {}
+""",
+    )
+    for region in ("", "liquid", "solidWalls"):
+        _write_foam(
+            destination / "system" / region / "decomposeParDict",
+            "numberOfSubdomains 2;\nmethod scotch;",
+        )
+
+
+def materialize_freemhd_s3_pipe_smoke(archive: str | Path, output_dir: str | Path) -> dict[str, object]:
+    """Materialize a private reduced S3 pipe smoke; never authorize B1 parity."""
+
+    source, destination = Path(archive).resolve(), Path(output_dir).resolve()
+    if destination.exists():
+        raise FileExistsError(f"Refusing to overwrite existing S3 input {destination}")
+    admission = preflight_freemhd_s3_pipe_archive(source)
+    if not admission["preflight_pass"]:
+        raise ValueError("S3 archive failed identity preflight; extraction denied")
+    try:
+        _extract_s3_pipe_inputs(source, destination)
+        _reduce_s3_pipe_input(destination)
+        manifest = {
+            "schema_version": 1, "classification": _S3_SMOKE_CLASS,
+            "archive_sha256": admission["observed_sha256"], "solver_updates": 2, "mpi_ranks": 2,
+            "case_tree_sha256_before_manifest": artifact_sha256(destination, "tree"),
+            "mesh_cells": {"liquid": 2560, "solidWalls": 512, "total": 3072},
+            "coordinates": {"axial_axis": "z", "radius_m": 0.04859, "z_over_radius": [-20.0, 20.0]},
+            "runtime_hartmann_number": admission["runtime_property_hartmann_number"],
+            **_S3_LOCAL_AUTHORITY, **_S3_DENIALS,
+        }
+        _write_json(destination / "s3-smoke-input.json", manifest)
+        return manifest
+    except Exception:
+        shutil.rmtree(destination, ignore_errors=True)
+        raise
 
 
 def audit_freemhd_case_against_spec(
@@ -882,6 +1000,205 @@ def run_matched_b2_lmx_smoke(
     return observe_lmx_b2_output(destination, input_path, evaluator)
 
 
+def _run_docker_smoke(
+    command: list[str], container: str, cidfile: Path, timeout_seconds: float, label: str
+) -> None:
+    if cidfile.exists():
+        raise FileExistsError(f"Refusing to replace existing Docker CID file {cidfile}")
+    try:
+        try:
+            subprocess.run(command, check=True, timeout=timeout_seconds, text=True, capture_output=True)
+        except subprocess.TimeoutExpired as error:
+            raise TimeoutError(f"{label} exceeded {timeout_seconds:g} seconds") from error
+        except subprocess.CalledProcessError as error:
+            output = "\n".join(part.strip() for part in (error.stdout, error.stderr) if part)
+            raise RuntimeError(f"{label} exited {error.returncode}:\n{output[-4000:]}") from error
+    finally:
+        try:
+            subprocess.run(["docker", "rm", "-f", container], check=False, capture_output=True, text=True)
+        except OSError:
+            pass
+        cidfile.unlink(missing_ok=True)
+
+
+def observe_freemhd_s3_pipe_smoke(
+    output_dir: str | Path, input_dir: str | Path, source_snapshot: str | Path
+) -> dict[str, object]:
+    """Fail closed on the compact two-update native-S3 harness output."""
+
+    root, case, source = Path(output_dir), Path(input_dir), Path(source_snapshot)
+    required = {"controlDict.used", "run.json", "run.log", "setup.log"}
+    if not root.is_dir() or {item.name for item in root.iterdir()} != required:
+        raise ValueError("FreeMHD S3 smoke output tree is incomplete")
+    metadata = json.loads((root / "run.json").read_text(encoding="utf-8"))
+    source_pin = json.loads((source / "source-pin.json").read_text(encoding="utf-8"))
+    input_manifest = json.loads((case / "s3-smoke-input.json").read_text(encoding="utf-8"))
+    expected = {"schema_version": 1, "classification": _S3_SMOKE_CLASS,
+                "input_sha256": artifact_sha256(case, "tree"),
+                "source_sha256": artifact_sha256(source, "tree"), "source_commit": _S3_SOURCE_COMMIT,
+                "nproc": 2, "float_precision": "float64"}
+    if (
+        set(metadata) != set(expected) | {"wall_seconds", "image_id"}
+        or any(metadata.get(key) != value for key, value in expected.items())
+        or source_pin.get("commit") != _S3_SOURCE_COMMIT
+        or input_manifest.get("classification") != _S3_SMOKE_CLASS
+        or input_manifest.get("archive_sha256") != _S3_PIPE_ARCHIVE["sha256"]
+        or not math.isclose(float(input_manifest.get("runtime_hartmann_number", math.nan)), _S3_RUNTIME_HA)
+        or input_manifest.get("mesh_cells") != {"liquid": 2560, "solidWalls": 512, "total": 3072}
+        or any(input_manifest.get(key) is not False for key in _S3_DENIALS)
+        or any(input_manifest.get(key) != value for key, value in _S3_LOCAL_AUTHORITY.items())
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", str(metadata.get("image_id"))) is None
+        or not math.isfinite(float(metadata.get("wall_seconds", math.nan)))
+        or float(metadata["wall_seconds"]) < 0.0
+        or (root / "controlDict.used").read_bytes() != (case / "system/controlDict").read_bytes()
+    ):
+        raise ValueError("FreeMHD S3 smoke provenance differs")
+    control = (root / "controlDict.used").read_text(encoding="utf-8")
+    controls = ("startTime 0;", "endTime 2e-6;", "deltaT 1e-6;", "maxDeltaT 1e-6;",
+                "writeInterval 1;", "adjustTimeStep off;")
+    if not all(value in control for value in controls) or "numberOfSubdomains 2;" not in (
+        case / "system/decomposeParDict"
+    ).read_text():
+        raise ValueError("FreeMHD S3 smoke controls differ")
+    setup = (root / "setup.log").read_text(encoding="utf-8")
+    cells = [int(value) for value in re.findall(r"Number of cells =\s*(\d+)", setup)]
+    if cells != [1280, 1280, 256, 256] or not all(re.search(pattern, setup) for pattern in (
+        r"Number of regions:\s*2", r"(?m)^0\s+2560\s*$", r"(?m)^1\s+512\s*$"
+    )):
+        raise ValueError("FreeMHD S3 reduced mesh or decomposition differs")
+    log = (root / "run.log").read_text(encoding="utf-8")
+    fatal = ("FOAM FATAL", "Segmentation fault", "MPI_ABORT", "killed")
+    if any(marker.lower() in log.lower() for marker in fatal) or re.search(
+        r"(?im)^(?!.*trapping enabled).*Floating point exception", log
+    ) or re.search(
+        r"(?i)(?:^|[\s=,(])(?:nan|[-+]?inf)(?:$|[\s,;)])", log
+    ):
+        raise ValueError("FreeMHD S3 smoke log reports a fatal or nonfinite failure")
+    times = np.asarray([float(value) for value in re.findall(r"(?m)^Time = ([0-9eE+.\-]+)\s*$", log)])
+    courant = np.asarray([
+        [float(mean), float(maximum)]
+        for line in log.splitlines() if line.startswith("Region: liquid Courant Number mean:")
+        for mean, maximum in re.findall(r"mean:\s*([0-9eE+.\-]+)\s+max:\s*([0-9eE+.\-]+)", line)
+    ])[-2:]
+    solves = [(field, float(final)) for field, final in re.findall(
+        r"Solving for ([^,\n]+), Initial residual =\s*[0-9eE+.\-]+, "
+        r"Final residual =\s*([0-9eE+.\-]+), No Iterations\s+\d+", log
+    )]
+    fields, residuals = [name for name, _ in solves], np.asarray([value for _, value in solves])
+    if (
+        not np.array_equal(times, (1e-6, 2e-6))
+        or courant.shape != (2, 2) or not np.all(np.isfinite(courant)) or np.any(courant[:, 1] > 0.4)
+        or residuals.size == 0 or not np.all(np.isfinite(residuals)) or np.any(residuals < 0.0)
+        or fields.count("potE") != 4 or fields.count("p_rgh") != 6
+        or re.search(r"(?m)^End\s*$", log) is None
+    ):
+        raise ValueError("FreeMHD S3 two-update execution shape differs")
+    return {
+        "schema_version": 1, "classification": _S3_SMOKE_CLASS,
+        "execution_pass": True, "steps": 2, "dt": [1e-6, 1e-6],
+        "cells": {"liquid": 2560, "solidWalls": 512, "total": 3072},
+        "courant_max": float(np.max(courant[:, 1])),
+        "residual_max": {field: max(value for name, value in solves if name == field) for field in set(fields)},
+        "solver_executed": True, "image_repository_head_verified": True,
+        "source_snapshot_role": "provenance-only", "archive_sha256": input_manifest["archive_sha256"],
+        "input_sha256": metadata["input_sha256"], "source_sha256": metadata["source_sha256"],
+        "source_commit": metadata["source_commit"], "image_id": metadata["image_id"],
+        "wall_seconds": metadata["wall_seconds"],
+        "runtime_hartmann_number": input_manifest["runtime_hartmann_number"],
+        **_S3_LOCAL_AUTHORITY, **_S3_DENIALS,
+    }
+
+
+def run_freemhd_s3_pipe_smoke(
+    input_dir: str | Path, source_snapshot: str | Path, output_dir: str | Path, *,
+    image: str = "freemhd-install:latest", timeout_seconds: float = 600.0,
+) -> dict[str, object]:
+    """Execute with an immutable image and provenance-only source snapshot."""
+
+    case, source, destination = map(lambda value: Path(value).resolve(), (input_dir, source_snapshot, output_dir))
+    if destination.exists():
+        raise FileExistsError(f"Refusing to overwrite existing FreeMHD S3 output {destination}")
+    if timeout_seconds <= 0.0 or timeout_seconds > 600.0 or not image.strip():
+        raise ValueError("FreeMHD S3 smoke requires a positive timeout no greater than 600 seconds")
+    source_pin = json.loads((source / "source-pin.json").read_text(encoding="utf-8"))
+    if source_pin.get("commit") != _S3_SOURCE_COMMIT:
+        raise ValueError("FreeMHD S3 smoke source snapshot is not pinned")
+    inspected = subprocess.run(
+        ["docker", "image", "inspect", image, "--format", "{{.Id}}"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    if re.fullmatch(r"sha256:[0-9a-f]{64}", inspected) is None:
+        raise ValueError("FreeMHD Docker image did not resolve to an immutable ID")
+    input_sha, source_sha = artifact_sha256(case, "tree"), artifact_sha256(source, "tree")
+    destination.mkdir(parents=True)
+    cidfile = destination / ".docker.cid"
+    container = f"lmx-s3-{os.getpid()}-{time.time_ns()}"
+    shell = f"""
+source /usr/lib/openfoam/openfoam2206/etc/bashrc
+set -euo pipefail
+test "$(git -C /opt/FreeMHD-src rev-parse HEAD)" = {_S3_SOURCE_COMMIT}
+work="$(mktemp -d /tmp/lmx-s3.XXXXXX)"
+rsync -a /input/ "$work/" && cd "$work"
+{{
+  blockMesh -fileHandler collated
+  splitMeshRegions -cellZonesOnly -overwrite -fileHandler collated
+  for region in liquid solidWalls; do
+    changeDictionary -region "$region" -fileHandler collated
+    setExprFields -region "$region" -fileHandler collated
+  done
+  decomposePar -allRegions -force -fileHandler collated
+}} > /output/setup.log 2>&1
+cp system/controlDict /output/controlDict.used
+mpirun -np 2 epotMultiRegionInterFoam -parallel > /output/run.log 2>&1
+"""
+    command = [
+        "docker", "run", "--rm", "--platform", "linux/amd64", "--name", container,
+        "--cidfile", str(cidfile), "--user", f"{os.getuid()}:{os.getgid()}", "--env", "HOME=/tmp",
+        "--network", "none", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+        "--pids-limit", "512", "--memory", "4g", "--cpus", "2",
+        "--mount", f"type=bind,src={case},dst=/input,readonly",
+        "--mount", f"type=bind,src={destination},dst=/output",
+        "--entrypoint", "/bin/bash", inspected, "-lc", shell,
+    ]
+    started = time.perf_counter()
+    _run_docker_smoke(command, container, cidfile, timeout_seconds, "FreeMHD S3 smoke")
+    if artifact_sha256(case, "tree") != input_sha or artifact_sha256(source, "tree") != source_sha:
+        raise ValueError("FreeMHD S3 inputs changed during execution")
+    _write_json(destination / "run.json", {
+        "schema_version": 1, "classification": _S3_SMOKE_CLASS,
+        "input_sha256": input_sha, "source_sha256": source_sha,
+        "source_commit": _S3_SOURCE_COMMIT, "wall_seconds": time.perf_counter() - started,
+        "nproc": 2, "image_id": inspected, "float_precision": "float64",
+    })
+    return observe_freemhd_s3_pipe_smoke(destination, case, source)
+
+
+def run_freemhd_s3_pipe_smoke_bundle(
+    archive: str | Path, source_repo: str | Path, output_dir: str | Path, *,
+    image: str = "freemhd-install:latest", timeout_seconds: float = 600.0,
+) -> dict[str, object]:
+    """Build and run provenance-only S3 evidence without a B1 formulation claim."""
+
+    destination = Path(output_dir)
+    if destination.exists():
+        raise FileExistsError(f"Refusing to overwrite existing FreeMHD S3 bundle {destination}")
+    destination.mkdir(parents=True)
+    try:
+        materialize_freemhd_s3_pipe_smoke(archive, destination / "freemhd_input")
+        materialize_freemhd_source_snapshot(
+            source_repo, destination / "freemhd_source", case_id="B1-fringing-pipe"
+        )
+        report = run_freemhd_s3_pipe_smoke(
+            destination / "freemhd_input", destination / "freemhd_source",
+            destination / "freemhd_output", image=image, timeout_seconds=timeout_seconds,
+        )
+        _write_json(destination / "report.json", report)
+        return report
+    except Exception:
+        shutil.rmtree(destination, ignore_errors=True)
+        raise
+
+
 def run_matched_b2_freemhd_smoke(
     input_dir: str | Path,
     evaluator: str | Path,
@@ -900,7 +1217,7 @@ def run_matched_b2_freemhd_smoke(
         raise ValueError("FreeMHD smoke resources are invalid")
     input_sha = artifact_sha256(source, "tree")
     destination.mkdir(parents=True)
-    cidfile = destination.parent / f".{destination.name}.cid"
+    cidfile = destination / ".docker.cid"
     container = f"lmx-b2-{os.getpid()}-{time.time_ns()}"
     objects = "b2PressureTaps massIn massOut currentIn currentOut currentIntoSolid currentIntoSolidMagnitude"
     shell = f"""
@@ -932,22 +1249,7 @@ done
         "--entrypoint", "/bin/bash", image, "-lc", shell,
     ]
     started = time.perf_counter()
-    try:
-        try:
-            subprocess.run(command, check=True, timeout=timeout_seconds, text=True, capture_output=True)
-        except subprocess.TimeoutExpired as error:
-            raise TimeoutError(f"FreeMHD B2 smoke exceeded {timeout_seconds:g} seconds") from error
-        except subprocess.CalledProcessError as error:
-            output = "\n".join(part.strip() for part in (error.stdout, error.stderr) if part)
-            raise RuntimeError(
-                f"FreeMHD B2 smoke exited {error.returncode}:\n{output[-4000:]}"
-            ) from error
-    finally:
-        try:
-            subprocess.run(["docker", "rm", "-f", container], check=False, capture_output=True, text=True)
-        except OSError:
-            pass
-        cidfile.unlink(missing_ok=True)
+    _run_docker_smoke(command, container, cidfile, timeout_seconds, "FreeMHD B2 smoke")
     if artifact_sha256(source, "tree") != input_sha:
         raise ValueError("FreeMHD B2 input changed during execution")
     _write_json(destination / "run.json", {
@@ -1326,6 +1628,12 @@ def main(argv: list[str] | None = None) -> int:
         metavar="ARCHIVE",
         help="verify the public native-pipe archive without extracting it",
     )
+    mode.add_argument(
+        "--freemhd-s3-smoke",
+        type=Path,
+        metavar="ARCHIVE",
+        help="privately extract and run the reduced two-update native-pipe smoke",
+    )
     parser.add_argument("--freemhd-image", default=os.environ.get("LMX_FREEMHD_IMAGE", "freemhd-install:latest"))
     parser.add_argument("--nproc", type=int, default=2)
     parser.add_argument("--smoke-timeout", type=float, default=600.0)
@@ -1351,6 +1659,15 @@ def main(argv: list[str] | None = None) -> int:
         _write_json(args.output / "freemhd-s3-preflight.json", report)
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0 if report["preflight_pass"] else 2
+    if args.freemhd_s3_smoke:
+        if args.nproc != 2:
+            parser.error("--freemhd-s3-smoke requires --nproc 2")
+        report = run_freemhd_s3_pipe_smoke_bundle(
+            args.freemhd_s3_smoke, args.freemhd_source_repo, args.output,
+            image=args.freemhd_image, timeout_seconds=args.smoke_timeout,
+        )
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return 0
     if args.materialize:
         manifest = materialize_matched_freemhd_case(
             args.freemhd_install_dir / "cases" / f"{args.materialize}_demo",

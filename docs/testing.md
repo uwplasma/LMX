@@ -10,8 +10,8 @@ external solvers, long physics campaigns, and hardware scaling.
 ```
 
 The driver runs the full suite with branch coverage, a minimum coverage of 95%,
-and a hard ten-minute timeout. The current Apple M4 record is 861 passed,
-8 expected external-data skips, 95.42% combined line/branch coverage, and 124.1
+and a hard ten-minute timeout. The current Apple M4 record is 868 passed,
+8 expected external-data skips, 95.42% combined line/branch coverage, and 123.2
 seconds with six workers. The default warning threshold is five minutes, and
 the current run leaves more than seven minutes of hard-budget headroom. The
 record keeps the ten slowest node IDs for critical-path review.
@@ -64,7 +64,7 @@ Exact benchmark node IDs and source hashes remain in the
 | Operators, mesh, and conservation | operator, mesh, physics, and convergence tests | manufactured solutions and observed order | stable |
 | Ducts and high Ha | solver, physics, and validation tests | A1/A2/A3 analytical and FreeMHD records | accepted |
 | Linear algebra and SOLVAX | linear plus focused solver/fringing tests | frozen SOLVAX CPU/GPU acceptance records | accepted |
-| B1/B2 fringing | benchmark, fringing, and independence-runner tests | exact B2 smoke plus B1/B2 ALEX evidence | production FreeMHD parity open |
+| B1/B2 fringing | benchmark, fringing, and independence-runner tests | exact B2 plus reduced native-S3 harness smokes and B1/B2 ALEX evidence | production FreeMHD parity open |
 | Fields, geometry, walls, and blanket models | field, mesh, wall, and blanket tests | limiting cases and convergence | scoped external status |
 | Differentiability | autodiff and gradient-focused solver tests | finite-difference and transpose evidence | stable paths accepted |
 | Q2D and external adapters | Q2D and external-validation tests | independent-data readiness | quantitative parity open |

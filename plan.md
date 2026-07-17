@@ -125,10 +125,10 @@ shared without removing cases or assertions.
 | package modules | 35 | no new module | 35 |
 | package lines | 34,310 | stay below 34,311 | 35,100 |
 | maintained-core lines | 7,869 | stay below 7,870 | 8,000 |
-| test files / lines | 30 / 20,983 | no new file; next test change must reduce lines | 31 / 21,100 |
+| test files / lines | 30 / 21,099 | no new file; next test change must reduce lines | 31 / 21,100 |
 | maintenance scripts | 13 | no new script without retiring an owner | 13 |
 | tracked files | 186 | no new file without retiring another owner | 187 |
-| tracked checkout | 4,575,563 bytes | stay below 4,575,564 without hiding direct visuals | 4,718,592 bytes |
+| tracked checkout | 4,600,795 bytes | stay below 4,600,796 without hiding direct visuals | 4,718,592 bytes |
 
 These ratchets must come from ownership deletion, shared helpers, or removal of
 superseded behavior—not unreadable formatting or arbitrary test merging.
@@ -178,8 +178,8 @@ above 45 seconds. Preserve the 300-second engineering target,
 parameterization and shared fixtures inside existing test files; do not create
 another test file merely to move lines.
 
-The current gate passes 861 tests with 8 expected skips and 95.42% combined
-coverage in 124.1 seconds. Shared centerline validation removes 20 source lines;
+The current gate passes 868 tests with 8 expected skips and 95.42% combined
+coverage in 123.2 seconds. Shared centerline validation removes 20 source lines;
 the layered-flow consolidation removes 17 test lines and one redundant
 6.894-second solve while retaining finite-field, current, and physics gates.
 Shared figure-pair assertions subsequently remove another 20 test lines while
@@ -394,13 +394,20 @@ fluid/conducting-wall O-grid is geometry-compatible with LMX's pipe mapping and
 was prepared for 96 MPI ranks, but the archive does not expose a reuse license
 and its Ha=616 PbLi-like setup is not parameter-identical to frozen ALEX B1 at
 Ha=6600. Never add the 1.93 GB archive or its 8.77 GB expanded mesh to Git.
-The manual runner's `--freemhd-s3-preflight` gate now streams the full hash and
-verifies seven small members without extraction. It reports the runtime-property
-Ha near 573 separately from the mesh-design label near 616, classifies the case
-only as a native-FreeMHD pipe regression, and always denies ALEX parity,
-archived-observer acceptance, source pinning, and solver execution. Next freeze
-coordinates, nondimensionalization, and observer mapping in a reduced O-grid
-materializer before authorizing a two-update pinned-source Docker pilot.
+The manual runner's `--freemhd-s3-preflight` gate streams the full hash and
+verifies seven small members without extraction. An explicit local-only command
+now safely extracts a 34-file allowlist, builds the 2,560-fluid plus
+512-conducting-wall O-grid, verifies the image's FreeMHD repository at `14b54a3`
+and pins the resolved Docker image,
+and fails closed on its two-rank, two-update logs. A private pilot passed both
+updates in 23.229 seconds end to end under x86 emulation, with exact balanced
+1,280-fluid plus 256-wall cells per rank and no fatal or nonfinite marker. This
+is only a native-S3 reduced-pipe harness smoke: it always denies full-S3 parity,
+ALEX-B1 equivalence, steady acceptance, archived-observer eligibility, and
+redistribution. The archive-to-report CLI still needs one end-to-end replay when
+the verified 1.93 GB user-owned ZIP is locally available; then freeze only its
+compact report and independently match the S3 formulation in LMX without
+relabeling it ALEX B1.
 Retained-modal results remain numerical evidence, not exact-formulation parity.
 The supplied 2.62-million-cell archive ran 8.22 hours on 96 ranks, records no
 FreeMHD Git SHA, and its 3.08-second centerline CSV contains a nonfinite row;

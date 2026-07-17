@@ -1066,20 +1066,124 @@ def test_s3_pipe_archive_preflight_is_identity_only(tmp_path: Path, monkeypatch:
     expected["members"][member] = (len(content), "0" * 64)
     rejected = run_freemhd_parity_suite.preflight_freemhd_s3_pipe_archive(archive)
     assert not rejected["preflight_pass"] and rejected["classification"] == "unverified-user-archive"
+    monkeypatch.setattr(run_freemhd_parity_suite, "run_freemhd_s3_pipe_smoke_bundle",
+                        lambda *_, **__: {"execution_pass": True})
+    assert run_freemhd_parity_suite.main([
+        "--output", str(tmp_path / "smoke"), "--freemhd-s3-smoke", str(archive)]) == 0
 
 
+def test_s3_pipe_materializer_safely_reduces_private_inputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    archive = tmp_path / "S3_Buhler_Ha616.zip"
+    fields = "boundaryField { inlet { type cyclic; } sink { type cyclic; } }\n"
+    mesh = "\n".join(
+        ["(52 52 194)\nsimpleGrading (9 9 9)"] * 5
+        + ["(194 52 194)\nsimpleGrading (9 9 9)"] * 4
+    )
+    members = {"system/0/T": fields, "system/0/JxB": fields, "system/blockMeshDict": mesh}
+    with run_freemhd_parity_suite.zipfile.ZipFile(archive, "w") as zipped:
+        for name, content in members.items():
+            zipped.writestr(name, content)
+    monkeypatch.setattr(run_freemhd_parity_suite, "_S3_PIPE_INPUT_MEMBERS", tuple(members))
+    monkeypatch.setattr(run_freemhd_parity_suite, "preflight_freemhd_s3_pipe_archive", lambda _: {
+        "preflight_pass": True, "observed_sha256": "a" * 64,
+        "runtime_property_hartmann_number": 573.33628803877, "extraction_authorized": False,
+    })
+    manifest = run_freemhd_parity_suite.materialize_freemhd_s3_pipe_smoke(archive, tmp_path / "input")
+    root = tmp_path / "input"
+    assert not (root / "system/0").exists()
+    assert (root / "0/T").read_text().count("type calculated;") == 2
+    assert (root / "0/JxB").read_text().count("type calculated;") == 2
+    reduced = (root / "system/blockMeshDict").read_text()
+    assert reduced.count("(8 8 8)") == 5 and reduced.count("(2 8 8)") == 4
+    assert reduced.count("simpleGrading (1 1 1)") == 9
+    assert manifest["private_extraction_authority"] == "explicit local user invocation"
+
+
+@pytest.mark.parametrize(("name", "symlink"), [("../escape", False), ("link", True)])
+def test_s3_pipe_extraction_rejects_unsafe_members(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, symlink: bool
+):
+    archive = tmp_path / "unsafe.zip"
+    monkeypatch.setattr(run_freemhd_parity_suite, "_S3_PIPE_INPUT_MEMBERS", ("safe",))
+    with run_freemhd_parity_suite.zipfile.ZipFile(archive, "w") as zipped:
+        zipped.writestr("safe", "input")
+        entry = run_freemhd_parity_suite.zipfile.ZipInfo(name)
+        if symlink:
+            entry.create_system, entry.external_attr = 3, 0o120777 << 16
+        zipped.writestr(entry, "target")
+    with pytest.raises(ValueError, match="Unsafe"):
+        run_freemhd_parity_suite._extract_s3_pipe_inputs(archive, tmp_path / "output")
+
+
+def _write_s3_smoke_fixture(root: Path) -> tuple[Path, Path, Path]:
+    case, source, output = root / "input", root / "source", root / "output"
+    (case / "system").mkdir(parents=True)
+    control = (
+        "startTime 0; endTime 2e-6; deltaT 1e-6; maxDeltaT 1e-6; writeInterval 1; "
+        "adjustTimeStep off;\n"
+    )
+    (case / "system/controlDict").write_text(control)
+    (case / "system/decomposeParDict").write_text("numberOfSubdomains 2;\n")
+    (case / "s3-smoke-input.json").write_text(json.dumps({
+        "classification": run_freemhd_parity_suite._S3_SMOKE_CLASS, "archive_sha256": run_freemhd_parity_suite._S3_PIPE_ARCHIVE["sha256"], "runtime_hartmann_number": run_freemhd_parity_suite._S3_RUNTIME_HA,
+        "mesh_cells": {"liquid": 2560, "solidWalls": 512, "total": 3072},
+        **run_freemhd_parity_suite._S3_DENIALS, **run_freemhd_parity_suite._S3_LOCAL_AUTHORITY,
+    }))
+    source.mkdir()
+    (source / "source-pin.json").write_text(json.dumps({"commit": run_freemhd_parity_suite._S3_SOURCE_COMMIT}))
+    output.mkdir()
+    (output / "controlDict.used").write_text(control)
+    setup = "Number of regions:2\n0  2560\n1  512\n" + "\n".join(
+        f"Number of cells = {value}" for value in (1280, 1280, 256, 256))
+    (output / "setup.log").write_text(setup)
+    solves = ["potE", "potE", "p_rgh", "p_rgh", "p_rgh"] * 2
+    run = "Region: liquid Courant Number mean: 1e-10 max: 2e-10\n"
+    for step in (1, 2):
+        run += f"Time = {step}e-06\nRegion: liquid Courant Number mean: 1e-10 max: 2e-10\n"
+        for field in solves[(step - 1) * 5:step * 5]:
+            run += f"Solving for {field}, Initial residual = 1, Final residual = 1e-8, No Iterations 2\n"
+    (output / "run.log").write_text(run + "End\n")
+    (output / "run.json").write_text(json.dumps({
+        "schema_version": 1, "classification": "native-s3-reduced-pipe-harness-smoke",
+        "input_sha256": artifact_sha256(case, "tree"),
+        "source_sha256": artifact_sha256(source, "tree"),
+        "source_commit": run_freemhd_parity_suite._S3_SOURCE_COMMIT,
+        "wall_seconds": 1.0, "nproc": 2, "image_id": f"sha256:{'a' * 64}",
+        "float_precision": "float64",
+    }))
+    return case, source, output
+
+
+def test_s3_pipe_observer_passes_execution_only_and_fails_closed(tmp_path: Path):
+    case, source, output = _write_s3_smoke_fixture(tmp_path)
+    report = run_freemhd_parity_suite.observe_freemhd_s3_pipe_smoke(output, case, source)
+    assert report["execution_pass"] and report["cells"]["total"] == 3072 and report["image_id"].startswith("sha256:")
+    assert not any(report[name] for name in run_freemhd_parity_suite._S3_DENIALS)
+    (output / "run.log").write_text((output / "run.log").read_text().replace("1e-8", "nan", 1))
+    with pytest.raises(ValueError, match="fatal or nonfinite"):
+        run_freemhd_parity_suite.observe_freemhd_s3_pipe_smoke(output, case, source)
+
+
+@pytest.mark.parametrize("kind", ["b2", "s3"])
 @pytest.mark.parametrize("result", ["success", "timeout", "failure"])
-def test_matched_b2_docker_runner_enforces_deadline_and_cleanup(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, result: str
+def test_freemhd_docker_runners_enforce_pins_deadline_and_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str, result: str
 ):
     source, evaluator, output = tmp_path / "input", tmp_path / "evaluator", tmp_path / "output"
     source.mkdir()
     (source / "input.txt").write_text("immutable\n")
     evaluator.write_text("evaluator\n")
+    snapshot = tmp_path / "source"
+    snapshot.mkdir()
+    (snapshot / "source-pin.json").write_text(json.dumps({
+        "commit": run_freemhd_parity_suite._S3_SOURCE_COMMIT
+    }))
     calls = []
 
     def run(command, **kwargs):
         calls.append((command, kwargs))
+        if command[1:3] == ["image", "inspect"]:
+            return SimpleNamespace(stdout=f"sha256:{'b' * 64}\n")
         if command[1] == "run" and result == "timeout":
             raise subprocess.TimeoutExpired(command, kwargs["timeout"])
         if command[1] == "run" and result == "failure":
@@ -1092,10 +1196,18 @@ def test_matched_b2_docker_runner_enforces_deadline_and_cleanup(
     monkeypatch.setattr(
         run_freemhd_parity_suite, "observe_freemhd_b2_output", lambda *args: {"observed": args}
     )
+    monkeypatch.setattr(
+        run_freemhd_parity_suite, "observe_freemhd_s3_pipe_smoke", lambda *_: {"execution_pass": True}
+    )
+
     def invoke():
+        if kind == "s3":
+            return run_freemhd_parity_suite.run_freemhd_s3_pipe_smoke(
+                source, snapshot, output, image="freemhd:test", timeout_seconds=7.0
+            )
         return run_freemhd_parity_suite.run_matched_b2_freemhd_smoke(
-            source, evaluator, output, image="freemhd:test", nproc=2, timeout_seconds=7.0
-        )
+            source, evaluator, output, image="freemhd:test", nproc=2, timeout_seconds=7.0)
+
     if result == "timeout":
         with pytest.raises(TimeoutError, match="exceeded 7 seconds"):
             invoke()
@@ -1103,14 +1215,18 @@ def test_matched_b2_docker_runner_enforces_deadline_and_cleanup(
         with pytest.raises(RuntimeError, match="setup failed"):
             invoke()
     else:
-        assert "observed" in invoke()
-        assert json.loads((output / "run.json").read_text())["image"] == "freemhd:test"
-
-    docker, cleanup = calls
+        observed = invoke()
+        assert ("observed" in observed) if kind == "b2" else observed["execution_pass"]
+        metadata = json.loads((output / "run.json").read_text())
+        assert metadata["image"] == "freemhd:test" if kind == "b2" else metadata["image_id"].startswith("sha256:")
+    docker = next(call for call in calls if call[0][1] == "run")
     assert docker[1]["timeout"] == 7.0
     rendered = " ".join(docker[0])
     assert {"--rm", "--name", "--cidfile"} <= set(rendered.split()) and "readonly" in rendered
-    assert cleanup[0][1:3] == ["rm", "-f"]
+    if kind == "s3":
+        assert f"{run_freemhd_parity_suite.os.getuid()}:{run_freemhd_parity_suite.os.getgid()}" in rendered
+        assert "HOME=/tmp" in rendered and f"sha256:{'b' * 64}" in rendered and "mpirun -np 2" in rendered and "--network none" in rendered and "--cap-drop ALL" in rendered
+    assert calls[-1][0][1:3] == ["rm", "-f"]
     assert (source / "input.txt").read_text() == "immutable\n"
 
 

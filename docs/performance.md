@@ -16,7 +16,7 @@ are diagnostics, and the GPU timing remains a calibration.
 
 | Path | Hardware and grid | Result | Interpretation |
 |---|---|---|---|
-| portable test gate | Apple M4, six workers | 861 pass, 8 skip, 95.42% combined line/branch coverage, 124.1 s | 41% of the five-minute target and 21% of the ten-minute budget |
+| portable test gate | Apple M4, six workers | 868 pass, 8 skip, 95.42% combined line/branch coverage, 123.2 s | 41% of the five-minute target and 21% of the ten-minute budget |
 | B2 CPU smoke | Apple M4, `8 x 7 x 7`, 1/2/4 forced CPU devices | current-source pressure observable agrees within `5.93e-15`; closure and exact restart pass | production sharding correctness; too small for scaling claims |
 | B2 monitored CPU scaling | `256 x 67 x 67`, 32 updates, 2/4/8 guest CPUs, 1/2/4 JAX devices, three warm trajectories per topology | 246.691/172.410/147.465 s; 1.431x/1.673x; peak process RSS 4.934/5.150/5.485 GB; CV at most 0.359% | accepted at source/evaluator `cbf4358`; large-work, environment, numerics, restart, and placement pass; exact host-core mapping and steady-state acceptance remain open |
 | B2 multi-minute GPU calibration | `256 x 67 x 67`, 1/2 RTX A4000, 96 updates, three warm trajectories per topology | 258.913/159.234 s; 1.626x; peak device memory 2.50 GB vs 1.41/1.31 GB; CV below 0.29% | recorded source `78858f5`; numerical/duration gates pass, but persistent foreign contexts block an authoritative timing claim |
