@@ -180,6 +180,7 @@ def test_curated_examples_use_submodules_and_linear_scripts_are_editable() -> No
         )
         if path.name in {
             "autodiff_design_demo.py",
+            "extruded_restart_demo.py",
             "hartmann_example.py",
             "hunt_example.py",
             "operator_verification_demo.py",

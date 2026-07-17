@@ -70,14 +70,15 @@ not a validated blanket design prediction.
 ```bash
 lmx examples/hartmann_case.toml
 lmx examples/cases/ducts/hartmann_restart_case.toml
-python examples/extruded_restart_demo.py --help
+python examples/extruded_restart_demo.py
 ```
 
 <p align="center">
   <img src="_static/extruded_restart_equivalence.webp" alt="Direct and restarted extruded solutions agree exactly in mean velocity, charge balance, and saved state" width="92%">
 </p>
 
-The portable 3+3-step demo reproduces the direct six-step solution bit-for-bit
+Edit the layered geometry, field envelope, and split lengths at the top of the
+file. The portable 3+3-step demo reproduces the direct six-step solution bit-for-bit
 across `u`, `v`, `w`, `p`, and `phi` (5.15 s on the reference Mac run).
 Restart metadata protects against incompatible source, mesh, or input state.
 Use atomic partial checkpoints for long extruded runs.

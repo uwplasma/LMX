@@ -22,13 +22,8 @@ def _fringing_pipe_root_or_skip() -> Path:
 
 
 def _load_example_module(filename: str):
-    root = Path(__file__).resolve().parents[1]
-    candidates = [root / "examples" / filename]
-    existing = [path for path in candidates if path.is_file()]
-    assert len(existing) == 1, (
-        f"Expected one workflow named {filename}, found {existing}"
-    )
-    module_path = existing[0]
+    module_path = Path(__file__).resolve().parents[1] / "examples" / filename
+    assert module_path.is_file(), f"Missing example {filename}"
     spec = importlib.util.spec_from_file_location(module_path.stem, module_path)
     assert spec is not None
     assert spec.loader is not None
@@ -179,12 +174,14 @@ def test_variable_field_extruded_demo_writes_summary(tmp_path: Path):
 
 
 def test_extruded_restart_demo_is_state_exact(tmp_path: Path):
-    module = _load_example_module("extruded_restart_demo.py")
-    summary = module.run_extruded_restart_demo(out_dir=tmp_path)
+    script = Path(__file__).resolve().parents[1] / "examples/extruded_restart_demo.py"
+    subprocess.run([sys.executable, script], cwd=tmp_path, timeout=60, check=True)
+    summary_path = next((tmp_path / "artifacts").rglob("extruded_restart_summary.json"))
+    summary = json.loads(summary_path.read_text())
     assert summary["max_state_difference"] == 0.0
     assert summary["max_mean_velocity_difference"] == 0.0
     assert summary["max_charge_balance_difference"] == 0.0
-    assert (tmp_path / "extruded_restart_demo.png").is_file()
+    assert (summary_path.parent / "extruded_restart_demo.png").is_file()
 
 
 def test_freemhd_closed_channel_observable_parity_writes_summary(
