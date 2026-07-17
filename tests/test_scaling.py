@@ -489,13 +489,13 @@ def test_scaling_worker_command_forwards_restart(tmp_path: Path, monkeypatch) ->
         strong_scaling_demo._materialize_exact(derived, Path.write_text, data="same")
     with pytest.raises(ValueError, match="differs"):
         strong_scaling_demo._materialize_exact(derived, Path.write_text, data="changed")
-    plot_options = {}
+    titles = []
     monkeypatch.setattr(strong_scaling_demo, "write_strong_scaling_plots",
-        lambda *args, **kwargs: plot_options.update(kwargs) or [])
-    for records, title in (([], "LMX fixed-work scaling calibration"),
-            (_sustained_ladder((1, 2, 4)), "LMX sustained multi-minute strong scaling")):
-        assert strong_scaling_demo._write_optional_scaling_plots(records, tmp_path) == []
-        assert plot_options["case_title"] == title
+        lambda *args, **kwargs: titles.append(kwargs["case_title"]) or [])
+    for records in ([], _sustained_ladder((1, 2, 4))):
+        strong_scaling_demo._write_optional_scaling_plots(records, tmp_path)
+    assert titles == ["LMX fixed-work scaling calibration",
+        "LMX sustained multi-minute strong scaling"]
     missing_plot = ModuleNotFoundError(name="matplotlib")
     monkeypatch.setattr(strong_scaling_demo, "write_strong_scaling_plots", lambda *args, **kwargs: (_ for _ in ()).throw(missing_plot))
     assert strong_scaling_demo._write_optional_scaling_plots([], tmp_path) == []
@@ -620,40 +620,36 @@ def test_strong_scaling_summary_table_computes_solver_diagnostics(tmp_path: Path
 
 
 def test_sustained_claim_fails_closed_on_incomplete_evidence():
-    bad = [_sustained_ladder((1, 2)), _sustained_ladder((1, 2, 4, 8))]
-    for field in (*scaling._sustained_identity_fields(_sustained_ladder((1,))[0]),
-            "memory_bytes_estimate", "resource_environment_verified"):
+    def mutated(*, monitoring=False, remove=(), **changes):
         records = _sustained_ladder((1, 2, 4))
-        records[-1].pop(field)
-        bad.append(records)
-    mismatched = _sustained_ladder((1, 2, 4))
-    mismatched[-1]["input_sha256"] = "other"
-    bad.append(mismatched)
-    nonpositive_memory = _sustained_ladder((1, 2, 4))
-    nonpositive_memory[-1]["peak_host_rss_bytes"] = 0
-    bad.append(nonpositive_memory)
+        target = records[-1]["resource_monitoring"] if monitoring else records[-1]
+        target.update(changes)
+        for field in remove:
+            target.pop(field)
+        return records
+
+    bad = [_sustained_ladder((1, 2)), _sustained_ladder((1, 2, 4, 8))]
+    bad += [mutated(remove=(field,)) for field in (
+        *scaling._sustained_identity_fields(_sustained_ladder((1,))[0]),
+        "memory_bytes_estimate", "resource_environment_verified")]
+    bad += [mutated(input_sha256="other"), mutated(peak_host_rss_bytes=0)]
     gpu_memory = _sustained_ladder((1, 2), "gpu")
     gpu_memory[-1]["device_memory"][0].pop("peak_bytes_in_use")
     bad.append(gpu_memory)
-    noisy = _sustained_ladder((1, 2, 4))
-    noisy[-1].update(warm_samples_seconds=[120.0, 121.0, 180.0], warm_seconds=121.0)
+    noisy = mutated(warm_samples_seconds=[120.0, 121.0, 180.0], warm_seconds=121.0)
     bad.append(noisy)
-    for field, value in (("total_cells", 1), ("cell_updates", 1),
+    bad += [mutated(**{field: value}) for field, value in (
+        ("total_cells", 1), ("cell_updates", 1),
             ("large_fixed_work_passed", False),
-            ("measurement_class", "debug-or-calibration")):
-        records = _sustained_ladder((1, 2, 4))
-        records[-1][field] = value
-        bad.append(records)
-    for field, value in (("schema_version", 0), ("scope", "preflight"),
+            ("measurement_class", "debug-or-calibration"))]
+    bad += [mutated(monitoring=True, **{field: value}) for field, value in (
+        ("schema_version", 0), ("scope", "preflight"),
             ("backend", "gpu"), ("num_devices", 8), ("verified", False),
             ("raw_sha256", "A" * 64), ("sample_period_seconds", 0.0),
             ("max_sample_gap_seconds", 5.001),
             ("monitored_worker_seconds", "invalid"),
             ("monitored_worker_seconds", 1.0),
-            ("postflight_seconds", 14.999), ("violation_count", 1)):
-        records = _sustained_ladder((1, 2, 4))
-        records[-1]["resource_monitoring"][field] = value
-        bad.append(records)
+            ("postflight_seconds", 14.999), ("violation_count", 1))]
 
     summaries = [summarize_strong_scaling_records(records) for records in bad]
     assert all(not summary["sustained_claim_eligible"] for summary in summaries)
