@@ -360,6 +360,16 @@ time more than doubles. The next bounded candidate must compute one reusable
 field halo for both diffusion and convection and eliminate the separate west
 transport exchange; do not rerun the reverted variant or relax its gate.
 
+The second candidate reuses field and face halos and is also rejected and
+reverted. It is 26.94% faster in the bounded wall screen, improves momentum
+17.59%, and keeps RSS growth to 2.23%, with every exact gate green. Yet collective
+time falls only 17.01% because the remaining directional plane permutations
+increase permutation union from 7.83 to 18.23 ms. Do not spend a sustained rung
+on this attractive small-case result. A materially different successor must
+remove the two remaining setup full-vector gathers and scalar setup gathers, or
+change axial operator/partition ownership; further rearrangement of the same
+two directional halos is closed.
+
 Keep the GPU diagnosis separate. Its existing trace spends only about 9% of
 device-active time in collectives and about 75% in transverse SOLVAX line work,
 so GPU promotion should optimize or fuse compute kernels while preserving exact

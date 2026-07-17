@@ -214,6 +214,14 @@ the frozen 25% gate. The implementation is reverted. A successor must reuse one
 halo across diffusion and convection and avoid the separate west-transport
 exchange before another bounded profile is justified.
 
+That fused successor is rejected too. Its bounded wall time improves 26.94%,
+momentum 17.59%, and RSS grows only 2.23%, with exact numerics, but collective
+time falls only 17.01%. The two remaining directional plane exchanges increase
+permutation union from 7.83 to 18.23 ms. This small-case speedup is not promoted
+to a sustained run. The next candidate must remove remaining setup gathers or
+change axial operator/partition ownership, rather than rearranging the same
+halo pair again.
+
 Superseded pilots and rejected ladders remain auditable in
 `benchmarks/results/b2-schema6-cpu-scaling-20260716.json`.
 

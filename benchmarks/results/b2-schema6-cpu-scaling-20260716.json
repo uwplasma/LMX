@@ -402,6 +402,29 @@
     "classification": "controlled Docker diagnostic; full-volume momentum gathers and greater than 20% collective occupancy require a sharding-aware momentum fix before another sustained ladder"
   },
   "post_profile_decisions": {
+    "fused_reusable_momentum_halos": {
+      "shape": [128, 35, 35],
+      "updates": 2,
+      "devices": 4,
+      "baseline_warm_median_seconds": 1.653702918,
+      "candidate_warm_median_seconds": 1.208216084,
+      "wall_time_improvement": 0.26939,
+      "momentum_phase_improvement": 0.17595,
+      "collective_time_improvement": 0.17013,
+      "peak_rss_change": 0.02232,
+      "full_vector_all_gather_static_sites": {"baseline": 12, "candidate": 2},
+      "replacement": "eight static loop vector-plane ppermutes plus one loop-invariant f64[33,33,2] face-data ppermute; ppermute union increased from 0.007829 to 0.018231 seconds",
+      "numerics_restart_and_placement_exact": true,
+      "pressure_iterations": {"maximum": 155, "mean": 153},
+      "promotion_thresholds": {
+        "wall_time_improvement": 0.08,
+        "momentum_phase_improvement": 0.15,
+        "collective_time_improvement": 0.25,
+        "maximum_rss_growth": 0.05
+      },
+      "raw_artifact_location": "/private/tmp/lmx-docker-hlo-momentum-fused-20260717-094333",
+      "decision": "reject and revert; collective improvement misses the predeclared 25% gate; do not rearrange the same two directional halos again"
+    },
     "sharding_aware_momentum_halos": {
       "shape": [128, 35, 35],
       "updates": 2,
