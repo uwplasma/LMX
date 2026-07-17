@@ -185,6 +185,10 @@ keeps inertial wake/recirculation physics research-stage.
 
 ![Seven-second nonlinear Q2D research workflow](_static/readme-q2d-turbulence.webp)
 
+This legacy 7.014 s asset is a **weakly forced** transient, not an unforced
+decay and not a statistically steady turbulence result. Its replacement must
+pass a predeclared statistical-stationarity gate before publication.
+
 ![Q2D-MHDfoam external diagnostics with parity explicitly open](_static/q2d_external_diagnostics.webp)
 
 The released lid-driven observable check (top) and turbulence audit (bottom)

@@ -60,8 +60,8 @@ SHA-256; `python scripts/manage_release_assets.py --check` verifies it locally.
 | geometry gallery | 61,600 | compressed WebP | released derivative `e844f069...` |
 | variable-field response | 41,648 | compressed WebP | released derivative `5d4b593c...` |
 | magnetic obstacle | 48,630 | compressed WebP | released derivative `6e351e80...` |
-| blanket-flow loop | 62,522 | 480 × 222 animated WebP, 7.000 s | released GIF `1a23d23...`; 35 timing slots, 22 encoded physical frames through source frame 21 at 2.90 s |
-| Q2D loop | 117,102 | 440 × 381 animated WebP, 7.014 s | legacy Python/Pillow derivative of released GIF `feb9e145...`; 42 frames; replace after the statistical-steady gate |
+| blanket-flow loop | 62,522 | 480 × 222 animated WebP, 7.000 s | accepted 18-update window; visible terminal metric `1.676904288502e-3` at source frame 21, step 58, 2.90 s |
+| Q2D loop | 117,102 | 440 × 381 animated WebP, 7.014 s | legacy weakly forced transient; 42 frames; not statistically steady |
 | B2 field, pressure, and acceleration | 48,994 | 1,000 × 895 WebP | released field/pressure source plus raw, bounded, and residual-spectrum gates; shared-norm acceleration rejected |
 | curved-pipe validation | 94,236 | compressed WebP | released derivative `d32d666a...` |
 | blanket current and pressure | 89,356 | 1,476 × 1,573 WebP | released sources `48f4ba58...` and `4be86176...`; research-stage |
@@ -76,9 +76,15 @@ The writer distributes integer frame durations without exceeding seven seconds
 and uses lossy WebP compression. Q2D samples its current source uniformly. The
 blanket derivative uses 35 slots at 5 fps and `--last-frame 21` to stop at the
 first stored state after its existing 18-update steady gate passes: the source
-history first satisfies `max(relative update) <= 2e-3` at step 57 (2.85 s), and
-source frame 21 is step 58 (2.90 s). It replaces the former 15-second physical
-tail without a solver rerun. No solver or motion interpolation is involved.
+history first satisfies `max(relative update) <= 2e-3` at step 57 (2.85 s),
+with a window maximum of `1.860420834008e-3`. Source frame 21 is step 58
+(2.90 s), where the visible terminal 18-update metric is
+`1.676904288502e-3`. The `3.000354787140735e-14` metric belongs to the full
+15-second source, not the displayed endpoint. It replaces that physical tail
+without a solver rerun. No solver or motion interpolation is involved. The
+Q2D asset is a 7.014-second legacy **weakly forced** transient; it is not an
+unforced decay or a statistically steady result and remains rejected for that
+claim.
 The paired writer supports 35 synchronized timing slots at 5 fps. The existing
 Hunt/Shercliff asset predates the shared steady gate and remains labelled as a
 legacy transient; a current-grid replacement must stop at its first full gate

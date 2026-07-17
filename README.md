@@ -128,8 +128,10 @@ Promoted objectives pass finite-difference/independent-transpose checks.
   <img src="docs/_static/readme-q2d-turbulence.webp" alt="Q2D turbulence movie" width="58%">
 </p>
 
-Implemented workflows; quantitative turbulent Q2D-MHDfoam parity and blanket
-validation remain open.
+The blanket loop stops at its accepted 18-update steady window. The Q2D loop
+is a weakly forced legacy transient (7.014 s), not a statistically steady
+result. Quantitative turbulent Q2D-MHDfoam parity and blanket validation remain
+open.
 [Geometry and fields →](https://lmx.readthedocs.io/en/latest/geometry.html) ·
 [External benchmarks →](https://lmx.readthedocs.io/en/latest/external_benchmarks.html)
 

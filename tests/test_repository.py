@@ -69,6 +69,18 @@ EXPECTED_ROOT_API = {
 }
 
 
+def _animated_webp_duration_ms(path: Path) -> int:
+    """Read the exact animation duration from WebP ANMF chunks."""
+
+    data, offset, duration = path.read_bytes(), 12, 0
+    while offset + 8 <= len(data):
+        size = int.from_bytes(data[offset + 4 : offset + 8], "little")
+        if data[offset : offset + 4] == b"ANMF":
+            duration += int.from_bytes(data[offset + 20 : offset + 23], "little")
+        offset += 8 + size + size % 2
+    return duration
+
+
 def test_architecture_inventory_is_deterministic_without_timing(tmp_path: Path) -> None:
     first = tmp_path / "first.json"
     second = tmp_path / "second.json"
@@ -281,6 +293,35 @@ def test_tracked_release_asset_manifest_matches_sources() -> None:
     assert showcase["bytes"] == sum(item["bytes"] for item in showcase["files"])
     assert showcase["bytes"] < 1280 * 1024
     assert len(showcase["files"]) <= 20
+    animations = {item["path"]: item for item in tracked["animations"]}
+    assert set(animations) == {
+        "docs/_static/readme-hunt-startup.webp",
+        "docs/_static/readme-blanket-flow.webp",
+        "docs/_static/readme-q2d-turbulence.webp",
+    }
+    for path, metadata in animations.items():
+        assert _animated_webp_duration_ms(Path(path)) == metadata["duration_ms"]
+    hunt = animations["docs/_static/readme-hunt-startup.webp"]
+    q2d = animations["docs/_static/readme-q2d-turbulence.webp"]
+    assert not hunt["accepted"] and hunt["status"] == "legacy_transient"
+    assert not q2d["accepted"] and q2d["status"] == "legacy_non_statistically_steady"
+    assert q2d["duration_ms"] == 7014
+    blanket = animations["docs/_static/readme-blanket-flow.webp"]
+    assert blanket["accepted"] and blanket["status"] == "steady_window_accepted"
+    acceptance = blanket["animation_acceptance"]
+    assert acceptance["accepted"]
+    assert acceptance["media_terminal"] == {
+        "source_frame": 21,
+        "step": 58,
+        "time_s": 2.9,
+        "window_max_relative_update": 0.001676904288502,
+    }
+    assert acceptance["full_source_terminal"]["window_max_relative_update"] < 1e-13
+    assert all(
+        len(item["sha256"]) == 64
+        for item in acceptance["historical_evidence"].values()
+        if isinstance(item, dict)
+    )
     assert check_manifest() == tracked
 
 
@@ -302,16 +343,7 @@ def test_animated_webp_is_bounded_and_preserves_motion(tmp_path: Path) -> None:
     with Image.open(output) as animation:
         assert animation.size == (24, 16)
         assert animation.n_frames >= 3
-    data = output.read_bytes()
-    offset = 12
-    durations = []
-    while offset + 8 <= len(data):
-        chunk_size = int.from_bytes(data[offset + 4 : offset + 8], "little")
-        payload = data[offset + 8 : offset + 8 + chunk_size]
-        if data[offset : offset + 4] == b"ANMF":
-            durations.append(int.from_bytes(payload[12:15], "little"))
-        offset += 8 + chunk_size + (chunk_size % 2)
-    assert durations and sum(durations) <= 7000
+    assert 0 < _animated_webp_duration_ms(output) <= 7000
     assert output.stat().st_size < 16_000
 
     trimmed = write_animated_webp(

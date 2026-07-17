@@ -561,6 +561,71 @@
       "sha256": "feb9e145cee2a5a87f13381803855a34ad16d44f4d63d0c31c155ad07f74bd96"
     }
   ],
+  "animations": [
+    {
+      "accepted": false,
+      "duration_ms": 7000,
+      "path": "docs/_static/readme-hunt-startup.webp",
+      "status": "legacy_transient"
+    },
+    {
+      "accepted": true,
+      "animation_acceptance": {
+        "accepted": true,
+        "first_pass": {
+          "step": 57,
+          "time_s": 2.85,
+          "window_max_relative_update": 0.001860420834008
+        },
+        "full_source_terminal": {
+          "step": 300,
+          "time_s": 15.0,
+          "window_max_relative_update": 3.000354787140735e-14
+        },
+        "gate": {
+          "relative_update_tolerance": 0.002,
+          "window_updates": 18
+        },
+        "historical_evidence": {
+          "git_commit": "c5496ea5350b227c1d95e420905564c7355041c8",
+          "history_csv": {
+            "git_blob_sha1": "88d9fa3017d42ac5f87c05f69b364037c1848e68",
+            "path": "docs/_static/generated/wham_blanket_transient_flow_history.csv",
+            "sha256": "de1acda5ca5fc6a3d350099fdee8badfa6f96bf17ba6033db9f86188281b7305"
+          },
+          "summary_json": {
+            "git_blob_sha1": "7d45753cf01eded531b6401fd5ace35c82beeeb9",
+            "path": "docs/_static/generated/wham_blanket_transient_flow_summary.json",
+            "sha256": "caa81b771393369058561f3ad85ee6b1990cb797aaa6713f136b2a26ddc91923"
+          }
+        },
+        "media": {
+          "duration_ms": 7000,
+          "path": "docs/_static/readme-blanket-flow.webp",
+          "sha256": "338556447bc78d1a0f9f4a52320f6e2bb32dbaa9d92fb07c0dd5960c2ecc162c"
+        },
+        "media_terminal": {
+          "source_frame": 21,
+          "step": 58,
+          "time_s": 2.9,
+          "window_max_relative_update": 0.001676904288502
+        },
+        "source": {
+          "path": "docs/_static/generated/wham_blanket_flow.gif",
+          "sha256": "1a23d23da1b22addea52b90b1827c058044fe4fbe305460b0a0cfea6118fc3d4"
+        }
+      },
+      "duration_ms": 7000,
+      "path": "docs/_static/readme-blanket-flow.webp",
+      "status": "steady_window_accepted"
+    },
+    {
+      "accepted": false,
+      "duration_ms": 7014,
+      "path": "docs/_static/readme-q2d-turbulence.webp",
+      "status": "legacy_non_statistically_steady"
+    }
+  ],
   "generated_by": "scripts/manage_release_assets.py",
   "release": {
     "archive_name": "lmx-research-assets-v1.tar.gz",

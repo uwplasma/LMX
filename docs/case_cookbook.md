@@ -64,7 +64,10 @@ is a bounded internal diagnostic, not experimental or FreeMHD validation.
 
 The reduced blanket workflow includes a conservative current-closure gate and
 a magnetic-field pressure-budget sweep. These are research-stage diagnostics,
-not a validated blanket design prediction.
+not a validated blanket design prediction. The movie ends at source frame 21
+(step 58, 2.90 s), where its 18-update window metric is
+`1.676904288502e-3 < 2e-3`; the `3.000354787140735e-14` metric belongs only to
+the full 15 s source history.
 
 ## Restart
 
