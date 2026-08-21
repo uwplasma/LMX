@@ -19,40 +19,58 @@ env:
   NUMEXPR_NUM_THREADS: "1"
 
 jobs:
-  test:
-    name: Python ${{ matrix.python-version }} (${{ matrix.lane }})
+  quality:
+    name: Metadata and architecture
     runs-on: ubuntu-latest
-    timeout-minutes: 22
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - python-version: "3.10"
-            lane: compatibility
-            solvax-version: "0.13.0"
-            coverage-args: --no-coverage
-          - python-version: "3.13"
-            lane: coverage
-            solvax-version: ""
-            coverage-args: ""
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-lmx
         with:
-          python-version: ${{ matrix.python-version }}
-          solvax-version: ${{ matrix.solvax-version }}
+          python-version: "3.13"
       - name: Verify metadata
         run: python scripts/manage_provenance.py --check
       - name: Enforce architecture budgets
         run: python scripts/audit_architecture.py --check --measure-import
-      - name: Run all tests and branch coverage
-        run: python scripts/run_full_test_suite.py --budget-seconds 1200 ${{ matrix.coverage-args }}
-      - name: Upload failure diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
+
+  compatibility:
+    name: Python 3.10 (${{ matrix.shard }})
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [core, examples, physics, validation]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-lmx
         with:
-          name: test-diagnostics-py${{ matrix.python-version }}
-          path: |
-            coverage.xml
-            artifacts/tests/full-suite-junit.xml
-          if-no-files-found: ignore
+          python-version: "3.10"
+          solvax-version: "0.13.0"
+      - name: Run test shard
+        run: >-
+          python scripts/run_full_test_suite.py --budget-seconds 600
+          --shard ${{ matrix.shard }} --no-coverage
+
+  coverage:
+    name: Combined branch coverage
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-lmx
+        with:
+          python-version: "3.13"
+      - name: Run bounded coverage shards
+        run: |
+          for lmx_shard in core examples physics validation; do
+            COVERAGE_FILE=".coverage.${lmx_shard}" python scripts/run_full_test_suite.py \
+              --budget-seconds 600 --shard "${lmx_shard}" --coverage-fail-under 0
+          done
+      - name: Combine and enforce coverage
+        run: |
+          python -m coverage combine
+          python -m coverage report --fail-under=95
+          python -m coverage xml -o coverage.xml

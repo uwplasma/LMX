@@ -656,9 +656,9 @@ change, a numerical algorithm change, and a history rewrite in one commit.
 - [ ] Restore required GitHub CI and branch protection. Workflow definitions
   are present and hosted jobs now execute on the canonical `uwplasma/LMX`
   repository. The stale unpublished SOLVAX compatibility pin was corrected to
-  0.13.0. Both hosted test lanes reached 69% without a test failure before the
-  former 600-second process budget expired; the evidence-based 1,200-second
-  rerun is pending. Branch protection still requires a plan that supports it
+  0.13.0. The monolithic hosted lanes reached 69% without a test failure before
+  runner termination; the exact bounded-shard replacement and combined-coverage
+  gate are pending. Branch protection still requires a plan that supports it
   for this private repo.
 - [ ] Record clean-clone, tracked-tree, wheel, module/file/line, import,
   runtime, memory, and test baselines using reproducible commands. Clone,
@@ -1001,10 +1001,27 @@ surface, measurements, validation, decision, and next action.
   released 0.13.0 required by `splu_solve`; local dependency, provenance,
   architecture, Ruff, and Sphinx checks pass on the corrected configuration.
 - The corrected hosted LMX lanes completed setup, metadata, and architecture
-  gates, then reached 69% without a test failure before the 600-second test
-  process budget expired on the two-core runner. Raised only the transitional
-  full-suite envelope to 1,200 seconds inside a 22-minute job cap. The planned
-  PR-suite consolidation and below-90-second target remain unchanged.
+  gates, then reached 69% without a test failure before runner termination. A
+  1,200-second rehearsal proved that enlarging the script and job budgets did
+  not prevent GitHub from sending a shutdown signal at 11 minutes. Replaced
+  the accumulating monolithic process with exact core (299), examples (22),
+  physics (232), and validation (274) shards. The minimum-dependency lane uses
+  isolated runners; the coverage lane uses fresh bounded pytest subprocesses
+  and combines their data in place. Examples run on one worker so their
+  existing subprocess timeouts measure the example, rather than contention
+  with a simultaneous JAX compile. The partition contains all 827 tests exactly
+  once per dependency lane before enforcing the unchanged 95% threshold.
+- Rehearsed the final partition locally in the repository environment: core
+  passed 296 with 3 optional-data skips in 53 seconds, examples passed all 22
+  on one worker in 55 seconds, physics passed 230 with 2 optional-data skips in
+  63 seconds, and validation passed all 274 in 6 seconds. Coverage-enabled
+  physics and validation took 74 and 11 seconds; the pre-isolation
+  core/examples coverage database took 66 seconds. The raw databases combined
+  successfully and passed the 95% line/branch gate. This bounded transition
+  does not relax the planned below-90-second default-suite target.
+- Kept the CI success path independent of Actions artifact storage after the
+  hosted account reported its artifact quota full. Coverage is combined and
+  enforced on the runner; normal logs retain the test and coverage evidence.
 - SOLVAX hosted lint, types, docs, and build passed. Current JAX reports its
   unsupported bfloat16 LU dtype as `TypeError`; the pre-existing portability
   test now accepts that documented backend error alongside the older runtime

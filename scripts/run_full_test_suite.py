@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the complete parallel LMX test and branch-coverage gate within a budget."""
+"""Run all or selected LMX tests in parallel within a declared budget."""
 
 from __future__ import annotations
 
@@ -9,6 +9,45 @@ import subprocess
 import sys
 import time
 
+_TEST_SHARDS = {
+    "core": (
+        "tests/test_autodiff.py",
+        "tests/test_benchmarks.py",
+        "tests/test_cli.py",
+        "tests/test_config.py",
+        "tests/test_field_models.py",
+        "tests/test_io.py",
+        "tests/test_linear.py",
+        "tests/test_mesh.py",
+        "tests/test_plotting.py",
+        "tests/test_reference_data.py",
+        "tests/test_reporting.py",
+        "tests/test_runtime_logging.py",
+        "tests/test_units_and_wall_models.py",
+    ),
+    "examples": (
+        "tests/test_example_runner.py",
+        "tests/test_repository.py",
+    ),
+    "physics": (
+        "tests/test_blanket.py",
+        "tests/test_fringing.py",
+        "tests/test_physics.py",
+        "tests/test_q2d.py",
+        "tests/test_scaling.py",
+        "tests/test_solver.py",
+    ),
+    "validation": (
+        "tests/test_external_validation.py",
+        "tests/test_freemhd.py",
+        "tests/test_run_benchmark_b_independence.py",
+        "tests/test_run_convergence_suite.py",
+        "tests/test_run_samper_table_i.py",
+        "tests/test_validation.py",
+        "tests/test_validation_workflows.py",
+    ),
+}
+
 
 def _default_workers() -> int:
     return max(1, min(6, os.cpu_count() or 1))
@@ -16,20 +55,32 @@ def _default_workers() -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--workers", type=int, default=_default_workers())
+    parser.add_argument("--workers", type=int)
     parser.add_argument("--budget-seconds", type=float, default=600.0)
     parser.add_argument("--warning-seconds", type=float, default=300.0)
     parser.add_argument("--no-coverage", action="store_true")
+    parser.add_argument("--shard", choices=tuple(_TEST_SHARDS))
+    parser.add_argument("--coverage-fail-under", type=float, default=95.0)
     parser.add_argument("--coverage-xml", default="coverage.xml")
     parser.add_argument("--junit-xml", default="artifacts/tests/full-suite-junit.xml")
+    parser.add_argument(
+        "tests", nargs="*", help="Test paths to run; defaults to the complete suite"
+    )
     args = parser.parse_args(argv)
 
-    if args.workers < 1:
+    workers = args.workers
+    if workers is None:
+        workers = 1 if args.shard == "examples" else _default_workers()
+    if workers < 1:
         parser.error("--workers must be positive")
     if args.budget_seconds <= 0.0:
         parser.error("--budget-seconds must be positive")
     if args.warning_seconds <= 0.0:
         parser.error("--warning-seconds must be positive")
+    if not 0.0 <= args.coverage_fail_under <= 100.0:
+        parser.error("--coverage-fail-under must be between 0 and 100")
+    if args.shard and args.tests:
+        parser.error("--shard cannot be combined with explicit test paths")
 
     junit_path = os.path.abspath(args.junit_xml)
     os.makedirs(os.path.dirname(junit_path), exist_ok=True)
@@ -39,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
         "-m",
         "pytest",
         "-n",
-        str(args.workers),
+        str(workers),
         "--dist",
         "worksteal",
         f"--junitxml={junit_path}",
@@ -51,9 +102,10 @@ def main(argv: list[str] | None = None) -> int:
                 "--cov-branch",
                 "--cov-report=term-missing:skip-covered",
                 f"--cov-report=xml:{args.coverage_xml}",
-                "--cov-fail-under=95",
+                f"--cov-fail-under={args.coverage_fail_under}",
             ]
         )
+    command.extend(_TEST_SHARDS[args.shard] if args.shard else args.tests or ["tests"])
 
     environment = os.environ.copy()
     environment.setdefault("MPLBACKEND", "Agg")
@@ -66,7 +118,7 @@ def main(argv: list[str] | None = None) -> int:
 
     started = time.monotonic()
     print(
-        f"LMX full test gate: workers={args.workers}, "
+        f"LMX full test gate: workers={workers}, "
         f"budget={args.budget_seconds:.0f}s, coverage={not args.no_coverage}",
         flush=True,
     )
@@ -79,7 +131,10 @@ def main(argv: list[str] | None = None) -> int:
         )
     except subprocess.TimeoutExpired:
         elapsed = time.monotonic() - started
-        print(f"LMX full test gate exceeded its {args.budget_seconds:.0f}s budget after {elapsed:.1f}s", file=sys.stderr)
+        print(
+            f"LMX full test gate exceeded its {args.budget_seconds:.0f}s budget after {elapsed:.1f}s",
+            file=sys.stderr,
+        )
         return 124
 
     elapsed = time.monotonic() - started
