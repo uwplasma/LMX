@@ -7,7 +7,8 @@ from types import SimpleNamespace
 
 import lmx.fringing as fringing_impl
 
-from lmx._fringing_types import ExtrudedInductionlessSolution
+from lmx._fringing_types import ExtrudedFieldBundle, ExtrudedInductionlessSolution
+from lmx.core import NumericalFailure
 from lmx.field_models import (
     make_divergence_free_cross_section_field,
     make_localized_divergence_free_obstacle_field,
@@ -93,6 +94,40 @@ def test_extruded_solution_reports_terminal_state():
     assert solution.steps == 7
     assert solution.status == "step_limit"
     assert solution.converged is False
+
+
+def test_poisson_iteration_rejects_nonfinite_state():
+    with pytest.raises(NumericalFailure, match="3-D Poisson iteration.*potential"):
+        _poisson_jacobi_3d(
+            jnp.full((2, 2, 2), jnp.nan),
+            dx=1.0,
+            dy=1.0,
+            dz=1.0,
+            iterations=1,
+            tolerance=1.0,
+        )
+
+
+def test_extruded_solver_rejects_nonfinite_result(monkeypatch: pytest.MonkeyPatch):
+    bundle = ExtrudedFieldBundle(
+        x=jnp.zeros((1,)),
+        y=jnp.zeros((1,)),
+        z=jnp.zeros((1,)),
+        field_scale=jnp.ones((1,)),
+        u=jnp.full((1, 1, 1), jnp.nan),
+        v=jnp.zeros((1, 1, 1)),
+        w=jnp.zeros((1, 1, 1)),
+        p=jnp.zeros((1, 1, 1)),
+        phi=jnp.zeros((1, 1, 1)),
+        geometry_kind="rect_duct",
+        solver_kind="extruded_inductionless",
+    )
+    monkeypatch.setattr(
+        fringing_impl, "_solve_extruded_projection", lambda *args, **kwargs: bundle
+    )
+
+    with pytest.raises(NumericalFailure, match="3-D fringing solve.*u"):
+        solve_extruded_inductionless(SimpleNamespace())
 
 
 def _with_analytic_field(problem, *, name, field_fn):

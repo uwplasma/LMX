@@ -11,7 +11,7 @@ import numpy as np
 import jax.numpy as jnp
 from jax.scipy.linalg import cho_factor, cho_solve
 
-from .core import Diagnostics, MHDState, NumericalFailure, Solution
+from .core import Diagnostics, MHDState, Solution, require_finite
 from .linear import (
     apply_five_point_operator,
     apply_poisson_operator,
@@ -50,18 +50,6 @@ _POTENTIAL_COUPLING_NORMALIZED_GATE = 1.0e-5
 _LINEAR_RESIDUAL_FLOOR = 1.0e-9
 _MIN_STRICT_POTENTIAL_COUPLING_SOLVES = 3
 _POTENTIAL_FGMRES_RELATIVE_TOLERANCE = 1.0e-12
-
-
-def _require_finite(stage: str, **values) -> None:
-    """Fail before a nonfinite field can be reported as numerical output."""
-
-    failed = [
-        name
-        for name, value in values.items()
-        if not bool(jnp.all(jnp.isfinite(jnp.asarray(value))))
-    ]
-    if failed:
-        raise NumericalFailure(f"{stage} produced nonfinite {', '.join(failed)}")
 
 
 def _coupling_potential_tolerance(
@@ -1526,7 +1514,7 @@ def _fully_developed_case_step(
                 potential_initial_residual,
                 _potential_solver_residual,
             ) = potential_result
-        _require_finite(
+        require_finite(
             "potential solve",
             potential=phi,
             residual=potential_residual,
@@ -2000,7 +1988,7 @@ def _solve_fully_developed(
         ):
             break
 
-    _require_finite(
+    require_finite(
         "fully developed solve",
         velocity=u,
         potential=phi,

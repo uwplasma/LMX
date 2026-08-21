@@ -11,6 +11,18 @@ class NumericalFailure(RuntimeError):
     """Raised when a solver produces nonfinite numerical state."""
 
 
+def require_finite(stage: str, **values) -> None:
+    """Raise with field names when numerical output is nonfinite."""
+
+    failed = [
+        name
+        for name, value in values.items()
+        if not bool(jnp.all(jnp.isfinite(jnp.asarray(value))))
+    ]
+    if failed:
+        raise NumericalFailure(f"{stage} produced nonfinite {', '.join(failed)}")
+
+
 @dataclass(frozen=True)
 class MHDState:
     u: jnp.ndarray

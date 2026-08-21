@@ -37,6 +37,7 @@ except Exception:  # pragma: no cover - SciPy should be present in shipped envir
     sparse_spsolve = None
 
 from .cases import _ha_to_b, make_shercliff_case
+from .core import require_finite
 from .field_models import load_tabulated_field, sample_tabulated_field_volume
 from .mesh import (
     generate_bent_pipe_mesh,
@@ -103,6 +104,16 @@ MAGNETIC_OBSTACLE_LITERATURE_REFERENCES: dict[str, dict[str, object]] = {
         ],
     },
 }
+
+_EXTRUDED_NUMERICAL_RESULTS = (
+    "x", "y", "z", "field_scale", "u", "v", "w", "p", "phi", "jx", "jy", "jz",
+    "lorentz_x", "lorentz_y", "lorentz_z", "residual",
+    "volumetric_flow_rate", "mean_velocity", "axial_current",
+    "wall_current_leakage", "current_scaled_pressure_proxy",
+    "charge_balance_residual", "boundary_current_residual",
+    "axial_pressure_loss_gradient",
+    "transverse_pressure_difference",
+)
 
 _FRINGING_JIT_CACHE: dict[tuple[object, ...], Callable] = {}
 _FRINGING_MODAL_FACTOR_CACHE: dict[tuple[object, ...], object] = {}
@@ -609,7 +620,8 @@ def _poisson_jacobi_3d(
             + (z_bottom + z_top) / max(dz**2, 1.0e-12)
             - rhs_compatible
         ) / diagonal
-        field = jnp.nan_to_num(updated - jnp.mean(updated))
+        field = updated - jnp.mean(updated)
+        require_finite("3-D Poisson iteration", potential=field)
         residual = float(
             jnp.max(
                 jnp.abs(
@@ -659,7 +671,8 @@ def _variable_coefficient_poisson_jacobi_3d(
     if initial_field is None:
         field = jnp.zeros_like(rhs_compatible)
     else:
-        field = jnp.nan_to_num(jnp.asarray(initial_field, dtype=rhs_compatible.dtype))
+        field = jnp.asarray(initial_field, dtype=rhs_compatible.dtype)
+        require_finite("3-D Poisson initial state", potential=field)
         field = field - jnp.sum(field * volume_weights) / jnp.sum(volume_weights)
     initial_residual = float(
         jnp.max(
@@ -688,9 +701,8 @@ def _variable_coefficient_poisson_jacobi_3d(
             + coef_z_b * z_bottom
             + coef_z_t * z_top
         ) / diagonal
-        field = jnp.nan_to_num(
-            updated - jnp.sum(updated * volume_weights) / jnp.sum(volume_weights)
-        )
+        field = updated - jnp.sum(updated * volume_weights) / jnp.sum(volume_weights)
+        require_finite("3-D variable Poisson iteration", potential=field)
         residual = float(
             jnp.max(
                 jnp.abs(
@@ -2058,7 +2070,7 @@ def _safe_correlation(x: jnp.ndarray, y: jnp.ndarray) -> float:
 
 
 def _clip_state(field: jnp.ndarray, limit: float) -> jnp.ndarray:
-    return jnp.clip(jnp.nan_to_num(field), -limit, limit)
+    return jnp.clip(field, -limit, limit)
 
 
 def _cross_section_mesh(case: CaseSpec):
@@ -3918,7 +3930,8 @@ def _pipe_poisson_jacobi_3d(
         )
         updated = (cross - rhs_compatible) / diagonal
         updated = updated.at[:, 0, :].set(updated[:, 1, :])
-        field = jnp.nan_to_num(updated - jnp.sum(updated * weights) / jnp.sum(weights))
+        field = updated - jnp.sum(updated * weights) / jnp.sum(weights)
+        require_finite("3-D pipe Poisson iteration", potential=field)
         residual = float(
             jnp.max(
                 jnp.abs(
@@ -6438,28 +6451,28 @@ def _solve_extruded_projection(
             y=r,
             z=theta,
             field_scale=field_scale,
-            u=jnp.nan_to_num(u),
-            v=jnp.nan_to_num(v),
-            w=jnp.nan_to_num(w),
-            p=jnp.nan_to_num(p),
-            phi=jnp.nan_to_num(phi),
-            jx=jnp.nan_to_num(jx),
-            jy=jnp.nan_to_num(jr),
-            jz=jnp.nan_to_num(jtheta),
-            lorentz_x=jnp.nan_to_num(lorentz_x),
-            lorentz_y=jnp.nan_to_num(lorentz_r),
-            lorentz_z=jnp.nan_to_num(lorentz_theta),
-            residual=jnp.nan_to_num(residual),
-            volumetric_flow_rate=jnp.nan_to_num(volumetric_flow_rate),
-            mean_velocity=jnp.nan_to_num(mean_velocity),
-            axial_current=jnp.nan_to_num(axial_current),
-            wall_current_leakage=jnp.nan_to_num(wall_current_leakage),
-            current_scaled_pressure_proxy=jnp.nan_to_num(current_scaled_pressure_proxy),
-            charge_balance_residual=jnp.nan_to_num(charge_balance_residual),
-            boundary_current_residual=jnp.nan_to_num(boundary_current_residual),
+            u=u,
+            v=v,
+            w=w,
+            p=p,
+            phi=phi,
+            jx=jx,
+            jy=jr,
+            jz=jtheta,
+            lorentz_x=lorentz_x,
+            lorentz_y=lorentz_r,
+            lorentz_z=lorentz_theta,
+            residual=residual,
+            volumetric_flow_rate=volumetric_flow_rate,
+            mean_velocity=mean_velocity,
+            axial_current=axial_current,
+            wall_current_leakage=wall_current_leakage,
+            current_scaled_pressure_proxy=current_scaled_pressure_proxy,
+            charge_balance_residual=charge_balance_residual,
+            boundary_current_residual=boundary_current_residual,
             geometry_kind=case.geometry.kind,
             solver_kind=case.solver.kind,
-            axial_pressure_loss_gradient=jnp.nan_to_num(axial_pressure_loss_gradient),
+            axial_pressure_loss_gradient=axial_pressure_loss_gradient,
             transverse_pressure_difference=jnp.zeros((nx,), dtype=float),
             **_iteration_history_arrays(residual_by_step, component_residual_by_step,
                 pressure_residual_by_step, electric_linear_by_step,
@@ -7700,35 +7713,6 @@ def _solve_extruded_projection(
         jnp.max(jnp.abs(bx) + jnp.abs(by) + jnp.abs(bz), axis=(1, 2)), 1.0e-12
     )
     charge_balance_residual = jnp.max(jnp.abs(div_j), axis=(1, 2))
-    residual = jnp.nan_to_num(
-        residual, nan=scalar_limit, posinf=scalar_limit, neginf=scalar_limit
-    )
-    volumetric_flow_rate = jnp.nan_to_num(volumetric_flow_rate)
-    mean_velocity = jnp.nan_to_num(mean_velocity)
-    axial_current = jnp.nan_to_num(
-        axial_current, nan=scalar_limit, posinf=scalar_limit, neginf=scalar_limit
-    )
-    wall_current_leakage = jnp.nan_to_num(
-        wall_current_leakage, nan=scalar_limit, posinf=scalar_limit, neginf=scalar_limit
-    )
-    current_scaled_pressure_proxy = jnp.nan_to_num(
-        current_scaled_pressure_proxy,
-        nan=scalar_limit,
-        posinf=scalar_limit,
-        neginf=scalar_limit,
-    )
-    charge_balance_residual = jnp.nan_to_num(
-        charge_balance_residual,
-        nan=scalar_limit,
-        posinf=scalar_limit,
-        neginf=scalar_limit,
-    )
-    boundary_current_residual = jnp.nan_to_num(
-        boundary_current_residual,
-        nan=scalar_limit,
-        posinf=scalar_limit,
-        neginf=scalar_limit,
-    )
     transverse_pressure_difference = _cross_duct_pressure_difference(
         p, active_mask=fluid_mask, magnetic_axis=1, side_axis=2
     )
@@ -7877,6 +7861,14 @@ def solve_extruded_inductionless(
     if num_devices is not None:
         projection_kwargs["num_devices"] = num_devices
     bundle = _solve_extruded_projection(problem, **projection_kwargs)
+    require_finite(
+        "3-D fringing solve",
+        **{
+            name: getattr(bundle, name)
+            for name in _EXTRUDED_NUMERICAL_RESULTS
+            if hasattr(bundle, name)
+        },
+    )
     station_history = _bundle_station_history(bundle)
     validation = validate_extruded_inductionless_solution(
         bundle, station_history=station_history

@@ -638,9 +638,9 @@ change, a numerical algorithm change, and a history rewrite in one commit.
   record build/run commands, digest or source commit, controls, runtime,
   observables, and tolerances.
 - [x] Add fail-closed steady-result/CLI semantics before large deletions.
-- [ ] Replace nonfinite state sanitation with typed numerical failure. The 2-D
-  solver now fails on nonfinite output; the 3-D internal sanitizers remain to
-  be replaced and regression-tested.
+- [x] Replace nonfinite state sanitation with typed numerical failure. Both
+  2-D and protected 3-D solution fields now fail closed; diagnostic matrices
+  retain explicit not-available sentinels paired with solver status codes.
 - [ ] Decide each unprotected research lane from the capability matrix and
   record the rationale in the decision register before deletion.
 - [x] Export a checksummed bundle and verify it by independent clone and
@@ -881,8 +881,21 @@ surface, measurements, validation, decision, and next action.
   and 3-D result models, surfaced it in CLI JSON, returned exit code 2 for a
   recorded unconverged steady solve, and replaced the 2-D potential
   `nan_to_num` repair with typed `NumericalFailure` behavior.
+- Removed every `nan_to_num` repair from LMX numerical source and added shared
+  typed finite-state checks at the 2-D, 3-D Poisson, and public extruded-result
+  boundaries. The physical fields and conserved observables fail closed;
+  solver diagnostic matrices may still use explicit not-available sentinels.
+- Reran the complete 829-test gate after the 3-D change: 824 passed and the
+  same 5 optional FreeMHD-data tests skipped. Fatal Ruff checks, provenance,
+  architecture, Sphinx warnings-as-errors, package build, and Twine checks
+  also passed. Source is 30,938 lines; wheel/sdist sizes are 290,945 and
+  275,382 bytes.
+- Recorded the canonical Hartmann `Ha=20`, `48 x 48` CPU baseline under
+  `/Users/rogeriojorge/local/tests/lmx-audit/phase0-baselines/`: 12.80 s cold,
+  8.69 s warm, 9.57 s mean over five repeats, and 1,574,371,328-byte maximum
+  host RSS. The remaining performance-matrix rows stay open.
 - Created and independently cloned/fsck-verified the complete 37 MiB bundle at
   `/Users/rogeriojorge/local/tests/lmx-audit/lmx-pre-simplification-20260821.bundle`.
   SHA-256: `9a56decc7de1e8946ec1a1de3e67e2ca06fabf7a9c9e7071b4491080e736a389`.
-- Next action: complete the runtime/memory matrix, replace 3-D nonfinite
-  sanitizers with fail-closed behavior, and decide the audit capabilities.
+- Next action: rerun the pinned B2 smoke on this committed safety tranche,
+  complete the runtime/memory matrix, and decide the audit capabilities.
