@@ -11,7 +11,7 @@ import numpy as np
 import jax.numpy as jnp
 from jax.scipy.linalg import cho_factor, cho_solve
 
-from .core import Diagnostics, MHDState, Solution
+from .core import Diagnostics, MHDState, NumericalFailure, Solution
 from .linear import (
     apply_five_point_operator,
     apply_poisson_operator,
@@ -50,6 +50,18 @@ _POTENTIAL_COUPLING_NORMALIZED_GATE = 1.0e-5
 _LINEAR_RESIDUAL_FLOOR = 1.0e-9
 _MIN_STRICT_POTENTIAL_COUPLING_SOLVES = 3
 _POTENTIAL_FGMRES_RELATIVE_TOLERANCE = 1.0e-12
+
+
+def _require_finite(stage: str, **values) -> None:
+    """Fail before a nonfinite field can be reported as numerical output."""
+
+    failed = [
+        name
+        for name, value in values.items()
+        if not bool(jnp.all(jnp.isfinite(jnp.asarray(value))))
+    ]
+    if failed:
+        raise NumericalFailure(f"{stage} produced nonfinite {', '.join(failed)}")
 
 
 def _coupling_potential_tolerance(
@@ -1512,9 +1524,13 @@ def _fully_developed_case_step(
                 potential_residual,
                 potential_iteration_count,
                 potential_initial_residual,
-                potential_solver_residual,
+                _potential_solver_residual,
             ) = potential_result
-        phi = jnp.nan_to_num(phi, nan=0.0, posinf=0.0, neginf=0.0)
+        _require_finite(
+            "potential solve",
+            potential=phi,
+            residual=potential_residual,
+        )
         phi_iter = phi
         magnetic_reaction = jnp.where(
             active_mask,
@@ -1984,6 +2000,28 @@ def _solve_fully_developed(
         ):
             break
 
+    _require_finite(
+        "fully developed solve",
+        velocity=u,
+        potential=phi,
+        current_y=jy,
+        current_z=jz,
+        lorentz_force=lorentz,
+        residual=residual_value,
+        residual_history=residual_history,
+        potential_residual_history=potential_history,
+        linear_residual_history=linear_residual_history,
+    )
+    steady_converged = bool(
+        steady_mode
+        and residual_history
+        and _fully_developed_converged(
+            case,
+            velocity_residual=residual_history[-1],
+            linear_residual=linear_residual_history[-1],
+            potential_residual=potential_history[-1],
+        )
+    )
     state = MHDState(
         u=u,
         phi=phi,
@@ -2023,7 +2061,21 @@ def _solve_fully_developed(
         gauge_residual_history=_concat_history(initial_diagnostics.gauge_residual_history if initial_diagnostics is not None else None, jnp.asarray(gauge_residual_history, dtype=float), append=append_diagnostics),
         interface_current_residual_history=_concat_history(initial_diagnostics.interface_current_residual_history if initial_diagnostics is not None else None, jnp.asarray(interface_current_residual_history, dtype=float), append=append_diagnostics),
     )
-    solution = Solution(mesh=mesh, state=state, diagnostics=diagnostics, case_name=case.name)
+    solution = Solution(
+        mesh=mesh,
+        state=state,
+        diagnostics=diagnostics,
+        case_name=case.name,
+        converged=steady_converged if steady_mode else None,
+        status=(
+            "converged"
+            if steady_converged
+            else "step_limit"
+            if steady_mode
+            else "completed"
+        ),
+        steps=step_count,
+    )
     if logger is not None:
         logger.emit_footer(solution)
     return solution

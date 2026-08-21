@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import lmx.fringing as fringing_impl
 
+from lmx._fringing_types import ExtrudedInductionlessSolution
 from lmx.field_models import (
     make_divergence_free_cross_section_field,
     make_localized_divergence_free_obstacle_field,
@@ -79,6 +80,19 @@ from lmx.specs import MagneticFieldSpec, RegionSpec
 
 
 pytestmark = pytest.mark.unit
+
+
+def test_extruded_solution_reports_terminal_state():
+    solution = ExtrudedInductionlessSolution(
+        problem=SimpleNamespace(),
+        bundle=SimpleNamespace(stopping_state=(7, 2, "step_limit")),
+        station_history=(),
+        validation=SimpleNamespace(),
+    )
+
+    assert solution.steps == 7
+    assert solution.status == "step_limit"
+    assert solution.converged is False
 
 
 def _with_analytic_field(problem, *, name, field_fn):

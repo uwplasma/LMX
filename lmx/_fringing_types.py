@@ -126,3 +126,21 @@ class ExtrudedInductionlessSolution:
     bundle: ExtrudedFieldBundle
     station_history: tuple[dict[str, float], ...]
     validation: ExtrudedInductionlessValidation
+
+    @property
+    def steps(self) -> int:
+        """Number of completed outer iterations."""
+
+        return int(self.bundle.stopping_state[0])
+
+    @property
+    def status(self) -> str:
+        """Terminal solver status."""
+
+        return str(self.bundle.stopping_state[2])
+
+    @property
+    def converged(self) -> bool:
+        """Whether the configured steady gates passed."""
+
+        return self.status == "converged"

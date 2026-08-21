@@ -6,6 +6,7 @@ import jax.numpy as jnp
 import pytest
 
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
+from lmx.core import NumericalFailure
 from lmx.io import load_restart_bundle, write_solution_npz
 from lmx.physics import (
     build_material_fields,
@@ -1608,6 +1609,52 @@ def test_fully_developed_steady_stops_once_residual_reaches_tolerance(
     assert solution.diagnostics.linear_residual_history.shape[0] == 3
     assert solution.state.time == pytest.approx(3 * case.time_stepper.dt)
     assert solution.state.residual == pytest.approx(1.0e-5)
+    assert solution.converged is True
+    assert solution.status == "converged"
+    assert solution.steps == 3
+
+
+def test_fully_developed_steady_reports_step_limit(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    case = _steady_stopping_case(
+        max_steps=2, steady_tolerance=1.0e-4, potential_tolerance=1.0e-3
+    )
+
+    monkeypatch.setattr(
+        solvers,
+        "_fully_developed_case_step",
+        lambda **kwargs: _fake_step_result(
+            kwargs["u_previous"],
+            velocity_residual=1.0e-2,
+            potential_residual=1.0e-2,
+            linear_residual=1.0e-2,
+        ),
+    )
+
+    solution = solve_steady(case)
+
+    assert solution.converged is False
+    assert solution.status == "step_limit"
+    assert solution.steps == 2
+
+
+def test_fully_developed_steady_rejects_nonfinite_output(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    case = _steady_stopping_case(max_steps=1)
+
+    monkeypatch.setattr(
+        solvers,
+        "_fully_developed_case_step",
+        lambda **kwargs: _fake_step_result(
+            kwargs["u_previous"],
+            phi=jnp.full_like(kwargs["u_previous"], jnp.nan),
+        ),
+    )
+
+    with pytest.raises(NumericalFailure, match="potential"):
+        solve_steady(case)
 
 
 def test_fully_developed_steady_requires_outer_state_convergence(

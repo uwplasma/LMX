@@ -7,6 +7,10 @@ import jax.numpy as jnp
 from .mesh import StructuredMesh
 
 
+class NumericalFailure(RuntimeError):
+    """Raised when a solver produces nonfinite numerical state."""
+
+
 @dataclass(frozen=True)
 class MHDState:
     u: jnp.ndarray
@@ -56,6 +60,9 @@ class Solution:
     state: MHDState
     diagnostics: Diagnostics
     case_name: str
+    converged: bool | None = None
+    status: str = "not_recorded"
+    steps: int = 0
 
 
 def zeros_state(mesh: StructuredMesh) -> MHDState:

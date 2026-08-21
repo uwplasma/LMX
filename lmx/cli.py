@@ -153,6 +153,9 @@ def _runtime_summary(solution, case, out_dir: Path, outputs: dict[str, list[Path
         "geometry": geometry,
         "solver_kind": getattr(getattr(case, "solver", None), "kind", "fully_developed_inductionless"),
         "solver_mode": getattr(getattr(case, "solver", None), "mode", "steady"),
+        "converged": getattr(solution, "converged", None),
+        "status": getattr(solution, "status", "not_recorded"),
+        "steps": int(getattr(solution, "steps", 0)),
         "time": float(solution.state.time),
         "residual": float(solution.state.residual),
         "u_max": float(jnp.max(jnp.abs(u_field))),
@@ -189,11 +192,20 @@ def _runtime_summary_extruded(
 ) -> dict[str, object]:
     bundle = solution.bundle
     validation = solution.validation
+    stopping_state = getattr(bundle, "stopping_state", (0, 0, "not_recorded"))
+    status = str(stopping_state[2])
     summary = {
         "case": case.name,
         "geometry": case.geometry.kind,
         "solver_kind": case.solver.kind,
         "solver_mode": case.solver.mode,
+        "converged": getattr(
+            solution,
+            "converged",
+            status == "converged" if status != "not_recorded" else None,
+        ),
+        "status": getattr(solution, "status", status),
+        "steps": int(getattr(solution, "steps", stopping_state[0])),
         "station_count": int(bundle.x.shape[0]),
         "u_max": float(jnp.max(jnp.abs(bundle.u))),
         "max_residual": float(validation.max_residual),
@@ -219,6 +231,12 @@ def _write_run_summary(summary: dict[str, object], case, out_dir: Path) -> Path 
     path = out_dir / f"{case.name}_summary.json"
     path.write_text(json.dumps(summary, indent=2) + "\n")
     return path
+
+
+def _summary_exit_code(summary: dict[str, object]) -> int:
+    """Return failure only for a recorded unconverged steady result."""
+
+    return 2 if summary.get("solver_mode") == "steady" and summary.get("converged") is False else 0
 
 
 def _run_config(config: RunConfig) -> dict[str, object]:
@@ -373,8 +391,7 @@ def run_from_toml(path: str | Path) -> dict[str, object]:
 def main(argv: list[str] | None = None) -> int:
     argv = list(argv) if argv is not None else sys.argv[1:]
     if argv and Path(argv[0]).suffix == ".toml":
-        run_from_toml(argv[0])
-        return 0
+        return _summary_exit_code(run_from_toml(argv[0]))
 
     formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
@@ -488,6 +505,11 @@ def main(argv: list[str] | None = None) -> int:
         z_profile = extract_midplane_profile(solution, axis="z")
         write_profile_csv(out_dir / f"{case.name}_midplane_z.csv", z_profile)
         payload = validation_summary(solution, case.name, ha=args.ha)
+        payload.update(
+            converged=getattr(solution, "converged", None),
+            status=getattr(solution, "status", "not_recorded"),
+            steps=int(getattr(solution, "steps", 0)),
+        )
         if args.case == "hartmann":
             comparison = hartmann_validation(solution, args.ha)
             write_analytic_comparison(comparison, out_dir / f"{case.name}_analytic.json", axis_name="y")
@@ -542,7 +564,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
         write_metrics_json(payload, out_dir / f"{case.name}_metrics.json")
         print(json.dumps(payload, indent=2))
-        return 0
+        return 2 if getattr(solution, "converged", None) is False else 0
 
     if args.case.startswith("fringing_"):
         problem = _build_extruded_problem(args)
@@ -578,7 +600,7 @@ def main(argv: list[str] | None = None) -> int:
             outputs.setdefault("json", []).append(summary_path)
             summary["generated_files"]["json"] = [_portable_path(summary_path)]
         print(json.dumps(summary, indent=2))
-        return 0
+        return _summary_exit_code(summary)
 
     case = _build_case(args)
     case = case.__class__(
@@ -622,5 +644,4 @@ def main(argv: list[str] | None = None) -> int:
         )
     if logging is not config.logging:
         config = RunConfig(case=case, solve_mode=args.mode, logging=logging)
-    _run_config(config)
-    return 0
+    return _summary_exit_code(_run_config(config))

@@ -260,6 +260,18 @@ def test_cli_dispatches_direct_toml_run(monkeypatch: pytest.MonkeyPatch):
     assert recorded["path"] == "/tmp/demo_case.toml"
 
 
+def test_cli_returns_nonzero_for_recorded_unconverged_steady_result():
+    assert cli._summary_exit_code(
+        {"solver_mode": "steady", "converged": False}
+    ) == 2
+    assert cli._summary_exit_code(
+        {"solver_mode": "steady", "converged": True}
+    ) == 0
+    assert cli._summary_exit_code(
+        {"solver_mode": "transient", "converged": False}
+    ) == 0
+
+
 def test_cli_case_builders_reject_unknown_case():
     with pytest.raises(ValueError):
         cli._build_case(SimpleNamespace(case="unknown", ha=5.0, output="out"))
