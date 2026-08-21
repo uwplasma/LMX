@@ -656,8 +656,10 @@ change, a numerical algorithm change, and a history rewrite in one commit.
 - [ ] Restore required GitHub CI and branch protection. Workflow definitions
   are present and hosted jobs now execute on the canonical `uwplasma/LMX`
   repository. The stale unpublished SOLVAX compatibility pin was corrected to
-  0.13.0; the refreshed run is pending. Branch protection still requires a
-  plan that supports it for this private repo.
+  0.13.0. Both hosted test lanes reached 69% without a test failure before the
+  former 600-second process budget expired; the evidence-based 1,200-second
+  rerun is pending. Branch protection still requires a plan that supports it
+  for this private repo.
 - [ ] Record clean-clone, tracked-tree, wheel, module/file/line, import,
   runtime, memory, and test baselines using reproducible commands. Clone,
   tree, distribution, import, and test baselines are recorded; the canonical
@@ -998,6 +1000,16 @@ surface, measurements, validation, decision, and next action.
   published. Raised the declared LMX minimum and compatibility lane to the
   released 0.13.0 required by `splu_solve`; local dependency, provenance,
   architecture, Ruff, and Sphinx checks pass on the corrected configuration.
+- The corrected hosted LMX lanes completed setup, metadata, and architecture
+  gates, then reached 69% without a test failure before the 600-second test
+  process budget expired on the two-core runner. Raised only the transitional
+  full-suite envelope to 1,200 seconds inside a 22-minute job cap. The planned
+  PR-suite consolidation and below-90-second target remain unchanged.
+- SOLVAX hosted lint, types, docs, and build passed. Current JAX reports its
+  unsupported bfloat16 LU dtype as `TypeError`; the pre-existing portability
+  test now accepts that documented backend error alongside the older runtime
+  error classes. The targeted local test passes and the corrected matrix is
+  pending on commit `8cfe56c`.
 - Next action: review/release the SOLVAX stationary primitive before replacing
   LMX's remaining Jacobi loops; independently complete the Shercliff, Hunt,
   fixed-flow, reduced 3-D, straight-pipe, and gradient performance baselines.
