@@ -894,8 +894,14 @@ surface, measurements, validation, decision, and next action.
   `/Users/rogeriojorge/local/tests/lmx-audit/phase0-baselines/`: 12.80 s cold,
   8.69 s warm, 9.57 s mean over five repeats, and 1,574,371,328-byte maximum
   host RSS. The remaining performance-matrix rows stay open.
+- Repeated the pinned B2 LMX/FreeMHD smoke on committed source `82538d2`.
+  Execution, artifacts, contract, observation, and comparison passed with no
+  failed checks and unchanged pressure Linf `0.0109172453` and RMS
+  `0.0045179771`. The harness role remains intentionally non-accepting. Its
+  complete record is outside the checkout at
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-phase0-b2-82538d2/b2`.
 - Created and independently cloned/fsck-verified the complete 37 MiB bundle at
   `/Users/rogeriojorge/local/tests/lmx-audit/lmx-pre-simplification-20260821.bundle`.
   SHA-256: `9a56decc7de1e8946ec1a1de3e67e2ca06fabf7a9c9e7071b4491080e736a389`.
-- Next action: rerun the pinned B2 smoke on this committed safety tranche,
-  complete the runtime/memory matrix, and decide the audit capabilities.
+- Next action: complete the runtime/memory matrix, decide the audit
+  capabilities, and begin the reusable-algebra ownership map.
