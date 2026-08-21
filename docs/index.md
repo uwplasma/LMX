@@ -73,7 +73,7 @@ developer_guide
 
 ## What is next
 
-- consume SOLVAX's additive line builder after 0.8.5 is published
+- replace the remaining local stationary iterations with released SOLVAX APIs
 - extend the passing primal and transpose gradient gates to new objectives
 - freeze and close the published pipe and square-duct fringing-field cases
 - rerun the same multi-minute fixed-work ladder for exact-core CPU or idle-host

@@ -654,9 +654,10 @@ change, a numerical algorithm change, and a history rewrite in one commit.
 
 - [x] Create a feature branch; do not refactor directly on `main`.
 - [ ] Restore required GitHub CI and branch protection. Workflow definitions
-  are present and Actions is enabled, but hosted jobs cannot start until the
-  organization resolves its Actions billing/spending-limit failure; branch
-  protection also requires a plan that supports it for this private repo.
+  are present and hosted jobs now execute on the canonical `uwplasma/LMX`
+  repository. The stale unpublished SOLVAX compatibility pin was corrected to
+  0.13.0; the refreshed run is pending. Branch protection still requires a
+  plan that supports it for this private repo.
 - [ ] Record clean-clone, tracked-tree, wheel, module/file/line, import,
   runtime, memory, and test baselines using reproducible commands. Clone,
   tree, distribution, import, and test baselines are recorded; the canonical
@@ -992,6 +993,11 @@ surface, measurements, validation, decision, and next action.
   and unchanged pressure Linf `0.0109172453` and RMS `0.0045179771`. The
   complete untracked record is at
   `/Users/rogeriojorge/local/tests/lmx-audit/lmx-phase1-b2-fc1e187/b2`.
+- Opened draft LMX PR #1 and SOLVAX PR #78. Hosted LMX docs passed, while the
+  Python 3.10 setup exposed a stale `solvax==0.8.5` pin that was never
+  published. Raised the declared LMX minimum and compatibility lane to the
+  released 0.13.0 required by `splu_solve`; local dependency, provenance,
+  architecture, Ruff, and Sphinx checks pass on the corrected configuration.
 - Next action: review/release the SOLVAX stationary primitive before replacing
   LMX's remaining Jacobi loops; independently complete the Shercliff, Hunt,
   fixed-flow, reduced 3-D, straight-pipe, and gradient performance baselines.

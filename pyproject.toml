@@ -15,7 +15,7 @@ dependencies = [
   "jax",
   "numpy",
   "scipy",
-  "solvax>=0.8.5,<1",
+  "solvax>=0.13,<1",
   "tomli; python_version < '3.11'",
 ]
 classifiers = [

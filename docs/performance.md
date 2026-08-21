@@ -131,19 +131,10 @@ It is algebraically and JVP exact, but at `7 x 9 x 16` and `11 x 17 x 32` it is
 27--29% slower cold and 38--39% slower warm. Device peak falls by at most 1.2%
 while host peak rises about 4%, so it is rejected before a production B1 run.
 
-The historical compact SOLVAX timing record remains the 0.8.1 measurement. A
-matched JAX 0.8.0 replay measured warm-time ratios of 1.155 for an immediate
-0.8.1 control and 1.184 for 0.8.2, so both miss the one-shot 1.10 threshold
-despite passing every forward, gradient, transpose, residual, memory, device,
-and Hartmann gate. SOLVAX PCG is unchanged between those releases; this is not
-evidence of a 0.8.2 regression, and no refresh is planned. SOLVAX has owned the
-Anderson-weight API used by B2 restart schema 6 since 0.8.4; LMX now accepts
-released `solvax>=0.8.5,<1` and uses its additive line-preconditioner owner.
-The raw [0.8.1 control](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/solvax-pcg-0.8.1-control-gpu.json)
-(`ab54c5aa4a4787e1024d72d29ac5cd1c465c951bcaed82f179539cf75544fc7b`)
-and [0.8.2 probe](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/solvax-pcg-0.8.2-equivalence-gpu.json)
-(`092fb878cd0182b0856b41afea9b90c99931a29b4b1976b4b5fd6c29272c8d36`)
-remain outside Git.
+LMX requires released `solvax>=0.13,<1`. SOLVAX owns PCG/GMRES, sparse-direct
+solves, fixed-point acceleration, line/additive preconditioners, block Thomas,
+and tridiagonal algebra; LMX supplies MHD coefficient actions, gauges,
+physical residual normalization, and acceptance gates.
 
 On the Mac, `512` axial stations silently forced replication at six devices;
 the placement gate now rejects that invalid point. The divisible `516`-station
