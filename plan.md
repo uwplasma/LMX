@@ -962,6 +962,11 @@ surface, measurements, validation, decision, and next action.
   solves, fatal Ruff checks, provenance, architecture, Sphinx
   warnings-as-errors, package build, and Twine checks passed. Package source
   is 30,941 lines across 32 modules.
-- Next action: commit and run B2 Docker parity, then eliminate the released
-  SOLVAX PCG wrappers and propose one generic stationary-iteration API for the
-  remaining 2-D/3-D Jacobi implementations.
+- Repeated the pinned B2 Docker smoke on committed source `48e30dd` after the
+  sparse-direct handoff. Execution, artifacts, contract, observation, and
+  comparison passed with no failed checks and unchanged pressure Linf
+  `0.0109172453` and RMS `0.0045179771`. The complete untracked record is at
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-phase1-b2-48e30dd/b2`.
+- Next action: eliminate the released SOLVAX PCG wrappers and propose one
+  generic stationary-iteration API for the remaining 2-D/3-D Jacobi
+  implementations.
