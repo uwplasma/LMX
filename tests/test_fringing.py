@@ -2473,6 +2473,30 @@ def test_poisson_helpers_can_stop_early():
     assert jnp.isfinite(field_sparse).all()
 
 
+def test_sparse_poisson_delegates_direct_solve_to_solvax(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    calls = []
+    original = fringing_impl.splu_solve
+
+    def record_call(matrix, rhs):
+        calls.append(matrix.shape)
+        return original(matrix, rhs)
+
+    monkeypatch.setattr(fringing_impl, "splu_solve", record_call)
+    _variable_coefficient_poisson_sparse_3d(
+        jnp.zeros((2, 2, 2)),
+        jnp.ones((2, 2, 2)),
+        dx=1.0,
+        dy=1.0,
+        dz=1.0,
+        iterations=4,
+        tolerance=1.0,
+    )
+
+    assert calls == [(8, 8)]
+
+
 def test_solve_extruded_inductionless_uses_projection_for_pipe_geometry(
     monkeypatch: pytest.MonkeyPatch,
 ):

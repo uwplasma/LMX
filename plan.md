@@ -84,17 +84,49 @@ remains intact until its acceptance decision is recorded here.
 | Rectangular/layered 3-D fringing | Variable imposed field, electric-current closure, Lorentz force, momentum and face-flux pressure projection on extruded grids | manufactured operators, projection/divergence, restart, variable-field and B2 square-duct tests in `tests/test_fringing.py`; B2 spec/reference | 3 primary modules / about 8,643 lines | **protected, active development**; pass reduced 3-D gates and executed B2 FreeMHD smoke after every structural tranche |
 | Straight-pipe 3-D fringing | O-grid cylindrical metrics, conducting annulus, fixed-flow projection, variable field | manufactured pipe Poisson/diffusion/projection tests, B1 spec/reference, retained-modal benchmark, native S3 execution harness | shares fringing plus mesh/field code | **protected, active development**; preserve B1 numerical gates and establish a matched production parity claim before promotion |
 | FreeMHD parity | Matched equations, geometry, material, forcing, controls, native-output observation, and declared tolerances | B2 deterministic contract and two-update harness; B1/S3 execution observer; parser/forgery tests in `tests/test_freemhd.py` | `freemhd.py` + external adapter / about 3,676 lines | **protected validation boundary**; run pinned Docker smoke locally, then reduce to one contract/runner/observer/comparator path |
-| Bent-pipe/Dean flow | Mapped pipe plus low-Dean hydrodynamic limit and secondary-flow literature observables | mapped finite-state tests, low-De baseline, analytic literature utilities; independent production parity is incomplete | `dean.py` plus shared fringing/mesh code | **audit**; retain only with an owned validation target and mesh-convergence roadmap |
-| Magnetic obstacle | Localized imposed field in a 3-D rectangular channel with velocity, pressure, current, and wake observables | internal response/baseline tests and literature-curve adapters; independent field parity is incomplete | shared fringing plus external adapters | **audit**; retain only if external observables and acceptance tolerances are executable |
-| Q2D MHD | Spectral/finite-difference vorticity evolution, forcing, walls, energy and spectrum observables | modal energy gates and Q2DMHDfoam parsers/fixtures; quantitative turbulent parity is incomplete | `q2d.py` 1,614 lines plus adapter/report code | **audit**; require a named user workflow and executed external/refinement validation |
-| WHAM/blanket reduced flow | Centerline/tube geometry, reduced pressure budget, transient filling, sensitivities | bounded numerical/unit/autodiff tests and internal plots; independent validation is incomplete | 2 modules / 2,274 lines plus shared field code | **audit**; retain only as a clearly labeled reduced model with an external validation owner |
-| Differentiable objectives | Gradients through selected physical solves and design observables | finite-difference/JVP/VJP tests across linear, 2-D, 3-D, and blanket paths | cross-cutting | **protected only per validated objective**; enumerate supported objectives and remove generic claims |
+| Bent-pipe/Dean flow | Mapped pipe plus low-Dean hydrodynamic limit and secondary-flow literature observables | mapped finite-state tests, low-De baseline, analytic literature utilities; independent production parity is incomplete | `dean.py` plus shared fringing/mesh code | **retain only mapped bent-pipe geometry as a fringing extension**; LMX 3-D owner; require metric/manufactured tests, low-De mesh convergence, and a named external target; remove standalone Dean report/plot adapters |
+| Magnetic obstacle | Localized imposed field in a 3-D rectangular channel with velocity, pressure, current, and wake observables | internal response/baseline tests and literature-curve adapters; independent field parity is incomplete | shared fringing plus external adapters | **retain as a 3-D fringing application**; LMX 3-D owner; keep field/flow/current observables and add executable external data; remove readiness proxies and literature-report machinery |
+| Q2D MHD | Spectral/finite-difference vorticity evolution, forcing, walls, energy and spectrum observables | modal energy gates and Q2DMHDfoam parsers/fixtures; quantitative turbulent parity is incomplete | `q2d.py` 1,614 lines plus adapter/report code | **remove after archive**; separate NumPy/SciPy solver family has no named production user or quantitative parity and does not exercise retained inductionless duct/fringing code |
+| WHAM mirror-pipe adapter | Branded builder and internal reduced validation around generic tabulated fields and pipe fringing | finite-state/bounded internal tests; no matched WHAM field/flow acceptance record | shared fringing/field code | **remove branded adapter after archive**; retain and document generic tabulated/vector-field plus straight-pipe capability, which can express a future validated WHAM case without product-specific proxy code |
+| Blanket reduced flow | Centerline/tube geometry, 1-D pressure budget, transient filling, sensitivities, and media | bounded numerical/unit/autodiff tests and internal plots; independent validation is incomplete | 2 modules / 2,274 lines plus media/tests | **remove after archive**; separate reduced model, geometry visualizer, and paper/media pipeline have no external validation owner and duplicate no protected 3-D capability |
+| Differentiable objectives | Gradients through selected physical solves and design observables | finite-difference/JVP/VJP tests across linear, 2-D, 3-D, and blanket paths | cross-cutting | **retain canonical Hartmann mean/profile objectives only in this refactor**; remove shadow 3-D projection, nonrectangular surrogate, WHAM, and blanket objectives; add 3-D gradients later only through the retained production solver |
 | Reusable solver algebra | Krylov, fixed point, structured direct solves, preconditioners, projected/nullspace algebra | LMX unit/manufactured tests and overlapping SOLVAX APIs | `linear.py`, large portions of `solvers.py`/`fringing.py` | **move to SOLVAX when general**; retain LMX coefficient assembly and physics gates |
 
 Current costs overlap where capabilities share modules; they are navigation
 estimates, not additive budgets. Each audit decision must name the accountable
 owner, retained public workflow, numerical gate, external or analytical
 reference, and maintenance cost.
+
+The accountable owner for retained 3-D geometry/application rows is the LMX
+3-D/fringing maintainer. Their common workflow is one `FringingCase` and one
+`solve` result; they do not retain separate solver families. Bent-pipe gates
+are mapped-metric/manufactured operators, low-De mesh convergence, and a future
+external curved-pipe target. Magnetic-obstacle gates are imposed-field
+Maxwell checks, current/flow conservation, mesh convergence, and an executable
+Votyakov/Andreev comparison before any quantitative claim. Until those final
+external gates exist, the capabilities may remain documented as development
+applications but not as validated benchmarks.
+
+## Reusable-algebra ownership map
+
+LMX owns physical coefficients, boundary/interface equations, dimensional
+scaling, convergence gates, and MHD observables. SOLVAX owns reusable solver
+algorithms and algebraic diagnostics. This table is the Phase 1 deletion map.
+
+| Current LMX surface | Owner | Action | Replacement/gate |
+|---|---|---|---|
+| SciPy `spsolve` calls in rectangular and pipe 3-D Poisson paths | SOLVAX | replace now | released `solvax.splu_solve`; preserve assembled matrices and 3-D/FreeMHD gates |
+| `solve_five_point_solvax_pcg_state` | SOLVAX algorithm, LMX residual contract | delete wrapper | call `solvax.pcg_linear_solve` from MHD orchestration and certify the returned field with the physical max-norm residual |
+| `solve_poisson_cg_state` | SOLVAX algorithm, LMX gauge/scaling | merge into MHD solve | direct `pcg_linear_solve`; retain only anchor projection, volume scaling, and physical residual in LMX |
+| `solve_poisson_jacobi_state` and 3-D Jacobi loops | SOLVAX | upstream or replace | one generic fixed/stationary-iteration primitive with explicit stopping diagnostics; keep only stencil mapping and gauge in LMX |
+| five-point/Poisson coefficient application | LMX | keep and merge into operators | it is the action of LMX-assembled boundary-aware coefficients, not a general solver |
+| five-point/Poisson physical residual norms | LMX | keep and merge into validation/solve | acceptance normalization is part of the MHD convergence contract |
+| 2-D line, additive, and deflated preconditioner builders | shared boundary | reduce to composition | LMX forms coefficient lines/coarse restriction; SOLVAX supplies tridiagonal solves, additive composition, and deflation |
+| 2-D fast-diagonalization/generalized modal inverse | candidate SOLVAX | upstream only after benchmark | reusable separable structured inverse API with factor reuse, adjoint/JIT tests, and performance evidence |
+| 3-D axial-mean/transverse-modal and pipe retained-modal factors | candidate SOLVAX | upstream common algebra | generic projected/nullspace and separable factor APIs; LMX retains geometry metrics, gauge, and boundary assembly |
+| Aitken, Anderson, GMRES/PCG, block Thomas, tridiagonal solves | SOLVAX | remove local wrappers/switches | released SOLVAX APIs already used; retain MHD-specific stopping and result translation only |
+| small fixed-flow response matrices | LMX | keep | geometry/constraint closure of at most a few degrees of freedom, not a reusable solver implementation |
+| shadow 3-D/WHAM/blanket autodiff solvers | neither | delete | proxies do not differentiate the retained production path and must not be upstreamed |
 
 ## Non-negotiable outcomes
 
@@ -641,7 +673,7 @@ change, a numerical algorithm change, and a history rewrite in one commit.
 - [x] Replace nonfinite state sanitation with typed numerical failure. Both
   2-D and protected 3-D solution fields now fail closed; diagnostic matrices
   retain explicit not-available sentinels paired with solver status codes.
-- [ ] Decide each unprotected research lane from the capability matrix and
+- [x] Decide each unprotected research lane from the capability matrix and
   record the rationale in the decision register before deletion.
 - [x] Export a checksummed bundle and verify it by independent clone and
   `git fsck`; retain the verified release-asset manifest before deletion.
@@ -651,7 +683,7 @@ and supported behavior has explicit gates.
 
 ### Phase 1 — establish the SOLVAX boundary
 
-- [ ] Map every LMX algebraic function to keep, replace, upstream, or delete.
+- [x] Map every LMX algebraic function to keep, replace, upstream, or delete.
 - [ ] Replace wrappers with existing released SOLVAX APIs first.
 - [ ] Propose only the projected/nullspace and separable structured APIs that
   pass the upstream criteria.
@@ -819,6 +851,11 @@ artifacts or release assets, not committed files.
 | D-008 | Archive and squash history only after the live product is complete | A default clone cannot reach <10 MB while the existing 38-MiB pack remains reachable. |
 | D-009 | Protect 3-D fringing and straight-pipe capabilities throughout the refactor | They are active development goals and must improve rather than disappear during trimming. |
 | D-010 | Keep FreeMHD as a pinned Docker validation oracle outside the runtime wheel | Executed independent parity is valuable; OpenFOAM runtime and generated data are not Python package responsibilities. |
+| D-011 | Remove the separate Q2D solver and blanket reduced-model families after verified archive | Neither has a named production user or quantitative external validation, and both expand dependencies, APIs, tests, and media without exercising the retained duct/fringing solver. |
+| D-012 | Retain bent-pipe geometry and magnetic-obstacle cases only as applications of the common 3-D fringing solver | They broaden the retained geometry/field model without justifying separate algorithms; independent validation remains a promotion gate. |
+| D-013 | Remove branded WHAM proxy builders while retaining generic tabulated fields and straight-pipe fringing | The general capability can express a future WHAM case once matched evidence exists, without carrying product-specific unvalidated code now. |
+| D-014 | Retain only objectives differentiated through the canonical Hartmann path in this refactor | Shadow 3-D, nonrectangular surrogate, WHAM, and blanket objectives can report gradients of a different model than the production solver. |
+| D-015 | Use released SOLVAX native sparse solves instead of calling SciPy solvers from LMX | LMX owns MHD matrix assembly; reusable host factorization and solve behavior belongs to SOLVAX. |
 
 ## Work log
 
@@ -905,3 +942,26 @@ surface, measurements, validation, decision, and next action.
   SHA-256: `9a56decc7de1e8946ec1a1de3e67e2ca06fabf7a9c9e7071b4491080e736a389`.
 - Next action: complete the runtime/memory matrix, decide the audit
   capabilities, and begin the reusable-algebra ownership map.
+
+### 2026-08-21 — SOLVAX ownership tranche started
+
+- Completed the Phase 0 research-lane decisions before deletion. Mapped
+  bent-pipe and magnetic-obstacle cases onto the retained common 3-D fringing
+  solver; scheduled the isolated Q2D, blanket, branded WHAM proxy, and shadow
+  autodiff families for removal only after the verified archive.
+- Classified the current linear, Poisson, Krylov, fixed-point, modal,
+  preconditioner, sparse-direct, and small constraint solves by LMX/SOLVAX
+  ownership. LMX retains MHD assembly, gauges, physical residuals, and
+  acceptance; SOLVAX owns reusable algebra.
+- Replaced both direct SciPy `spsolve` calls in the rectangular and pipe 3-D
+  Poisson paths with released `solvax.splu_solve`. MHD-specific sparse matrix
+  assembly remains in LMX. Added a regression test that observes the SOLVAX
+  call rather than merely comparing the resulting field.
+- Ran the complete 830-test gate: 825 passed and the same 5 optional
+  FreeMHD-data tests skipped. Targeted rectangular/pipe sparse and full 3-D
+  solves, fatal Ruff checks, provenance, architecture, Sphinx
+  warnings-as-errors, package build, and Twine checks passed. Package source
+  is 30,941 lines across 32 modules.
+- Next action: commit and run B2 Docker parity, then eliminate the released
+  SOLVAX PCG wrappers and propose one generic stationary-iteration API for the
+  remaining 2-D/3-D Jacobi implementations.

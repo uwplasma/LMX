@@ -26,15 +26,14 @@ from solvax import (
     gmres,
     linear_solve,
     pcg_linear_solve,
+    splu_solve,
     tridiagonal_solve,
 )
 
 try:
     from scipy import sparse
-    from scipy.sparse.linalg import spsolve as sparse_spsolve
 except Exception:  # pragma: no cover - SciPy should be present in shipped environments.
     sparse = None
-    sparse_spsolve = None
 
 from .cases import _ha_to_b, make_shercliff_case
 from .core import require_finite
@@ -843,7 +842,7 @@ def _variable_coefficient_poisson_sparse_3d(
     tolerance: float,
     initial_field: jnp.ndarray | None = None,
 ) -> tuple[jnp.ndarray, float, int, float]:
-    if sparse is None or sparse_spsolve is None:
+    if sparse is None:
         return _variable_coefficient_poisson_jacobi_3d(
             rhs,
             conductivity,
@@ -959,7 +958,7 @@ def _variable_coefficient_poisson_sparse_3d(
         )
     )
     try:
-        solution = sparse_spsolve(matrix, rhs_vector)
+        solution = np.asarray(splu_solve(matrix, jnp.asarray(rhs_vector)))
     except Exception:
         return _variable_coefficient_poisson_jacobi_3d(
             rhs,
@@ -4076,7 +4075,7 @@ def _pipe_poisson_sparse_3d(
     tolerance: float,
     initial_field: jnp.ndarray | None = None,
 ) -> tuple[jnp.ndarray, float, int, float]:
-    if sparse is None or sparse_spsolve is None:
+    if sparse is None:
         field, residual, iteration_count, initial_residual = _pipe_poisson_jacobi_3d(
             rhs,
             dx=dx,
@@ -4197,7 +4196,7 @@ def _pipe_poisson_sparse_3d(
     if initial_field is not None:
         _ = np.asarray(initial_field, dtype=float)
     initial_residual = float(np.max(np.abs(matrix @ np.zeros(size) - rhs_vector)))
-    solution = sparse_spsolve(matrix, rhs_vector)
+    solution = np.asarray(splu_solve(matrix, jnp.asarray(rhs_vector)))
     field = jnp.asarray(solution.reshape((nx, nr, ntheta)), dtype=rhs.dtype)
     field = field - field[0, 0, 0]
     residual_field = (
