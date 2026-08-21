@@ -17,7 +17,6 @@ from .linear import (
     apply_poisson_operator,
     five_point_residual_norm,
     poisson_residual_norm,
-    solve_five_point_solvax_pcg_state,
     solve_poisson_cg_state,
     solve_poisson_jacobi_state,
 )
@@ -38,6 +37,8 @@ from solvax import (
     anderson_mixing as _solvax_anderson_mixing,
     galerkin_deflation as _solvax_galerkin_deflation,
     gmres as _solvax_gmres,
+    jacobi as _solvax_jacobi,
+    pcg_linear_solve as _solvax_pcg_linear_solve,
     tridiagonal_solve as _solvax_tridiagonal_solve,
 )
 
@@ -576,6 +577,43 @@ def _velocity_system_coefficients(
     return diagonal, west, east, south, north
 
 
+@partial(jax.jit, static_argnames=("max_steps", "tolerance", "preconditioner"))
+def _solve_velocity_coefficients(
+    coefficients: tuple[jnp.ndarray, ...],
+    rhs: jnp.ndarray,
+    *,
+    max_steps: int,
+    tolerance: float,
+    preconditioner: str,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """Compose LMX coefficients and residual scaling with SOLVAX PCG."""
+
+    def matvec(field: jnp.ndarray) -> jnp.ndarray:
+        return apply_five_point_operator(*coefficients, field)
+
+    tiny = jnp.asarray(jnp.finfo(rhs.dtype).tiny, dtype=rhs.dtype)
+    if preconditioner in {"jacobi", "block_jacobi"}:
+        apply_preconditioner = _solvax_jacobi(jnp.maximum(coefficients[0], tiny))
+    elif preconditioner == "none":
+        apply_preconditioner = None
+    else:
+        raise ValueError(f"Unsupported preconditioner {preconditioner!r}")
+    l2_tolerance = tolerance / (rhs.size**0.5)
+    solution = _solvax_pcg_linear_solve(
+        matvec,
+        rhs,
+        precond=apply_preconditioner,
+        rtol=l2_tolerance,
+        atol=0.0,
+        max_steps=max_steps,
+        transpose_rtol=l2_tolerance,
+        transpose_atol=0.0,
+        transpose_max_steps=max_steps,
+    )
+    residual = five_point_residual_norm(*coefficients, rhs, solution.x)
+    return solution.x, residual, solution.iterations
+
+
 def _solve_velocity_system(
     *,
     mesh: StructuredMesh,
@@ -591,25 +629,22 @@ def _solve_velocity_system(
     diagonal, west, east, south, north = _velocity_system_coefficients(mesh, diffusivity, reaction, active_mask)
     rhs_masked = jnp.where(active_mask, rhs, 0.0)
     cell_metric = _cell_metric(mesh).astype(rhs_masked.dtype)
+    coefficients = tuple(
+        coefficient * cell_metric
+        for coefficient in (diagonal, west, east, south, north)
+    )
+    rhs_scaled = rhs_masked * cell_metric
     initial_residual = five_point_residual_norm(
-        diagonal * cell_metric,
-        west * cell_metric,
-        east * cell_metric,
-        south * cell_metric,
-        north * cell_metric,
-        rhs_masked * cell_metric,
+        *coefficients,
+        rhs_scaled,
         jnp.zeros_like(rhs_masked),
     )
     if linear_solver.lower() not in {"auto", "cg", "solvax_pcg"}:
         raise ValueError(f"Unsupported linear solver {linear_solver!r}")
-    field, residual, iterations = solve_five_point_solvax_pcg_state(
-        diagonal * cell_metric,
-        west * cell_metric,
-        east * cell_metric,
-        south * cell_metric,
-        north * cell_metric,
-        rhs_masked * cell_metric,
-        max_steps,
+    field, residual, iterations = _solve_velocity_coefficients(
+        coefficients,
+        rhs_scaled,
+        max_steps=max_steps,
         tolerance=tolerance,
         preconditioner=preconditioner,
     )

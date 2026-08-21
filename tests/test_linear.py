@@ -65,59 +65,10 @@ def test_anchored_poisson_operator_is_spd():
     assert jnp.allclose(matrix, matrix.T) and jnp.all(jnp.linalg.eigvalsh(matrix) > 0)
 
 
-
-@pytest.mark.parametrize("preconditioner", ("jacobi", "block_jacobi", "none"))
-def test_solvax_pcg_recovers_manufactured_five_point_solution(preconditioner):
-    scale = 1.0e-8
-    diagonal = scale * jnp.full((3, 3), 6.0)
-    west = scale * jnp.ones((3, 3))
-    east = scale * jnp.ones((3, 3))
-    south = scale * jnp.ones((3, 3))
-    north = scale * jnp.ones((3, 3))
-    known = jnp.arange(1.0, 10.0).reshape(3, 3)
-    rhs = linear.apply_five_point_operator(diagonal, west, east, south, north, known)
-    tolerance = max(1.0e-11, 100.0 * jnp.finfo(rhs.dtype).eps)
-
-    solvax, residual, _ = linear.solve_five_point_solvax_pcg_state(
-        diagonal,
-        west,
-        east,
-        south,
-        north,
-        rhs,
-        iterations=40,
-        tolerance=tolerance,
-        preconditioner=preconditioner,
-    )
-
-    assert float(residual) <= tolerance
-    assert jnp.allclose(solvax, known, rtol=tolerance, atol=tolerance)
-
-
-def test_solvax_pcg_five_point_gradient_is_implicit_and_matches_exact_solution():
+def test_poisson_pcg_gradient_is_implicit_and_matches_exact_solution():
     diagonal = jnp.full((2, 2), 4.0)
     zeros = jnp.zeros((2, 2))
     rhs_base = jnp.arange(1.0, 5.0).reshape(2, 2)
-    exact_base = rhs_base / diagonal
-
-    def objective(scale):
-        field, _, _ = linear.solve_five_point_solvax_pcg_state(
-            diagonal,
-            zeros,
-            zeros,
-            zeros,
-            zeros,
-            scale * rhs_base,
-            iterations=8,
-            tolerance=1.0e-12,
-            preconditioner="jacobi",
-        )
-        return jnp.sum(field**2)
-
-    scale = 1.3
-    expected = 2.0 * scale * jnp.sum(exact_base**2)
-    assert jnp.allclose(jax.grad(objective)(scale), expected, rtol=1.0e-10)
-
     anchored_rhs = rhs_base.at[0, 0].set(0.0)
 
     def poisson_objective(alpha):

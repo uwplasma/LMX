@@ -116,7 +116,7 @@ algorithms and algebraic diagnostics. This table is the Phase 1 deletion map.
 | Current LMX surface | Owner | Action | Replacement/gate |
 |---|---|---|---|
 | SciPy `spsolve` calls in rectangular and pipe 3-D Poisson paths | SOLVAX | replace now | released `solvax.splu_solve`; preserve assembled matrices and 3-D/FreeMHD gates |
-| `solve_five_point_solvax_pcg_state` | SOLVAX algorithm, LMX residual contract | delete wrapper | call `solvax.pcg_linear_solve` from MHD orchestration and certify the returned field with the physical max-norm residual |
+| `solve_five_point_solvax_pcg_state` | SOLVAX algorithm, LMX residual contract | **deleted** | `solvax.pcg_linear_solve` is composed inside one measured JIT boundary with the MHD coefficient action and physical max-norm certification |
 | `solve_poisson_cg_state` | SOLVAX algorithm, LMX gauge/scaling | merge into MHD solve | direct `pcg_linear_solve`; retain only anchor projection, volume scaling, and physical residual in LMX |
 | `solve_poisson_jacobi_state` and 3-D Jacobi loops | SOLVAX | upstream or replace | one generic fixed/stationary-iteration primitive with explicit stopping diagnostics; keep only stencil mapping and gauge in LMX |
 | five-point/Poisson coefficient application | LMX | keep and merge into operators | it is the action of LMX-assembled boundary-aware coefficients, not a general solver |
@@ -967,6 +967,25 @@ surface, measurements, validation, decision, and next action.
   comparison passed with no failed checks and unchanged pressure Linf
   `0.0109172453` and RMS `0.0045179771`. The complete untracked record is at
   `/Users/rogeriojorge/local/tests/lmx-audit/lmx-phase1-b2-48e30dd/b2`.
-- Next action: eliminate the released SOLVAX PCG wrappers and propose one
-  generic stationary-iteration API for the remaining 2-D/3-D Jacobi
-  implementations.
+- Deleted `solve_five_point_solvax_pcg_state` and its redundant SOLVAX unit
+  tests. The fully developed velocity path now composes released
+  `solvax.pcg_linear_solve` directly with LMX coefficient action, physical
+  max-norm certification, and one private JIT boundary. Source/test changes
+  are 82 net lines smaller; package source is 30,926 lines.
+- Rejected an uncompiled version after measurement: Hartmann `Ha=20`,
+  `48 x 48` warm time regressed from 8.69 s to 36.42 s and maximum RSS from
+  1.57 GB to 5.06 GB. The accepted JIT composition measured 12.62 s cold,
+  8.51 s warm, 10.86 s mean, 1.59 GB maximum RSS, and 1.06 GB peak footprint.
+  Its record is `phase0-baselines/hartmann-ha20-48x48-direct-solvax-pcg-jit.json`
+  in the external audit directory.
+- Added and locally committed generic `fixed_point_iteration` on SOLVAX branch
+  `codex/stationary-fixed-point` at `573fd4e`. It supports custom physical
+  residuals, relaxed tolerance stopping, and static fixed-step reverse-mode
+  differentiation. SOLVAX passed 700 tests with 6 optional-backend skips,
+  Ruff, Sphinx warnings-as-errors, package build, and Twine checks. LMX does
+  not consume the unreleased API.
+- Reran the accepted LMX gate: 822 passed and the same 5 optional FreeMHD-data
+  tests skipped. Fatal Ruff checks, provenance, architecture, Sphinx
+  warnings-as-errors, package build, and Twine checks passed.
+- Next action: commit and rerun B2 parity, then review/release the SOLVAX
+  stationary primitive before replacing LMX's remaining Jacobi loops.

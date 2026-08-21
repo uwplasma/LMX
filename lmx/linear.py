@@ -6,7 +6,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from solvax import jacobi, pcg_linear_solve as _solvax_pcg_linear_solve
+from solvax import pcg_linear_solve as _solvax_pcg_linear_solve
 
 
 def apply_five_point_operator(
@@ -147,56 +147,6 @@ def solve_poisson_jacobi_state(
     )
     iteration_count, phi, residual = jax.lax.while_loop(cond_fun, body_fun, init_state)
     return phi, residual, iteration_count
-
-
-@partial(
-    jax.jit,
-    static_argnames=("iterations", "tolerance", "preconditioner"),
-)
-def solve_five_point_solvax_pcg_state(
-    diagonal: jnp.ndarray,
-    west: jnp.ndarray,
-    east: jnp.ndarray,
-    south: jnp.ndarray,
-    north: jnp.ndarray,
-    rhs: jnp.ndarray,
-    iterations: int,
-    tolerance: float | None = None,
-    preconditioner: str = "jacobi",
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    """Solve a five-point SPD system with the released SOLVAX PCG backend."""
-
-    tiny = jnp.asarray(jnp.finfo(rhs.dtype).tiny, dtype=rhs.dtype)
-    def matvec(field: jnp.ndarray) -> jnp.ndarray:
-        return apply_five_point_operator(diagonal, west, east, south, north, field)
-
-    if preconditioner in {"jacobi", "block_jacobi"}:
-        apply_preconditioner = jacobi(jnp.maximum(diagonal, tiny))
-    elif preconditioner == "none":
-        apply_preconditioner = None
-    else:
-        raise ValueError(f"Unsupported preconditioner {preconditioner!r}")
-
-    # SOLVAX uses an L2 relative residual while LMX certifies the returned
-    # solution with its physical max-norm residual. The sqrt(N) factor makes
-    # the inner criterion at least as strict for a same-order field scale.
-    requested = 0.0 if tolerance is None else tolerance
-    l2_tolerance = requested / (rhs.size**0.5)
-    solution = _solvax_pcg_linear_solve(
-        matvec,
-        rhs,
-        precond=apply_preconditioner,
-        rtol=l2_tolerance,
-        atol=0.0,
-        max_steps=iterations,
-        transpose_rtol=l2_tolerance,
-        transpose_atol=0.0,
-        transpose_max_steps=iterations,
-    )
-    residual = five_point_residual_norm(
-        diagonal, west, east, south, north, rhs, solution.x
-    )
-    return solution.x, residual, solution.iterations
 
 
 @partial(
