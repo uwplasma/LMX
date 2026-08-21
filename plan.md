@@ -987,5 +987,11 @@ surface, measurements, validation, decision, and next action.
 - Reran the accepted LMX gate: 822 passed and the same 5 optional FreeMHD-data
   tests skipped. Fatal Ruff checks, provenance, architecture, Sphinx
   warnings-as-errors, package build, and Twine checks passed.
-- Next action: commit and rerun B2 parity, then review/release the SOLVAX
-  stationary primitive before replacing LMX's remaining Jacobi loops.
+- Repeated the pinned B2 Docker smoke on committed source `fc1e187` after the
+  direct PCG composition. All executable gates passed with no failed checks
+  and unchanged pressure Linf `0.0109172453` and RMS `0.0045179771`. The
+  complete untracked record is at
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-phase1-b2-fc1e187/b2`.
+- Next action: review/release the SOLVAX stationary primitive before replacing
+  LMX's remaining Jacobi loops; independently complete the Shercliff, Hunt,
+  fixed-flow, reduced 3-D, straight-pipe, and gradient performance baselines.
