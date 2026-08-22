@@ -11,6 +11,7 @@ validation result.
 | High-$Ha$ fully developed flow | layer resolution, Richardson trend, integral balances | bounded accepted campaign cases |
 | Rectangular 3-D fringe | manufactured operators, projection, restart, refinement, FreeMHD B2 | active validation; each artifact states the gates it passes |
 | Straight-pipe 3-D fringe | mapped operators, fixed flow, annular current, Benchmark B1 data | active validation; production parity requires the complete matched gate |
+| Periodic Q2D | analytical decay, energy identity, spectral incompressibility, spatial refinement, CPU/GPU parity | verified for the documented SM82 model and numerical gates |
 | Bent pipe and magnetic obstacle | mapped/conservation tests and internal observables | development applications, not externally validated benchmarks |
 
 For 2-D cases, `validation_summary` reports convergence, current continuity,
@@ -40,6 +41,13 @@ native-output observation, and comparison gates. The normalized transverse
 pressure difference has RMS error 0.004518 and maximum error 0.01092 against
 FreeMHD on the harness mesh, below its frozen 0.16 and 0.32 bounds. This is an
 executable integration check, not a production-mesh validation result.
+
+The Q2D Taylor--Green case matches its exact viscous/Hartmann decay, and a
+nonlinear three-grid test compares $12^2$ and $24^2$ solutions with a $48^2$
+reference. On the documented $256^2$, 80-step float32 workload, one RTX A4000
+is 25.78x faster than CPU after compilation; final fields agree to relative
+$L_2=2.38\times10^{-6}$. This is a measured backend-parity and performance
+result, not external physics validation.
 
 ## Test gates
 

@@ -7,9 +7,10 @@
 [![License](https://img.shields.io/github/license/uwplasma/LMX)](LICENSE)
 
 LMX solves inductionless liquid-metal magnetohydrodynamics in ducts with JAX.
-It covers fully developed Hartmann, Shercliff, and Hunt flows and three-dimensional
-extruded ducts and pipes in spatially varying magnetic fields. LMX owns the MHD
-models, boundary conditions, coupling, diagnostics, and validation;
+It covers fully developed Hartmann, Shercliff, and Hunt flows, three-dimensional
+extruded ducts and pipes in spatially varying magnetic fields, and periodic Q2D
+vortex dynamics with Hartmann-layer damping. LMX owns the MHD models, boundary
+conditions, coupling, diagnostics, and validation;
 [SOLVAX](https://github.com/uwplasma/SOLVAX) supplies reusable linear and
 fixed-point algorithms.
 
@@ -75,6 +76,28 @@ vector fields use the same problem interface.
 
 ![Three-dimensional fringing-field result](docs/_static/fringing_solver_family.webp)
 
+## Evolve a Q2D flow
+
+```python
+import lmx
+
+case = lmx.make_q2d_case(
+    shape=(64, 64),
+    viscosity=2.0e-3,
+    hartmann_friction=4.0e-2,
+    history_stride=4,
+)
+result = lmx.solve(case)
+
+print(result.converged, result.diagnostics.energy_budget_residual)
+```
+
+The compact Q2D path uses dealiased Fourier vorticity evolution and a released
+SOLVAX periodic Poisson inversion. It reports energy, enstrophy, divergence,
+Courant number, and energy-budget closure.
+
+![Q2D vortex decay](docs/_static/q2d_vortex_decay.webp)
+
 ## Capabilities and evidence
 
 | Capability | Interface | Evidence |
@@ -83,6 +106,7 @@ vector fields use the same problem interface.
 | Conducting and insulating wall layers | `WallLayer`, layered mesh builders | interface-current and layer-resolution gates |
 | 3-D rectangular fringing fields | `lmx.fringing` | manufactured operators, projection, restart, Benchmark B2 |
 | 3-D pipe fringing fields | `lmx.fringing` | mapped operators, current closure, fixed-flow and Benchmark B1 gates |
+| Periodic Q2D flow | `Q2DProblem`, `make_q2d_case`, `solve` | analytical decay, energy identity, spatial refinement, measured CPU/GPU parity |
 | FreeMHD comparison | `validation/freemhd.py`, validation scripts | pinned case contracts, native-output observers, executable Docker workflow |
 | Cases, solve workflows, and differentiable Hartmann objectives | `lmx.cases` | finite-difference, JVP, and VJP checks |
 | Meshes and analytic/tabulated fields | `lmx.mesh` | geometry, divergence, and interpolation tests |
@@ -96,6 +120,7 @@ Internal diagnostics are not presented as external validation.
 - [Install and run](https://lmx.readthedocs.io/en/latest/getting_started/install.html)
 - [First 2-D solve](https://lmx.readthedocs.io/en/latest/getting_started/first_run.html)
 - [3-D fringing tutorial](https://lmx.readthedocs.io/en/latest/tutorials/fringing.html)
+- [Q2D vortex tutorial](https://lmx.readthedocs.io/en/latest/tutorials/q2d.html)
 - [Walls and imposed fields](https://lmx.readthedocs.io/en/latest/tutorials/walls_and_fields.html)
 - [Equations and assumptions](https://lmx.readthedocs.io/en/latest/physics/equations.html)
 - [Numerical methods and SOLVAX boundary](https://lmx.readthedocs.io/en/latest/physics/numerics.html)

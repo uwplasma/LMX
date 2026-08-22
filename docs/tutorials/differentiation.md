@@ -27,5 +27,5 @@ Inputs such as forcing and Hartmann number remain differentiable arrays. The
 accepted gradients are checked against finite differences and with JVP/VJP
 identities.
 
-Run `python examples/autodiff_design_demo.py` for a sensitivity scan and a
-small inverse problem that recovers the forcing from a target profile.
+The finite-difference, JVP, and VJP tests in `tests/test_physics.py` are the
+executable reference for extending this compact differentiable surface.
