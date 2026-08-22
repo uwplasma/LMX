@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import partial
 
 import jax
@@ -60,6 +61,17 @@ _POTENTIAL_COUPLING_NORMALIZED_GATE = 1.0e-5
 _LINEAR_RESIDUAL_FLOOR = 1.0e-9
 _MIN_STRICT_POTENTIAL_COUPLING_SOLVES = 3
 _POTENTIAL_FGMRES_RELATIVE_TOLERANCE = 1.0e-12
+
+
+@dataclass(frozen=True)
+class _PotentialSystem:
+    coefficients: tuple[jnp.ndarray, ...]
+    volume_coefficients: tuple[jnp.ndarray, ...] | None
+    face_conductance: tuple[jnp.ndarray, jnp.ndarray]
+    residual_scale: jnp.ndarray
+    residual_scale_min: float
+    preconditioner: Callable[[jnp.ndarray], jnp.ndarray] | None
+    flexible: bool
 
 
 def solve_poisson_jacobi_state(
@@ -565,11 +577,19 @@ def _face_conductance(
     return jnp.pad(conductance, lower_pad) / spacing, jnp.pad(conductance, upper_pad) / spacing
 
 
-def _face_emf(mesh: StructuredMesh, sigma: jnp.ndarray, source: jnp.ndarray, *, axis: int) -> jnp.ndarray:
+def _face_emf(
+    mesh: StructuredMesh,
+    sigma: jnp.ndarray,
+    source: jnp.ndarray,
+    *,
+    axis: int,
+    conductance: jnp.ndarray | None = None,
+) -> jnp.ndarray:
     widths = (mesh.dy, mesh.dz)[axis]
     field = jnp.moveaxis(source, axis, 0)
-    conductance = jnp.moveaxis(_interface_conductance(mesh, sigma, axis=axis), axis, 0)
-    emf = conductance * (0.5 * widths[:-1, None] * field[:-1] + 0.5 * widths[1:, None] * field[1:])
+    face_conductance = _interface_conductance(mesh, sigma, axis=axis) if conductance is None else conductance
+    face_conductance = jnp.moveaxis(face_conductance, axis, 0)
+    emf = face_conductance * (0.5 * widths[:-1, None] * field[:-1] + 0.5 * widths[1:, None] * field[1:])
     return jnp.moveaxis(emf, 0, axis)
 
 
@@ -687,21 +707,15 @@ def _solve_velocity_coefficients(
 
 def _solve_velocity_system(
     *,
-    mesh: StructuredMesh,
-    diffusivity: jnp.ndarray,
-    reaction: jnp.ndarray,
+    coefficients: tuple[jnp.ndarray, ...],
+    cell_metric: jnp.ndarray,
     rhs: jnp.ndarray,
     active_mask: jnp.ndarray,
     preconditioner: str,
     max_steps: int,
     tolerance: float,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    diagonal, west, east, south, north = _velocity_system_coefficients(
-        mesh, diffusivity, reaction, active_mask
-    )
     rhs_masked = jnp.where(active_mask, rhs, 0.0)
-    cell_metric = _cell_metric(mesh).astype(rhs_masked.dtype)
-    coefficients = tuple(coefficient * cell_metric for coefficient in (diagonal, west, east, south, north))
     rhs_scaled = rhs_masked * cell_metric
     initial_residual = five_point_residual_norm(
         *coefficients,
@@ -770,6 +784,54 @@ def _volume_scaled_potential_system(
     )
 
 
+def _prepare_potential_system(
+    mesh: StructuredMesh,
+    sigma: jnp.ndarray,
+    anchor: tuple[int, int],
+    solver: str,
+) -> _PotentialSystem:
+    """Assemble invariant potential coefficients and preconditioning once."""
+
+    coefficients = _potential_coefficients(mesh, sigma)
+    _, _, east, _, north = coefficients
+    face_conductance = (
+        east[:-1, :] * mesh.dy[:-1, None],
+        north[:, :-1] * mesh.dz[None, :-1],
+    )
+    residual_scale = _cell_metric(mesh)
+    residual_scale_min = float(np.min(np.asarray(residual_scale)))
+    if solver != "cg_volume":
+        return _PotentialSystem(
+            coefficients,
+            None,
+            face_conductance,
+            residual_scale,
+            residual_scale_min,
+            None,
+            False,
+        )
+    volume_coefficients = _volume_scaled_potential_system(
+        mesh,
+        *coefficients,
+        jnp.zeros_like(sigma),
+    )[:5]
+    preconditioner, flexible = _potential_preconditioner_for_materials(
+        mesh,
+        sigma,
+        *volume_coefficients,
+        anchor,
+    )
+    return _PotentialSystem(
+        coefficients,
+        volume_coefficients,
+        face_conductance,
+        residual_scale,
+        residual_scale_min,
+        preconditioner,
+        flexible,
+    )
+
+
 def _solve_potential(
     mesh: StructuredMesh,
     sigma: jnp.ndarray,
@@ -783,14 +845,15 @@ def _solve_potential(
     relaxation: float = 1.0,
     solver: str = "jacobi",
     initial_phi: jnp.ndarray | None = None,
-    potential_preconditioner: Callable[[jnp.ndarray], jnp.ndarray] | None = None,
-    potential_flexible: bool = False,
+    system: _PotentialSystem | None = None,
     return_solver_residual: bool = False,
 ) -> tuple[jnp.ndarray, ...]:
+    if system is None:
+        system = _prepare_potential_system(mesh, sigma, anchor, solver)
     uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
     uxb_z = jnp.where(fluid_mask, u * by, 0.0)
-    conv_y = _face_emf(mesh, sigma, uxb_y, axis=0)
-    conv_z = _face_emf(mesh, sigma, uxb_z, axis=1)
+    conv_y = _face_emf(mesh, sigma, uxb_y, axis=0, conductance=system.face_conductance[0])
+    conv_z = _face_emf(mesh, sigma, uxb_z, axis=1, conductance=system.face_conductance[1])
     face_conv_y = jnp.pad(conv_y, ((1, 1), (0, 0)))
     face_conv_z = jnp.pad(conv_z, ((0, 0), (1, 1)))
     rhs = -(
@@ -803,7 +866,7 @@ def _solve_potential(
     rhs_mean = jnp.sum(conductive_weight * rhs) / conductive_total_weight
     rhs = jnp.where(sigma > 0.0, rhs - rhs_mean, 0.0)
 
-    diagonal, west, east, south, north = _potential_coefficients(mesh, sigma)
+    diagonal, west, east, south, north = system.coefficients
     warm_start = jnp.zeros_like(rhs) if initial_phi is None else jnp.asarray(initial_phi)
     if warm_start.shape != rhs.shape:
         raise ValueError("Potential initial guess must match the potential field shape")
@@ -848,31 +911,11 @@ def _solve_potential(
         )
         solver_residual = residual
     elif solver == "cg_volume":
-        residual_scale = _cell_metric(mesh)
-        diagonal_scaled, west_scaled, east_scaled, south_scaled, north_scaled, rhs_scaled = (
-            _volume_scaled_potential_system(
-                mesh,
-                diagonal,
-                west,
-                east,
-                south,
-                north,
-                rhs,
-            )
-        )
-        selected_preconditioner = (
-            potential_preconditioner
-            if potential_preconditioner is not None
-            else _select_potential_preconditioner(
-                diagonal_scaled,
-                west_scaled,
-                east_scaled,
-                south_scaled,
-                north_scaled,
-                anchor,
-            )
-        )
-        if potential_flexible and selected_preconditioner is not None:
+        if system.volume_coefficients is None:
+            raise ValueError("Volume-scaled potential coefficients are required for cg_volume")
+        diagonal_scaled, west_scaled, east_scaled, south_scaled, north_scaled = system.volume_coefficients
+        rhs_scaled = jnp.where((west + east + south + north) > 0.0, rhs * system.residual_scale, 0.0)
+        if system.flexible and system.preconditioner is not None:
             phi, solver_residual, iteration_count = _solve_potential_fgmres_state(
                 diagonal_scaled,
                 west_scaled,
@@ -887,8 +930,8 @@ def _solve_potential(
                 # the map at the residual floor and prevents strict outer
                 # convergence on high-Ha Hunt cases.
                 initial=jnp.zeros_like(solve_start),
-                residual_scale=_cell_metric(mesh),
-                preconditioner=selected_preconditioner,
+                residual_scale=system.residual_scale,
+                preconditioner=system.preconditioner,
             )
         else:
             phi, solver_residual, iteration_count = solve_poisson_cg_state(
@@ -902,9 +945,9 @@ def _solve_potential(
                 iterations,
                 tolerance=tolerance,
                 initial=solve_start,
-                residual_scale=residual_scale,
-                residual_scale_min=float(np.min(np.asarray(residual_scale))),
-                preconditioner=selected_preconditioner,
+                residual_scale=system.residual_scale,
+                residual_scale_min=system.residual_scale_min,
+                preconditioner=system.preconditioner,
             )
         residual = poisson_residual_norm(diagonal, west, east, south, north, rhs, phi, anchor)
     else:

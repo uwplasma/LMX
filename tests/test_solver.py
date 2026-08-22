@@ -260,11 +260,15 @@ def test_hunt_fully_developed_velocity_linear_solve_is_well_conditioned():
     diffusivity = jnp.ones(mesh.yz_shape) * 0.1
     reaction = jnp.ones(mesh.yz_shape) * 0.2
     rhs = jnp.ones(mesh.yz_shape) * 0.05
+    cell_metric = solvers._cell_metric(mesh)
+    coefficients = tuple(
+        coefficient * cell_metric
+        for coefficient in solvers._velocity_system_coefficients(mesh, diffusivity, reaction, active_mask)
+    )
 
     u, residual, iterations, initial_residual = solvers._solve_velocity_system(
-        mesh=mesh,
-        diffusivity=diffusivity,
-        reaction=reaction,
+        coefficients=coefficients,
+        cell_metric=cell_metric,
         rhs=rhs,
         active_mask=active_mask,
         preconditioner="jacobi",
@@ -499,6 +503,21 @@ def test_diagnostic_history_is_terminal_by_default_and_strided_when_requested(
     assert resumed.diagnostics.time_history.tolist() == pytest.approx([0.02])
     with pytest.raises(ValueError, match="history_stride"):
         solve_steady(replace(case, output=replace(case.output, history_stride=-1)))
+
+
+def test_fully_developed_solve_reuses_invariant_linear_systems(monkeypatch: pytest.MonkeyPatch):
+    case = _steady_stopping_case(dt=0.002, t_final=0.006, max_steps=3, steady_tolerance=0.0)
+    systems = []
+
+    def fake_step(**kwargs):
+        systems.append((kwargs["potential_system"], kwargs["velocity_system"]))
+        return _fake_step_result(kwargs["u_previous"], velocity_residual=1.0e-2)
+
+    monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_step)
+    solve_steady(case)
+    assert len(systems) == 3
+    assert all(potential is systems[0][0] for potential, _ in systems)
+    assert all(velocity is systems[0][1] for _, velocity in systems)
 
 
 def test_transient_restart_can_append_diagnostics(
@@ -1007,11 +1026,15 @@ def test_solve_velocity_system_returns_zero_outside_active_mask():
             [False, False, False, False],
         ]
     )
+    cell_metric = solvers._cell_metric(mesh)
+    coefficients = tuple(
+        coefficient * cell_metric
+        for coefficient in solvers._velocity_system_coefficients(mesh, diffusivity, reaction, active_mask)
+    )
 
     field, residual, iterations, initial_residual = solvers._solve_velocity_system(
-        mesh=mesh,
-        diffusivity=diffusivity,
-        reaction=reaction,
+        coefficients=coefficients,
+        cell_metric=cell_metric,
         rhs=rhs,
         active_mask=active_mask,
         preconditioner="jacobi",
