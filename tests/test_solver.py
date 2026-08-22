@@ -1078,11 +1078,18 @@ def test_velocity_system_coefficients_cover_connected_and_boundary_fallback_path
     assert float(north[0, 0]) == pytest.approx(0.0)
 
     interior_value = float(west[3, 3])
-    boundary_fallback = float(west[2, 2])
+    boundary_coupling = float(west[2, 2])
     assert interior_value > 0.0
-    assert boundary_fallback > 0.0
-    assert boundary_fallback != pytest.approx(interior_value)
+    assert boundary_coupling == 0.0
+    assert float(diagonal[2, 2]) > interior_value
     assert float(diagonal[3, 3]) > float(reaction[3, 3])
+    metric = mesh.dy[:, None] * mesh.dz[None, :]
+    coefficients = tuple(value * metric for value in (diagonal, west, east, south, north))
+    left = jnp.sin(jnp.arange(diagonal.size, dtype=float)).reshape(diagonal.shape)
+    right = jnp.cos(jnp.arange(diagonal.size, dtype=float)).reshape(diagonal.shape)
+    assert jnp.vdot(left, solvers.apply_five_point_operator(*coefficients, right)) == pytest.approx(
+        jnp.vdot(solvers.apply_five_point_operator(*coefficients, left), right), abs=1e-12
+    )
 
 
 def test_face_emf_uses_distance_weighted_nonuniform_interface_source():
