@@ -1028,6 +1028,7 @@ artifacts or release assets, not committed files.
 | D-030 | Differentiate the mathematical result, not incidental solver work | Implicit adjoints are the default for converged steady equations; checkpointed discrete adjoints are the default for finite trajectories. This matches established Optimistix, PETSc TSAdjoint/Revolve, and JAX scientific-computing practice while preserving one LMX production equation path. |
 | D-031 | Fail closed when a production adjoint does not converge | A finite primal is insufficient evidence: unsupported geometry remains unavailable until its transpose solve passes an independent derivative gate. |
 | D-032 | Eliminate inactive degrees of freedom from SPD off-diagonals | A fluid boundary contribution belongs on the diagonal, not as a coupling to an identity-constrained solid cell. Keeping the volume-scaled momentum operator symmetric makes primal PCG mathematically valid and gives its implicit transpose solve the same conditioning. |
+| D-033 | Differentiate one production 3-D recurrence with bounded nested derivatives | Generic rectangular/layered ducts expose pressure forcing and imposed-field scale through the retained field update. SOLVAX uses an implicit VJP for converged electric closure and exact checkpointing for finite projection and outer iterations. Specialized B2 and pipe lanes remain unavailable until their distinct coupled operators pass the same gates. |
 
 ## Work log
 
@@ -1957,3 +1958,37 @@ surface, measurements, validation, decision, and next action.
 - Next action: merge the layered-Hunt tranche after every hosted gate passes,
   then expose a differentiated 3-D field core. GPU parity remains queued until
   an office device is unoccupied.
+
+### 2026-08-22 — differentiated production 3-D field recurrence
+
+- Merged the layered-Hunt formulation as PR #5 at `3748653` after every hosted
+  metadata, architecture, Python 3.10, physics, benchmark, combined-coverage,
+  documentation, and package-build gate passed.
+- Added `lmx.fringing.evolve_extruded_fields` without adding a root export or
+  source file. Generic rectangular and layered ducts now return velocity,
+  pressure, potential, current, and Lorentz-force fields through the same
+  finite update used by `solve_extruded_inductionless`. Specialized ALEX B2
+  and pipe formulations fail closed rather than borrowing an unvalidated
+  derivative contract.
+- Preserved the validated finite collocated pressure projection and routed its
+  reverse pass through SOLVAX checkpointing. A converged nearest-neighbor PCG
+  replacement was rejected because the collocated central divergence/gradient
+  pair is not that Poisson operator and it regressed mass conservation.
+  Electric closure remains implicit; the outer recurrence uses the same exact
+  `checkpointed_fori_loop` with a square-root storage default.
+- All 11 field outputs match the ordinary production solve to numerical
+  precision on the acceptance problem. Pressure-forcing and magnetic-scale
+  VJPs agree with centered differences; JVP/VJP duality passes. On the
+  eight-step `4 x 4 x 4` float64 gate, checkpointing reduces compiled reverse
+  temporary storage from 354,456 to 228,824 bytes (35.4%) with identical value
+  and gradient.
+- The implementation preserves the existing architecture ceiling at 16
+  modules, 28 root exports, and 15,363 package lines. It removes the duplicated
+  generic production update and groups immutable step inputs once; no solver,
+  proxy discretization, test file, or experimental lane was added.
+- The complete local gate passes 508 tests in 158.2 seconds at 95.07% combined
+  line/branch coverage. Ruff, formatting, architecture/import, all curated
+  examples, warning-free HTML documentation, and external link checks pass.
+- Next action: complete hosted CI, package, and FreeMHD gates, then merge the
+  3-D tranche. Measure CPU/GPU parity and strong scaling as soon as an office
+  GPU is available.

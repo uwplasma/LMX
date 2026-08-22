@@ -15,7 +15,7 @@ from jax.scipy.linalg import solve_triangular
 from jax.sharding import Mesh, NamedSharding
 from jax.sharding import PartitionSpec as P
 from solvax import (
-    fixed_point_iteration,
+    checkpointed_fori_loop,
     pcg_linear_solve,
     tridiagonal_solve,
 )
@@ -622,7 +622,7 @@ def _gradient_3d(
     dy_values = jnp.asarray(dy)
     dz_values = jnp.asarray(dz)
     d_dy = (
-        (y_north - y_south) / max(2.0 * float(dy_values), 1.0e-12)
+        (y_north - y_south) / jnp.maximum(2.0 * dy_values, 1.0e-12)
         if dy_values.ndim == 0
         else _nonuniform_axis_gradient(
             field,
@@ -631,7 +631,7 @@ def _gradient_3d(
         )
     )
     d_dz = (
-        (z_top - z_bottom) / max(2.0 * float(dz_values), 1.0e-12)
+        (z_top - z_bottom) / jnp.maximum(2.0 * dz_values, 1.0e-12)
         if dz_values.ndim == 0
         else _nonuniform_axis_gradient(
             field,
@@ -905,9 +905,8 @@ def _projection_pressure_correction_3d(
     dy: float | jnp.ndarray,
     dz: float | jnp.ndarray,
     iterations: int,
-    tolerance: float,
 ) -> jnp.ndarray:
-    """Apply the collocated projection stencil with SOLVAX fixed-point control."""
+    """Apply the validated collocated projection with bounded exact reverse mode."""
 
     dy_widths = _spacing_vector(dy, rhs.shape[1], dtype=rhs.dtype)
     dz_widths = _spacing_vector(dz, rhs.shape[2], dtype=rhs.dtype)
@@ -916,39 +915,135 @@ def _projection_pressure_correction_3d(
     coefficients = _variable_diffusion_coefficients_3d(jnp.ones_like(rhs), dx=dx, dy=dy_widths, dz=dz_widths)
     diagonal = jnp.maximum(sum(coefficients), 1.0e-12)
 
-    def update(field):
-        neighbors = _neighbor_fields(
-            field,
-            mode_x="neumann",
-            mode_y="neumann",
-            mode_z="neumann",
-        )
-        corrected = (
+    def advance(_, field):
+        neighbors = _neighbor_fields(field, mode_x="neumann", mode_y="neumann", mode_z="neumann")
+        field = (
             sum(coefficient * neighbor for coefficient, neighbor in zip(coefficients, neighbors))
             - compatible_rhs
         ) / diagonal
-        return corrected - jnp.sum(corrected * volume) / jnp.sum(volume)
+        return field - jnp.sum(field * volume) / jnp.sum(volume)
 
-    solution = fixed_point_iteration(
-        update,
-        jnp.zeros_like(rhs),
-        residual_norm=lambda field: jnp.max(
-            jnp.abs(
-                _variable_coefficient_residual_3d(
-                    field,
-                    compatible_rhs,
-                    jnp.ones_like(rhs),
-                    dx=dx,
-                    dy=dy_widths,
-                    dz=dz_widths,
-                )
-            )
-        ),
-        rtol=0.0,
-        atol=tolerance,
-        max_steps=iterations,
+    return checkpointed_fori_loop(0, iterations, advance, jnp.zeros_like(rhs))
+
+
+def _generic_duct_step(
+    state: tuple[jnp.ndarray, ...],
+    *,
+    material: tuple[jnp.ndarray, ...],
+    field: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
+    forcing: jnp.ndarray,
+    spacing: tuple[float | jnp.ndarray, ...],
+    solves: tuple[int | float, ...],
+    limits: tuple[float, float],
+    flow: tuple[float | jnp.ndarray | None, ...],
+    operators: tuple[Callable, Callable, Callable],
+) -> tuple[tuple[jnp.ndarray, ...], tuple[jnp.ndarray, ...]]:
+    """Advance the retained generic duct equations and return final observables."""
+
+    electric_solve, emf_operator, current_diagnostics = operators
+    sigma, rho, nu, fluid_mask, cell_area = material
+    u, v, w, pressure, potential = state
+    bx, by, bz = field
+    dt, dx, dy, dz, dy_momentum, dz_momentum = spacing
+    poisson_iterations, electric_iterations, electric_tolerance = solves
+    velocity_limit, scalar_limit = limits
+    target_flow_rate, unit_pressure_response, flow_relaxation = flow
+    potential_gradient = _gradient_3d(potential, dx=dx, dy=dy, dz=dz)
+    uxb = (v * bz - w * by, w * bx - u * bz, u * by - v * bx)
+    current = tuple(sigma * (-gradient + emf) for gradient, emf in zip(potential_gradient, uxb))
+    jx, jy, jz = current
+    lorentz = (jy * bz - jz * by, jz * bx - jx * bz, jx * by - jy * bx)
+    pressure_gradient = _gradient_3d(pressure, dx=dx, dy=dy_momentum, dz=dz_momentum)
+    laplacian = tuple(
+        _laplacian_3d(component, dx=dx, dy=dy_momentum, dz=dz_momentum) for component in (u, v, w)
     )
-    return solution.x
+    source = (forcing / rho, jnp.zeros_like(rho), jnp.zeros_like(rho))
+    predicted = tuple(
+        _enforce_velocity_bc_3d(
+            jnp.clip(
+                component + dt * (nu * diffusion + drive + force / rho - gradient / rho),
+                -velocity_limit,
+                velocity_limit,
+            ),
+            fluid_mask,
+        )
+        for component, diffusion, drive, force, gradient in zip(
+            (u, v, w), laplacian, source, lorentz, pressure_gradient, strict=True
+        )
+    )
+    velocity_divergence = sum(
+        _gradient_3d(component, dx=dx, dy=dy_momentum, dz=dz_momentum)[axis]
+        for axis, component in enumerate(predicted)
+    )
+    correction = _projection_pressure_correction_3d(
+        (rho / max(dt, 1.0e-12)) * jnp.where(fluid_mask, velocity_divergence, 0.0),
+        dx=dx,
+        dy=dy_momentum,
+        dz=dz_momentum,
+        iterations=poisson_iterations,
+    )
+    correction = jnp.clip(jnp.where(fluid_mask, correction, 0.0), -scalar_limit, scalar_limit)
+    correction_gradient = _gradient_3d(correction, dx=dx, dy=dy_momentum, dz=dz_momentum)
+    velocity = tuple(
+        jnp.clip(
+            _enforce_velocity_bc_3d(value - (dt / rho) * gradient, fluid_mask),
+            -velocity_limit,
+            velocity_limit,
+        )
+        for value, gradient in zip(predicted, correction_gradient, strict=True)
+    )
+    if target_flow_rate is None:
+        velocity = (
+            _enforce_stationwise_flow_rate_3d(
+                velocity[0], active_mask=fluid_mask, cell_area=cell_area, relaxation=flow_relaxation
+            ),
+            velocity[1],
+            velocity[2],
+        )
+        pressure_loss = jnp.full((u.shape[0],), forcing, dtype=u.dtype)
+    else:
+        axial, pressure_loss = _apply_fixed_flow_pressure_constraint(
+            velocity[0],
+            unit_pressure_response=unit_pressure_response,
+            active_mask=fluid_mask,
+            cell_area=cell_area,
+            target_flow_rate=target_flow_rate,
+            base_pressure_loss_gradient=forcing,
+        )
+        velocity = (axial, velocity[1], velocity[2])
+    velocity = tuple(_enforce_velocity_bc_3d(value, fluid_mask) for value in velocity)
+    pressure = jnp.where(
+        fluid_mask,
+        jnp.clip(pressure + correction, -scalar_limit, scalar_limit),
+        0.0,
+    )
+    u, v, w = velocity
+    uxb = (v * bz - w * by, w * bx - u * bz, u * by - v * bx)
+    potential, *electric_diagnostics = electric_solve(
+        emf_operator(sigma, *uxb, dx=dx, dy=dy, dz=dz),
+        sigma,
+        dx=dx,
+        dy=dy,
+        dz=dz,
+        iterations=electric_iterations,
+        tolerance=electric_tolerance,
+        initial_field=potential,
+    )
+    potential = jnp.clip(potential, -scalar_limit, scalar_limit)
+    current = tuple(
+        jnp.clip(sigma * (-gradient + emf), -scalar_limit, scalar_limit)
+        for gradient, emf in zip(_gradient_3d(potential, dx=dx, dy=dy, dz=dz), uxb, strict=True)
+    )
+    jx, jy, jz = current
+    div_j, _, _ = current_diagnostics(sigma, potential, *uxb, dx=dx, dy=dy, dz=dz)
+    lorentz = (jy * bz - jz * by, jz * bx - jx * bz, jx * by - jy * bx)
+    velocity_divergence = sum(
+        _gradient_3d(component, dx=dx, dy=dy_momentum, dz=dz_momentum)[axis]
+        for axis, component in enumerate(velocity)
+    )
+    projected_divergence = jnp.max(jnp.abs(jnp.where(fluid_mask, velocity_divergence, 0.0)))
+    observables = (*current, *lorentz, div_j, projected_divergence, pressure_loss, *electric_diagnostics)
+    return (u, v, w, pressure, potential), observables
 
 
 def _rectangular_fluid_bounds(fluid_mask: jnp.ndarray) -> tuple[int, int, int, int]:
