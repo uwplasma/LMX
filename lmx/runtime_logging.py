@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
-from pathlib import Path
 import sys
 import time
+from dataclasses import dataclass
+from pathlib import Path
 from typing import TextIO
 
 import jax.numpy as jnp
@@ -108,17 +108,27 @@ class StreamingSolverLogger:
         self._write(f"Solver kind                 : {solver_kind}")
         self._write(f"Geometry                    : {case.geometry.kind}")
         self._write(f"Cells (nx, ny, nz)          : ({mesh.nx}, {mesh.ny}, {mesh.nz})")
-        self._write(f"Domain (L, W, H)            : ({case.geometry.length:.6e}, {case.geometry.width:.6e}, {case.geometry.height:.6e})")
-        self._write(f"Time controls               : dt={case.time_stepper.dt:.6e}, endTime={case.time_stepper.t_final:.6e}, maxSteps={case.time_stepper.max_steps}")
+        self._write(
+            f"Domain (L, W, H)            : ({case.geometry.length:.6e}, {case.geometry.width:.6e}, {case.geometry.height:.6e})"
+        )
+        self._write(
+            f"Time controls               : dt={case.time_stepper.dt:.6e}, endTime={case.time_stepper.t_final:.6e}, maxSteps={case.time_stepper.max_steps}"
+        )
         if solver is not None:
             self._write(
                 f"Solver controls             : linearSolver={solver.linear_solver}, preconditioner={solver.preconditioner}, "
                 f"timeScheme={solver.time_scheme}, couplingIterations={solver.coupling_iterations}, "
                 f"couplingTolerance={solver.coupling_tolerance:.6e}"
             )
-        self._write(f"Potential controls          : solver={potential_solver}, iterations={case.time_stepper.potential_iterations}, tolerance={case.time_stepper.potential_tolerance}, omega={case.time_stepper.potential_relaxation:.6e}")
-        self._write(f"Magnetic field              : kind={case.magnetic_field.kind}, value={case.magnetic_field.value}, rampStart={case.magnetic_field.ramp_start:.6e}, rampDuration={case.magnetic_field.ramp_duration:.6e}")
-        self._write(f"Flow forcing                : explicit={case.forcing:.6e}, initialVelocity={case.initial_velocity:.6e}, targetMeanVelocity={target_mean_velocity}, referenceMeanVelocity={reference_mean_velocity}")
+        self._write(
+            f"Potential controls          : solver={potential_solver}, iterations={case.time_stepper.potential_iterations}, tolerance={case.time_stepper.potential_tolerance}, omega={case.time_stepper.potential_relaxation:.6e}"
+        )
+        self._write(
+            f"Magnetic field              : kind={case.magnetic_field.kind}, value={case.magnetic_field.value}, rampStart={case.magnetic_field.ramp_start:.6e}, rampDuration={case.magnetic_field.ramp_duration:.6e}"
+        )
+        self._write(
+            f"Flow forcing                : explicit={case.forcing:.6e}, initialVelocity={case.initial_velocity:.6e}, targetMeanVelocity={target_mean_velocity}, referenceMeanVelocity={reference_mean_velocity}"
+        )
         if restart is not None and restart.enabled:
             self._write(
                 f"Restart controls            : source={restart.path}, startTime={restart.start_time:.6e}, "
@@ -234,10 +244,7 @@ class StreamingSolverLogger:
                 f"step = {record.step_index:d}, dt = {record.dt:.6e}, "
                 f"faceCurrentRatio = {face_current_ratio:.6e}, faceLorentzRatio = {face_lorentz_ratio:.6e}"
             )
-        self._write(
-            "steadySolver                   "
-            f"velocity residual = {record.residual:.6e}"
-        )
+        self._write(f"steadySolver                   velocity residual = {record.residual:.6e}")
         if progress is None:
             self._write(
                 "Progress                       "

@@ -1,20 +1,13 @@
-"""Differentiable objectives and inverse-design helpers."""
+"""Differentiable objectives for the canonical Hartmann solve."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 
 import jax
 import jax.numpy as jnp
+from solvax import fixed_point_iteration
 
-from .field_models import wham_mirror_station_scale
-from .fringing import (
-    _conservative_current_fluxes_3d as _canonical_current_fluxes_3d,
-    _conservative_emf_rhs_3d as _extruded_conservative_emf_rhs,
-    _enforce_velocity_bc_3d as _extruded_enforce_velocity_bc,
-    _neighbor_fields,
-)
 from .mesh import StructuredMesh, generate_rect_duct_mesh
 from .operators import gradient_scalar
 from .solvers import (
@@ -25,14 +18,6 @@ from .solvers import (
     _velocity_system_coefficients,
     solve_poisson_jacobi_state,
 )
-
-_extruded_conservative_current_fluxes = _canonical_current_fluxes_3d
-
-
-@dataclass(frozen=True)
-class FringingAutodiffProblem:
-    base_problem: HartmannAutodiffProblem
-    x: jnp.ndarray
 
 
 @dataclass(frozen=True)
@@ -78,250 +63,6 @@ def build_hartmann_autodiff_problem(
     )
 
 
-def build_fringing_autodiff_problem(
-    *,
-    nx_stations: int = 15,
-    length: float = 6.0,
-    **kwargs,
-) -> FringingAutodiffProblem:
-    return FringingAutodiffProblem(
-        base_problem=build_hartmann_autodiff_problem(**kwargs),
-        x=jnp.linspace(0.0, length, nx_stations),
-    )
-
-
-def _smooth_fringing_scale(
-    x: jnp.ndarray,
-    *,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-    peak_scale: float | jnp.ndarray = 1.0,
-) -> jnp.ndarray:
-    width = jnp.maximum(jnp.asarray(transition_width), 1.0e-6)
-    rise = 0.5 * (1.0 + jnp.tanh((x - jnp.asarray(entry_center)) / width))
-    fall = 0.5 * (1.0 - jnp.tanh((x - jnp.asarray(exit_center)) / width))
-    return jnp.asarray(peak_scale) * rise * fall
-
-
-def _extruded_rect_current_diagnostics(state, context):
-    """Reconstruct conservative current diagnostics from one trajectory state."""
-
-    u, v, _, _, phi = state
-    _, sigma, bz, dx, dy, dz = context
-    dphi_dx, dphi_dy, _ = _extruded_gradient(phi, dx=dx, dy=dy, dz=dz)
-    uxb_x, uxb_y, uxb_z = v * bz, -u * bz, jnp.zeros_like(u)
-    jx = sigma * (-dphi_dx + uxb_x)
-    jy = sigma * (-dphi_dy + uxb_y)
-    fx, fy, fz = _extruded_conservative_current_fluxes(
-        sigma, phi, uxb_x, uxb_y, uxb_z, dx=dx, dy=dy, dz=dz
-    )
-    div_j = (
-        (fx[1:] - fx[:-1]) / max(dx, 1.0e-12)
-        + (fy[:, 1:, :] - fy[:, :-1, :]) / max(dy, 1.0e-12)
-        + (fz[:, :, 1:] - fz[:, :, :-1]) / max(dz, 1.0e-12)
-    )
-    boundary = jnp.abs(
-        -jnp.sum(fx[0], axis=(0, 1)) * dy * dz
-        + jnp.sum(fx[-1], axis=(0, 1)) * dy * dz
-        - jnp.sum(fy[:, 0, :], axis=1) * dx * dz
-        + jnp.sum(fy[:, -1, :], axis=1) * dx * dz
-        - jnp.sum(fz[:, :, 0], axis=1) * dx * dy
-        + jnp.sum(fz[:, :, -1], axis=1) * dx * dy
-    )
-    return jx, jy, (fx, fy, fz), div_j, boundary
-
-
-def _extruded_rect_projection_trajectory(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    field_scale: jnp.ndarray,
-    station_indices: jnp.ndarray | None = None,
-):
-    """Advance one rectangular projection trajectory, recording only on request."""
-
-    mesh = problem.base_problem.mesh
-    ny, nz = mesh.yz_shape
-    nx = int(problem.x.shape[0])
-    dx = float((problem.x[-1] - problem.x[0]) / max(nx - 1, 1)) if nx > 1 else 1.0
-    dy = float(jnp.mean(mesh.dy))
-    dz = float(jnp.mean(mesh.dz))
-    sigma = jnp.broadcast_to(problem.base_problem.sigma[None, :, :], (nx, ny, nz))
-    rho = jnp.broadcast_to(problem.base_problem.rho[None, :, :], (nx, ny, nz))
-    nu = jnp.broadcast_to(problem.base_problem.nu[None, :, :], (nx, ny, nz))
-    scale = jnp.asarray(field_scale, dtype=sigma.dtype)
-    bz = jnp.broadcast_to(jnp.asarray(peak_hartmann_number) * scale[:, None, None], (nx, ny, nz))
-    forcing_value = jnp.asarray(forcing, dtype=sigma.dtype)
-    inverse_diffusive_scale = jnp.max(nu) * (1.0 / max(dx**2, 1.0e-12) + 1.0 / max(dy**2, 1.0e-12) + 1.0 / max(dz**2, 1.0e-12))
-    dt = jnp.asarray(0.2) / jnp.maximum(inverse_diffusive_scale, 1.0e-12)
-    pressure_iterations = max(4, problem.base_problem.potential_iterations // 2)
-    context = (scale, sigma, bz, dx, dy, dz)
-
-    def advance(state):
-        u, v, w, p, phi = state
-        dphi_dx, dphi_dy, _ = _extruded_gradient(phi, dx=dx, dy=dy, dz=dz)
-        uxb_x = v * bz
-        uxb_y = -u * bz
-        uxb_z = jnp.zeros_like(u)
-        jx = sigma * (-dphi_dx + uxb_x)
-        jy = sigma * (-dphi_dy + uxb_y)
-        lorentz_x = jy * bz
-        lorentz_y = -jx * bz
-        lorentz_z = jnp.zeros_like(u)
-
-        dp_dx, dp_dy, dp_dz = _extruded_gradient(p, dx=dx, dy=dy, dz=dz)
-        u_star = _extruded_enforce_velocity_bc(
-            u + dt * (nu * _extruded_laplacian(u, dx=dx, dy=dy, dz=dz) + forcing_value / jnp.maximum(rho, 1.0e-12) + lorentz_x / jnp.maximum(rho, 1.0e-12) - dp_dx / jnp.maximum(rho, 1.0e-12))
-        )
-        v_star = _extruded_enforce_velocity_bc(
-            v + dt * (nu * _extruded_laplacian(v, dx=dx, dy=dy, dz=dz) + lorentz_y / jnp.maximum(rho, 1.0e-12) - dp_dy / jnp.maximum(rho, 1.0e-12))
-        )
-        w_star = _extruded_enforce_velocity_bc(
-            w + dt * (nu * _extruded_laplacian(w, dx=dx, dy=dy, dz=dz) + lorentz_z / jnp.maximum(rho, 1.0e-12) - dp_dz / jnp.maximum(rho, 1.0e-12))
-        )
-
-        du_dx, _, _ = _extruded_gradient(u_star, dx=dx, dy=dy, dz=dz)
-        _, dv_dy, _ = _extruded_gradient(v_star, dx=dx, dy=dy, dz=dz)
-        _, _, dw_dz = _extruded_gradient(w_star, dx=dx, dy=dy, dz=dz)
-        divergence = du_dx + dv_dy + dw_dz
-        p_corr = _extruded_poisson_jacobi((rho / jnp.maximum(dt, 1.0e-12)) * divergence, dx=dx, dy=dy, dz=dz, iterations=pressure_iterations)
-        dpc_dx, dpc_dy, dpc_dz = _extruded_gradient(p_corr, dx=dx, dy=dy, dz=dz)
-        u_next = _extruded_enforce_velocity_bc(u_star - (dt / jnp.maximum(rho, 1.0e-12)) * dpc_dx)
-        v_next = _extruded_enforce_velocity_bc(v_star - (dt / jnp.maximum(rho, 1.0e-12)) * dpc_dy)
-        w_next = _extruded_enforce_velocity_bc(w_star - (dt / jnp.maximum(rho, 1.0e-12)) * dpc_dz)
-        p_next = p + p_corr
-
-        uxb_x = v_next * bz
-        uxb_y = -u_next * bz
-        uxb_z = jnp.zeros_like(u_next)
-        rhs_phi = _extruded_conservative_emf_rhs(sigma, uxb_x, uxb_y, uxb_z, dx=dx, dy=dy, dz=dz)
-        phi_next = _extruded_poisson_jacobi(
-            rhs_phi,
-            dx=dx,
-            dy=dy,
-            dz=dz,
-            iterations=problem.base_problem.potential_iterations,
-        )
-        return u_next, v_next, w_next, p_next, phi_next
-
-    zero = jnp.zeros((nx, ny, nz), dtype=problem.base_problem.sigma.dtype)
-    initial_state = (zero,) * 5
-    if station_indices is None:
-        state = jax.lax.fori_loop(
-            0, problem.base_problem.macro_iterations,
-            lambda _, value: advance(value), initial_state
-        )
-        return state, None, context, None
-
-    station_ids = jnp.asarray(station_indices, dtype=jnp.int32)
-
-    def step(state, _):
-        next_state = advance(state)
-        u, _, _, p, phi = next_state
-        _, jy, _, div_j, boundary = _extruded_rect_current_diagnostics(
-            next_state, context
-        )
-        return next_state, {
-            "u_field": u[station_ids],
-            "phi_field": phi[station_ids],
-            "jy_field": jy[station_ids],
-            "pressure_field": p[station_ids],
-            "charge_balance_residual": jnp.max(jnp.abs(div_j), axis=(1, 2))[station_ids],
-            "boundary_current_residual": boundary[station_ids],
-        }
-
-    state, history = jax.lax.scan(
-        step, initial_state, xs=None, length=problem.base_problem.macro_iterations)
-    return state, history, context, station_ids
-
-
-def _extruded_rect_projection_history_from_field_scale(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    field_scale: jnp.ndarray,
-) -> dict[str, jnp.ndarray]:
-    state, _, context, _ = _extruded_rect_projection_trajectory(
-        problem, forcing=forcing, peak_hartmann_number=peak_hartmann_number,
-        field_scale=field_scale,
-    )
-    u, v, w, p, phi = state
-    scale, sigma, bz, dx, dy, dz = context
-
-    jx, jy, (fx, fy, fz), div_j, boundary_current_residual = (
-        _extruded_rect_current_diagnostics(state, context)
-    )
-    wall_current_leakage = (
-        jnp.sum(jnp.abs(fy[:, 0, :]), axis=1) * dx * dz
-        + jnp.sum(jnp.abs(fy[:, -1, :]), axis=1) * dx * dz
-        + jnp.sum(jnp.abs(fz[:, :, 0]), axis=1) * dx * dy
-        + jnp.sum(jnp.abs(fz[:, :, -1]), axis=1) * dx * dy
-    )
-    pressure_span = jnp.max(p, axis=(1, 2)) - jnp.min(p, axis=(1, 2))
-    transverse_kinetic_energy = jnp.mean(v**2 + w**2, axis=(1, 2))
-    return {
-        "x": problem.x,
-        "field_scale": scale,
-        "mean_velocity": jnp.mean(u, axis=(1, 2)),
-        "current_proxy": jnp.mean(jnp.abs(jy), axis=(1, 2)),
-        "charge_balance_residual": jnp.max(jnp.abs(div_j), axis=(1, 2)),
-        "boundary_current_residual": boundary_current_residual,
-        "pressure_span": pressure_span,
-        "transverse_kinetic_energy": transverse_kinetic_energy,
-        "wall_current_leakage": wall_current_leakage,
-        "axial_current": jnp.sum(jx, axis=(1, 2)) * dy * dz,
-        "u_field": u,
-        "v_field": v,
-        "w_field": w,
-        "pressure_field": p,
-        "phi_field": phi,
-        "jy_field": jy,
-    }
-
-
-def _extruded_gradient(field: jnp.ndarray, *, dx: float, dy: float, dz: float) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
-        field, mode_x="neumann", mode_y="dirichlet", mode_z="dirichlet"
-    )
-    d_dx = (x_east - x_west) / max(2.0 * dx, 1.0e-12)
-    d_dy = (y_north - y_south) / max(2.0 * dy, 1.0e-12)
-    d_dz = (z_top - z_bottom) / max(2.0 * dz, 1.0e-12)
-    return d_dx, d_dy, d_dz
-
-
-def _extruded_laplacian(field: jnp.ndarray, *, dx: float, dy: float, dz: float) -> jnp.ndarray:
-    x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
-        field, mode_x="neumann", mode_y="dirichlet", mode_z="dirichlet"
-    )
-    return (
-        (x_west - 2.0 * field + x_east) / max(dx**2, 1.0e-12)
-        + (y_south - 2.0 * field + y_north) / max(dy**2, 1.0e-12)
-        + (z_bottom - 2.0 * field + z_top) / max(dz**2, 1.0e-12)
-    )
-
-
-def _extruded_poisson_jacobi(rhs: jnp.ndarray, *, dx: float, dy: float, dz: float, iterations: int) -> jnp.ndarray:
-    rhs_compatible = rhs - jnp.mean(rhs)
-    diagonal = 2.0 / max(dx**2, 1.0e-12) + 2.0 / max(dy**2, 1.0e-12) + 2.0 / max(dz**2, 1.0e-12)
-
-    def body_fun(_, field):
-        x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
-            field, mode_x="neumann", mode_y="dirichlet", mode_z="dirichlet"
-        )
-        updated = (
-            (x_west + x_east) / max(dx**2, 1.0e-12)
-            + (y_south + y_north) / max(dy**2, 1.0e-12)
-            + (z_bottom + z_top) / max(dz**2, 1.0e-12)
-            - rhs_compatible
-        ) / diagonal
-        return updated - jnp.mean(updated)
-
-    return jax.lax.fori_loop(0, iterations, body_fun, jnp.zeros_like(rhs_compatible))
-
-
 def _solve_velocity_jacobi_state(
     *,
     mesh: StructuredMesh,
@@ -332,21 +73,31 @@ def _solve_velocity_jacobi_state(
     iterations: int,
     relaxation: float,
 ) -> jnp.ndarray:
-    diagonal, west, east, south, north = _velocity_system_coefficients(mesh, diffusivity, reaction, active_mask)
+    diagonal, west, east, south, north = _velocity_system_coefficients(
+        mesh, diffusivity, reaction, active_mask
+    )
     diagonal = jnp.maximum(diagonal, 1.0e-12)
-    omega = jnp.asarray(relaxation, dtype=rhs.dtype)
     field0 = jnp.zeros_like(rhs)
 
-    def body_fun(_, field):
+    def update(field):
         west_field = jnp.pad(field[:-1, :], ((1, 0), (0, 0)))
         east_field = jnp.pad(field[1:, :], ((0, 1), (0, 0)))
         south_field = jnp.pad(field[:, :-1], ((0, 0), (1, 0)))
         north_field = jnp.pad(field[:, 1:], ((0, 0), (0, 1)))
-        updated = (rhs + west * west_field + east * east_field + south * south_field + north * north_field) / diagonal
-        blended = (1.0 - omega) * field + omega * updated
-        return jnp.where(active_mask, blended, 0.0)
+        updated = (
+            rhs + west * west_field + east * east_field + south * south_field + north * north_field
+        ) / diagonal
+        return jnp.where(active_mask, updated, 0.0)
 
-    return jax.lax.fori_loop(0, iterations, body_fun, field0)
+    return fixed_point_iteration(
+        update,
+        field0,
+        relaxation=relaxation,
+        rtol=0.0,
+        atol=0.0,
+        max_steps=iterations,
+        fixed_steps=True,
+    ).x
 
 
 def solve_differentiable_hartmann(
@@ -411,7 +162,12 @@ def solve_differentiable_hartmann(
         )
         return _enforce_velocity_bc(u_next, mesh, fluid_mask, interpolate_direct_fluid_walls=False)
 
-    u = jax.lax.fori_loop(0, problem.macro_iterations, macro_body, jnp.zeros(mesh.yz_shape, dtype=sigma.dtype))
+    u = jax.lax.fori_loop(
+        0,
+        problem.macro_iterations,
+        macro_body,
+        jnp.zeros(mesh.yz_shape, dtype=sigma.dtype),
+    )
 
     uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
     uxb_z = jnp.where(fluid_mask, u * by, 0.0)
@@ -439,38 +195,6 @@ def solve_differentiable_hartmann(
     return u, phi
 
 
-def fringing_mean_velocity_history(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-) -> dict[str, jnp.ndarray]:
-    field_scale = _smooth_fringing_scale(
-        problem.x,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-        peak_scale=1.0,
-    )
-
-    def single_station(scale_value):
-        return hartmann_mean_velocity(
-            problem.base_problem,
-            forcing=forcing,
-            hartmann_number=jnp.asarray(peak_hartmann_number) * scale_value,
-        )
-
-    mean_velocity = jax.vmap(single_station)(field_scale)
-    return {
-        "x": problem.x,
-        "field_scale": field_scale,
-        "mean_velocity": mean_velocity,
-    }
-
-
 def hartmann_current_proxy(
     problem: HartmannAutodiffProblem,
     *,
@@ -481,191 +205,6 @@ def hartmann_current_proxy(
     dphi_dy, _ = gradient_scalar(phi, problem.mesh)
     jy = -dphi_dy - u * jnp.asarray(hartmann_number, dtype=u.dtype)
     return jnp.mean(jnp.abs(jy))
-
-
-def fringing_response_history(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-) -> dict[str, jnp.ndarray]:
-    field_scale = _smooth_fringing_scale(
-        problem.x,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-        peak_scale=1.0,
-    )
-
-    def single_station(scale_value):
-        station_ha = jnp.asarray(peak_hartmann_number) * scale_value
-        return (
-            hartmann_mean_velocity(
-                problem.base_problem,
-                forcing=forcing,
-                hartmann_number=station_ha,
-            ),
-            hartmann_current_proxy(
-                problem.base_problem,
-                forcing=forcing,
-                hartmann_number=station_ha,
-            ),
-        )
-
-    mean_velocity, current_proxy = jax.vmap(single_station)(field_scale)
-    return {
-        "x": problem.x,
-        "field_scale": field_scale,
-        "mean_velocity": mean_velocity,
-        "current_proxy": current_proxy,
-    }
-
-
-def extruded_rect_projection_history(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-) -> dict[str, jnp.ndarray]:
-    field_scale = _smooth_fringing_scale(
-        problem.x,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-        peak_scale=1.0,
-    )
-    return _extruded_rect_projection_history_from_field_scale(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_hartmann_number,
-        field_scale=field_scale,
-    )
-
-
-def wham_mirror_pressure_drop_history(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    coil_separation: float | jnp.ndarray,
-    center_offset: float | jnp.ndarray = 0.0,
-    current_scale: float = 2000.0 * 17.0 / 17.51,
-    inner_radius: float = 0.5 * 86.0e-3,
-    outer_radius: float = 0.5 * 730.0e-3,
-    coil_axial_thickness: float = 14.3e-3 * 8.0,
-    radial_loops: int = 24,
-    axial_loops: int = 8,
-) -> dict[str, jnp.ndarray]:
-    centered_x = problem.x - 0.5 * (problem.x[0] + problem.x[-1]) - jnp.asarray(center_offset, dtype=jnp.float32)
-    field_scale = wham_mirror_station_scale(
-        centered_x,
-        coil_separation=coil_separation,
-        current_scale=current_scale,
-        inner_radius=inner_radius,
-        outer_radius=outer_radius,
-        coil_axial_thickness=coil_axial_thickness,
-        radial_loops=radial_loops,
-        axial_loops=axial_loops,
-    )
-    return _extruded_rect_projection_history_from_field_scale(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_hartmann_number,
-        field_scale=field_scale,
-    )
-
-
-def wham_mirror_pressure_drop_sensitivity(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    coil_separation: float | jnp.ndarray,
-    center_offset: float | jnp.ndarray = 0.0,
-    current_scale: float = 2000.0 * 17.0 / 17.51,
-    inner_radius: float = 0.5 * 86.0e-3,
-    outer_radius: float = 0.5 * 730.0e-3,
-    coil_axial_thickness: float = 14.3e-3 * 8.0,
-    radial_loops: int = 24,
-    axial_loops: int = 8,
-) -> dict[str, jnp.ndarray]:
-    def objective(separation_value):
-        response = wham_mirror_pressure_drop_history(
-            problem,
-            forcing=forcing,
-            peak_hartmann_number=peak_hartmann_number,
-            coil_separation=separation_value,
-            center_offset=center_offset,
-            current_scale=current_scale,
-            inner_radius=inner_radius,
-            outer_radius=outer_radius,
-            coil_axial_thickness=coil_axial_thickness,
-            radial_loops=radial_loops,
-            axial_loops=axial_loops,
-        )
-        x = response["x"]
-        pressure_span = response["pressure_span"]
-        dx = x[1:] - x[:-1]
-        return jnp.sum(0.5 * (pressure_span[1:] + pressure_span[:-1]) * dx) / jnp.maximum(x[-1] - x[0], 1.0e-12)
-
-    pressure_drop_proxy = objective(coil_separation)
-    response = wham_mirror_pressure_drop_history(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_hartmann_number,
-        coil_separation=coil_separation,
-        center_offset=center_offset,
-        current_scale=current_scale,
-        inner_radius=inner_radius,
-        outer_radius=outer_radius,
-        coil_axial_thickness=coil_axial_thickness,
-        radial_loops=radial_loops,
-        axial_loops=axial_loops,
-    )
-    return {
-        "pressure_drop_proxy": pressure_drop_proxy,
-        "d_pressure_drop_d_separation": jax.grad(objective)(coil_separation),
-        "x": response["x"],
-        "field_scale": response["field_scale"],
-        "pressure_span": response["pressure_span"],
-        "mean_velocity": response["mean_velocity"],
-        "current_proxy": response["current_proxy"],
-    }
-
-
-def extruded_rect_projection_iteration_history(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-    station_indices: jnp.ndarray,
-) -> dict[str, jnp.ndarray]:
-    field_scale = _smooth_fringing_scale(
-        problem.x,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-        peak_scale=1.0,
-    )
-    _, history, _, station_ids = _extruded_rect_projection_trajectory(
-        problem, forcing=forcing, peak_hartmann_number=peak_hartmann_number,
-        field_scale=field_scale,
-        station_indices=station_indices,
-    )
-    assert history is not None and station_ids is not None
-    history["station_indices"] = station_ids
-    history["field_scale"] = field_scale[station_ids]
-    history["x"] = problem.x[station_ids]
-    return history
 
 
 def hartmann_mean_velocity(
@@ -684,13 +223,17 @@ def hartmann_mean_velocity_gradients(
     forcing: float | jnp.ndarray,
     hartmann_number: float | jnp.ndarray,
 ) -> dict[str, jnp.ndarray]:
-    objective = lambda force_value, ha_value: hartmann_mean_velocity(
-        problem,
-        forcing=force_value,
-        hartmann_number=ha_value,
-    )
+    def objective(force_value, ha_value):
+        return hartmann_mean_velocity(
+            problem,
+            forcing=force_value,
+            hartmann_number=ha_value,
+        )
+
     mean_velocity = objective(forcing, hartmann_number)
-    d_mean_velocity_d_forcing, d_mean_velocity_d_ha = jax.grad(objective, argnums=(0, 1))(forcing, hartmann_number)
+    d_mean_velocity_d_forcing, d_mean_velocity_d_ha = jax.grad(objective, argnums=(0, 1))(
+        forcing, hartmann_number
+    )
     return {
         "mean_velocity": mean_velocity,
         "d_mean_velocity_d_forcing": d_mean_velocity_d_forcing,
@@ -707,10 +250,26 @@ def hartmann_mean_velocity_finite_difference_gradients(
     delta_ha: float = 1.0e-3,
 ) -> dict[str, jnp.ndarray]:
     mean_velocity = hartmann_mean_velocity(problem, forcing=forcing, hartmann_number=hartmann_number)
-    plus_forcing = hartmann_mean_velocity(problem, forcing=jnp.asarray(forcing) + delta_forcing, hartmann_number=hartmann_number)
-    minus_forcing = hartmann_mean_velocity(problem, forcing=jnp.asarray(forcing) - delta_forcing, hartmann_number=hartmann_number)
-    plus_ha = hartmann_mean_velocity(problem, forcing=forcing, hartmann_number=jnp.asarray(hartmann_number) + delta_ha)
-    minus_ha = hartmann_mean_velocity(problem, forcing=forcing, hartmann_number=jnp.asarray(hartmann_number) - delta_ha)
+    plus_forcing = hartmann_mean_velocity(
+        problem,
+        forcing=jnp.asarray(forcing) + delta_forcing,
+        hartmann_number=hartmann_number,
+    )
+    minus_forcing = hartmann_mean_velocity(
+        problem,
+        forcing=jnp.asarray(forcing) - delta_forcing,
+        hartmann_number=hartmann_number,
+    )
+    plus_ha = hartmann_mean_velocity(
+        problem,
+        forcing=forcing,
+        hartmann_number=jnp.asarray(hartmann_number) + delta_ha,
+    )
+    minus_ha = hartmann_mean_velocity(
+        problem,
+        forcing=forcing,
+        hartmann_number=jnp.asarray(hartmann_number) - delta_ha,
+    )
     return {
         "mean_velocity": mean_velocity,
         "d_mean_velocity_d_forcing": (plus_forcing - minus_forcing) / (2.0 * delta_forcing),
@@ -732,195 +291,6 @@ def hartmann_profile_loss(
     return jnp.mean((centerline / centerline_scale - target_profile / target_scale) ** 2)
 
 
-def fringing_history_loss(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-    target_mean_velocity: jnp.ndarray,
-) -> jnp.ndarray:
-    history = fringing_mean_velocity_history(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_hartmann_number,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-    )["mean_velocity"]
-    scale = jnp.maximum(jnp.max(jnp.abs(target_mean_velocity)), 1.0e-12)
-    return jnp.mean(((history - target_mean_velocity) / scale) ** 2)
-
-
-def fringing_response_loss(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-    target_mean_velocity: jnp.ndarray,
-    target_current_proxy: jnp.ndarray,
-    current_weight: float = 1.0,
-) -> jnp.ndarray:
-    response = fringing_response_history(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_hartmann_number,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-    )
-    velocity_scale = jnp.maximum(jnp.max(jnp.abs(target_mean_velocity)), 1.0e-12)
-    current_scale = jnp.maximum(jnp.max(jnp.abs(target_current_proxy)), 1.0e-12)
-    velocity_loss = jnp.mean(((response["mean_velocity"] - target_mean_velocity) / velocity_scale) ** 2)
-    current_loss = jnp.mean(((response["current_proxy"] - target_current_proxy) / current_scale) ** 2)
-    return velocity_loss + current_weight * current_loss
-
-
-def extruded_rect_projection_loss(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-    target_mean_velocity: jnp.ndarray,
-    target_current_proxy: jnp.ndarray,
-    target_charge_balance: jnp.ndarray,
-    target_boundary_current: jnp.ndarray,
-    target_pressure_span: jnp.ndarray,
-    current_weight: float = 1.0,
-    charge_balance_weight: float = 0.1,
-    boundary_current_weight: float = 0.1,
-    pressure_span_weight: float = 0.25,
-) -> jnp.ndarray:
-    response = extruded_rect_projection_history(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_hartmann_number,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-    )
-    velocity_scale = jnp.maximum(jnp.max(jnp.abs(target_mean_velocity)), 1.0e-12)
-    current_scale = jnp.maximum(jnp.max(jnp.abs(target_current_proxy)), 1.0e-12)
-    charge_scale = jnp.maximum(jnp.max(jnp.abs(target_charge_balance)), 1.0e-12)
-    boundary_scale = jnp.maximum(jnp.max(jnp.abs(target_boundary_current)), 1.0e-12)
-    pressure_scale = jnp.maximum(jnp.max(jnp.abs(target_pressure_span)), 1.0e-12)
-    velocity_loss = jnp.mean(((response["mean_velocity"] - target_mean_velocity) / velocity_scale) ** 2)
-    current_loss = jnp.mean(((response["current_proxy"] - target_current_proxy) / current_scale) ** 2)
-    charge_loss = jnp.mean(((response["charge_balance_residual"] - target_charge_balance) / charge_scale) ** 2)
-    boundary_loss = jnp.mean(((response["boundary_current_residual"] - target_boundary_current) / boundary_scale) ** 2)
-    pressure_loss = jnp.mean(((response["pressure_span"] - target_pressure_span) / pressure_scale) ** 2)
-    return (
-        velocity_loss
-        + current_weight * current_loss
-        + charge_balance_weight * charge_loss
-        + boundary_current_weight * boundary_loss
-        + pressure_span_weight * pressure_loss
-    )
-
-
-def extruded_rect_projection_field_loss(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-    target_u_field: jnp.ndarray,
-    target_phi_field: jnp.ndarray,
-    target_jy_field: jnp.ndarray,
-    target_pressure_field: jnp.ndarray,
-    station_indices: jnp.ndarray,
-    u_weight: float = 1.0,
-    phi_weight: float = 0.25,
-    jy_weight: float = 0.5,
-    pressure_weight: float = 0.25,
-) -> jnp.ndarray:
-    response = extruded_rect_projection_history(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_hartmann_number,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-    )
-    station_ids = jnp.asarray(station_indices, dtype=jnp.int32)
-    u_field = response["u_field"][station_ids]
-    phi_field = response["phi_field"][station_ids]
-    jy_field = response["jy_field"][station_ids]
-    pressure_field = response["pressure_field"][station_ids]
-    u_scale = jnp.maximum(jnp.max(jnp.abs(target_u_field)), 1.0e-12)
-    phi_scale = jnp.maximum(jnp.max(jnp.abs(target_phi_field)), 1.0e-12)
-    jy_scale = jnp.maximum(jnp.max(jnp.abs(target_jy_field)), 1.0e-12)
-    pressure_scale = jnp.maximum(jnp.max(jnp.abs(target_pressure_field)), 1.0e-12)
-    u_loss = jnp.mean(((u_field - target_u_field) / u_scale) ** 2)
-    phi_loss = jnp.mean(((phi_field - target_phi_field) / phi_scale) ** 2)
-    jy_loss = jnp.mean(((jy_field - target_jy_field) / jy_scale) ** 2)
-    pressure_loss = jnp.mean(((pressure_field - target_pressure_field) / pressure_scale) ** 2)
-    return u_weight * u_loss + phi_weight * phi_loss + jy_weight * jy_loss + pressure_weight * pressure_loss
-
-
-def extruded_rect_projection_trajectory_loss(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-    target_u_history: jnp.ndarray,
-    target_phi_history: jnp.ndarray,
-    target_jy_history: jnp.ndarray,
-    target_pressure_history: jnp.ndarray,
-    target_charge_balance_history: jnp.ndarray,
-    target_boundary_current_history: jnp.ndarray,
-    station_indices: jnp.ndarray,
-    u_weight: float = 1.0,
-    phi_weight: float = 0.25,
-    jy_weight: float = 0.5,
-    pressure_weight: float = 0.25,
-    charge_balance_weight: float = 0.1,
-    boundary_current_weight: float = 0.1,
-) -> jnp.ndarray:
-    trajectory = extruded_rect_projection_iteration_history(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_hartmann_number,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-        station_indices=station_indices,
-    )
-    u_scale = jnp.maximum(jnp.max(jnp.abs(target_u_history)), 1.0e-12)
-    phi_scale = jnp.maximum(jnp.max(jnp.abs(target_phi_history)), 1.0e-12)
-    jy_scale = jnp.maximum(jnp.max(jnp.abs(target_jy_history)), 1.0e-12)
-    pressure_scale = jnp.maximum(jnp.max(jnp.abs(target_pressure_history)), 1.0e-12)
-    charge_scale = jnp.maximum(jnp.max(jnp.abs(target_charge_balance_history)), 1.0e-12)
-    boundary_scale = jnp.maximum(jnp.max(jnp.abs(target_boundary_current_history)), 1.0e-12)
-    u_loss = jnp.mean(((trajectory["u_field"] - target_u_history) / u_scale) ** 2)
-    phi_loss = jnp.mean(((trajectory["phi_field"] - target_phi_history) / phi_scale) ** 2)
-    jy_loss = jnp.mean(((trajectory["jy_field"] - target_jy_history) / jy_scale) ** 2)
-    pressure_loss = jnp.mean(((trajectory["pressure_field"] - target_pressure_history) / pressure_scale) ** 2)
-    charge_loss = jnp.mean(((trajectory["charge_balance_residual"] - target_charge_balance_history) / charge_scale) ** 2)
-    boundary_loss = jnp.mean(((trajectory["boundary_current_residual"] - target_boundary_current_history) / boundary_scale) ** 2)
-    return (
-        u_weight * u_loss
-        + phi_weight * phi_loss
-        + jy_weight * jy_loss
-        + pressure_weight * pressure_loss
-        + charge_balance_weight * charge_loss
-        + boundary_current_weight * boundary_loss
-    )
-
-
 def hartmann_profile_loss_gradients(
     problem: HartmannAutodiffProblem,
     *,
@@ -928,215 +298,22 @@ def hartmann_profile_loss_gradients(
     hartmann_number: float | jnp.ndarray,
     target_profile: jnp.ndarray,
 ) -> dict[str, jnp.ndarray]:
-    objective = lambda force_value, ha_value: hartmann_profile_loss(
-        problem,
-        forcing=force_value,
-        hartmann_number=ha_value,
-        target_profile=target_profile,
+    def objective(force_value, ha_value):
+        return hartmann_profile_loss(
+            problem,
+            forcing=force_value,
+            hartmann_number=ha_value,
+            target_profile=target_profile,
+        )
+
+    loss, (d_loss_d_forcing, d_loss_d_ha) = jax.value_and_grad(objective, argnums=(0, 1))(
+        forcing, hartmann_number
     )
-    loss, (d_loss_d_forcing, d_loss_d_ha) = jax.value_and_grad(
-        objective, argnums=(0, 1)
-    )(forcing, hartmann_number)
     return {
         "loss": loss,
         "d_loss_d_forcing": d_loss_d_forcing,
         "d_loss_d_ha": d_loss_d_ha,
     }
-
-
-_FRINGING_GRADIENT_KEYS = (
-    "d_peak_hartmann_number", "d_entry_center", "d_exit_center", "d_transition_width"
-)
-
-
-def _fringing_parameter_loss_gradients(
-    objective: Callable[..., jnp.ndarray],
-    values: tuple[float | jnp.ndarray, ...],
-) -> dict[str, jnp.ndarray]:
-    """Evaluate one four-control objective and its named gradients."""
-
-    loss, gradients = jax.value_and_grad(objective, argnums=(0, 1, 2, 3))(*values)
-    return {"loss": loss, **dict(zip(_FRINGING_GRADIENT_KEYS, gradients, strict=True))}
-
-
-def fringing_history_loss_gradients(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-    target_mean_velocity: jnp.ndarray,
-) -> dict[str, jnp.ndarray]:
-    objective = lambda peak_ha, entry, exit_, width: fringing_history_loss(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_ha,
-        entry_center=entry,
-        exit_center=exit_,
-        transition_width=width,
-        target_mean_velocity=target_mean_velocity,
-    )
-    return _fringing_parameter_loss_gradients(
-        objective, (peak_hartmann_number, entry_center, exit_center, transition_width)
-    )
-
-
-def fringing_response_loss_gradients(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-    target_mean_velocity: jnp.ndarray,
-    target_current_proxy: jnp.ndarray,
-    current_weight: float = 1.0,
-) -> dict[str, jnp.ndarray]:
-    objective = lambda peak_ha, entry, exit_, width: fringing_response_loss(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_ha,
-        entry_center=entry,
-        exit_center=exit_,
-        transition_width=width,
-        target_mean_velocity=target_mean_velocity,
-        target_current_proxy=target_current_proxy,
-        current_weight=current_weight,
-    )
-    return _fringing_parameter_loss_gradients(
-        objective, (peak_hartmann_number, entry_center, exit_center, transition_width)
-    )
-
-
-def extruded_rect_projection_loss_gradients(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-    target_mean_velocity: jnp.ndarray,
-    target_current_proxy: jnp.ndarray,
-    target_charge_balance: jnp.ndarray,
-    target_boundary_current: jnp.ndarray,
-    target_pressure_span: jnp.ndarray,
-    current_weight: float = 1.0,
-    charge_balance_weight: float = 0.1,
-    boundary_current_weight: float = 0.1,
-    pressure_span_weight: float = 0.25,
-) -> dict[str, jnp.ndarray]:
-    objective = lambda peak_ha, entry, exit_, width: extruded_rect_projection_loss(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_ha,
-        entry_center=entry,
-        exit_center=exit_,
-        transition_width=width,
-        target_mean_velocity=target_mean_velocity,
-        target_current_proxy=target_current_proxy,
-        target_charge_balance=target_charge_balance,
-        target_boundary_current=target_boundary_current,
-        target_pressure_span=target_pressure_span,
-        current_weight=current_weight,
-        charge_balance_weight=charge_balance_weight,
-        boundary_current_weight=boundary_current_weight,
-        pressure_span_weight=pressure_span_weight,
-    )
-    return _fringing_parameter_loss_gradients(
-        objective, (peak_hartmann_number, entry_center, exit_center, transition_width)
-    )
-
-
-def extruded_rect_projection_field_loss_gradients(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-    target_u_field: jnp.ndarray,
-    target_phi_field: jnp.ndarray,
-    target_jy_field: jnp.ndarray,
-    target_pressure_field: jnp.ndarray,
-    station_indices: jnp.ndarray,
-    u_weight: float = 1.0,
-    phi_weight: float = 0.25,
-    jy_weight: float = 0.5,
-    pressure_weight: float = 0.25,
-) -> dict[str, jnp.ndarray]:
-    objective = lambda peak_ha, entry, exit_, width: extruded_rect_projection_field_loss(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_ha,
-        entry_center=entry,
-        exit_center=exit_,
-        transition_width=width,
-        target_u_field=target_u_field,
-        target_phi_field=target_phi_field,
-        target_jy_field=target_jy_field,
-        target_pressure_field=target_pressure_field,
-        station_indices=station_indices,
-        u_weight=u_weight,
-        phi_weight=phi_weight,
-        jy_weight=jy_weight,
-        pressure_weight=pressure_weight,
-    )
-    return _fringing_parameter_loss_gradients(
-        objective, (peak_hartmann_number, entry_center, exit_center, transition_width)
-    )
-
-
-def extruded_rect_projection_trajectory_loss_gradients(
-    problem: FringingAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    peak_hartmann_number: float | jnp.ndarray,
-    entry_center: float | jnp.ndarray,
-    exit_center: float | jnp.ndarray,
-    transition_width: float | jnp.ndarray,
-    target_u_history: jnp.ndarray,
-    target_phi_history: jnp.ndarray,
-    target_jy_history: jnp.ndarray,
-    target_pressure_history: jnp.ndarray,
-    target_charge_balance_history: jnp.ndarray,
-    target_boundary_current_history: jnp.ndarray,
-    station_indices: jnp.ndarray,
-    u_weight: float = 1.0,
-    phi_weight: float = 0.25,
-    jy_weight: float = 0.5,
-    pressure_weight: float = 0.25,
-    charge_balance_weight: float = 0.1,
-    boundary_current_weight: float = 0.1,
-) -> dict[str, jnp.ndarray]:
-    objective = lambda peak_ha, entry, exit_, width: extruded_rect_projection_trajectory_loss(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_ha,
-        entry_center=entry,
-        exit_center=exit_,
-        transition_width=width,
-        target_u_history=target_u_history,
-        target_phi_history=target_phi_history,
-        target_jy_history=target_jy_history,
-        target_pressure_history=target_pressure_history,
-        target_charge_balance_history=target_charge_balance_history,
-        target_boundary_current_history=target_boundary_current_history,
-        station_indices=station_indices,
-        u_weight=u_weight,
-        phi_weight=phi_weight,
-        jy_weight=jy_weight,
-        pressure_weight=pressure_weight,
-        charge_balance_weight=charge_balance_weight,
-        boundary_current_weight=boundary_current_weight,
-    )
-    return _fringing_parameter_loss_gradients(
-        objective, (peak_hartmann_number, entry_center, exit_center, transition_width)
-    )
 
 
 def run_hartmann_profile_inverse_design(
@@ -1184,450 +361,4 @@ def run_hartmann_profile_inverse_design(
         "history": history,
         "recovered_profile": recovered_profile,
         "recovered_phi_max": float(jnp.max(jnp.abs(recovered_phi))),
-    }
-
-
-def _run_fringing_parameter_descent(
-    problem: FringingAutodiffProblem,
-    *,
-    gradient_function: Callable[..., dict[str, jnp.ndarray]],
-    gradient_kwargs: dict[str, object],
-    initial: tuple[float, float, float, float],
-    learning_rates: tuple[float, float, float, float],
-    steps: int,
-) -> tuple[tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray], list[dict[str, float]]]:
-    """Optimize the four bounded parameters shared by fringing objectives."""
-    peak_hartmann_number, entry_center, exit_center, transition_width = (
-        jnp.asarray(value, dtype=jnp.float32) for value in initial
-    )
-    learning_rate_peak_ha, learning_rate_entry, learning_rate_exit, learning_rate_width = learning_rates
-    x_max = float(problem.x[-1])
-    history: list[dict[str, float]] = []
-    for step in range(steps):
-        gradients = gradient_function(
-            problem,
-            peak_hartmann_number=peak_hartmann_number,
-            entry_center=entry_center,
-            exit_center=exit_center,
-            transition_width=transition_width,
-            **gradient_kwargs,
-        )
-        history.append(
-            {
-                "iteration": float(step),
-                "peak_hartmann_number": float(peak_hartmann_number),
-                "entry_center": float(entry_center),
-                "exit_center": float(exit_center),
-                "transition_width": float(transition_width),
-                "loss": float(gradients["loss"]),
-            }
-        )
-        peak_hartmann_number = jnp.clip(
-            peak_hartmann_number - learning_rate_peak_ha * gradients["d_peak_hartmann_number"], 0.5, 60.0
-        )
-        entry_center = jnp.clip(entry_center - learning_rate_entry * gradients["d_entry_center"], 0.0, x_max)
-        exit_center = jnp.clip(exit_center - learning_rate_exit * gradients["d_exit_center"], 0.0, x_max)
-        transition_width = jnp.clip(transition_width - learning_rate_width * gradients["d_transition_width"], 0.05, x_max)
-        exit_center = jnp.maximum(exit_center, entry_center + 0.2)
-    return (peak_hartmann_number, entry_center, exit_center, transition_width), history
-
-
-def run_fringing_history_inverse_design(
-    problem: FringingAutodiffProblem,
-    *,
-    target_mean_velocity: jnp.ndarray,
-    forcing: float,
-    peak_hartmann_init: float,
-    entry_center_init: float,
-    exit_center_init: float,
-    transition_width_init: float,
-    learning_rate_peak_ha: float = 1.0,
-    learning_rate_entry: float = 0.2,
-    learning_rate_exit: float = 0.2,
-    learning_rate_width: float = 0.1,
-    steps: int = 16,
-) -> dict[str, object]:
-    """Recover fringing-field parameters from an axial velocity history."""
-    (peak_hartmann_number, entry_center, exit_center, transition_width), history = _run_fringing_parameter_descent(
-        problem,
-        gradient_function=fringing_history_loss_gradients,
-        gradient_kwargs={
-            "forcing": forcing,
-            "target_mean_velocity": target_mean_velocity,
-        },
-        initial=(peak_hartmann_init, entry_center_init, exit_center_init, transition_width_init),
-        learning_rates=(learning_rate_peak_ha, learning_rate_entry, learning_rate_exit, learning_rate_width),
-        steps=steps,
-    )
-    recovered = fringing_mean_velocity_history(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_hartmann_number,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-    )
-    return {
-        "peak_hartmann_number": float(peak_hartmann_number),
-        "entry_center": float(entry_center),
-        "exit_center": float(exit_center),
-        "transition_width": float(transition_width),
-        "history": history,
-        "recovered_mean_velocity": recovered["mean_velocity"],
-        "recovered_field_scale": recovered["field_scale"],
-        "x": recovered["x"],
-    }
-
-
-def run_fringing_response_inverse_design(
-    problem: FringingAutodiffProblem,
-    *,
-    target_mean_velocity: jnp.ndarray,
-    target_current_proxy: jnp.ndarray,
-    forcing: float,
-    peak_hartmann_init: float,
-    entry_center_init: float,
-    exit_center_init: float,
-    transition_width_init: float,
-    current_weight: float = 1.0,
-    learning_rate_peak_ha: float = 1.0,
-    learning_rate_entry: float = 0.2,
-    learning_rate_exit: float = 0.2,
-    learning_rate_width: float = 0.1,
-    steps: int = 16,
-) -> dict[str, object]:
-    """Recover fringing-field parameters from velocity and current responses."""
-    (peak_hartmann_number, entry_center, exit_center, transition_width), history = _run_fringing_parameter_descent(
-        problem,
-        gradient_function=fringing_response_loss_gradients,
-        gradient_kwargs={
-            "forcing": forcing,
-            "target_mean_velocity": target_mean_velocity,
-            "target_current_proxy": target_current_proxy,
-            "current_weight": current_weight,
-        },
-        initial=(peak_hartmann_init, entry_center_init, exit_center_init, transition_width_init),
-        learning_rates=(learning_rate_peak_ha, learning_rate_entry, learning_rate_exit, learning_rate_width),
-        steps=steps,
-    )
-    recovered = fringing_response_history(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_hartmann_number,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-    )
-    return {
-        "peak_hartmann_number": float(peak_hartmann_number),
-        "entry_center": float(entry_center),
-        "exit_center": float(exit_center),
-        "transition_width": float(transition_width),
-        "history": history,
-        "recovered_mean_velocity": recovered["mean_velocity"],
-        "recovered_current_proxy": recovered["current_proxy"],
-        "recovered_field_scale": recovered["field_scale"],
-        "x": recovered["x"],
-    }
-
-
-def run_extruded_rect_projection_inverse_design(
-    problem: FringingAutodiffProblem,
-    *,
-    target_mean_velocity: jnp.ndarray,
-    target_current_proxy: jnp.ndarray,
-    target_charge_balance: jnp.ndarray,
-    target_boundary_current: jnp.ndarray,
-    target_pressure_span: jnp.ndarray,
-    forcing: float,
-    peak_hartmann_init: float,
-    entry_center_init: float,
-    exit_center_init: float,
-    transition_width_init: float,
-    current_weight: float = 1.0,
-    charge_balance_weight: float = 0.1,
-    boundary_current_weight: float = 0.1,
-    pressure_span_weight: float = 0.25,
-    learning_rate_peak_ha: float = 0.4,
-    learning_rate_entry: float = 0.1,
-    learning_rate_exit: float = 0.1,
-    learning_rate_width: float = 0.05,
-    steps: int = 8,
-) -> dict[str, object]:
-    """Recover field parameters from projected extruded-duct observables."""
-    (peak_hartmann_number, entry_center, exit_center, transition_width), history = _run_fringing_parameter_descent(
-        problem,
-        gradient_function=extruded_rect_projection_loss_gradients,
-        gradient_kwargs={
-            "forcing": forcing,
-            "target_mean_velocity": target_mean_velocity,
-            "target_current_proxy": target_current_proxy,
-            "target_charge_balance": target_charge_balance,
-            "target_boundary_current": target_boundary_current,
-            "target_pressure_span": target_pressure_span,
-            "current_weight": current_weight,
-            "charge_balance_weight": charge_balance_weight,
-            "boundary_current_weight": boundary_current_weight,
-            "pressure_span_weight": pressure_span_weight,
-        },
-        initial=(peak_hartmann_init, entry_center_init, exit_center_init, transition_width_init),
-        learning_rates=(learning_rate_peak_ha, learning_rate_entry, learning_rate_exit, learning_rate_width),
-        steps=steps,
-    )
-    recovered = extruded_rect_projection_history(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_hartmann_number,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-    )
-    return {
-        "peak_hartmann_number": float(peak_hartmann_number),
-        "entry_center": float(entry_center),
-        "exit_center": float(exit_center),
-        "transition_width": float(transition_width),
-        "history": history,
-        "recovered_mean_velocity": recovered["mean_velocity"],
-        "recovered_current_proxy": recovered["current_proxy"],
-        "recovered_charge_balance": recovered["charge_balance_residual"],
-        "recovered_boundary_current": recovered["boundary_current_residual"],
-        "recovered_pressure_span": recovered["pressure_span"],
-        "recovered_transverse_kinetic_energy": recovered["transverse_kinetic_energy"],
-        "recovered_field_scale": recovered["field_scale"],
-        "x": recovered["x"],
-        "model": "direct_extruded_projection",
-    }
-
-
-def run_extruded_rect_projection_field_inverse_design(
-    problem: FringingAutodiffProblem,
-    *,
-    target_u_field: jnp.ndarray,
-    target_phi_field: jnp.ndarray,
-    target_jy_field: jnp.ndarray,
-    target_pressure_field: jnp.ndarray,
-    station_indices: jnp.ndarray,
-    forcing: float,
-    peak_hartmann_init: float,
-    entry_center_init: float,
-    exit_center_init: float,
-    transition_width_init: float,
-    u_weight: float = 1.0,
-    phi_weight: float = 0.25,
-    jy_weight: float = 0.5,
-    pressure_weight: float = 0.25,
-    learning_rate_peak_ha: float = 0.4,
-    learning_rate_entry: float = 0.1,
-    learning_rate_exit: float = 0.1,
-    learning_rate_width: float = 0.05,
-    steps: int = 8,
-) -> dict[str, object]:
-    """Recover field parameters from selected three-dimensional snapshots."""
-    station_ids = jnp.asarray(station_indices, dtype=jnp.int32)
-    (peak_hartmann_number, entry_center, exit_center, transition_width), history = _run_fringing_parameter_descent(
-        problem,
-        gradient_function=extruded_rect_projection_field_loss_gradients,
-        gradient_kwargs={
-            "forcing": forcing,
-            "target_u_field": target_u_field,
-            "target_phi_field": target_phi_field,
-            "target_jy_field": target_jy_field,
-            "target_pressure_field": target_pressure_field,
-            "station_indices": station_ids,
-            "u_weight": u_weight,
-            "phi_weight": phi_weight,
-            "jy_weight": jy_weight,
-            "pressure_weight": pressure_weight,
-        },
-        initial=(peak_hartmann_init, entry_center_init, exit_center_init, transition_width_init),
-        learning_rates=(learning_rate_peak_ha, learning_rate_entry, learning_rate_exit, learning_rate_width),
-        steps=steps,
-    )
-    recovered = extruded_rect_projection_history(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_hartmann_number,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-    )
-    return {
-        "peak_hartmann_number": float(peak_hartmann_number),
-        "entry_center": float(entry_center),
-        "exit_center": float(exit_center),
-        "transition_width": float(transition_width),
-        "history": history,
-        "station_indices": jnp.asarray(station_ids).tolist(),
-        "recovered_u_field": recovered["u_field"][station_ids],
-        "recovered_phi_field": recovered["phi_field"][station_ids],
-        "recovered_jy_field": recovered["jy_field"][station_ids],
-        "recovered_pressure_field": recovered["pressure_field"][station_ids],
-        "x": recovered["x"],
-        "field_scale": recovered["field_scale"],
-        "model": "direct_extruded_projection_fields",
-    }
-
-
-def run_extruded_rect_projection_trajectory_inverse_design(
-    problem: FringingAutodiffProblem,
-    *,
-    target_u_history: jnp.ndarray,
-    target_phi_history: jnp.ndarray,
-    target_jy_history: jnp.ndarray,
-    target_pressure_history: jnp.ndarray,
-    target_charge_balance_history: jnp.ndarray,
-    target_boundary_current_history: jnp.ndarray,
-    station_indices: jnp.ndarray,
-    forcing: float,
-    peak_hartmann_init: float,
-    entry_center_init: float,
-    exit_center_init: float,
-    transition_width_init: float,
-    u_weight: float = 1.0,
-    phi_weight: float = 0.25,
-    jy_weight: float = 0.5,
-    pressure_weight: float = 0.25,
-    charge_balance_weight: float = 0.1,
-    boundary_current_weight: float = 0.1,
-    learning_rate_peak_ha: float = 0.35,
-    learning_rate_entry: float = 0.08,
-    learning_rate_exit: float = 0.08,
-    learning_rate_width: float = 0.04,
-    steps: int = 8,
-) -> dict[str, object]:
-    """Recover field parameters from selected solver-iteration trajectories."""
-    station_ids = jnp.asarray(station_indices, dtype=jnp.int32)
-    (peak_hartmann_number, entry_center, exit_center, transition_width), history = _run_fringing_parameter_descent(
-        problem,
-        gradient_function=extruded_rect_projection_trajectory_loss_gradients,
-        gradient_kwargs={
-            "forcing": forcing,
-            "target_u_history": target_u_history,
-            "target_phi_history": target_phi_history,
-            "target_jy_history": target_jy_history,
-            "target_pressure_history": target_pressure_history,
-            "target_charge_balance_history": target_charge_balance_history,
-            "target_boundary_current_history": target_boundary_current_history,
-            "station_indices": station_ids,
-            "u_weight": u_weight,
-            "phi_weight": phi_weight,
-            "jy_weight": jy_weight,
-            "pressure_weight": pressure_weight,
-            "charge_balance_weight": charge_balance_weight,
-            "boundary_current_weight": boundary_current_weight,
-        },
-        initial=(peak_hartmann_init, entry_center_init, exit_center_init, transition_width_init),
-        learning_rates=(learning_rate_peak_ha, learning_rate_entry, learning_rate_exit, learning_rate_width),
-        steps=steps,
-    )
-    recovered = extruded_rect_projection_iteration_history(
-        problem,
-        forcing=forcing,
-        peak_hartmann_number=peak_hartmann_number,
-        entry_center=entry_center,
-        exit_center=exit_center,
-        transition_width=transition_width,
-        station_indices=station_ids,
-    )
-    return {
-        "peak_hartmann_number": float(peak_hartmann_number),
-        "entry_center": float(entry_center),
-        "exit_center": float(exit_center),
-        "transition_width": float(transition_width),
-        "history": history,
-        "station_indices": jnp.asarray(station_ids).tolist(),
-        "recovered_u_history": recovered["u_field"],
-        "recovered_phi_history": recovered["phi_field"],
-        "recovered_jy_history": recovered["jy_field"],
-        "recovered_pressure_history": recovered["pressure_field"],
-        "recovered_charge_balance_history": recovered["charge_balance_residual"],
-        "recovered_boundary_current_history": recovered["boundary_current_residual"],
-        "x": recovered["x"],
-        "field_scale": recovered["field_scale"],
-        "model": "direct_extruded_projection_trajectory",
-    }
-
-
-def build_extruded_response_targets(extruded_solution) -> dict[str, jnp.ndarray]:
-    bundle = extruded_solution.bundle
-    return {
-        "x": jnp.asarray(bundle.x, dtype=jnp.float32),
-        "field_scale": jnp.asarray(bundle.field_scale, dtype=jnp.float32),
-        "mean_velocity": jnp.asarray(bundle.mean_velocity, dtype=jnp.float32),
-        "current_proxy": jnp.asarray(bundle.current_scaled_pressure_proxy, dtype=jnp.float32),
-        "charge_balance_residual": jnp.asarray(bundle.charge_balance_residual, dtype=jnp.float32),
-        "boundary_current_residual": jnp.asarray(bundle.boundary_current_residual, dtype=jnp.float32),
-        "wall_current_leakage": jnp.asarray(bundle.wall_current_leakage, dtype=jnp.float32),
-        "axial_current": jnp.asarray(bundle.axial_current, dtype=jnp.float32),
-        "pressure_span": jnp.asarray(jnp.max(bundle.p, axis=(1, 2)) - jnp.min(bundle.p, axis=(1, 2)), dtype=jnp.float32),
-        "transverse_kinetic_energy": jnp.asarray(jnp.mean(bundle.v**2 + bundle.w**2, axis=(1, 2)), dtype=jnp.float32),
-        "u_field": jnp.asarray(bundle.u, dtype=jnp.float32),
-        "phi_field": jnp.asarray(bundle.phi, dtype=jnp.float32),
-        "jy_field": jnp.asarray(bundle.jy, dtype=jnp.float32),
-        "pressure_field": jnp.asarray(bundle.p, dtype=jnp.float32),
-    }
-
-
-def run_extruded_target_inverse_design(
-    extruded_solution,
-    *,
-    ny: int = 12,
-    nz: int = 12,
-    potential_iterations: int = 12,
-    velocity_iterations: int = 16,
-    macro_iterations: int = 3,
-    peak_hartmann_init: float = 10.0,
-    entry_center_init: float = 1.0,
-    exit_center_init: float = 5.0,
-    transition_width_init: float = 0.7,
-    current_weight: float = 0.5,
-    steps: int = 16,
-) -> dict[str, object]:
-    targets = build_extruded_response_targets(extruded_solution)
-    x = targets["x"]
-    problem = build_fringing_autodiff_problem(
-        nx_stations=int(x.shape[0]),
-        length=float(x[-1] - x[0]) if x.shape[0] > 1 else 1.0,
-        ny=ny,
-        nz=nz,
-        potential_iterations=potential_iterations,
-        velocity_iterations=velocity_iterations,
-        macro_iterations=macro_iterations,
-    )
-    if str(extruded_solution.problem.case.geometry.kind) == "rect_duct":
-        result = run_extruded_rect_projection_inverse_design(
-            problem,
-            target_mean_velocity=targets["mean_velocity"],
-            target_current_proxy=targets["current_proxy"],
-            target_charge_balance=targets["charge_balance_residual"],
-            target_boundary_current=targets["boundary_current_residual"],
-            target_pressure_span=targets["pressure_span"],
-            forcing=float(extruded_solution.problem.case.forcing),
-            peak_hartmann_init=peak_hartmann_init,
-            entry_center_init=entry_center_init,
-            exit_center_init=exit_center_init,
-            transition_width_init=transition_width_init,
-            current_weight=current_weight,
-            steps=steps,
-        )
-    else:
-        result = run_fringing_response_inverse_design(
-            problem,
-            target_mean_velocity=targets["mean_velocity"],
-            target_current_proxy=targets["current_proxy"],
-            forcing=float(extruded_solution.problem.case.forcing),
-            peak_hartmann_init=peak_hartmann_init,
-            entry_center_init=entry_center_init,
-            exit_center_init=exit_center_init,
-            transition_width_init=transition_width_init,
-            current_weight=current_weight,
-            steps=steps,
-        )
-        result["model"] = "fringing_response_surrogate"
-    return {
-        "target": targets,
-        "recovered": result,
-        "geometry_kind": extruded_solution.problem.case.geometry.kind,
-        "forcing": float(extruded_solution.problem.case.forcing),
     }

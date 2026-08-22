@@ -14,13 +14,7 @@ from .units import magnetic_field_from_hartmann
 
 
 def _ha_to_b(ha: float, length_scale: float, conductivity: float, density: float, viscosity: float) -> float:
-    """Return ``B`` for target ``Ha`` using LMX's kinematic-viscosity convention.
-
-    ``viscosity`` is retained as the public constructor argument for backward
-    compatibility, but it is interpreted as kinematic viscosity ``nu`` in
-    ``m^2/s``.  Dynamic viscosity ``mu`` must be divided by density before
-    calling these case constructors.
-    """
+    """Return ``B`` for target ``Ha`` with ``viscosity`` interpreted as ``nu``."""
 
     return magnetic_field_from_hartmann(
         hartmann=ha,
@@ -39,9 +33,13 @@ def _wall_conductivity_from_conductance_ratio(
     hartmann_half_spacing: float,
 ) -> float:
     if wall_thickness <= 0.0:
-        raise ValueError("wall_thickness must be positive when deriving wall conductivity from conductance ratio")
+        raise ValueError(
+            "wall_thickness must be positive when deriving wall conductivity from conductance ratio"
+        )
     if hartmann_half_spacing <= 0.0:
-        raise ValueError("hartmann_half_spacing must be positive when deriving wall conductivity from conductance ratio")
+        raise ValueError(
+            "hartmann_half_spacing must be positive when deriving wall conductivity from conductance ratio"
+        )
     return wall_conductance_ratio * fluid_conductivity * hartmann_half_spacing / wall_thickness
 
 
@@ -116,7 +114,9 @@ def make_hartmann_case(
             BoundaryCondition("walls", "no_slip"),
             BoundaryCondition("electric", "insulating"),
         ),
-        time_stepper=TimeStepperConfig(dt=0.001, t_final=1.0, max_steps=400, potential_iterations=200, relaxation=0.1),
+        time_stepper=TimeStepperConfig(
+            dt=0.001, t_final=1.0, max_steps=400, potential_iterations=200, relaxation=0.1
+        ),
         solver=_fully_developed_solver(),
         output=OutputSpec(directory=output_dir),
         forcing=1.0,
@@ -150,7 +150,9 @@ def make_shercliff_case(
             BoundaryCondition("walls", "no_slip"),
             BoundaryCondition("electric", "insulating"),
         ),
-        time_stepper=TimeStepperConfig(dt=0.001, t_final=1.5, max_steps=400, potential_iterations=225, relaxation=0.1),
+        time_stepper=TimeStepperConfig(
+            dt=0.001, t_final=1.5, max_steps=400, potential_iterations=225, relaxation=0.1
+        ),
         solver=_fully_developed_solver(),
         output=OutputSpec(directory=output_dir),
         forcing=1.0,
@@ -212,13 +214,19 @@ def make_hunt_case(
         regions=(
             RegionSpec("fluid", "fluid", fluid_conductivity, density, viscosity),
             RegionSpec("conducting_wall", "solid", wall_conductivity, density, viscosity, wall_thickness),
-            RegionSpec("insulating_wall", "solid", insulator_conductivity, density, viscosity, insulator_thickness),
+            RegionSpec(
+                "insulating_wall", "solid", insulator_conductivity, density, viscosity, insulator_thickness
+            ),
         ),
         magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, 1.0 * bmag, 0.0)),
         boundary_conditions=(
             BoundaryCondition("walls", "no_slip"),
-            BoundaryCondition("conducting_hartmann_walls", "conducting_wall", region="conducting_wall", side="left_right"),
-            BoundaryCondition("insulating_side_walls", "insulating", region="insulating_wall", side="top_bottom"),
+            BoundaryCondition(
+                "conducting_hartmann_walls", "conducting_wall", region="conducting_wall", side="left_right"
+            ),
+            BoundaryCondition(
+                "insulating_side_walls", "insulating", region="insulating_wall", side="top_bottom"
+            ),
         ),
         time_stepper=controls,
         solver=_fully_developed_solver(),

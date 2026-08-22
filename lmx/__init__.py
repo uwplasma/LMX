@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from importlib import import_module
 
-
 __all__ = [
     "enable_compilation_cache",
     "make_hartmann_case",
@@ -56,7 +55,10 @@ _EXPORTS = {
     "generate_rect_duct_mesh": ("lmx.mesh", "generate_rect_duct_mesh"),
     "generate_rect_duct_mesh_from_faces": ("lmx.mesh", "generate_rect_duct_mesh_from_faces"),
     "generate_layered_duct_mesh": ("lmx.mesh", "generate_layered_duct_mesh"),
-    "generate_layered_duct_mesh_from_fluid_faces": ("lmx.mesh", "generate_layered_duct_mesh_from_fluid_faces"),
+    "generate_layered_duct_mesh_from_fluid_faces": (
+        "lmx.mesh",
+        "generate_layered_duct_mesh_from_fluid_faces",
+    ),
     "generate_multilayer_duct_mesh": ("lmx.mesh", "generate_multilayer_duct_mesh"),
     "WallLayer": ("lmx.wall_models", "WallLayer"),
     "dynamic_to_kinematic_viscosity": ("lmx.units", "dynamic_to_kinematic_viscosity"),

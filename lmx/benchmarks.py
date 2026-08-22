@@ -1,20 +1,19 @@
 from __future__ import annotations
 
 import csv
-from copy import deepcopy
 import hashlib
 import json
 import math
 import platform
 import time
-from typing import Any
+from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
 import jax
 import jax.numpy as jnp
 
 from .cases import make_hartmann_case
-
 
 BENCHMARK_B_SPEC_FILES = {
     "B1-fringing-pipe": "alex-b1-pipe.toml",
@@ -99,16 +98,20 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
     if not isinstance(roles, dict) or set(roles) != expected_roles:
         raise ValueError("Benchmark B matched production role differs")
     if case_id == "B2-fringing-square":
-        encoded_smoke = json.dumps(
-            roles["harness-smoke"], sort_keys=True, separators=(",", ":")
-        ).encode()
-        if hashlib.sha256(encoded_smoke).hexdigest() != "3ef7c6f58900629221bc83c90fe3afef8a656efddd1d455cd60a71e8b38ac4d5":
+        encoded_smoke = json.dumps(roles["harness-smoke"], sort_keys=True, separators=(",", ":")).encode()
+        if (
+            hashlib.sha256(encoded_smoke).hexdigest()
+            != "3ef7c6f58900629221bc83c90fe3afef8a656efddd1d455cd60a71e8b38ac4d5"
+        ):
             raise ValueError("Benchmark B matched smoke role differs")
         smoke = spec.get("harness_smoke_execution")
         expected_smoke = {
-            "output_schema_version": 1, "executed_steps": 2,
-            "dt_absolute_tolerance": 1.0e-18, "courant_max": 0.4,
-            "mass_balance_max": 1.0e-3, "current_balance_max": 1.0e-3,
+            "output_schema_version": 1,
+            "executed_steps": 2,
+            "dt_absolute_tolerance": 1.0e-18,
+            "courant_max": 0.4,
+            "mass_balance_max": 1.0e-3,
+            "current_balance_max": 1.0e-3,
             "interface_current_balance_max": 1.0e-3,
             "interface_current_activity_min": 1.0e-12,
             "restart_absolute_tolerance": 1.0e-12,
@@ -152,8 +155,7 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
         "zero normal current",
     ):
         raise ValueError("Benchmark B matched formulation semantics differ")
-    if (case_id == "B2-fringing-square" and
-            int(contract["stopping_rules"].get("steady_steps_min", 0)) != 3):
+    if case_id == "B2-fringing-square" and int(contract["stopping_rules"].get("steady_steps_min", 0)) != 3:
         raise ValueError("Benchmark B matched stopping contract differs")
 
     if spec.get("free_mhd_discretization_reference") != _FREEMHD_DISCRETIZATION_REFERENCE:
@@ -201,7 +203,8 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
     if (
         not str(wall.get("numerical_realization", "")).startswith("explicit volumetric")
         or float(wall.get("nominal_thickness_over_L", 0.0)) <= 0.0
-        or float(wall.get("confirmation_thickness_over_L", math.inf)) >= float(wall.get("nominal_thickness_over_L", 0.0))
+        or float(wall.get("confirmation_thickness_over_L", math.inf))
+        >= float(wall.get("nominal_thickness_over_L", 0.0))
         or float(wall.get("thickness_independence_relative_max", math.inf)) > 0.02
     ):
         raise ValueError("Benchmark B thin-wall numerical realization is incomplete")
@@ -237,12 +240,14 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
             acceleration == "aitken"
             and (
                 float(solver.get("coupling_min_relaxation", 0.0)) <= 0.0
-                or float(solver.get("coupling_max_relaxation", 0.0)) < float(solver.get("coupling_min_relaxation", 0.0))
+                or float(solver.get("coupling_max_relaxation", 0.0))
+                < float(solver.get("coupling_min_relaxation", 0.0))
             )
         )
         or steady_uncertainty_fraction > 0.05
         or (case_id == "B2-fringing-square" and int(solver.get("steady_steps_min", 0)) != 3)
-        or float(solver.get("steady_residual_max", math.inf)) > steady_uncertainty_fraction * reference_uncertainty
+        or float(solver.get("steady_residual_max", math.inf))
+        > steady_uncertainty_fraction * reference_uncertainty
         or actual_elliptic_controls != expected_elliptic_controls
         or float(solver.get("tolerance_independence_factor", math.inf)) != 0.5
         or float(solver.get("tolerance_independence_uncertainty_fraction_max", math.inf)) > 0.25
@@ -257,7 +262,9 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
 
     reference = spec["reference"]
     data_path = root / str(reference["data_path"])
-    if not data_path.is_file() or hashlib.sha256(data_path.read_bytes()).hexdigest() != reference.get("data_sha256"):
+    if not data_path.is_file() or hashlib.sha256(data_path.read_bytes()).hexdigest() != reference.get(
+        "data_sha256"
+    ):
         raise ValueError("Benchmark B reference data are missing or fail SHA-256")
 
 
@@ -303,10 +310,14 @@ def load_benchmark_b_reference(case_id: str, root: str | Path | None = None) -> 
                 if not math.isfinite(value):
                     raise ValueError("Benchmark B reference values must be finite")
                 values[name].append(value)
-    if len(values["x_over_L"]) < 10 or any(right <= left for left, right in zip(values["x_over_L"], values["x_over_L"][1:])):
+    if len(values["x_over_L"]) < 10 or any(
+        right <= left for left, right in zip(values["x_over_L"], values["x_over_L"][1:])
+    ):
         raise ValueError("Benchmark B reference coordinates must be strictly increasing")
     geometry = spec["geometry"]
-    if values["x_over_L"][0] != float(geometry["x_over_L_min"]) or values["x_over_L"][-1] != float(geometry["x_over_L_max"]):
+    if values["x_over_L"][0] != float(geometry["x_over_L_min"]) or values["x_over_L"][-1] != float(
+        geometry["x_over_L_max"]
+    ):
         raise ValueError("Benchmark B reference data do not span the frozen domain")
     if any(value <= 0.0 for value in values["b_uncertainty"] + values["pressure_uncertainty"]):
         raise ValueError("Benchmark B reference uncertainties must be positive")
@@ -522,7 +533,9 @@ def benchmark_b_pressure_observable(solution, case_id: str) -> jnp.ndarray:
     return difference / interaction
 
 
-def benchmark_solver(repeats: int = 3, ha: float = 20.0, ny: int = 48, nz: int = 48) -> dict[str, float | str]:
+def benchmark_solver(
+    repeats: int = 3, ha: float = 20.0, ny: int = 48, nz: int = 48
+) -> dict[str, float | str]:
     from .solvers import solve_steady
 
     case = make_hartmann_case(ha=ha, ny=ny, nz=nz)

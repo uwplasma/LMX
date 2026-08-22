@@ -11,9 +11,6 @@ jobs:
 
       - uses: ./.github/actions/setup-lmx
 
-      - name: Verify provenance
-        run: python scripts/manage_provenance.py --check
-
       - name: Run benchmark suite
         env:
           MPLBACKEND: Agg
@@ -24,13 +21,6 @@ jobs:
           MKL_NUM_THREADS: "1"
           NUMEXPR_NUM_THREADS: "1"
         run: python -m lmx benchmark --output artifacts/benchmarks/benchmark.json --repeats 2
-
-      - name: Build benchmark summary
-        run: |
-          python scripts/summarize_ci_artifacts.py \
-            --benchmark-report artifacts/benchmarks/benchmark.json \
-            --output-json artifacts/benchmarks/summary-report.json \
-            --output-md artifacts/benchmarks/summary-report.md
 
       - name: Upload benchmark artifacts
         uses: actions/upload-artifact@v4

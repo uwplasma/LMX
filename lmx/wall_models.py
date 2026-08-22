@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
+from dataclasses import dataclass
 from typing import Sequence
 
 from .units import wall_conductance_ratio
@@ -37,7 +37,9 @@ def tangential_stack_conductance_ratio(
         raise ValueError("fluid_conductivity must be positive")
     if length_scale <= 0.0:
         raise ValueError("length_scale must be positive")
-    equivalent_surface_conductance = sum(float(layer.conductivity) * float(layer.thickness) for layer in layers)
+    equivalent_surface_conductance = sum(
+        float(layer.conductivity) * float(layer.thickness) for layer in layers
+    )
     return equivalent_surface_conductance / (float(fluid_conductivity) * float(length_scale))
 
 
@@ -77,7 +79,9 @@ def effective_pinhole_conductance_ratio(
         raise ValueError("intact_conductance_ratio must be non-negative")
     if metal_conductance_ratio < 0.0:
         raise ValueError("metal_conductance_ratio must be non-negative")
-    return (1.0 - float(pinhole_fraction)) * float(intact_conductance_ratio) + float(pinhole_fraction) * float(metal_conductance_ratio)
+    return (1.0 - float(pinhole_fraction)) * float(intact_conductance_ratio) + float(
+        pinhole_fraction
+    ) * float(metal_conductance_ratio)
 
 
 def equivalent_single_layer(
@@ -89,8 +93,15 @@ def equivalent_single_layer(
 
     _validate_layers(layers)
     total_thickness = sum(float(layer.thickness) for layer in layers)
-    equivalent_conductivity = sum(float(layer.conductivity) * float(layer.thickness) for layer in layers) / total_thickness
-    return WallLayer(name=name, conductivity=equivalent_conductivity, thickness=total_thickness, cells=sum(max(int(layer.cells), 0) for layer in layers))
+    equivalent_conductivity = (
+        sum(float(layer.conductivity) * float(layer.thickness) for layer in layers) / total_thickness
+    )
+    return WallLayer(
+        name=name,
+        conductivity=equivalent_conductivity,
+        thickness=total_thickness,
+        cells=sum(max(int(layer.cells), 0) for layer in layers),
+    )
 
 
 def nested_wall_layer_resolution_summary(
@@ -145,7 +156,9 @@ def wall_layer_from_conductance_ratio(
         raise ValueError("thickness must be positive")
     if conductance_ratio < 0.0:
         raise ValueError("conductance_ratio must be non-negative")
-    conductivity = float(conductance_ratio) * float(fluid_conductivity) * float(length_scale) / float(thickness)
+    conductivity = (
+        float(conductance_ratio) * float(fluid_conductivity) * float(length_scale) / float(thickness)
+    )
     layer = WallLayer(name=name, conductivity=conductivity, thickness=thickness, cells=cells)
     recovered = wall_conductance_ratio(
         wall_conductivity=layer.conductivity,

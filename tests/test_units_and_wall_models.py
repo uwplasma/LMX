@@ -21,7 +21,6 @@ from lmx import (
 from lmx.units import normal_leakage_ratio
 from lmx.wall_models import wall_layer_from_conductance_ratio
 
-
 pytestmark = pytest.mark.unit
 
 
@@ -51,9 +50,9 @@ def test_viscosity_conversion_round_trip_and_hartmann_convention():
 
 
 def test_nondimensional_numbers_are_hand_calculable():
-    assert reynolds_number(
-        velocity=0.2, length_scale=0.05, kinematic_viscosity=1.0e-6
-    ) == pytest.approx(10000.0)
+    assert reynolds_number(velocity=0.2, length_scale=0.05, kinematic_viscosity=1.0e-6) == pytest.approx(
+        10000.0
+    )
     assert interaction_parameter(
         magnetic_field=2.0,
         length_scale=0.1,
@@ -61,9 +60,9 @@ def test_nondimensional_numbers_are_hand_calculable():
         density=1000.0,
         velocity=0.5,
     ) == pytest.approx(800.0)
-    assert magnetic_reynolds_number(
-        velocity=0.5, length_scale=0.1, conductivity=1.0e6
-    ) == pytest.approx(4.0e-7 * math.pi * 5.0e4)
+    assert magnetic_reynolds_number(velocity=0.5, length_scale=0.1, conductivity=1.0e6) == pytest.approx(
+        4.0e-7 * math.pi * 5.0e4
+    )
 
 
 def test_thin_wall_and_normal_leakage_ratios_are_distinct():
@@ -90,9 +89,7 @@ def test_nested_wall_stack_reduces_to_equivalent_single_layer_for_tangential_con
         WallLayer("aln", conductivity=1.0e-8, thickness=2.0e-4, cells=4),
         WallLayer("metal", conductivity=1.0e6, thickness=1.0e-3, cells=8),
     )
-    stack_c = tangential_stack_conductance_ratio(
-        layers, fluid_conductivity=1.0e6, length_scale=0.01
-    )
+    stack_c = tangential_stack_conductance_ratio(layers, fluid_conductivity=1.0e6, length_scale=0.01)
     equivalent = equivalent_single_layer(layers)
     equivalent_c = wall_conductance_ratio(
         wall_conductivity=equivalent.conductivity,
@@ -110,9 +107,7 @@ def test_normal_stack_leakage_is_limited_by_insulating_layer():
         WallLayer("aln", conductivity=1.0e-8, thickness=2.0e-4, cells=4),
         WallLayer("metal", conductivity=1.0e6, thickness=1.0e-3, cells=8),
     )
-    leakage = normal_stack_leakage_ratio(
-        layers, fluid_conductivity=1.0e6, length_scale=0.01
-    )
+    leakage = normal_stack_leakage_ratio(layers, fluid_conductivity=1.0e6, length_scale=0.01)
     single_aln = normal_leakage_ratio(
         coating_conductivity=1.0e-8,
         coating_thickness=2.0e-4,
@@ -249,13 +244,9 @@ def test_unit_helpers_reject_invalid_physical_inputs(function, kwargs, message):
         function(**kwargs)
 
 
-@pytest.mark.parametrize(
-    "bad_name", ["length_scale", "conductivity", "density", "kinematic_viscosity"]
-)
+@pytest.mark.parametrize("bad_name", ["length_scale", "conductivity", "density", "kinematic_viscosity"])
 def test_hartmann_helpers_reject_nonpositive_scales(bad_name):
-    kwargs = dict(
-        length_scale=1.0, conductivity=1.0, density=1.0, kinematic_viscosity=1.0
-    )
+    kwargs = dict(length_scale=1.0, conductivity=1.0, density=1.0, kinematic_viscosity=1.0)
     kwargs[bad_name] = 0.0
     with pytest.raises(ValueError, match=bad_name):
         hartmann_number(magnetic_field=1.0, **kwargs)

@@ -6,36 +6,45 @@ import jax
 import jax.numpy as jnp
 import pytest
 
+import lmx.solvers as solvers
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.core import NumericalFailure
 from lmx.io import load_restart_bundle, write_solution_npz
-from lmx.physics import (
-    build_material_fields,
-    magnetic_field_components,
-    magnetic_ramp_scale,
-)
-import lmx.solvers as solvers
 from lmx.mesh import (
     StructuredMesh,
     generate_layered_duct_mesh,
     generate_rect_duct_mesh,
     generate_rect_duct_mesh_from_faces,
 )
-from lmx.specs import BoundaryCondition, GeometrySpec
+from lmx.physics import (
+    build_material_fields,
+    magnetic_field_components,
+    magnetic_ramp_scale,
+)
 from lmx.solvers import solve_steady, solve_transient
+from lmx.specs import BoundaryCondition, GeometrySpec
 
 
 def _fake_step_result(u, **overrides):
     """Build the 17-value private step result used by orchestration tests."""
     zero = jnp.zeros_like(u)
     values = {
-        "phi": zero, "jy": zero, "jz": zero, "lorentz": zero,
-        "velocity_residual": 0.0, "potential_residual": 0.0,
-        "potential_iterations": 1.0, "linear_residual": 0.0,
-        "linear_iterations": 1.0, "face_current_max": 0.0,
-        "emf_max": 0.0, "face_lorentz_max": 0.0,
-        "mean_velocity": float(jnp.mean(u)), "applied_forcing": 0.0,
-        "potential_initial_residual": 0.0, "linear_initial_residual": 0.0,
+        "phi": zero,
+        "jy": zero,
+        "jz": zero,
+        "lorentz": zero,
+        "velocity_residual": 0.0,
+        "potential_residual": 0.0,
+        "potential_iterations": 1.0,
+        "linear_residual": 0.0,
+        "linear_iterations": 1.0,
+        "face_current_max": 0.0,
+        "emf_max": 0.0,
+        "face_lorentz_max": 0.0,
+        "mean_velocity": float(jnp.mean(u)),
+        "applied_forcing": 0.0,
+        "potential_initial_residual": 0.0,
+        "linear_initial_residual": 0.0,
     }
     values.update(overrides)
     return (u, *(values[name] for name in values))
@@ -43,9 +52,7 @@ def _fake_step_result(u, **overrides):
 
 def _steady_stopping_case(**time_stepper):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    return replace(
-        case, time_stepper=replace(case.time_stepper, **time_stepper)
-    )
+    return replace(case, time_stepper=replace(case.time_stepper, **time_stepper))
 
 
 def _fake_potential_solver(shape, residual, iterations, initial_residual):
@@ -87,9 +94,10 @@ def test_solve_poisson_cg_converges_on_zero_rhs():
 
 def test_anchored_poisson_operator_is_spd():
     coefficients = _poisson_coefficients()[:5]
-    apply = lambda field: solvers.apply_poisson_operator(
-        *coefficients, field, anchor=(0, 0)
-    )
+
+    def apply(field):
+        return solvers.apply_poisson_operator(*coefficients, field, anchor=(0, 0))
+
     basis = jnp.eye(4).reshape(4, 2, 2)
     matrix = jnp.stack([apply(vector).reshape(-1) for vector in basis], axis=1)
     assert jnp.allclose(matrix, matrix.T) and jnp.all(jnp.linalg.eigvalsh(matrix) > 0)
@@ -127,14 +135,15 @@ def test_hartmann_solver_runs(monkeypatch: pytest.MonkeyPatch):
         u_prev = kwargs["u_previous"]
         updated = jnp.full_like(u_prev, 0.2)
         return _fake_step_result(
-            updated, velocity_residual=1e-6, potential_residual=1e-6,
-            linear_residual=2.0, potential_initial_residual=1e-3,
+            updated,
+            velocity_residual=1e-6,
+            potential_residual=1e-6,
+            linear_residual=2.0,
+            potential_initial_residual=1e-3,
             linear_initial_residual=1e-3,
         )
 
-    monkeypatch.setattr(
-        solvers, "_fully_developed_case_step", fake_fully_developed_case_step
-    )
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case)
     assert solution.state.u.shape == (12, 12)
     assert float(jnp.max(solution.state.u)) > 0.0
@@ -162,14 +171,15 @@ def test_solve_steady_accepts_custom_mesh_override(monkeypatch: pytest.MonkeyPat
         u_prev = kwargs["u_previous"]
         updated = jnp.full_like(u_prev, 0.1)
         return _fake_step_result(
-            updated, velocity_residual=1e-9, potential_residual=1e-9,
-            linear_residual=1e-9, potential_initial_residual=1e-9,
+            updated,
+            velocity_residual=1e-9,
+            potential_residual=1e-9,
+            linear_residual=1e-9,
+            potential_initial_residual=1e-9,
             linear_initial_residual=1e-9,
         )
 
-    monkeypatch.setattr(
-        solvers, "_fully_developed_case_step", fake_fully_developed_case_step
-    )
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case, mesh=custom_mesh)
 
     assert solution.mesh is custom_mesh
@@ -187,22 +197,10 @@ def test_build_mesh_uses_magnetic_axis_to_cluster_rect_duct_layers():
 
 
 def test_bounded_time_step_count_covers_zero_and_invalid_dt_cases():
-    assert (
-        solvers._bounded_time_step_count(
-            start_time=0.0, dt=0.1, t_final=1.0, max_steps=0
-        )
-        == 0
-    )
-    assert (
-        solvers._bounded_time_step_count(
-            start_time=1.0, dt=0.1, t_final=0.5, max_steps=10
-        )
-        == 0
-    )
+    assert solvers._bounded_time_step_count(start_time=0.0, dt=0.1, t_final=1.0, max_steps=0) == 0
+    assert solvers._bounded_time_step_count(start_time=1.0, dt=0.1, t_final=0.5, max_steps=10) == 0
     with pytest.raises(ValueError, match="dt must be positive"):
-        solvers._bounded_time_step_count(
-            start_time=0.0, dt=0.0, t_final=1.0, max_steps=10
-        )
+        solvers._bounded_time_step_count(start_time=0.0, dt=0.0, t_final=1.0, max_steps=10)
 
 
 def test_potential_coefficients_stay_positive_for_low_conductivity_cells():
@@ -310,18 +308,14 @@ def test_hunt_case_derives_wall_conductivity_from_conductance_ratio():
         wall_cells=2,
     )
 
-    wall_region = next(
-        region for region in case.regions if region.name == "conducting_wall"
-    )
+    wall_region = next(region for region in case.regions if region.name == "conducting_wall")
     expected = 0.05 * 2.0 * (0.5 * 2.0) / 0.1
     assert wall_region.conductivity == pytest.approx(expected)
 
 
 def test_hunt_case_adds_explicit_insulating_side_wall_region():
     case = make_hunt_case(ha=20.0, fluid_conductivity=2.0, ny=16, nz=16, wall_cells=2)
-    insulator_region = next(
-        region for region in case.regions if region.name == "insulating_wall"
-    )
+    insulator_region = next(region for region in case.regions if region.name == "insulating_wall")
     assert insulator_region.conductivity == pytest.approx(2.0e-12)
     assert case.geometry.wall_cells == (2, 2, 2, 2)
     assert case.geometry.wall_thickness == pytest.approx((0.1, 0.1, 0.1, 0.1))
@@ -336,9 +330,7 @@ def test_hunt_case_allows_explicit_wall_conductivity_override():
         nz=16,
         wall_cells=2,
     )
-    wall_region = next(
-        region for region in case.regions if region.name == "conducting_wall"
-    )
+    wall_region = next(region for region in case.regions if region.name == "conducting_wall")
     assert wall_region.conductivity == pytest.approx(7.5)
 
 
@@ -374,29 +366,28 @@ def test_hunt_inlet_flow_rate_boundary_drives_short_transient(
         increment = 0.05 if target is not None else 0.0
         updated = u_prev + increment
         return _fake_step_result(
-            updated, velocity_residual=1e-6, potential_residual=1e-6,
-            linear_residual=2.0, linear_iterations=increment,
-            face_current_max=increment, emf_max=increment,
-            mean_velocity=0.0, potential_initial_residual=1e-3,
+            updated,
+            velocity_residual=1e-6,
+            potential_residual=1e-6,
+            linear_residual=2.0,
+            linear_iterations=increment,
+            face_current_max=increment,
+            emf_max=increment,
+            mean_velocity=0.0,
+            potential_initial_residual=1e-3,
             linear_initial_residual=1e-3,
         )
 
-    monkeypatch.setattr(
-        solvers, "_fully_developed_case_step", fake_fully_developed_case_step
-    )
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
 
     driven_solution = solve_steady(driven)
     undriven_solution = solve_steady(undriven)
 
-    assert float(jnp.max(driven_solution.state.u)) > float(
-        jnp.max(undriven_solution.state.u)
-    )
+    assert float(jnp.max(driven_solution.state.u)) > float(jnp.max(undriven_solution.state.u))
 
 
 @pytest.fixture
-def transient_restart_setup(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
+def transient_restart_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     direct_case = replace(
         case,
@@ -412,20 +403,22 @@ def transient_restart_setup(
         step_time = kwargs["step_time"]
         updated = jnp.full_like(u_prev, step_time * 10.0)
         return _fake_step_result(
-            updated, velocity_residual=1e-6, potential_residual=1e-6,
-            linear_residual=2.0, linear_iterations=0.3,
-            face_current_max=0.2, emf_max=0.1, face_lorentz_max=0.05,
-            applied_forcing=0.3, potential_initial_residual=1e-3,
+            updated,
+            velocity_residual=1e-6,
+            potential_residual=1e-6,
+            linear_residual=2.0,
+            linear_iterations=0.3,
+            face_current_max=0.2,
+            emf_max=0.1,
+            face_lorentz_max=0.05,
+            applied_forcing=0.3,
+            potential_initial_residual=1e-3,
             linear_initial_residual=1e-3,
         )
 
-    monkeypatch.setattr(
-        solvers, "_fully_developed_case_step", fake_fully_developed_case_step
-    )
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
     partial = solve_transient(partial_case)
-    restart = load_restart_bundle(
-        write_solution_npz(partial, partial_case, tmp_path / "partial_restart.npz")
-    )
+    restart = load_restart_bundle(write_solution_npz(partial, partial_case, tmp_path / "partial_restart.npz"))
     return direct_case, restart
 
 
@@ -444,9 +437,7 @@ def test_transient_restart_matches_direct_run(transient_restart_setup):
     assert jnp.allclose(resumed.state.phi, direct.state.phi, atol=1e-6, rtol=1e-6)
     assert jnp.allclose(resumed.state.jy, direct.state.jy, atol=1e-6, rtol=1e-6)
     assert jnp.allclose(resumed.state.jz, direct.state.jz, atol=1e-6, rtol=1e-6)
-    assert jnp.allclose(
-        resumed.state.lorentz_x, direct.state.lorentz_x, atol=1e-6, rtol=1e-6
-    )
+    assert jnp.allclose(resumed.state.lorentz_x, direct.state.lorentz_x, atol=1e-6, rtol=1e-6)
 
 
 @pytest.mark.parametrize(
@@ -482,11 +473,7 @@ def test_target_mean_velocity_only_uses_inlet_flow_rate():
         case,
         forcing=0.0,
         boundary_conditions=case.boundary_conditions
-        + (
-            BoundaryCondition(
-                "inlet", "inlet_velocity", value=(0.2, 0.0, 0.0), axis="x"
-            ),
-        ),
+        + (BoundaryCondition("inlet", "inlet_velocity", value=(0.2, 0.0, 0.0), axis="x"),),
     )
     inlet_flow_rate_case = replace(
         case,
@@ -543,9 +530,7 @@ def test_enforce_velocity_bc_handles_degenerate_direct_wall_axes():
     u = jnp.asarray([[2.0]])
     fluid_mask = jnp.asarray([[True]])
 
-    result = solvers._enforce_velocity_bc(
-        u, mesh, fluid_mask, interpolate_direct_fluid_walls=True
-    )
+    result = solvers._enforce_velocity_bc(u, mesh, fluid_mask, interpolate_direct_fluid_walls=True)
 
     assert result.shape == (1, 1)
     assert float(result[0, 0]) == pytest.approx(2.0)
@@ -557,30 +542,20 @@ def test_reference_mean_velocity_uses_inlet_velocity_or_initial_velocity():
         case,
         forcing=0.0,
         boundary_conditions=case.boundary_conditions
-        + (
-            BoundaryCondition(
-                "inlet", "inlet_velocity", value=(0.2, 0.0, 0.0), axis="x"
-            ),
-        ),
+        + (BoundaryCondition("inlet", "inlet_velocity", value=(0.2, 0.0, 0.0), axis="x"),),
     )
     initial_velocity_case = replace(case, initial_velocity=0.15)
 
     assert solvers._reference_mean_velocity(inlet_velocity_case) == pytest.approx(0.2)
-    assert solvers._reference_mean_velocity(initial_velocity_case) == pytest.approx(
-        0.15
-    )
+    assert solvers._reference_mean_velocity(initial_velocity_case) == pytest.approx(0.15)
 
 
 def test_concat_history_handles_append_and_empty_inputs():
     current = jnp.asarray([1.0, 2.0])
 
     assert jnp.allclose(solvers._concat_history(None, current, append=True), current)
-    assert jnp.allclose(
-        solvers._concat_history(jnp.asarray([]), current, append=True), current
-    )
-    assert jnp.allclose(
-        solvers._concat_history(jnp.asarray([9.0]), current, append=False), current
-    )
+    assert jnp.allclose(solvers._concat_history(jnp.asarray([]), current, append=True), current)
+    assert jnp.allclose(solvers._concat_history(jnp.asarray([9.0]), current, append=False), current)
     assert jnp.allclose(
         solvers._concat_history(jnp.asarray([9.0]), current, append=True),
         jnp.asarray([9.0, 1.0, 2.0]),
@@ -634,9 +609,7 @@ def test_scaled_pressure_proxy_value_uses_available_current_source():
 
 def test_magnetic_ramp_scale_disables_when_duration_is_zero():
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    assert float(magnetic_ramp_scale(case.magnetic_field, time=0.0)) == pytest.approx(
-        1.0
-    )
+    assert float(magnetic_ramp_scale(case.magnetic_field, time=0.0)) == pytest.approx(1.0)
 
 
 def test_magnetic_ramp_scale_matches_reference_startup_formula():
@@ -646,15 +619,9 @@ def test_magnetic_ramp_scale_matches_reference_startup_formula():
         magnetic_field=replace(case.magnetic_field, ramp_start=0.0, ramp_duration=1e-5),
     )
 
-    assert float(magnetic_ramp_scale(ramped.magnetic_field, time=0.0)) == pytest.approx(
-        0.0
-    )
-    assert float(
-        magnetic_ramp_scale(ramped.magnetic_field, time=1e-5)
-    ) == pytest.approx(10.0 / 11.0)
-    assert float(
-        magnetic_ramp_scale(ramped.magnetic_field, time=2e-5)
-    ) == pytest.approx(1.0)
+    assert float(magnetic_ramp_scale(ramped.magnetic_field, time=0.0)) == pytest.approx(0.0)
+    assert float(magnetic_ramp_scale(ramped.magnetic_field, time=1e-5)) == pytest.approx(10.0 / 11.0)
+    assert float(magnetic_ramp_scale(ramped.magnetic_field, time=2e-5)) == pytest.approx(1.0)
 
 
 def test_magnetic_ramp_delays_short_transient_lorentz_response(
@@ -666,14 +633,8 @@ def test_magnetic_ramp_delays_short_transient_lorentz_response(
         forcing=0.0,
         initial_velocity=0.25,
         boundary_conditions=case.boundary_conditions
-        + (
-            BoundaryCondition(
-                "inlet", "inlet_velocity", value=(0.25, 0.0, 0.0), axis="x"
-            ),
-        ),
-        time_stepper=replace(
-            case.time_stepper, dt=1e-5, t_final=2e-5, max_steps=2, relaxation=0.1
-        ),
+        + (BoundaryCondition("inlet", "inlet_velocity", value=(0.25, 0.0, 0.0), axis="x"),),
+        time_stepper=replace(case.time_stepper, dt=1e-5, t_final=2e-5, max_steps=2, relaxation=0.1),
     )
     ramped = replace(
         base,
@@ -689,16 +650,21 @@ def test_magnetic_ramp_delays_short_transient_lorentz_response(
         jy = jnp.full_like(updated, 0.2 * scale)
         lorentz = jnp.full_like(updated, 0.05 * scale)
         return _fake_step_result(
-            updated, jy=jy, lorentz=lorentz, velocity_residual=1e-6,
-            potential_residual=1e-6, linear_residual=2.0,
-            linear_iterations=0.2 * scale, face_current_max=0.15 * scale,
-            emf_max=0.1 * scale, face_lorentz_max=0.05 * scale,
-            potential_initial_residual=1e-3, linear_initial_residual=1e-3,
+            updated,
+            jy=jy,
+            lorentz=lorentz,
+            velocity_residual=1e-6,
+            potential_residual=1e-6,
+            linear_residual=2.0,
+            linear_iterations=0.2 * scale,
+            face_current_max=0.15 * scale,
+            emf_max=0.1 * scale,
+            face_lorentz_max=0.05 * scale,
+            potential_initial_residual=1e-3,
+            linear_initial_residual=1e-3,
         )
 
-    monkeypatch.setattr(
-        solvers, "_fully_developed_case_step", fake_fully_developed_case_step
-    )
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
 
     baseline = solve_steady(base)
     delayed = solve_steady(ramped)
@@ -778,16 +744,14 @@ def test_current_reconstruction_modes_and_face_diagnostics_are_finite():
         assert jnp.isfinite(jz).all()
         assert jnp.isfinite(lorentz).all()
 
-    face_current_max, emf_max, face_lorentz_max = (
-        solvers._face_current_emf_and_lorentz_max(
-            mesh,
-            materials.conductivity,
-            materials.fluid_mask,
-            u,
-            phi,
-            by,
-            bz,
-        )
+    face_current_max, emf_max, face_lorentz_max = solvers._face_current_emf_and_lorentz_max(
+        mesh,
+        materials.conductivity,
+        materials.fluid_mask,
+        u,
+        phi,
+        by,
+        bz,
     )
     assert float(face_current_max) >= 0.0
     assert float(emf_max) >= 0.0
@@ -851,23 +815,15 @@ def test_face_current_components_and_integral_diagnostics_remain_bounded():
     div_current = (padded_y[1:, :] - padded_y[:-1, :]) / mesh.dy[:, None] + (
         padded_z[:, 1:] - padded_z[:, :-1]
     ) / mesh.dz[None, :]
-    jump_y = (
-        jnp.abs(materials.conductivity[:-1, :] - materials.conductivity[1:, :])
-        > 1.0e-12
-    )
-    jump_z = (
-        jnp.abs(materials.conductivity[:, :-1] - materials.conductivity[:, 1:])
-        > 1.0e-12
-    )
+    jump_y = jnp.abs(materials.conductivity[:-1, :] - materials.conductivity[1:, :]) > 1.0e-12
+    jump_z = jnp.abs(materials.conductivity[:, :-1] - materials.conductivity[:, 1:]) > 1.0e-12
     interface_cells = jnp.zeros(mesh.yz_shape, dtype=bool)
     interface_cells = interface_cells.at[:-1, :].set(interface_cells[:-1, :] | jump_y)
     interface_cells = interface_cells.at[1:, :].set(interface_cells[1:, :] | jump_y)
     interface_cells = interface_cells.at[:, :-1].set(interface_cells[:, :-1] | jump_z)
     interface_cells = interface_cells.at[:, 1:].set(interface_cells[:, 1:] | jump_z)
     cell_length = jnp.sqrt(mesh.dy[:, None] * mesh.dz[None, :])
-    expected_interface_residual = jnp.max(
-        jnp.where(interface_cells, jnp.abs(div_current) * cell_length, 0.0)
-    )
+    expected_interface_residual = jnp.max(jnp.where(interface_cells, jnp.abs(div_current) * cell_length, 0.0))
     assert float(diagnostics[-1]) == pytest.approx(float(expected_interface_residual))
 
 
@@ -880,13 +836,8 @@ def test_auto_potential_backend_uses_cg_for_single_region_and_volume_scaled_cg_f
     hartmann_materials = build_material_fields(hartmann, hartmann_mesh)
     hunt_materials = build_material_fields(hunt, hunt_mesh)
 
-    assert (
-        solvers._resolve_potential_solver("auto", hartmann_materials.fluid_mask) == "cg"
-    )
-    assert (
-        solvers._resolve_potential_solver("auto", hunt_materials.fluid_mask)
-        == "cg_volume"
-    )
+    assert solvers._resolve_potential_solver("auto", hartmann_materials.fluid_mask) == "cg"
+    assert solvers._resolve_potential_solver("auto", hunt_materials.fluid_mask) == "cg_volume"
 
 
 def test_build_material_fields_assigns_hunt_side_and_hartmann_wall_regions():
@@ -941,21 +892,17 @@ def test_volume_scaled_potential_system_is_symmetric_after_cell_metric_weighting
         wall_cells=(2, 2, 2, 2),
         target_ha=20.0,
     )
-    sigma = jnp.linspace(1.0, 3.0, mesh.ny * mesh.nz, dtype=float).reshape(
-        mesh.yz_shape
-    )
+    sigma = jnp.linspace(1.0, 3.0, mesh.ny * mesh.nz, dtype=float).reshape(mesh.yz_shape)
     diagonal, west, east, south, north = solvers._potential_coefficients(mesh, sigma)
     rhs = jnp.ones(mesh.yz_shape)
-    diagonal_s, west_s, east_s, south_s, north_s, rhs_s = (
-        solvers._volume_scaled_potential_system(
-            mesh,
-            diagonal,
-            west,
-            east,
-            south,
-            north,
-            rhs,
-        )
+    diagonal_s, west_s, east_s, south_s, north_s, rhs_s = solvers._volume_scaled_potential_system(
+        mesh,
+        diagonal,
+        west,
+        east,
+        south,
+        north,
+        rhs,
     )
 
     assert rhs_s.shape == rhs.shape
@@ -1218,22 +1165,24 @@ def test_conductive_current_components_keep_wall_currents_for_interface_audits()
 def test_solve_steady_respects_t_final_when_tolerance_not_reached(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    case = _steady_stopping_case(
-        dt=0.002, t_final=0.01, max_steps=200, steady_tolerance=0.0
-    )
+    case = _steady_stopping_case(dt=0.002, t_final=0.01, max_steps=200, steady_tolerance=0.0)
 
     def fake_fully_developed_case_step(**kwargs):
         u = kwargs["u_previous"]
         return _fake_step_result(
-            u, velocity_residual=1e-2, potential_residual=1e-2,
-            potential_iterations=25, linear_residual=1e-2,
-            linear_iterations=8.0, mean_velocity=0.0, applied_forcing=1.0,
-            potential_initial_residual=1e-2, linear_initial_residual=1e-2,
+            u,
+            velocity_residual=1e-2,
+            potential_residual=1e-2,
+            potential_iterations=25,
+            linear_residual=1e-2,
+            linear_iterations=8.0,
+            mean_velocity=0.0,
+            applied_forcing=1.0,
+            potential_initial_residual=1e-2,
+            linear_initial_residual=1e-2,
         )
 
-    monkeypatch.setattr(
-        solvers, "_fully_developed_case_step", fake_fully_developed_case_step
-    )
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case)
 
     assert solution.diagnostics.time_history.shape[0] == 5
@@ -1266,33 +1215,16 @@ def test_hunt_low_resolution_manual_interface_gate_is_now_bounded():
 
 
 def test_bounded_time_step_count_does_not_round_up_fractional_end_times():
-    assert (
-        solvers._bounded_time_step_count(
-            start_time=0.0, dt=0.002, t_final=0.011, max_steps=200
-        )
-        == 5
-    )
-    assert (
-        solvers._bounded_time_step_count(
-            start_time=0.004, dt=0.002, t_final=0.011, max_steps=200
-        )
-        == 3
-    )
-    assert (
-        solvers._bounded_time_step_count(
-            start_time=0.0, dt=0.02, t_final=0.01, max_steps=200
-        )
-        == 0
-    )
+    assert solvers._bounded_time_step_count(start_time=0.0, dt=0.002, t_final=0.011, max_steps=200) == 5
+    assert solvers._bounded_time_step_count(start_time=0.004, dt=0.002, t_final=0.011, max_steps=200) == 3
+    assert solvers._bounded_time_step_count(start_time=0.0, dt=0.02, t_final=0.01, max_steps=200) == 0
 
 
 def test_build_mesh_rejects_unsupported_geometry():
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
     bad_case = replace(
         case,
-        geometry=GeometrySpec(
-            kind="pipe_ogrid", width=1.0, height=1.0, radius=0.5, nr=4, ntheta=8
-        ),
+        geometry=GeometrySpec(kind="pipe_ogrid", width=1.0, height=1.0, radius=0.5, nr=4, ntheta=8),
     )
     with pytest.raises(NotImplementedError, match="not supported"):
         solvers._build_mesh(bad_case)
@@ -1302,13 +1234,9 @@ def test_fully_developed_solver_rejects_pipe_geometry():
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
     bad_case = replace(
         case,
-        geometry=GeometrySpec(
-            kind="pipe_ogrid", width=1.0, height=1.0, radius=0.5, nr=4, ntheta=8
-        ),
+        geometry=GeometrySpec(kind="pipe_ogrid", width=1.0, height=1.0, radius=0.5, nr=4, ntheta=8),
     )
-    with pytest.raises(
-        NotImplementedError, match="not supported by the laminar solver"
-    ):
+    with pytest.raises(NotImplementedError, match="not supported by the laminar solver"):
         solvers._solve_fully_developed(bad_case)
 
 
@@ -1342,9 +1270,7 @@ def test_fully_developed_case_step_uses_explicit_forcing_when_no_target_velocity
     monkeypatch: pytest.MonkeyPatch,
 ):
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
-    case = replace(
-        case, time_stepper=replace(case.time_stepper, velocity_update_limit=1.0)
-    )
+    case = replace(case, time_stepper=replace(case.time_stepper, velocity_update_limit=1.0))
     mesh = solvers._build_mesh(case)
     materials = build_material_fields(case, mesh)
     u_previous = jnp.zeros(mesh.yz_shape)
@@ -1418,9 +1344,7 @@ def test_fully_developed_case_step_uses_explicit_forcing_when_no_target_velocity
         coupling_tolerance=1.0e-6,
     )
 
-    active_mask = (
-        materials.fluid_mask.at[[0, -1], :].set(False).at[:, [0, -1]].set(False)
-    )
+    active_mask = materials.fluid_mask.at[[0, -1], :].set(False).at[:, [0, -1]].set(False)
     assert call_counter["velocity"] == 1
     assert jnp.allclose(u_next[active_mask], 0.25)
     assert jnp.isfinite(u_next[~active_mask]).all()
@@ -1433,12 +1357,8 @@ def test_fully_developed_case_step_uses_explicit_forcing_when_no_target_velocity
     assert float(face_current_max) == pytest.approx(1.0e-4)
     assert float(emf_max) == pytest.approx(2.0e-4)
     assert float(face_lorentz_max) == pytest.approx(3.0e-4)
-    fluid_weight = jnp.where(
-        materials.fluid_mask, solvers._cell_metric(mesh).astype(u_next.dtype), 0.0
-    )
-    expected_mean_velocity = float(
-        jnp.sum(fluid_weight * u_next) / jnp.sum(fluid_weight)
-    )
+    fluid_weight = jnp.where(materials.fluid_mask, solvers._cell_metric(mesh).astype(u_next.dtype), 0.0)
+    expected_mean_velocity = float(jnp.sum(fluid_weight * u_next) / jnp.sum(fluid_weight))
     assert float(mean_velocity) == pytest.approx(expected_mean_velocity)
     assert float(applied_forcing) == pytest.approx(case.forcing)
     assert float(potential_initial_residual) == pytest.approx(1.0e-6)
@@ -1457,9 +1377,7 @@ def test_fully_developed_case_step_does_not_double_count_implicit_magnetic_react
     mesh = solvers._build_mesh(case)
     materials = build_material_fields(case, mesh)
     u_previous = jnp.where(materials.fluid_mask, 0.4, 0.0)
-    _, by, bz = magnetic_field_components(
-        case.magnetic_field, mesh, time=case.time_stepper.dt
-    )
+    _, by, bz = magnetic_field_components(case.magnetic_field, mesh, time=case.time_stepper.dt)
     magnetic_reaction = jnp.where(
         materials.fluid_mask,
         materials.conductivity * (by**2 + bz**2) / materials.density,
@@ -1529,9 +1447,7 @@ def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity
     monkeypatch: pytest.MonkeyPatch,
 ):
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
-    case = replace(
-        case, time_stepper=replace(case.time_stepper, velocity_update_limit=1.0)
-    )
+    case = replace(case, time_stepper=replace(case.time_stepper, velocity_update_limit=1.0))
     mesh = solvers._build_mesh(case)
     materials = build_material_fields(case, mesh)
     u_previous = jnp.zeros(mesh.yz_shape)
@@ -1611,27 +1527,17 @@ def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity
         coupling_tolerance=1.0e-6,
     )
 
-    active_mask = (
-        materials.fluid_mask.at[[0, -1], :].set(False).at[:, [0, -1]].set(False)
-    )
+    active_mask = materials.fluid_mask.at[[0, -1], :].set(False).at[:, [0, -1]].set(False)
     assert velocity_calls["count"] == 2
-    fluid_weight = jnp.where(
-        materials.fluid_mask, solvers._cell_metric(mesh).astype(u_next.dtype), 0.0
-    )
-    expected_mean_velocity = float(
-        jnp.sum(fluid_weight * u_next) / jnp.sum(fluid_weight)
-    )
+    fluid_weight = jnp.where(materials.fluid_mask, solvers._cell_metric(mesh).astype(u_next.dtype), 0.0)
+    expected_mean_velocity = float(jnp.sum(fluid_weight * u_next) / jnp.sum(fluid_weight))
     assert float(mean_velocity) == pytest.approx(0.7)
     assert expected_mean_velocity == pytest.approx(0.7)
     assert float(jnp.max(u_next[active_mask])) > 0.7
-    west_ratio = float(
-        (mesh.y_centers[0] - mesh.y_faces[0]) / (mesh.y_centers[1] - mesh.y_faces[0])
-    )
+    west_ratio = float((mesh.y_centers[0] - mesh.y_faces[0]) / (mesh.y_centers[1] - mesh.y_faces[0]))
     assert float(u_next[0, 1] / u_next[1, 1]) == pytest.approx(west_ratio)
     assert jnp.isfinite(u_next[~active_mask]).all()
-    assert float(jnp.max(jnp.abs(u_next[~active_mask]))) <= float(
-        jnp.max(u_next[active_mask])
-    )
+    assert float(jnp.max(jnp.abs(u_next[~active_mask]))) <= float(jnp.max(u_next[active_mask]))
     assert float(velocity_residual) == pytest.approx(float(jnp.max(u_next)))
     assert float(linear_residual) == pytest.approx(3.0e-7)
     assert int(linear_iterations) == 4
@@ -1642,23 +1548,24 @@ def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity
 def test_fully_developed_steady_stops_once_residual_reaches_tolerance(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    case = _steady_stopping_case(
-        max_steps=10, steady_tolerance=1e-4, potential_tolerance=1.0e-2
-    )
+    case = _steady_stopping_case(max_steps=10, steady_tolerance=1e-4, potential_tolerance=1.0e-2)
     residuals = iter([1.0e-1, 1.0e-2, 1.0e-5, 1.0e-6])
 
     def fake_fully_developed_case_step(**kwargs):
         u = kwargs["u_previous"]
         return _fake_step_result(
-            u, velocity_residual=next(residuals), potential_residual=1e-2,
-            potential_iterations=25, linear_iterations=8.0,
-            mean_velocity=0.0, applied_forcing=1.0,
-            potential_initial_residual=1e-2, linear_initial_residual=1e-2,
+            u,
+            velocity_residual=next(residuals),
+            potential_residual=1e-2,
+            potential_iterations=25,
+            linear_iterations=8.0,
+            mean_velocity=0.0,
+            applied_forcing=1.0,
+            potential_initial_residual=1e-2,
+            linear_initial_residual=1e-2,
         )
 
-    monkeypatch.setattr(
-        solvers, "_fully_developed_case_step", fake_fully_developed_case_step
-    )
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case)
 
     assert solution.diagnostics.residual_history.shape[0] == 3
@@ -1674,9 +1581,7 @@ def test_fully_developed_steady_stops_once_residual_reaches_tolerance(
 def test_fully_developed_steady_reports_step_limit(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    case = _steady_stopping_case(
-        max_steps=2, steady_tolerance=1.0e-4, potential_tolerance=1.0e-3
-    )
+    case = _steady_stopping_case(max_steps=2, steady_tolerance=1.0e-4, potential_tolerance=1.0e-3)
 
     monkeypatch.setattr(
         solvers,
@@ -1717,23 +1622,24 @@ def test_fully_developed_steady_rejects_nonfinite_output(
 def test_fully_developed_steady_requires_outer_state_convergence(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    case = _steady_stopping_case(
-        max_steps=5, steady_tolerance=1.0e-4, potential_tolerance=1.0e-2
-    )
+    case = _steady_stopping_case(max_steps=5, steady_tolerance=1.0e-4, potential_tolerance=1.0e-2)
     updates = iter([1.0e-2, 1.0e-5])
 
     def fake_fully_developed_case_step(**kwargs):
         u = kwargs["u_previous"] + next(updates)
         return _fake_step_result(
-            u, velocity_residual=1e-6, potential_residual=1e-3,
-            potential_iterations=5, linear_iterations=2.0,
-            mean_velocity=0.0, applied_forcing=1.0,
-            potential_initial_residual=1e-3, linear_initial_residual=1e-3,
+            u,
+            velocity_residual=1e-6,
+            potential_residual=1e-3,
+            potential_iterations=5,
+            linear_iterations=2.0,
+            mean_velocity=0.0,
+            applied_forcing=1.0,
+            potential_initial_residual=1e-3,
+            linear_initial_residual=1e-3,
         )
 
-    monkeypatch.setattr(
-        solvers, "_fully_developed_case_step", fake_fully_developed_case_step
-    )
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case)
 
     assert solution.diagnostics.residual_history == pytest.approx([1.0e-2, 1.0e-5])
@@ -1744,24 +1650,25 @@ def test_fully_developed_steady_requires_outer_state_convergence(
 def test_fully_developed_steady_can_require_potential_residual_when_requested(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    case = _steady_stopping_case(
-        max_steps=6, steady_tolerance=1e-4, steady_potential_tolerance=5e-4
-    )
+    case = _steady_stopping_case(max_steps=6, steady_tolerance=1e-4, steady_potential_tolerance=5e-4)
     residuals = iter([1.0e-3, 1.0e-5, 1.0e-5, 1.0e-6])
     potential_residuals = iter([1.0e-2, 1.0e-3, 1.0e-4, 1.0e-5])
 
     def fake_fully_developed_case_step(**kwargs):
         u = kwargs["u_previous"]
         return _fake_step_result(
-            u, velocity_residual=next(residuals),
-            potential_residual=next(potential_residuals), potential_iterations=20,
-            linear_iterations=8.0, mean_velocity=0.0, applied_forcing=1.0,
-            potential_initial_residual=1e-2, linear_initial_residual=1e-2,
+            u,
+            velocity_residual=next(residuals),
+            potential_residual=next(potential_residuals),
+            potential_iterations=20,
+            linear_iterations=8.0,
+            mean_velocity=0.0,
+            applied_forcing=1.0,
+            potential_initial_residual=1e-2,
+            linear_initial_residual=1e-2,
         )
 
-    monkeypatch.setattr(
-        solvers, "_fully_developed_case_step", fake_fully_developed_case_step
-    )
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case)
 
     assert solution.diagnostics.residual_history.shape[0] == 3
@@ -1833,20 +1740,18 @@ def test_potential_solver_supports_cg_volume_backend():
     by = jnp.zeros(mesh.yz_shape)
     bz = jnp.ones(mesh.yz_shape)
 
-    phi, residual, iterations, initial_residual, solver_residual = (
-        solvers._solve_potential(
-            mesh,
-            sigma,
-            fluid_mask,
-            u,
-            by,
-            bz,
-            anchor=(mesh.yz_shape[0] // 2, mesh.yz_shape[1] // 2),
-            iterations=12,
-            tolerance=1.0e-6,
-            solver="cg_volume",
-            return_solver_residual=True,
-        )
+    phi, residual, iterations, initial_residual, solver_residual = solvers._solve_potential(
+        mesh,
+        sigma,
+        fluid_mask,
+        u,
+        by,
+        bz,
+        anchor=(mesh.yz_shape[0] // 2, mesh.yz_shape[1] // 2),
+        iterations=12,
+        tolerance=1.0e-6,
+        solver="cg_volume",
+        return_solver_residual=True,
     )
 
     assert jnp.isfinite(phi).all()
@@ -1902,9 +1807,7 @@ def test_potential_line_preconditioners_use_solvax_and_anchor_gauge(
     west = jnp.ones((4, 3))
     east = jnp.ones((4, 3))
     anchor = (2, 1)
-    preconditioner = solvers._potential_y_line_preconditioner(
-        diagonal, west, east, anchor
-    )
+    preconditioner = solvers._potential_y_line_preconditioner(diagonal, west, east, anchor)
     assert preconditioner is not None
     result = preconditioner(jnp.ones((4, 3)))
     captured = calls.pop()
@@ -1923,9 +1826,8 @@ def test_potential_line_preconditioners_use_solvax_and_anchor_gauge(
     assert result.shape == shape
     assert result[2, 1] == 0.0
 
-def test_potential_deflated_line_preconditioner_accelerates_anisotropic_system() -> (
-    None
-):
+
+def test_potential_deflated_line_preconditioner_accelerates_anisotropic_system() -> None:
     shape = (33, 33)
     anchor = (16, 16)
     strong = 1.0e5
@@ -1936,11 +1838,7 @@ def test_potential_deflated_line_preconditioner_accelerates_anisotropic_system()
     diagonal = west + east + south + north
     y = jnp.linspace(-1.0, 1.0, shape[0])
     z = jnp.linspace(-1.0, 1.0, shape[1])
-    rhs = (
-        (jnp.sin(jnp.pi * y)[:, None] * jnp.cos(jnp.pi * z)[None, :])
-        .at[anchor]
-        .set(0.0)
-    )
+    rhs = (jnp.sin(jnp.pi * y)[:, None] * jnp.cos(jnp.pi * z)[None, :]).at[anchor].set(0.0)
 
     preconditioner = solvers._potential_deflated_line_preconditioner(
         diagonal, west, east, south, north, anchor, coarse_stride=4
@@ -1984,9 +1882,7 @@ def test_fast_diagonalization_preconditioner_closes_stretched_tensor_system() ->
     conductivity = jnp.ones(shape)
     coefficients = solvers._potential_coefficients(mesh, conductivity)
     metric = mesh.dy[:, None] * mesh.dz[None, :]
-    scaled = solvers._volume_scaled_potential_system(
-        mesh, *coefficients, jnp.zeros(shape)
-    )
+    scaled = solvers._volume_scaled_potential_system(mesh, *coefficients, jnp.zeros(shape))
     y = jnp.linspace(-1.0, 1.0, shape[0])
     z = jnp.linspace(-1.0, 1.0, shape[1])
     rhs = jnp.sin(jnp.pi * y)[:, None] * jnp.cos(jnp.pi * z)[None, :]
@@ -2017,13 +1913,12 @@ def test_fast_diagonalization_preconditioner_closes_stretched_tensor_system() ->
     recovered = preconditioner(compatible_rhs)
     assert jnp.linalg.norm(recovered - known) / jnp.linalg.norm(known) <= 1.0e-7
 
+
 def test_conducting_rectangle_preconditioner_crops_exact_insulators() -> None:
     mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=9, nz=9)
     sigma = jnp.ones((9, 9)).at[:, :2].set(0.0).at[:, -2:].set(0.0)
     coefficients = solvers._potential_coefficients(mesh, sigma)
-    scaled = solvers._volume_scaled_potential_system(
-        mesh, *coefficients, jnp.zeros((9, 9))
-    )
+    scaled = solvers._volume_scaled_potential_system(mesh, *coefficients, jnp.zeros((9, 9)))
     anchor = (4, 4)
     preconditioner = solvers._potential_conducting_rectangle_preconditioner(
         mesh, sigma, scaled[1], scaled[2], scaled[3], scaled[4], anchor
@@ -2036,15 +1931,11 @@ def test_conducting_rectangle_preconditioner_crops_exact_insulators() -> None:
     recovered = preconditioner(rhs)
     assert jnp.linalg.norm(recovered - known) / jnp.linalg.norm(known) <= 1.0e-10
 
-    selected, flexible = solvers._potential_preconditioner_for_materials(
-        mesh, sigma, *scaled[:5], anchor
-    )
+    selected, flexible = solvers._potential_preconditioner_for_materials(mesh, sigma, *scaled[:5], anchor)
     assert selected is not None
     assert flexible is True
     selected_recovery = selected(rhs)
-    assert (
-        jnp.linalg.norm(selected_recovery - known) / jnp.linalg.norm(known) <= 1.0e-10
-    )
+    assert jnp.linalg.norm(selected_recovery - known) / jnp.linalg.norm(known) <= 1.0e-10
     physical_rhs = solvers.apply_five_point_operator(*scaled[:5], known)
     solved, residual, iterations = solvers._solve_potential_fgmres_state(
         *scaled[:5],
@@ -2071,9 +1962,7 @@ def test_conducting_rectangle_preconditioner_crops_exact_insulators() -> None:
         )
         is None
     )
-    _, flexible = solvers._potential_preconditioner_for_materials(
-        mesh, nonrectangular, *scaled[:5], anchor
-    )
+    _, flexible = solvers._potential_preconditioner_for_materials(mesh, nonrectangular, *scaled[:5], anchor)
     assert flexible is False
 
 
@@ -2094,23 +1983,11 @@ def test_potential_line_preconditioner_is_reserved_for_confirmation_meshes(
     )
     small = jnp.ones((99, 99))
     large = jnp.ones((119, 119))
-    assert (
-        solvers._select_potential_preconditioner(
-            small, small, small, small, small, (49, 49)
-        )
-        is None
-    )
-    assert (
-        solvers._select_potential_preconditioner(
-            large, large, large, large, large, (59, 59)
-        )
-        is sentinel
-    )
+    assert solvers._select_potential_preconditioner(small, small, small, small, small, (49, 49)) is None
+    assert solvers._select_potential_preconditioner(large, large, large, large, large, (59, 59)) is sentinel
     anisotropic = small.at[0, 0].set(4.0e4)
     assert (
-        solvers._select_potential_preconditioner(
-            anisotropic, small, small, small, small, (49, 49)
-        )
+        solvers._select_potential_preconditioner(anisotropic, small, small, small, small, (49, 49))
         is deflated
     )
 
@@ -2146,15 +2023,11 @@ def test_coupling_potential_tolerance_tightens_near_fixed_point() -> None:
 
 
 def test_nested_velocity_tolerance_is_tighter_than_fixed_point_target() -> None:
-    assert solvers._nested_velocity_tolerance(
-        1.0e-8, jnp.dtype("float64")
-    ) == pytest.approx(1.0e-10)
-    assert solvers._nested_velocity_tolerance(
-        1.0e-10, jnp.dtype("float64")
-    ) == pytest.approx(1.0e-12)
-    assert solvers._nested_velocity_tolerance(
-        0.0, jnp.dtype("float64")
-    ) == pytest.approx(10.0 * jnp.finfo(jnp.float64).eps)
+    assert solvers._nested_velocity_tolerance(1.0e-8, jnp.dtype("float64")) == pytest.approx(1.0e-10)
+    assert solvers._nested_velocity_tolerance(1.0e-10, jnp.dtype("float64")) == pytest.approx(1.0e-12)
+    assert solvers._nested_velocity_tolerance(0.0, jnp.dtype("float64")) == pytest.approx(
+        10.0 * jnp.finfo(jnp.float64).eps
+    )
 
 
 def test_resolve_potential_solver_auto_handles_none_and_full_fluid_mask():
@@ -2169,12 +2042,8 @@ def test_enforce_velocity_bc_supports_direct_wall_interpolation():
     u = jnp.arange(16.0).reshape(4, 4)
     fluid_mask = jnp.ones((4, 4), dtype=bool)
 
-    zeroed = solvers._enforce_velocity_bc(
-        u, mesh, fluid_mask, interpolate_direct_fluid_walls=False
-    )
-    enforced = solvers._enforce_velocity_bc(
-        u, mesh, fluid_mask, interpolate_direct_fluid_walls=True
-    )
+    zeroed = solvers._enforce_velocity_bc(u, mesh, fluid_mask, interpolate_direct_fluid_walls=False)
+    enforced = solvers._enforce_velocity_bc(u, mesh, fluid_mask, interpolate_direct_fluid_walls=True)
 
     assert enforced.shape == u.shape
     assert jnp.isfinite(enforced).all()
@@ -2294,9 +2163,7 @@ def test_target_mean_velocity_projection_preserves_area_weighted_flow_rate():
     field = jnp.asarray([[0.2, 0.4], [0.6, 0.0]])
 
     projected = solvers._enforce_target_mean_velocity(field, mesh, fluid_mask, 0.5)
-    fluid_weight = jnp.where(
-        fluid_mask, solvers._cell_metric(mesh).astype(projected.dtype), 0.0
-    )
+    fluid_weight = jnp.where(fluid_mask, solvers._cell_metric(mesh).astype(projected.dtype), 0.0)
     mean = jnp.sum(fluid_weight * projected) / jnp.sum(fluid_weight)
 
     assert float(mean) == pytest.approx(0.5)
@@ -2395,9 +2262,7 @@ def test_concat_history_and_velocity_targets_cover_empty_and_forcing_paths():
     current = jnp.asarray([1.0, 2.0])
     previous = jnp.asarray([0.5])
     assert jnp.array_equal(solvers._concat_history(None, current, append=True), current)
-    assert jnp.array_equal(
-        solvers._concat_history(previous, current, append=False), current
-    )
+    assert jnp.array_equal(solvers._concat_history(previous, current, append=False), current)
     assert jnp.array_equal(
         solvers._concat_history(previous, current, append=True),
         jnp.asarray([0.5, 1.0, 2.0]),
@@ -2410,23 +2275,15 @@ def test_concat_history_and_velocity_targets_cover_empty_and_forcing_paths():
     flow_rate_case = replace(
         forced_case,
         forcing=0.0,
-        boundary_conditions=(
-            BoundaryCondition("inlet", "inlet_flow_rate", value=1.0, axis="x"),
-        ),
+        boundary_conditions=(BoundaryCondition("inlet", "inlet_flow_rate", value=1.0, axis="x"),),
     )
     expected_speed = 1.0 / (forced_case.geometry.width * forced_case.geometry.height)
-    assert solvers._target_mean_velocity(flow_rate_case) == pytest.approx(
-        expected_speed
-    )
-    assert solvers._reference_mean_velocity(flow_rate_case) == pytest.approx(
-        expected_speed
-    )
+    assert solvers._target_mean_velocity(flow_rate_case) == pytest.approx(expected_speed)
+    assert solvers._reference_mean_velocity(flow_rate_case) == pytest.approx(expected_speed)
 
     inlet_velocity_case = replace(
         forced_case,
-        boundary_conditions=(
-            BoundaryCondition("inlet", "inlet_velocity", value=0.25, axis="x"),
-        ),
+        boundary_conditions=(BoundaryCondition("inlet", "inlet_velocity", value=0.25, axis="x"),),
     )
     assert solvers._reference_mean_velocity(inlet_velocity_case) == pytest.approx(0.25)
 
@@ -2470,9 +2327,7 @@ def test_initial_solver_state_restores_restart_fields_and_time():
 
 def test_inlet_speed_supports_tuple_scalar_and_flow_rate_boundaries():
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    tuple_bc = BoundaryCondition(
-        "tuple", "inlet_velocity", value=(1.0, 2.0, 3.0), axis="z"
-    )
+    tuple_bc = BoundaryCondition("tuple", "inlet_velocity", value=(1.0, 2.0, 3.0), axis="z")
     scalar_bc = BoundaryCondition("scalar", "inlet_velocity", value=1.5, axis="x")
     flow_bc = BoundaryCondition(
         "flow",
@@ -2533,9 +2388,7 @@ def test_fully_developed_case_step_covers_forcing_and_target_velocity_paths():
         0.0,
     )
     target_mean = solvers._target_mean_velocity(flow_case)
-    projected_mean = float(
-        jnp.sum(fluid_weight * flow_result[0]) / jnp.sum(fluid_weight)
-    )
+    projected_mean = float(jnp.sum(fluid_weight * flow_result[0]) / jnp.sum(fluid_weight))
     assert projected_mean == pytest.approx(target_mean)
     assert float(flow_result[13]) == pytest.approx(target_mean)
     assert float(flow_result[14]) == pytest.approx(float(flow_result[14]))
@@ -2725,9 +2578,7 @@ def test_scaled_pressure_proxy_value_falls_back_to_unity_reference_for_zero_curr
 
 def test_inlet_speed_defaults_tuple_axis_to_x_and_rejects_zero_area_flow_rate():
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    tuple_bc = BoundaryCondition(
-        "tuple", "inlet_velocity", value=(1.0, 2.0, 3.0), axis="bad"
-    )
+    tuple_bc = BoundaryCondition("tuple", "inlet_velocity", value=(1.0, 2.0, 3.0), axis="bad")
     zero_area_case = replace(case, geometry=replace(case.geometry, width=0.0))
     flow_bc = BoundaryCondition("flow", "inlet_flow_rate", value=1.0, axis="x")
 
@@ -2785,18 +2636,14 @@ def test_fully_developed_solver_rejects_unsupported_geometry_after_mesh_build(
 ):
     case = replace(
         make_hartmann_case(ha=5.0, ny=4, nz=4),
-        geometry=GeometrySpec(
-            kind="pipe_ogrid", width=1.0, height=1.0, radius=0.5, nr=4, ntheta=8
-        ),
+        geometry=GeometrySpec(kind="pipe_ogrid", width=1.0, height=1.0, radius=0.5, nr=4, ntheta=8),
     )
     fake_mesh = generate_rect_duct_mesh(width=1.0, height=1.0, ny=4, nz=4)
     monkeypatch.setattr(solvers, "_build_mesh", lambda case: fake_mesh)
     monkeypatch.setattr(
         solvers,
         "build_material_fields",
-        lambda case, mesh: build_material_fields(
-            make_hartmann_case(ha=5.0, ny=4, nz=4), fake_mesh
-        ),
+        lambda case, mesh: build_material_fields(make_hartmann_case(ha=5.0, ny=4, nz=4), fake_mesh),
     )
     with pytest.raises(NotImplementedError, match="does not yet support geometry"):
         solvers._solve_fully_developed(case)
@@ -2810,9 +2657,7 @@ def test_public_solver_entrypoints_coerce_or_preserve_mode_before_dispatch(
     calls: list[tuple[str, bool]] = []
 
     def fake_solve(case_arg, **kwargs):
-        calls.append(
-            (case_arg.solver.mode, bool(kwargs.get("append_diagnostics", False)))
-        )
+        calls.append((case_arg.solver.mode, bool(kwargs.get("append_diagnostics", False))))
         return "ok"
 
     monkeypatch.setattr(solvers, "_solve_fully_developed", fake_solve)
@@ -2893,6 +2738,8 @@ def test_steady_solver_rejects_invalid_coupling_acceleration_controls():
         )
         with pytest.raises(ValueError, match=message):
             solve_steady(invalid_anderson)
+
+
 for _unit_test_name in (
     "test_hartmann_solver_runs",
     "test_hunt_solver_keeps_solid_velocity_zero",

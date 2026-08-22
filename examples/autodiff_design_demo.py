@@ -20,7 +20,6 @@ from lmx.autodiff import (
     solve_differentiable_hartmann,
 )
 
-
 # Inputs: mesh, solver effort, parameter scan, design controls, and outputs.
 OUTPUT_DIR = Path("artifacts/examples/autodiff_design")
 NY = NZ = 24  # Increase both mesh counts to resolve thinner Hartmann layers.
@@ -61,15 +60,11 @@ problem = build_hartmann_autodiff_problem(
 def mean_velocity_objective(hartmann_number: jax.Array) -> jax.Array:
     """Return the mean velocity whose Hartmann sensitivity is requested."""
 
-    return hartmann_mean_velocity(
-        problem, forcing=FORCING, hartmann_number=hartmann_number
-    )
+    return hartmann_mean_velocity(problem, forcing=FORCING, hartmann_number=hartmann_number)
 
 
 hartmann_numbers = jnp.linspace(HARTMANN_MIN, HARTMANN_MAX, SCAN_POINTS)
-mean_velocity, sensitivity = jax.jit(
-    jax.vmap(jax.value_and_grad(mean_velocity_objective))
-)(hartmann_numbers)
+mean_velocity, sensitivity = jax.jit(jax.vmap(jax.value_and_grad(mean_velocity_objective)))(hartmann_numbers)
 scan_arrays = map(np.asarray, (hartmann_numbers, mean_velocity, sensitivity))
 sensitivity_scan = [
     {
@@ -82,7 +77,9 @@ sensitivity_scan = [
 
 # Build target data, then state the least-squares design objective explicitly.
 target_u, _ = solve_differentiable_hartmann(
-    problem, forcing=FORCING, hartmann_number=TARGET_HARTMANN_NUMBER,
+    problem,
+    forcing=FORCING,
+    hartmann_number=TARGET_HARTMANN_NUMBER,
 )
 target_profile = target_u[:, target_u.shape[1] // 2]
 

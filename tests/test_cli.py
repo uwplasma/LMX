@@ -1,12 +1,11 @@
+import runpy
 from pathlib import Path
 from types import SimpleNamespace
-import runpy
 
 import pytest
 
 from lmx import cli
 from lmx.config import FringingSpec, LoggingSpec, RestartSpec, RunConfig
-
 
 pytestmark = pytest.mark.unit
 
@@ -14,23 +13,15 @@ pytestmark = pytest.mark.unit
 def _stub_validation_cli(
     monkeypatch: pytest.MonkeyPatch, *, case_name: str, output_dir: Path
 ) -> dict[str, object]:
-    case = SimpleNamespace(
-        name=case_name, output=SimpleNamespace(directory=str(output_dir))
-    )
-    solution = SimpleNamespace(
-        state=SimpleNamespace(time=1.25, residual=0.01), mesh=SimpleNamespace()
-    )
+    case = SimpleNamespace(name=case_name, output=SimpleNamespace(directory=str(output_dir)))
+    solution = SimpleNamespace(state=SimpleNamespace(time=1.25, residual=0.01), mesh=SimpleNamespace())
     recorded: dict[str, object] = {}
     monkeypatch.setattr(cli, "_build_case", lambda args: case)
     monkeypatch.setattr(cli, "solve_steady", lambda built_case: solution)
     monkeypatch.setattr(cli, "write_paraview", lambda solved, out_dir: [])
     monkeypatch.setattr(cli, "write_profile_csv", lambda path, profile: path)
-    monkeypatch.setattr(
-        cli, "extract_centerline", lambda solved: {"y": [0.0], "u": [1.0]}
-    )
-    monkeypatch.setattr(
-        cli, "extract_midplane_profile", lambda solved, axis: {"z": [0.0], "u": [1.0]}
-    )
+    monkeypatch.setattr(cli, "extract_centerline", lambda solved: {"y": [0.0], "u": [1.0]})
+    monkeypatch.setattr(cli, "extract_midplane_profile", lambda solved, axis: {"z": [0.0], "u": [1.0]})
     monkeypatch.setattr(
         cli,
         "validation_summary",
@@ -157,12 +148,8 @@ def test_cli_run_branch_uses_case_builder_and_solver(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ):
     output_dir = tmp_path / "run"
-    case = SimpleNamespace(
-        name="demo_case", output=SimpleNamespace(directory=str(output_dir))
-    )
-    solution = SimpleNamespace(
-        state=SimpleNamespace(time=1.25, residual=0.01), mesh=SimpleNamespace()
-    )
+    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(output_dir)))
+    solution = SimpleNamespace(state=SimpleNamespace(time=1.25, residual=0.01), mesh=SimpleNamespace())
     recorded: list[tuple[str, object]] = []
 
     monkeypatch.setattr(cli, "_build_case", lambda args: case)
@@ -175,8 +162,7 @@ def test_cli_run_branch_uses_case_builder_and_solver(
         cli,
         "write_solution_outputs",
         lambda solved, built_case, out_dir, write_npz, write_plots: (
-            recorded.append(("outputs", out_dir))
-            or {"paraview": [], "csv": [], "npz": [], "plots": []}
+            recorded.append(("outputs", out_dir)) or {"paraview": [], "csv": [], "npz": [], "plots": []}
         ),
     )
 
@@ -185,7 +171,7 @@ def test_cli_run_branch_uses_case_builder_and_solver(
     assert exit_code == 0
     assert recorded[0][0] == "solve"
     assert recorded[1][0] == "outputs"
-    assert '"case": "demo_case"' in capsys.readouterr().out
+    assert f'"case": "{case.name}"' in capsys.readouterr().out
 
 
 def test_cli_run_branch_dispatches_extruded_case(
@@ -209,16 +195,12 @@ def test_cli_run_branch_dispatches_extruded_case(
     recorded: dict[str, object] = {}
 
     monkeypatch.setattr(cli, "_build_extruded_problem", lambda args: problem)
-    monkeypatch.setattr(
-        cli, "solve_extruded_inductionless", lambda built_problem: solution
-    )
+    monkeypatch.setattr(cli, "solve_extruded_inductionless", lambda built_problem: solution)
     monkeypatch.setattr(
         cli,
         "write_extruded_solution_outputs",
         lambda solved, built_case, out_dir, write_npz, write_plots=False: (
-            recorded.update(
-                out_dir=Path(out_dir), write_npz=write_npz, write_plots=write_plots
-            )
+            recorded.update(out_dir=Path(out_dir), write_npz=write_npz, write_plots=write_plots)
             or {
                 "csv": [Path(out_dir) / "stations.csv"],
                 "npz": [Path(out_dir) / "bundle.npz"],
@@ -261,15 +243,9 @@ def test_cli_dispatches_direct_toml_run(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_cli_returns_nonzero_for_recorded_unconverged_steady_result():
-    assert cli._summary_exit_code(
-        {"solver_mode": "steady", "converged": False}
-    ) == 2
-    assert cli._summary_exit_code(
-        {"solver_mode": "steady", "converged": True}
-    ) == 0
-    assert cli._summary_exit_code(
-        {"solver_mode": "transient", "converged": False}
-    ) == 0
+    assert cli._summary_exit_code({"solver_mode": "steady", "converged": False}) == 2
+    assert cli._summary_exit_code({"solver_mode": "steady", "converged": True}) == 0
+    assert cli._summary_exit_code({"solver_mode": "transient", "converged": False}) == 0
 
 
 def test_cli_case_builders_reject_unknown_case():
@@ -303,9 +279,7 @@ def test_python_module_entrypoint_delegates_to_cli_main(
 ):
     recorded: dict[str, object] = {}
 
-    monkeypatch.setattr(
-        "lmx.cli.main", lambda argv=None: recorded.update(argv=argv) or 0
-    )
+    monkeypatch.setattr("lmx.cli.main", lambda argv=None: recorded.update(argv=argv) or 0)
     with pytest.raises(SystemExit) as excinfo:
         runpy.run_module("lmx", run_name="__main__")
 
@@ -317,20 +291,15 @@ def test_run_config_uses_restart_bundle_and_writes_restart_output(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ):
     output_dir = tmp_path / "run"
-    case = cli._build_case(
-        SimpleNamespace(case="hartmann", ha=5.0, output=str(output_dir))
-    )
+    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(output_dir)))
     case = case.__class__(
         **{
             **case.__dict__,
-            "output": case.output.__class__(
-                **{**case.output.__dict__, "directory": str(output_dir)}
-            ),
+            "output": case.output.__class__(**{**case.output.__dict__, "directory": str(output_dir)}),
         }
     )
     config = RunConfig(
         case=case,
-        solve_mode="steady",
         logging=LoggingSpec(enabled=False),
         restart=RestartSpec(
             enabled=True,
@@ -394,9 +363,7 @@ def test_run_config_uses_restart_bundle_and_writes_restart_output(
             "plots": [],
         },
     )
-    monkeypatch.setattr(
-        cli, "write_restart_npz", lambda solved, built_case, path: Path(path)
-    )
+    monkeypatch.setattr(cli, "write_restart_npz", lambda solved, built_case, path: Path(path))
 
     summary = cli._run_config(config)
 
@@ -410,27 +377,18 @@ def test_run_config_uses_restart_bundle_and_writes_restart_output(
 def test_run_config_dispatches_extruded_solver_kind(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ):
-    case = cli._build_case(
-        SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path / "run"))
-    )
+    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path / "run")))
     case = case.__class__(
         **{
             **case.__dict__,
             "name": "fringing_rect_demo",
-            "geometry": case.geometry.__class__(
-                **{**case.geometry.__dict__, "length": 6.0, "nx": 5}
-            ),
-            "solver": case.solver.__class__(
-                **{**case.solver.__dict__, "kind": "extruded_inductionless"}
-            ),
-            "output": case.output.__class__(
-                **{**case.output.__dict__, "directory": str(tmp_path / "run")}
-            ),
+            "geometry": case.geometry.__class__(**{**case.geometry.__dict__, "length": 6.0, "nx": 5}),
+            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
+            "output": case.output.__class__(**{**case.output.__dict__, "directory": str(tmp_path / "run")}),
         }
     )
     config = RunConfig(
         case=case,
-        solve_mode="steady",
         logging=LoggingSpec(enabled=False),
         fringing=FringingSpec(
             enabled=True,
@@ -461,9 +419,7 @@ def test_run_config_dispatches_extruded_solver_kind(
         cli,
         "write_extruded_solution_outputs",
         lambda solved, built_case, out_dir, write_npz, write_plots=False: (
-            recorded.update(
-                out_dir=Path(out_dir), write_npz=write_npz, write_plots=write_plots
-            )
+            recorded.update(out_dir=Path(out_dir), write_npz=write_npz, write_plots=write_plots)
             or {
                 "csv": [Path(out_dir) / "stations.csv"],
                 "npz": [Path(out_dir) / "bundle.npz"],
@@ -483,24 +439,17 @@ def test_run_config_dispatches_extruded_solver_kind(
 
 
 def test_run_config_extruded_requires_restart_path_when_restart_enabled(tmp_path: Path):
-    case = cli._build_case(
-        SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path / "run"))
-    )
+    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path / "run")))
     case = case.__class__(
         **{
             **case.__dict__,
             "name": "fringing_rect_demo",
-            "geometry": case.geometry.__class__(
-                **{**case.geometry.__dict__, "length": 6.0, "nx": 5}
-            ),
-            "solver": case.solver.__class__(
-                **{**case.solver.__dict__, "kind": "extruded_inductionless"}
-            ),
+            "geometry": case.geometry.__class__(**{**case.geometry.__dict__, "length": 6.0, "nx": 5}),
+            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
         }
     )
     config = RunConfig(
         case=case,
-        solve_mode="steady",
         logging=LoggingSpec(enabled=False),
         fringing=FringingSpec(
             enabled=True,
@@ -516,24 +465,16 @@ def test_run_config_extruded_requires_restart_path_when_restart_enabled(tmp_path
 
 
 def test_run_config_extruded_requires_fringing_block(tmp_path: Path):
-    case = cli._build_case(
-        SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path / "run"))
-    )
+    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path / "run")))
     case = case.__class__(
         **{
             **case.__dict__,
             "name": "fringing_rect_demo",
-            "geometry": case.geometry.__class__(
-                **{**case.geometry.__dict__, "length": 6.0, "nx": 5}
-            ),
-            "solver": case.solver.__class__(
-                **{**case.solver.__dict__, "kind": "extruded_inductionless"}
-            ),
+            "geometry": case.geometry.__class__(**{**case.geometry.__dict__, "length": 6.0, "nx": 5}),
+            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
         }
     )
-    config = RunConfig(
-        case=case, solve_mode="steady", logging=LoggingSpec(enabled=False)
-    )
+    config = RunConfig(case=case, logging=LoggingSpec(enabled=False))
     with pytest.raises(ValueError, match="\\[fringing\\] block"):
         cli._run_config(config)
 
@@ -546,9 +487,7 @@ def test_run_config_supports_extruded_restart_and_structured_output_layout(
     output_dir = tmp_path / "fringing_run"
     input_path = tmp_path / "fringing_case.toml"
     input_path.write_text("[case]\nname='demo'\n", encoding="utf-8")
-    case = cli._build_case(
-        SimpleNamespace(case="hartmann", ha=5.0, output=str(output_dir))
-    )
+    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(output_dir)))
     case = case.__class__(
         **{
             **case.__dict__,
@@ -561,9 +500,7 @@ def test_run_config_supports_extruded_restart_and_structured_output_layout(
                     "nx": 5,
                 }
             ),
-            "solver": case.solver.__class__(
-                **{**case.solver.__dict__, "kind": "extruded_inductionless"}
-            ),
+            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
             "output": case.output.__class__(
                 **{
                     **case.output.__dict__,
@@ -576,7 +513,6 @@ def test_run_config_supports_extruded_restart_and_structured_output_layout(
     )
     config = RunConfig(
         case=case,
-        solve_mode="steady",
         logging=LoggingSpec(enabled=True),
         restart=RestartSpec(
             enabled=True,
@@ -605,9 +541,7 @@ def test_run_config_supports_extruded_restart_and_structured_output_layout(
     solution = _extruded_solution()
     recorded: dict[str, object] = {}
 
-    monkeypatch.setattr(
-        cli, "load_extruded_restart_bundle", lambda path: restart_bundle
-    )
+    monkeypatch.setattr(cli, "load_extruded_restart_bundle", lambda path: restart_bundle)
     monkeypatch.setattr(
         cli,
         "validate_extruded_restart_bundle",
@@ -623,9 +557,7 @@ def test_run_config_supports_extruded_restart_and_structured_output_layout(
     monkeypatch.setattr(
         cli,
         "solve_extruded_inductionless",
-        lambda problem, initial_bundle=None: (
-            recorded.update(initial_bundle=initial_bundle) or solution
-        ),
+        lambda problem, initial_bundle=None: recorded.update(initial_bundle=initial_bundle) or solution,
     )
     monkeypatch.setattr(
         cli,
@@ -656,16 +588,10 @@ def test_cli_validate_branches_into_reference_comparison(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ):
     output_dir = tmp_path / "validate"
-    recorded = _stub_validation_cli(
-        monkeypatch, case_name="shercliff_ha5", output_dir=output_dir
-    )
+    recorded = _stub_validation_cli(monkeypatch, case_name="shercliff_ha5", output_dir=output_dir)
     comparison = SimpleNamespace(
         y_profile=SimpleNamespace(l2_error=0.2, linf_error=0.3),
         z_profile=SimpleNamespace(l2_error=0.4, linf_error=0.5),
-    )
-    slice_report = SimpleNamespace(
-        y_profile=SimpleNamespace(l2_error=0.6, linf_error=0.7),
-        z_profile=SimpleNamespace(l2_error=0.8, linf_error=0.9),
     )
     monkeypatch.setattr(
         cli,
@@ -676,16 +602,6 @@ def test_cli_validate_branches_into_reference_comparison(
         cli,
         "write_closed_channel_validation",
         lambda report, path: recorded.update(closed=path) or path,
-    )
-    monkeypatch.setattr(
-        cli,
-        "processed_slice_validation",
-        lambda solved, case_name, ha, x_slice, reference_root: slice_report,
-    )
-    monkeypatch.setattr(
-        cli,
-        "write_processed_slice_validation",
-        lambda report, path: recorded.update(slice=path) or path,
     )
     exit_code = cli.main(
         [
@@ -704,10 +620,7 @@ def test_cli_validate_branches_into_reference_comparison(
     assert "y_l2_error" in recorded["metrics"]
     assert "combined_l2_error" in recorded["metrics"]
     assert recorded["closed"] == output_dir / "shercliff_ha5_analytic.json"
-    assert recorded["slice"] == output_dir / "shercliff_ha5_slice.json"
-    assert recorded["metrics"]["combined_l2_error"] == pytest.approx(
-        ((0.2**2 + 0.4**2) / 2.0) ** 0.5
-    )
+    assert recorded["metrics"]["combined_l2_error"] == pytest.approx(((0.2**2 + 0.4**2) / 2.0) ** 0.5)
     assert '"y_l2_error": 0.2' in capsys.readouterr().out
 
 
@@ -715,15 +628,11 @@ def test_cli_validate_hartmann_branch_writes_analytic_report(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ):
     output_dir = tmp_path / "validate"
-    recorded = _stub_validation_cli(
-        monkeypatch, case_name="hartmann_ha5", output_dir=output_dir
-    )
+    recorded = _stub_validation_cli(monkeypatch, case_name="hartmann_ha5", output_dir=output_dir)
     monkeypatch.setattr(
         cli,
         "hartmann_validation",
-        lambda solved, ha: SimpleNamespace(
-            y_profile=SimpleNamespace(l2_error=0.2, linf_error=0.3)
-        ),
+        lambda solved, ha: SimpleNamespace(y_profile=SimpleNamespace(l2_error=0.2, linf_error=0.3)),
     )
     monkeypatch.setattr(
         cli,
@@ -737,18 +646,14 @@ def test_cli_validate_hartmann_branch_writes_analytic_report(
     monkeypatch.setattr(
         cli,
         "write_analytic_comparison",
-        lambda report, path, axis_name: (
-            recorded.update(analytic=path, axis=axis_name) or path
-        ),
+        lambda report, path, axis_name: recorded.update(analytic=path, axis=axis_name) or path,
     )
     monkeypatch.setattr(
         cli,
         "write_acceptance_report",
         lambda report, path: recorded.update(acceptance=path) or path,
     )
-    exit_code = cli.main(
-        ["validate", "hartmann", "--ha", "5", "--output", str(output_dir)]
-    )
+    exit_code = cli.main(["validate", "hartmann", "--ha", "5", "--output", str(output_dir)])
 
     assert exit_code == 0
     assert recorded["axis"] == "y"
@@ -756,50 +661,6 @@ def test_cli_validate_hartmann_branch_writes_analytic_report(
     assert recorded["acceptance"] == output_dir / "hartmann_ha5_acceptance.json"
     assert recorded["metrics"]["accepted"] == pytest.approx(1.0)
     assert '"y_l2_error": 0.2' not in capsys.readouterr().out
-
-
-def test_cli_validate_reference_branch_handles_missing_slice_file(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-):
-    output_dir = tmp_path / "validate"
-    recorded = _stub_validation_cli(
-        monkeypatch, case_name="hunt_ha5", output_dir=output_dir
-    )
-    comparison = SimpleNamespace(
-        y_profile=SimpleNamespace(l2_error=0.2, linf_error=0.3),
-        z_profile=SimpleNamespace(l2_error=0.4, linf_error=0.5),
-    )
-    monkeypatch.setattr(
-        cli,
-        "closed_channel_validation",
-        lambda solved, case_name, ha, reference_root: comparison,
-    )
-    monkeypatch.setattr(
-        cli,
-        "processed_slice_validation",
-        lambda *args, **kwargs: (_ for _ in ()).throw(FileNotFoundError("missing")),
-    )
-    monkeypatch.setattr(
-        cli,
-        "write_closed_channel_validation",
-        lambda report, path: recorded.update(closed=path) or path,
-    )
-    exit_code = cli.main(
-        [
-            "validate",
-            "hunt",
-            "--output",
-            str(output_dir),
-            "--reference-root",
-            str(tmp_path / "refs"),
-        ]
-    )
-
-    assert exit_code == 0
-    assert recorded["closed"] == output_dir / "hunt_ha5_analytic.json"
-    assert "slice_y_l2_error" not in recorded["metrics"]
-    assert "combined_l2_error" in recorded["metrics"]
-    assert '"y_l2_error": 0.2' in capsys.readouterr().out
 
 
 def test_solve_case_with_optional_logger_falls_back_on_typeerror(
@@ -824,32 +685,21 @@ def test_solve_case_with_optional_logger_falls_back_on_typeerror(
     monkeypatch.setattr(cli, "solve_steady", fake_steady)
 
     assert (
-        cli._solve_case_with_optional_logger(
-            case, solve_mode="transient", logger=object()
-        )
-        == "transient-ok"
+        cli._solve_case_with_optional_logger(case, solve_mode="transient", logger=object()) == "transient-ok"
     )
-    assert (
-        cli._solve_case_with_optional_logger(case, solve_mode="steady", logger=object())
-        == "steady-ok"
-    )
+    assert cli._solve_case_with_optional_logger(case, solve_mode="steady", logger=object()) == "steady-ok"
     assert calls == [("transient", case), ("steady", case)]
 
 
 def test_write_run_summary_respects_disabled_json_summary(tmp_path: Path):
-    case = SimpleNamespace(
-        name="demo", output=SimpleNamespace(write_json_summary=False)
-    )
+    case = SimpleNamespace(name="demo", output=SimpleNamespace(write_json_summary=False))
     assert cli._write_run_summary({"case": "demo"}, case, tmp_path) is None
 
 
 def test_run_config_requires_restart_path(tmp_path: Path):
-    case = cli._build_case(
-        SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path))
-    )
+    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path)))
     config = RunConfig(
         case=case,
-        solve_mode="steady",
         logging=LoggingSpec(enabled=False),
         restart=RestartSpec(enabled=True, path=None),
     )
@@ -873,9 +723,7 @@ def test_run_branch_logging_flags(
     expected_enabled: bool,
     expected_verbosity: str | None,
 ):
-    case = cli._build_case(
-        SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path))
-    )
+    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path)))
     recorded: dict[str, object] = {}
 
     monkeypatch.setattr(cli, "_build_case", lambda args: case)
@@ -883,9 +731,7 @@ def test_run_branch_logging_flags(
         cli,
         "_run_config",
         lambda config: (
-            recorded.update(
-                enabled=config.logging.enabled, verbosity=config.logging.verbosity
-            )
+            recorded.update(enabled=config.logging.enabled, verbosity=config.logging.verbosity)
             or {"case": case.name}
         ),
     )

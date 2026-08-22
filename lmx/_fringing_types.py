@@ -10,10 +10,14 @@ import jax.numpy as jnp
 from .specs import CaseSpec
 
 EXTRUDED_HISTORY_WIDTHS = (
-    ("iteration_residual_history", 0), ("iteration_momentum_defect_history", 0),
-    ("iteration_component_residual_history", 6), ("iteration_pressure_residual_history", 0),
-    ("iteration_pressure_linear_history", 5), ("iteration_electric_linear_history", 6),
-    ("iteration_potential_residual_history", 0), ("iteration_courant_history", 3),
+    ("iteration_residual_history", 0),
+    ("iteration_momentum_defect_history", 0),
+    ("iteration_component_residual_history", 6),
+    ("iteration_pressure_residual_history", 0),
+    ("iteration_pressure_linear_history", 5),
+    ("iteration_electric_linear_history", 6),
+    ("iteration_potential_residual_history", 0),
+    ("iteration_courant_history", 3),
 )
 
 
@@ -46,9 +50,7 @@ class ExtrudedFieldBundle:
     rho_phi_inlet: jnp.ndarray | None = None
     aitken_state: tuple[jnp.ndarray | None, float, int] | None = None
     # Previous raw mapped field, residual, compact plus flux, and inlet flux.
-    anderson_state: tuple[
-        jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray
-    ] | None = None
+    anderson_state: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray] | None = None
     stopping_state: tuple[int, int, str] = (0, 0, "not_recorded")
     jx: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     jy: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
@@ -74,6 +76,7 @@ class ExtrudedFieldBundle:
     iteration_electric_linear_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0, 6)))
     iteration_potential_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     iteration_courant_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0, 3)))
+
 
 @dataclass(frozen=True)
 class ExtrudedIterationProgress:

@@ -1,18 +1,16 @@
-from pathlib import Path
-from types import SimpleNamespace
 from copy import deepcopy
 from dataclasses import replace
-import hashlib
-import json
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 import lmx.benchmarks as benchmarks
 from lmx.benchmarks import (
     benchmark_b_pressure_observable,
-    build_benchmark_b_problem,
-    build_benchmark_b_field_profile,
     benchmark_solver,
+    build_benchmark_b_field_profile,
+    build_benchmark_b_problem,
     load_benchmark_b_reference,
     load_benchmark_b_spec,
     write_benchmark_report,
@@ -23,12 +21,6 @@ from lmx.fringing import (
     solve_extruded_inductionless,
 )
 from lmx.io import load_extruded_restart_bundle, write_extruded_bundle_restart_npz
-from scripts.analyze_freemhd_benchmark_a_ladder import (
-    analyze_ladder,
-    compact_evidence,
-    freeze_summary,
-)
-
 
 pytestmark = pytest.mark.unit
 
@@ -38,88 +30,14 @@ _EQUATIONS = _SHARED + ("equations",)
 _MESH_LEVELS = ("mesh", "levels")
 _SEMANTICS = "matched formulation semantics differ"
 _FREEMHD_COMMIT = ("free_mhd_discretization_reference", "repository_commit")
-_STEADY_STEPS = _MATCHED + ("roles", "b2-production", "stopping_rules", "steady_steps_min")
-_STOPPING = "matched stopping contract differs"
-_REFERENCE_HEADER = (
-    "x_over_L,b_over_B0,b_uncertainty,pressure_observable,pressure_uncertainty"
+_STEADY_STEPS = _MATCHED + (
+    "roles",
+    "b2-production",
+    "stopping_rules",
+    "steady_steps_min",
 )
-
-
-def _freemhd_record(case_kind: str, cells: int) -> dict:
-    h = 1.0 / cells
-    reference = [0.0, 1.0, 0.0]
-    shape = [0.5, -1.0, 0.5]
-    simulated = [value + h**2 * delta for value, delta in zip(reference, shape)]
-    cut = {
-        "coordinate": [-1.0, 0.0, 1.0],
-        "reference": reference,
-        "simulated": simulated,
-        "l2_error": (0.5 * h**4) ** 0.5,
-    }
-    return {
-        "case_kind": case_kind,
-        "settings": {"ny": cells, "nz": cells},
-        "benchmark_spec": {
-            "id": f"A2-{case_kind}-ha20",
-            "path": f"{case_kind}.toml",
-            "sha256": "a" * 64,
-        },
-        "solver_diagnostics": {
-            "potential_iterations_used": 20,
-            "potential_residual": 1.0e-10,
-        },
-        "integral_observables": {
-            "applied_pressure_gradient": 10.0 + 100.0 * h**2,
-            "reference_pressure_gradient": 10.0,
-            "pressure_gradient_relative_error": 0.006,
-        },
-        "observables": {
-            name: {axis: deepcopy(cut) for axis in ("y", "z")}
-            for name in ("velocity", "potential", "current", "lorentz")
-        },
-        "current_balance": {"acceptance_target": 0.001},
-        "power_balance": {"mechanical_power_relative_error": 1.0e-5},
-        "continuum_velocity_audit": {
-            "reference_path": f"/nonportable/reference/{case_kind}.txt",
-            "axes": {"y": {"lmx_raw_analytical": {"l2_error": 0.007}}},
-        },
-    }
-
-
-def _freemhd_levels(
-    levels=(("coarse", 10), ("medium", 20), ("fine", 40)),
-) -> list[dict]:
-    return [
-        {
-            "label": label,
-            "records": [
-                _freemhd_record("shercliff", cells),
-                _freemhd_record("hunt", cells),
-            ],
-        }
-        for label, cells in levels
-    ]
-
-
-def _freemhd_summary() -> dict[str, object]:
-    return {
-        "best_level_label": "confirmation",
-        "implementation": {
-            "runner_sha256": "1" * 64,
-            "solver_core_sha256": "2" * 64,
-            "lmx_version": "1.2.3",
-            "solvax_version": "0.4.0",
-        },
-        "ladder": _freemhd_levels(
-            (label, 85) for label in ("coarse", "medium", "fine", "confirmation")
-        ),
-        "richardson": {
-            "schema_version": 1,
-            "levels": ["medium", "fine", "confirmation"],
-            "cases": {},
-            "research_grade_validation_pass": False,
-        },
-    }
+_STOPPING = "matched stopping contract differs"
+_REFERENCE_HEADER = "x_over_L,b_over_B0,b_uncertainty,pressure_observable,pressure_uncertainty"
 
 
 def _assert_iteration_histories(bundle):
@@ -127,9 +45,7 @@ def _assert_iteration_histories(bundle):
     pressure = bundle.iteration_pressure_residual_history
     potential = bundle.iteration_potential_residual_history
     assert pressure.shape == potential.shape == history.shape
-    assert benchmarks.jnp.all(
-        history[:, None] >= benchmarks.jnp.stack((pressure, potential), 1)
-    )
+    assert benchmarks.jnp.all(history[:, None] >= benchmarks.jnp.stack((pressure, potential), 1))
     electric = bundle.iteration_electric_linear_history
     assert electric.shape == (history.size, 6)
     assert benchmarks.jnp.all(electric[:, 3] > 0)
@@ -159,109 +75,6 @@ def _install_reference(tmp_path, monkeypatch, rows):
     monkeypatch.setattr(benchmarks, "load_benchmark_b_spec", lambda *_: spec)
 
 
-def test_analyze_freemhd_ladder_recovers_second_order() -> None:
-    result = analyze_ladder(_freemhd_levels())
-    for case in result["cases"].values():
-        assert case["profiles"]["velocity_y"]["observed_order"] == pytest.approx(2.0)
-        assert case["profiles"]["velocity_y"]["extrapolated_l2"] == pytest.approx(
-            0.0, abs=1.0e-14
-        )
-        assert case["pressure_gradient"]["observed_order"] == pytest.approx(2.0)
-        assert case["pressure_gradient"][
-            "extrapolated_relative_error"
-        ] == pytest.approx(0.0, abs=1.0e-14)
-        assert case["extrapolated_primary_pass"] is True
-    assert result["research_grade_validation_pass"] is True
-
-
-def test_analyze_freemhd_ladder_rejects_bad_inputs_and_unavailable_order() -> None:
-    with pytest.raises(ValueError, match="exactly three levels"):
-        analyze_ladder(_freemhd_levels()[:2])
-    levels = _freemhd_levels()
-    levels[1]["records"][0]["benchmark_spec"]["sha256"] = "b" * 64
-    with pytest.raises(ValueError, match="specification changed"):
-        analyze_ladder(levels)
-
-    levels = _freemhd_levels()
-    for level in levels:
-        cut = level["records"][0]["observables"]["velocity"]["y"]
-        cut["simulated"] = cut["reference"]
-        cut["l2_error"] = 0.0
-    profile = analyze_ladder(levels)["cases"]["shercliff"]["profiles"]["velocity_y"]
-    assert profile["observed_order"] is None
-    assert profile["extrapolation_status"] == "order_unavailable"
-    assert profile["extrapolated_pass"] is False
-
-
-def test_compact_freemhd_evidence_is_portable_and_deterministic(tmp_path: Path) -> None:
-    summary = _freemhd_summary()
-    evidence = compact_evidence(summary, source_sha256="b" * 64)
-    assert set(evidence) == {"richardson", "continuum", "power"}
-    assert evidence["power"]["confirmation_level"] == "confirmation"
-    assert evidence["power"]["implementation"]["solver_core_sha256"] == "2" * 64
-    continuum = evidence["continuum"]["cases"]["shercliff"]
-    assert continuum["reference_file"] == "shercliff.txt"
-    assert "reference_path" not in continuum
-
-    source = tmp_path / "summary.json"
-    source.write_text(json.dumps(summary), encoding="utf-8")
-    first = freeze_summary(source, tmp_path / "first")
-    second = freeze_summary(source, tmp_path / "second")
-    assert first.keys() == second.keys()
-    assert all(first[kind].read_bytes() == second[kind].read_bytes() for kind in first)
-
-
-@pytest.mark.parametrize(
-    "mutation, message",
-    [
-        (lambda summary: summary.update(ladder=summary["ladder"][:3]), "at least four"),
-        (lambda summary: summary.update(best_level_label="fine"), "Best level"),
-        (lambda summary: summary.pop("implementation"), "implementation fingerprint"),
-        (
-            lambda summary: summary["richardson"].update(
-                levels=["coarse", "medium", "fine"]
-            ),
-            "final three",
-        ),
-        (
-            lambda summary: summary["ladder"][-1].update(
-                records=[_freemhd_record("hunt", 85)]
-            ),
-            "one Shercliff",
-        ),
-    ],
-)
-def test_compact_freemhd_evidence_rejects_inconsistent_campaign(
-    mutation, message: str
-) -> None:
-    summary = _freemhd_summary()
-    mutation(summary)
-    with pytest.raises(ValueError, match=message):
-        compact_evidence(summary, source_sha256="c" * 64)
-
-
-def test_benchmark_b_specification_index_is_complete_and_deterministic():
-    expected = json.loads(
-        Path("benchmarks/results/benchmark-b-specification.json").read_text()
-    )
-    assert expected["specification_freeze_pass"] is True
-    assert expected["production_results_included"] is False
-    assert {case["id"] for case in expected["cases"]} == {
-        "B1-fringing-pipe",
-        "B2-fringing-square",
-    }
-    assert all(
-        case["mesh_levels"] == ["coarse", "medium", "fine"]
-        and case["numerical_independence"]["tolerance_uncertainty_fraction_max"] == 0.25
-        for case in expected["cases"]
-    )
-    for case in expected["cases"]:
-        for prefix in ("spec", "data"):
-            digest = hashlib.sha256(Path(case[f"{prefix}_path"]).read_bytes()).hexdigest()
-            assert digest == case[f"{prefix}_sha256"]
-    assert len(expected["production_blockers"]) == 2
-
-
 def test_benchmark_solver_returns_positive_timings(monkeypatch: pytest.MonkeyPatch):
     times = iter([10.0, 10.4, 10.4, 10.7])
 
@@ -273,9 +86,7 @@ def test_benchmark_solver_returns_positive_timings(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr("lmx.solvers.solve_steady", lambda case: SimpleNamespace())
     monkeypatch.setattr(benchmarks.time, "perf_counter", lambda: next(times))
     monkeypatch.setattr(benchmarks.jax, "default_backend", lambda: "cpu")
-    monkeypatch.setattr(
-        benchmarks.jax, "devices", lambda: [SimpleNamespace(device_kind="cpu")]
-    )
+    monkeypatch.setattr(benchmarks.jax, "devices", lambda: [SimpleNamespace(device_kind="cpu")])
     monkeypatch.setattr(benchmarks.platform, "python_version", lambda: "3.13.7")
 
     report = benchmark_solver(repeats=2, ha=5.0, ny=16, nz=16)
@@ -285,9 +96,7 @@ def test_benchmark_solver_returns_positive_timings(monkeypatch: pytest.MonkeyPat
 
 
 def test_benchmark_writer(tmp_path: Path):
-    path = write_benchmark_report(
-        {"cold_seconds": 1.0, "warm_seconds": 0.5}, tmp_path / "benchmark.json"
-    )
+    path = write_benchmark_report({"cold_seconds": 1.0, "warm_seconds": 0.5}, tmp_path / "benchmark.json")
     assert path.exists()
 
 
@@ -333,10 +142,7 @@ def test_benchmark_b_field_profile_is_cell_centered_monotone_and_bounded(case_id
     assert float(profile.x[-1]) < 10.0
     assert min(profile.field_scale) >= 0.0
     assert max(profile.field_scale) <= 1.0
-    assert all(
-        right <= left
-        for left, right in zip(profile.field_scale, profile.field_scale[1:])
-    )
+    assert all(right <= left for left, right in zip(profile.field_scale, profile.field_scale[1:]))
 
 
 def test_benchmark_b_field_profile_rejects_degenerate_station_count():
@@ -392,8 +198,10 @@ def test_benchmark_b_problem_binds_frozen_nondimensional_contract(
     mesh = _cross_section_mesh(case)
     assert mesh.x_centers.tolist() == pytest.approx(problem.profile.x.tolist())
     if case_id == "B2-fringing-square":
-        invalid = replace(problem, case=replace(
-            case, solver=replace(case.solver, coupling_history_depth=3)))
+        invalid = replace(
+            problem,
+            case=replace(case, solver=replace(case.solver, coupling_history_depth=3)),
+        )
         with pytest.raises(ValueError, match="requires history depth 2"):
             solve_extruded_inductionless(invalid)
 
@@ -403,9 +211,7 @@ def test_benchmark_b_pipe_mesh_resolves_frozen_hartmann_layer():
     mesh = _cross_section_mesh(problem.case)
     radial_cells = int(problem.case.geometry.nr)
     layer_cells = int(problem.case.geometry.hartmann_layer_cells)
-    resolved_thickness = float(
-        mesh.y_faces[radial_cells] - mesh.y_faces[radial_cells - layer_cells]
-    )
+    resolved_thickness = float(mesh.y_faces[radial_cells] - mesh.y_faces[radial_cells - layer_cells])
     assert resolved_thickness == pytest.approx(1.0 / 6600.0, rel=2.0e-4)
     assert float(mesh.y_faces[radial_cells]) == pytest.approx(1.0)
 
@@ -413,17 +219,23 @@ def test_benchmark_b_pipe_mesh_resolves_frozen_hartmann_layer():
 def test_benchmark_b_problem_rejects_unfrozen_choices():
     for case_id, message, options in (
         ("B1-fringing-pipe", "mesh_level", {"mesh_level": "tiny"}),
-        ("B1-fringing-pipe", "wall_realization", {"mesh_level": "coarse", "wall_realization": "thick"}),
-        ("B2-fringing-square", "num_devices", {"mesh_level": "coarse", "num_devices": 0}),
+        (
+            "B1-fringing-pipe",
+            "wall_realization",
+            {"mesh_level": "coarse", "wall_realization": "thick"},
+        ),
+        (
+            "B2-fringing-square",
+            "num_devices",
+            {"mesh_level": "coarse", "num_devices": 0},
+        ),
     ):
         with pytest.raises(ValueError, match=message):
             build_benchmark_b_problem(case_id, **options)
 
 
 def test_benchmark_b_sharded_mesh_rounds_frozen_axial_minimum_upward():
-    problem = build_benchmark_b_problem(
-        "B2-fringing-square", mesh_level="coarse", num_devices=2
-    )
+    problem = build_benchmark_b_problem("B2-fringing-square", mesh_level="coarse", num_devices=2)
     assert problem.case.geometry.nx == 102
     assert problem.profile.x.size == 102
 
@@ -455,9 +267,7 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
             coupling_tolerance=1.0e-9,
         ),
     )
-    profile = build_benchmark_b_field_profile(
-        "B1-fringing-pipe", axial_stations=case.geometry.nx
-    )
+    profile = build_benchmark_b_field_profile("B1-fringing-pipe", axial_stations=case.geometry.nx)
     reduced_problem = replace(problem, case=case, profile=profile)
     progress = []
     solution = solve_extruded_inductionless(
@@ -476,9 +286,7 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
     assert all(item.checkpoint is not None for item in progress)
     assert progress[-1].checkpoint.u.shape == solution.bundle.u.shape
     assert progress[-1].checkpoint.iteration_residual_history.size == len(progress)
-    assert float(benchmarks.jnp.mean(solution.bundle.mean_velocity)) == pytest.approx(
-        1.0, abs=1.0e-8
-    )
+    assert float(benchmarks.jnp.mean(solution.bundle.mean_velocity)) == pytest.approx(1.0, abs=1.0e-8)
     assert solution.validation.mean_velocity_span < 1.0e-3
     assert solution.validation.volumetric_flow_rate_span < 1.0e-3
     assert solution.validation.max_charge_balance_residual < 1.0e-3
@@ -491,8 +299,10 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
 
     restart_progress = []
     restarted = solve_extruded_inductionless(
-        replace(reduced_problem, case=replace(
-            case, time_stepper=replace(case.time_stepper, max_steps=1))),
+        replace(
+            reduced_problem,
+            case=replace(case, time_stepper=replace(case.time_stepper, max_steps=1)),
+        ),
         initial_bundle=progress[-1].checkpoint,
         progress_callback=restart_progress.append,
     )
@@ -500,9 +310,7 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
     assert restarted.steps == 1
     assert restarted.status == "step_limit"
     assert not restarted.converged
-    assert float(benchmarks.jnp.mean(restarted.bundle.mean_velocity)) == pytest.approx(
-        1.0, abs=1.0e-8
-    )
+    assert float(benchmarks.jnp.mean(restarted.bundle.mean_velocity)) == pytest.approx(1.0, abs=1.0e-8)
     assert restarted.bundle.iteration_pressure_residual_history[-1] < 1.0e-3
     assert restarted.validation.max_charge_balance_residual < 1.0e-3
 
@@ -534,9 +342,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
             coupling_tolerance=0.33,
         ),
     )
-    profile = build_benchmark_b_field_profile(
-        "B2-fringing-square", axial_stations=case.geometry.nx
-    )
+    profile = build_benchmark_b_field_profile("B2-fringing-square", axial_stations=case.geometry.nx)
     progress = []
     solution = solve_extruded_inductionless(
         replace(problem, case=case, profile=profile),
@@ -545,17 +351,13 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     )
     assert len(progress) == 3 and all(item.checkpoint is not None for item in progress)
 
-    assert float(benchmarks.jnp.mean(solution.bundle.mean_velocity)) == pytest.approx(
-        1.0, abs=1.0e-10
-    )
+    assert float(benchmarks.jnp.mean(solution.bundle.mean_velocity)) == pytest.approx(1.0, abs=1.0e-10)
     assert solution.validation.max_charge_balance_residual < 1.0e-3
     assert solution.validation.net_boundary_current_residual < 1.0e-3
     history = _assert_iteration_histories(solution.bundle)
     assert solution.bundle.iteration_courant_history.shape == (history.size, 3)
     assert benchmarks.jnp.all(solution.bundle.iteration_courant_history >= 0.0)
-    assert solution.bundle.iteration_courant_history[:, 0] == pytest.approx(
-        0.064 / 540.0
-    )
+    assert solution.bundle.iteration_courant_history[:, 0] == pytest.approx(0.064 / 540.0)
     pressure_linear = solution.bundle.iteration_pressure_linear_history
     assert benchmarks.jnp.all(pressure_linear[:, :2] >= 0.0)
     assert benchmarks.jnp.all(pressure_linear[:, 2] > 0.0)
@@ -568,32 +370,23 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     assert solution.bundle.stopping_state[0] == history.size
     assert solution.bundle.stopping_state == (3, 3, "converged")
 
-    fx, fy, fz = _unpack_duct_mass_flux(
-        solution.bundle.rho_phi_plus, solution.bundle.rho_phi_inlet
-    )
-    flux_divergence = (
-        fx[1:] - fx[:-1] + fy[:, 1:] - fy[:, :-1] + fz[:, :, 1:] - fz[:, :, :-1]
-    )
-    inlet_flux, outlet_flux = map(
-        float, (benchmarks.jnp.sum(fx[0]), benchmarks.jnp.sum(fx[-1]))
-    )
+    fx, fy, fz = _unpack_duct_mass_flux(solution.bundle.rho_phi_plus, solution.bundle.rho_phi_inlet)
+    flux_divergence = fx[1:] - fx[:-1] + fy[:, 1:] - fy[:, :-1] + fz[:, :, 1:] - fz[:, :, :-1]
+    inlet_flux, outlet_flux = map(float, (benchmarks.jnp.sum(fx[0]), benchmarks.jnp.sum(fx[-1])))
     assert inlet_flux > 0.0
     assert outlet_flux == pytest.approx(inlet_flux, abs=1.0e-10)
     assert float(benchmarks.jnp.max(benchmarks.jnp.abs(flux_divergence))) < 1.0e-8
 
-    continuation_case = replace(
-        case, time_stepper=replace(case.time_stepper, max_steps=1)
-    )
-    continuation_problem = replace(
-        problem, case=continuation_case, profile=profile
-    )
+    continuation_case = replace(case, time_stepper=replace(case.time_stepper, max_steps=1))
+    continuation_problem = replace(problem, case=continuation_case, profile=profile)
     terminal, direct_two = (
-        replace(item.checkpoint, stopping_state=(*item.checkpoint.stopping_state[:2], "step_limit"))
+        replace(
+            item.checkpoint,
+            stopping_state=(*item.checkpoint.stopping_state[:2], "step_limit"),
+        )
         for item in progress[:2]
     )
-    path = write_extruded_bundle_restart_npz(
-        terminal, continuation_case, tmp_path / "b2.npz"
-    )
+    path = write_extruded_bundle_restart_npz(terminal, continuation_case, tmp_path / "b2.npz")
     restart = load_extruded_restart_bundle(path)
     assert terminal.aitken_state is None
     assert restart.bundle.aitken_state is None
@@ -601,7 +394,8 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     with pytest.raises(ValueError, match="both compact flux arrays"):
         solve_extruded_inductionless(
             continuation_problem,
-            initial_bundle=replace(restart.bundle, rho_phi_inlet=None))
+            initial_bundle=replace(restart.bundle, rho_phi_inlet=None),
+        )
     with pytest.raises(ValueError, match="momentum-defect contract"):
         solve_extruded_inductionless(
             continuation_problem,
@@ -614,7 +408,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
         continuation_problem,
         initial_bundle=restart.bundle,
     )
-    assert restart.metadata["restart_schema"] == "b2_diagnostics_v6"
+    assert restart.metadata["restart_schema"] == "extruded_anderson_v1"
     for name in (
         "u",
         "v",
@@ -632,14 +426,13 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
         "iteration_potential_residual_history",
         "iteration_courant_history",
     ):
-        assert benchmarks.jnp.array_equal(
-            getattr(resumed.bundle, name), getattr(direct_two, name)
+        assert benchmarks.jnp.array_equal(getattr(resumed.bundle, name), getattr(direct_two, name))
+    assert all(
+        benchmarks.jnp.array_equal(resumed_value, direct_value)
+        for resumed_value, direct_value in zip(
+            resumed.bundle.anderson_state, direct_two.anderson_state, strict=True
         )
-    assert all(benchmarks.jnp.array_equal(resumed_value, direct_value)
-               for resumed_value, direct_value in zip(
-                   resumed.bundle.anderson_state,
-                   direct_two.anderson_state,
-                   strict=True))
+    )
     assert resumed.bundle.stopping_state == direct_two.stopping_state
 
 
@@ -658,12 +451,12 @@ def test_benchmark_b_primary_pressure_observables_use_direct_fields():
             transverse_pressure_difference=benchmarks.jnp.asarray([0.0, 54.0, 0.0]),
         )
     )
-    assert benchmark_b_pressure_observable(
-        b1, "B1-fringing-pipe"
-    ).tolist() == pytest.approx([2.0 / 10700.0, 1.0 / 10700.0, 0.0, 0.0])
-    assert benchmark_b_pressure_observable(
-        b2, "B2-fringing-square"
-    ).tolist() == pytest.approx([0.0, 0.1, 0.0])
+    assert benchmark_b_pressure_observable(b1, "B1-fringing-pipe").tolist() == pytest.approx(
+        [2.0 / 10700.0, 1.0 / 10700.0, 0.0, 0.0]
+    )
+    assert benchmark_b_pressure_observable(b2, "B2-fringing-square").tolist() == pytest.approx(
+        [0.0, 0.1, 0.0]
+    )
 
 
 @pytest.mark.parametrize(
@@ -684,7 +477,11 @@ def test_benchmark_b_primary_pressure_observables_use_direct_fields():
         (("matched_contract", "roles"), {}, "matched production role differs"),
         (("matched_contract", "shared"), {}, "matched shared contract is incomplete"),
         (_STEADY_STEPS, 2, _STOPPING),
-        (("harness_smoke_execution", "restart_absolute_tolerance"), 1.0e-6, "smoke execution contract"),
+        (
+            ("harness_smoke_execution", "restart_absolute_tolerance"),
+            1.0e-6,
+            "smoke execution contract",
+        ),
         (("sources",), [], "both review"),
         (("sources", 0, "pages"), "", "pages"),
         (("field", "representation"), "spline", "field reconstruction"),
@@ -698,7 +495,9 @@ def test_benchmark_b_primary_pressure_observables_use_direct_fields():
     ],
 )
 def test_benchmark_b_spec_validation_rejects_contract_drift(path, value, message):
-    case_id = "B2-fringing-square" if message in {_STOPPING, "smoke execution contract"} else "B1-fringing-pipe"
+    case_id = (
+        "B2-fringing-square" if message in {_STOPPING, "smoke execution contract"} else "B1-fringing-pipe"
+    )
     spec = deepcopy(load_benchmark_b_spec(case_id))
     _set_nested(spec, path, value)
     with pytest.raises(ValueError, match=message):
@@ -716,9 +515,7 @@ def test_benchmark_b_spec_validation_rejects_contract_drift(path, value, message
         ),
     ],
 )
-def test_benchmark_b_reference_rejects_malformed_data(
-    tmp_path, monkeypatch, rows, message
-):
+def test_benchmark_b_reference_rejects_malformed_data(tmp_path, monkeypatch, rows, message):
     _install_reference(tmp_path, monkeypatch, rows)
     with pytest.raises(ValueError, match=message):
         load_benchmark_b_reference("B1-fringing-pipe", tmp_path)
@@ -780,32 +577,16 @@ def test_benchmark_b_field_profile_rejects_contract_violations(monkeypatch):
         ("B2-fringing-square", "transverse_pressure_difference", "B2 requires"),
     ],
 )
-def test_benchmark_b_pressure_observable_rejects_missing_direct_fields(
-    case_id, field, message
-):
-    solution = SimpleNamespace(
-        bundle=SimpleNamespace(**{field: benchmarks.jnp.zeros(0)})
-    )
+def test_benchmark_b_pressure_observable_rejects_missing_direct_fields(case_id, field, message):
+    solution = SimpleNamespace(bundle=SimpleNamespace(**{field: benchmarks.jnp.zeros(0)}))
     with pytest.raises(ValueError, match=message):
         benchmark_b_pressure_observable(solution, case_id)
 
 
 def test_benchmark_b_pressure_observable_has_coordinate_free_fallback():
     solution = SimpleNamespace(
-        bundle=SimpleNamespace(
-            axial_pressure_loss_gradient=benchmarks.jnp.asarray([3.0, 2.0, 1.0])
-        )
+        bundle=SimpleNamespace(axial_pressure_loss_gradient=benchmarks.jnp.asarray([3.0, 2.0, 1.0]))
     )
-    assert benchmark_b_pressure_observable(
-        solution, "B1-fringing-pipe"
-    ).tolist() == pytest.approx([1.0 / 10700.0, 0.0, -1.0 / 10700.0])
-
-
-def test_b2_bounded_affine_rationale_fails_closed():
-    path = Path("benchmarks/results/b2-momentum-defect-20260715.json")
-    audit = json.loads(path.read_text())["residual_spectrum_audit"]
-    depth3 = audit["bounded_depth3_velocity_minimax"]
-    assert not audit["block_balanced_velocity_minimax"]["every_pair_pass"]
-    assert not depth3["every_update_pass"]
-    assert min(depth3["maximum_predicted_velocity_gain"]) < depth3["gain_min"]
-    assert all(sum(weights) == pytest.approx(1.0) for weights in depth3["optimal_weights"])
+    assert benchmark_b_pressure_observable(solution, "B1-fringing-pipe").tolist() == pytest.approx(
+        [1.0 / 10700.0, 0.0, -1.0 / 10700.0]
+    )

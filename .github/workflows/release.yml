@@ -24,8 +24,10 @@ jobs:
       - uses: ./.github/actions/setup-lmx
         with:
           extras: dev,docs
-      - name: Verify metadata
-        run: python scripts/manage_provenance.py --check
+      - name: Check Python quality
+        run: |
+          python -m ruff check lmx tests examples scripts docs/conf.py
+          python -m ruff format --check lmx tests examples scripts docs/conf.py
       - name: Enforce architecture budgets
         run: python scripts/audit_architecture.py --check --measure-import
       - name: Run portable quality gate

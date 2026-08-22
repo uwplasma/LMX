@@ -32,23 +32,17 @@ EXCLUDED_PARTS = {
     "_build",
 }
 EXCLUDED_FILES = {".coverage", "coverage.xml"}
+CURRENT_STATE_TERMS = ("legacy", "deprecated", "previously", "no longer", "backward compat")
 
 RESEARCH_STAGE = {
     "autodiff.py",
     "fringing.py",
     "_fringing_types.py",
-    "q2d.py",
-    "blanket_flow.py",
-    "blanket_geometry.py",
-    "centerline_fields.py",
-    "dean.py",
-    "scaling.py",
 }
 COMPATIBILITY: set[str] = set()
 VISUALIZATION = {"plotting.py"}
 VALIDATION = {
     "validation.py",
-    "external_validation.py",
     "freemhd.py",
     "reference_data.py",
 }
@@ -70,23 +64,20 @@ def _root_exports(root: Path) -> list[str]:
     tree = ast.parse((root / "lmx" / "__init__.py").read_text(encoding="utf-8"))
     for node in tree.body:
         if isinstance(node, ast.Assign) and any(
-            isinstance(target, ast.Name) and target.id == "__all__"
-            for target in node.targets
+            isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets
         ):
             exports = ast.literal_eval(node.value)
-            if not isinstance(exports, list) or not all(
-                isinstance(item, str) for item in exports
-            ):
+            if not isinstance(exports, list) or not all(isinstance(item, str) for item in exports):
                 break
             return exports
     raise ValueError("lmx.__all__ must be a literal list for architecture auditing")
 
 
-def _tracked_files(root: Path) -> list[Path] | None:
-    """Return live Git-tracked files, or ``None`` outside a worktree."""
+def _repository_files(root: Path) -> list[Path] | None:
+    """Return tracked and untracked Git files, or ``None`` outside a worktree."""
 
     completed = subprocess.run(
-        ["git", "ls-files", "-z"],
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
         cwd=root,
         capture_output=True,
         check=False,
@@ -104,23 +95,35 @@ def _checkout_size(root: Path) -> int:
     """Measure tracked checkout bytes without counting local build products."""
 
     total = 0
-    tracked = _tracked_files(root)
-    paths = tracked if tracked is not None else root.rglob("*")
+    repository_files = _repository_files(root)
+    paths = repository_files if repository_files is not None else root.rglob("*")
     for path in paths:
         relative = path.relative_to(root)
-        if (
-            not path.is_file()
-            or path.name in EXCLUDED_FILES
-            or path.name.startswith(".coverage.")
-        ):
+        if not path.is_file() or path.name in EXCLUDED_FILES or path.name.startswith(".coverage."):
             continue
-        if any(
-            part in EXCLUDED_PARTS or part.endswith(".egg-info")
-            for part in relative.parts
-        ):
+        if any(part in EXCLUDED_PARTS or part.endswith(".egg-info") for part in relative.parts):
             continue
         total += path.stat().st_size
     return total
+
+
+def _current_state_violations(root: Path) -> list[str]:
+    paths = [root / name for name in ("README.md", "CONTRIBUTING.md", "CITATION.cff")]
+    for directory, patterns in (
+        ("lmx", ("*.py",)),
+        ("docs", ("*.md", "*.py")),
+        ("examples", ("*.py", "*.toml")),
+        ("scripts", ("*.py",)),
+    ):
+        paths.extend(path for pattern in patterns for path in (root / directory).rglob(pattern))
+    violations = []
+    for path in paths:
+        if not path.is_file() or path == Path(__file__) or "lmx/data" in path.as_posix():
+            continue
+        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if any(term in line.casefold() for term in CURRENT_STATE_TERMS):
+                violations.append(f"{path.relative_to(root)}:{line_number}")
+    return violations
 
 
 def _release_asset_candidates(root: Path) -> list[dict[str, Any]]:
@@ -179,9 +182,7 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
         if item.get("status") not in allowed_example_statuses:
             raise ValueError(f"Unknown curated workflow status: {item.get('status')!r}")
         if item.get("runtime") not in allowed_runtime_tiers:
-            raise ValueError(
-                f"Unknown curated workflow runtime: {item.get('runtime')!r}"
-            )
+            raise ValueError(f"Unknown curated workflow runtime: {item.get('runtime')!r}")
         if not item.get("command") or not item.get("outputs") or not item.get("docs"):
             raise ValueError("Curated workflows need command, outputs, and docs")
         if not (root / str(item["docs"])).is_file():
@@ -192,12 +193,11 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
     unclassified = sorted(set(examples) - set(curated_paths))
     stale = sorted(set(curated_paths) - set(examples))
     if unclassified or stale:
-        raise ValueError(
-            f"Workflow catalog drift: unclassified={unclassified}, stale={stale}"
-        )
+        raise ValueError(f"Workflow catalog drift: unclassified={unclassified}, stale={stale}")
     exports = _root_exports(root)
     release_candidates = _release_asset_candidates(root)
     checkout_bytes = _checkout_size(root)
+    prose_violations = _current_state_violations(root)
     pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
     project = pyproject["project"]
     return {
@@ -211,10 +211,7 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
                 if module["role"] in {"stable_core", "compatibility_facade"}
             ),
             "test_file_count": len(test_files),
-            "test_lines": sum(
-                len(path.read_text(encoding="utf-8").splitlines())
-                for path in test_files
-            ),
+            "test_lines": sum(len(path.read_text(encoding="utf-8").splitlines()) for path in test_files),
             "maintenance_script_count": len(maintenance_scripts),
             "package_modules": modules,
             "root_export_count": len(exports),
@@ -225,32 +222,29 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
             "curated_examples": curated,
             "uncurated_example_count": len(set(examples) - set(curated_paths)),
             "checkout_bytes_excluding_build_artifacts": checkout_bytes,
-            "release_asset_candidate_bytes": sum(
-                item["bytes"] for item in release_candidates
-            ),
+            "release_asset_candidate_bytes": sum(item["bytes"] for item in release_candidates),
             "checkout_bytes_excluding_release_candidates": checkout_bytes
             - sum(item["bytes"] for item in release_candidates),
             "release_asset_candidates": release_candidates,
+            "current_state_prose_violations": prose_violations,
             "dependencies": {
                 "runtime": sorted(project.get("dependencies", [])),
                 "optional": {
                     key: sorted(value)
-                    for key, value in sorted(
-                        project.get("optional-dependencies", {}).items()
-                    )
+                    for key, value in sorted(project.get("optional-dependencies", {}).items())
                 },
             },
         },
         "targets": {
-            "package_module_count_max": 34,
-            "total_package_lines_max": 34950,
-            "maintained_core_lines_max": 7800,
-            "test_file_count_max": 30,
-            "test_lines_max": 20900,
-            "maintenance_script_count_max": 13,
+            "package_module_count_max": 24,
+            "total_package_lines_max": 18500,
+            "maintained_core_lines_max": 10000,
+            "test_file_count_max": 14,
+            "test_lines_max": 13500,
+            "maintenance_script_count_max": 4,
             "stable_root_exports_max": 30,
-            "curated_examples_max": 12,
-            "checkout_bytes_max": 4608 * 1024,
+            "curated_examples_max": 8,
+            "checkout_bytes_max": 3500 * 1024,
             "root_import_median_seconds_max": 0.25,
             "sdist_bytes_max": 512 * 1024,
             "wheel_bytes_max": 384 * 1024,
@@ -290,11 +284,7 @@ def inspect_wheel(path: str | Path) -> dict[str, Any]:
     wheel = Path(path)
     with zipfile.ZipFile(wheel) as archive:
         members = [name for name in archive.namelist() if not name.endswith("/")]
-    forbidden = [
-        name
-        for name in members
-        if not (name.startswith("lmx/") or ".dist-info/" in name)
-    ]
+    forbidden = [name for name in members if not (name.startswith("lmx/") or ".dist-info/" in name)]
     return {
         "path": wheel.name,
         "bytes": wheel.stat().st_size,
@@ -311,13 +301,16 @@ def inspect_sdist(path: str | Path) -> dict[str, Any]:
         members = [member.name for member in archive.getmembers() if member.isfile()]
     relative = [name.split("/", 1)[1] if "/" in name else name for name in members]
     allowed_files = {
-        "LICENSE", "MANIFEST.in", "PKG-INFO", "README.md", "pyproject.toml", "setup.cfg"
+        "LICENSE",
+        "MANIFEST.in",
+        "PKG-INFO",
+        "README.md",
+        "pyproject.toml",
+        "setup.cfg",
     }
     allowed_roots = ("lmx/", "lmx.egg-info/")
     forbidden = [
-        name
-        for name in relative
-        if name not in allowed_files and not name.startswith(allowed_roots)
+        name for name in relative if name not in allowed_files and not name.startswith(allowed_roots)
     ]
     return {
         "path": sdist.name,
@@ -357,6 +350,11 @@ def architecture_budget_errors(
         errors.append("all examples must be listed in examples/catalog.toml")
     if inventory["release_asset_candidate_bytes"]:
         errors.append("generated release assets must not be tracked in Git")
+    if inventory["current_state_prose_violations"]:
+        errors.append(
+            "user-facing files contain project-history language: "
+            + ", ".join(inventory["current_state_prose_violations"])
+        )
     measurement = payload.get("import_measurement")
     if measurement is not None:
         if measurement["median_seconds"] > targets["root_import_median_seconds_max"]:
@@ -367,8 +365,7 @@ def architecture_budget_errors(
         wheel_record = inspect_wheel(wheel)
         if wheel_record["bytes"] > targets["wheel_bytes_max"]:
             errors.append(
-                f"wheel bytes={wheel_record['bytes']} exceeds "
-                f"wheel_bytes_max={targets['wheel_bytes_max']}"
+                f"wheel bytes={wheel_record['bytes']} exceeds wheel_bytes_max={targets['wheel_bytes_max']}"
             )
         if wheel_record["forbidden_members"]:
             errors.append(
@@ -379,8 +376,7 @@ def architecture_budget_errors(
         sdist_record = inspect_sdist(sdist)
         if sdist_record["bytes"] > targets["sdist_bytes_max"]:
             errors.append(
-                f"sdist bytes={sdist_record['bytes']} exceeds "
-                f"sdist_bytes_max={targets['sdist_bytes_max']}"
+                f"sdist bytes={sdist_record['bytes']} exceeds sdist_bytes_max={targets['sdist_bytes_max']}"
             )
         if sdist_record["forbidden_members"]:
             errors.append(
@@ -390,16 +386,12 @@ def architecture_budget_errors(
     return errors
 
 
-def write_inventory(
-    output: Path, *, root: Path = ROOT, measure: bool = False
-) -> dict[str, Any]:
+def write_inventory(output: Path, *, root: Path = ROOT, measure: bool = False) -> dict[str, Any]:
     payload = build_inventory(root)
     if measure:
         payload["import_measurement"] = measure_import(root)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return payload
 
 

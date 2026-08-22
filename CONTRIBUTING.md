@@ -67,7 +67,7 @@ TOML, NPZ, CSV, JSON, VTK, and external-solver data as untrusted input.
 Freeze a versioned benchmark specification before examining production results.
 Never relax a tolerance retrospectively to obtain a pass. A threshold may change
 only when reference uncertainty, discretization analysis, or a corrected physical
-definition justifies it, with the old and new evidence retained.
+definition justifies it, with before-and-after evidence retained.
 
 ## Pull requests
 

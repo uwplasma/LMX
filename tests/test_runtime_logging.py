@@ -16,7 +16,6 @@ from lmx.runtime_logging import (
 )
 from lmx.solvers import _build_mesh
 
-
 pytestmark = pytest.mark.unit
 
 
@@ -143,17 +142,13 @@ def _sample_record(step_index: int = 1) -> SolverStepRecord:
 
 def test_streaming_solver_logger_respects_disable_stride_and_restart_sections():
     disabled_stream = StringIO()
-    disabled_logger = StreamingSolverLogger(
-        LoggingSpec(enabled=False), stream=disabled_stream
-    )
+    disabled_logger = StreamingSolverLogger(LoggingSpec(enabled=False), stream=disabled_stream)
     disabled_logger.emit_step(_sample_record())
     assert disabled_stream.getvalue() == ""
 
     step_stream = StringIO()
     extra_stream = StringIO()
-    logger = StreamingSolverLogger(
-        LoggingSpec(step_stride=2, print_footer=False), stream=step_stream
-    )
+    logger = StreamingSolverLogger(LoggingSpec(step_stride=2, print_footer=False), stream=step_stream)
     logger.add_stream(extra_stream)
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     mesh = _build_mesh(case)
@@ -166,9 +161,7 @@ def test_streaming_solver_logger_respects_disable_stride_and_restart_sections():
         potential_solver=case.time_stepper.potential_solver,
         target_mean_velocity=None,
         reference_mean_velocity=None,
-        restart=RestartLogInfo(
-            enabled=True, path="restart.npz", start_time=0.2, reset_histories=False
-        ),
+        restart=RestartLogInfo(enabled=True, path="restart.npz", start_time=0.2, reset_histories=False),
     )
     logger.emit_step(_sample_record(step_index=2))
     logger.emit_footer(

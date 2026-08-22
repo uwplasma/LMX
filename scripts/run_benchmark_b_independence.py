@@ -6,16 +6,16 @@
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import replace
 import hashlib
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -32,24 +32,40 @@ from lmx.benchmarks import (
     load_benchmark_b_reference,
     load_benchmark_b_spec,
 )
-from lmx.fringing import _cross_section_mesh, solve_extruded_inductionless
 from lmx.freemhd import validate_matched_b_record
+from lmx.fringing import _cross_section_mesh, solve_extruded_inductionless
 from lmx.io import (
     load_extruded_restart_bundle,
     write_extruded_bundle_restart_npz,
     write_extruded_restart_npz,
 )
-from lmx.scaling import summarize_pressure_linear_history
-
 
 if ROOT not in Path(lmx.__file__).resolve().parents:
-    raise RuntimeError(
-        f"Benchmark B runner imported LMX outside its source tree: {lmx.__file__}"
-    )
+    raise RuntimeError(f"Benchmark B runner imported LMX outside its source tree: {lmx.__file__}")
 
 CASE_IDS = ("B1-fringing-pipe", "B2-fringing-square")
 MESH_LEVELS = ("coarse", "medium", "fine")
 VARIANTS = ("baseline", "tight_tolerance", "extended_iterations", "thin_wall")
+
+
+def _summarize_pressure_linear_history(
+    history: object, *, expected_steps: int | None = None
+) -> dict[str, float | int | bool | None]:
+    """Summarize the pressure solves recorded by a Benchmark B run."""
+
+    rows = np.asarray(history, dtype=float).reshape((-1, 5))
+    valid = rows[np.all(np.isfinite(rows), axis=1) & (rows[:, 4] >= 0.0)]
+    count = len(valid)
+    return {
+        "max_pressure_linear_residual": (float(np.max(np.abs(valid[:, 0]))) if count else None),
+        "max_pressure_linear_relative_residual": (float(np.max(np.abs(valid[:, 1]))) if count else None),
+        "pressure_linear_iterations_max": int(np.max(valid[:, 2])) if count else None,
+        "pressure_linear_iterations_mean": float(np.mean(valid[:, 2])) if count else None,
+        "pressure_linear_solve_count": count,
+        "pressure_solves_converged": bool(np.all(valid[:, 3] == 1.0)) if count else None,
+        "pressure_linear_diagnostics_complete": count
+        == (len(rows) if expected_steps is None else expected_steps),
+    }
 
 
 def _source_fingerprint(root: Path = ROOT) -> str:
@@ -144,8 +160,7 @@ def _evaluate_acceptance(
         fine_y = fine_y[keep]
         delta = np.interp(fine_x[keep], coarse_x, coarse_y) - fine_y
         return float(
-            np.linalg.norm(delta)
-            / max(np.linalg.norm(fine_y), uncertainty_floor * np.sqrt(fine_y.size))
+            np.linalg.norm(delta) / max(np.linalg.norm(fine_y), uncertainty_floor * np.sqrt(fine_y.size))
         )
 
     coarse_medium = relative_change(levels[0], levels[1])
@@ -165,12 +180,10 @@ def _evaluate_acceptance(
     gates = {
         "all_mesh_independence": all(independence.values()),
         "weighted_rms": finest["weighted_rms"] <= float(acceptance["weighted_rms_max"]),
-        "weighted_linf": finest["weighted_linf"]
-        <= float(acceptance["weighted_linf_max"]),
+        "weighted_linf": finest["weighted_linf"] <= float(acceptance["weighted_linf_max"]),
         "integrated_pressure": finest["integrated_pressure_relative_error"]
         <= float(acceptance["integrated_pressure_relative_error_max"]),
-        "finest_mesh_change": medium_fine
-        <= float(acceptance["finest_mesh_change_relative_max"]),
+        "finest_mesh_change": medium_fine <= float(acceptance["finest_mesh_change_relative_max"]),
         "monotonic_or_asymptotic_refinement": (
             literature[levels[2]]["weighted_rms"]
             <= literature[levels[1]]["weighted_rms"]
@@ -196,9 +209,7 @@ def _evaluate_acceptance(
     }
 
 
-def _variant_problem(
-    case_id: str, mesh_level: str, variant: str, *, num_devices: int | None = None
-):
+def _variant_problem(case_id: str, mesh_level: str, variant: str, *, num_devices: int | None = None):
     wall = "confirmation" if variant == "thin_wall" else "nominal"
     problem = build_benchmark_b_problem(
         case_id,
@@ -217,9 +228,7 @@ def _variant_problem(
         tolerance *= tolerance_factor
         # Budget both independent perturbations; early convergence preserves
         # the normal runtime while slow refined meshes retain bounded headroom.
-        coupling_iterations = int(
-            round(coupling_iterations * iteration_factor / tolerance_factor)
-        )
+        coupling_iterations = int(round(coupling_iterations * iteration_factor / tolerance_factor))
         potential_iterations *= 2
     elif variant == "extended_iterations":
         factor = float(spec["solver"]["iteration_independence_factor"])
@@ -270,9 +279,7 @@ def _spatial_placement(field, expected: int | None) -> dict[str, Any]:
     actual = len(shards)
     requested = expected or 1
     if actual != requested:
-        raise RuntimeError(
-            f"Requested {requested} spatial devices, but the solution has {actual} shards"
-        )
+        raise RuntimeError(f"Requested {requested} spatial devices, but the solution has {actual} shards")
     return {
         "spatial_devices": requested,
         "actual_spatial_shards": actual,
@@ -296,15 +303,10 @@ def _prolong_b2_restart(bundle, problem):
     if not problem.case.name.startswith("alex_b2-fringing-square_"):
         raise ValueError("Restart prolongation currently supports only ALEX B2")
     mesh = _cross_section_mesh(problem.case)
-    target = tuple(
-        np.asarray(axis) for axis in (mesh.x_centers, mesh.y_centers, mesh.z_centers)
-    )
+    target = tuple(np.asarray(axis) for axis in (mesh.x_centers, mesh.y_centers, mesh.z_centers))
     source = tuple(np.asarray(axis) for axis in (bundle.x, bundle.y, bundle.z))
     expected_shape = tuple(len(axis) for axis in source)
-    if any(
-        np.asarray(getattr(bundle, name)).shape != expected_shape
-        for name in ("u", "v", "w", "p", "phi")
-    ):
+    if any(np.asarray(getattr(bundle, name)).shape != expected_shape for name in ("u", "v", "w", "p", "phi")):
         raise ValueError("Restart coordinates and field shapes do not match")
 
     def interpolate(values):
@@ -312,9 +314,7 @@ def _prolong_b2_restart(bundle, problem):
             values = _interpolate_axis(values, old, new, axis)
         return values
 
-    fields = {
-        name: interpolate(getattr(bundle, name)) for name in ("u", "v", "w", "p", "phi")
-    }
+    fields = {name: interpolate(getattr(bundle, name)) for name in ("u", "v", "w", "p", "phi")}
     prolonged = replace(
         bundle,
         x=target[0],
@@ -352,9 +352,7 @@ def _progress_writer(
         nonlocal checkpoint_sha256, checkpoint_step
         if progress.checkpoint is not None:
             temporary = partial_restart_path.with_suffix(".tmp.npz")
-            write_extruded_bundle_restart_npz(
-                progress.checkpoint, problem.case, temporary
-            )
+            write_extruded_bundle_restart_npz(progress.checkpoint, problem.case, temporary)
             temporary.replace(partial_restart_path)
             checkpoint_sha256 = _file_sha256(partial_restart_path)
             checkpoint_step = progress.step
@@ -394,9 +392,7 @@ def _load_partial_restart(
     """Load a partial restart only when its progress provenance matches."""
 
     if not progress_path.is_file():
-        raise ValueError(
-            f"Partial restart has no progress metadata: {partial_restart_path}"
-        )
+        raise ValueError(f"Partial restart has no progress metadata: {partial_restart_path}")
     progress = json.loads(progress_path.read_text())
     if progress.get("source_fingerprint") != fingerprint:
         raise ValueError(f"Checkpoint fingerprint mismatch: {partial_restart_path}")
@@ -406,9 +402,7 @@ def _load_partial_restart(
     return load_extruded_restart_bundle(partial_restart_path).bundle
 
 
-def _load_restart_observable(
-    restart_path: Path, case_id: str
-) -> tuple[np.ndarray, np.ndarray]:
+def _load_restart_observable(restart_path: Path, case_id: str) -> tuple[np.ndarray, np.ndarray]:
     """Read the acceptance curve from the exact checksummed restart."""
 
     bundle = load_extruded_restart_bundle(restart_path).bundle
@@ -435,9 +429,7 @@ def _run_record(
     target_shape = (mesh.nx, mesh.ny, mesh.nz)
     if initial_bundle is not None and initial_bundle.u.shape != target_shape:
         if not prolong_restart:
-            raise ValueError(
-                "Restart shape differs from the target mesh; pass --prolong-restart"
-            )
+            raise ValueError("Restart shape differs from the target mesh; pass --prolong-restart")
         initial_bundle, prolongation = _prolong_b2_restart(initial_bundle, problem)
     started = time.perf_counter()
     progress_path = restart_path.with_suffix(".progress.json")
@@ -469,7 +461,7 @@ def _run_record(
     pressure_linear_history = np.asarray(
         solution.bundle.iteration_pressure_linear_history, dtype=float
     ).reshape((-1, 5))
-    pressure_linear_diagnostics = summarize_pressure_linear_history(
+    pressure_linear_diagnostics = _summarize_pressure_linear_history(
         pressure_linear_history, expected_steps=int(completed_steps)
     )
     return {
@@ -488,11 +480,7 @@ def _run_record(
             "initialization": (
                 initialization
                 if initialization is not None
-                else (
-                    "baseline_restart"
-                    if initial_bundle is not None
-                    else "frozen_initial_state"
-                )
+                else ("baseline_restart" if initial_bundle is not None else "frozen_initial_state")
             ),
             "initialization_sha256": initialization_sha256,
             "restart_prolongation": prolongation,
@@ -511,9 +499,7 @@ def _run_record(
         },
         "x_over_L": observable_x.tolist(),
         "primary_observable": observable.tolist(),
-        "iteration_residual_history": np.asarray(
-            solution.bundle.iteration_residual_history
-        ).tolist(),
+        "iteration_residual_history": np.asarray(solution.bundle.iteration_residual_history).tolist(),
         "iteration_component_residual_history": np.asarray(
             solution.bundle.iteration_component_residual_history
         ).tolist(),
@@ -569,8 +555,7 @@ def _comparison(case_id: str, records: dict[str, dict[str, Any]]) -> dict[str, A
         return min(steady_max, float(requested))
 
     gates = {
-        "steady_residual": float(base_diagnostics["max_residual"])
-        <= steady_limit(records["baseline"]),
+        "steady_residual": float(base_diagnostics["max_residual"]) <= steady_limit(records["baseline"]),
         "mass_balance": max(
             float(base_diagnostics["volumetric_flow_rate_span"]),
             float(base_diagnostics.get("max_divergence_residual", 0.0)),
@@ -584,31 +569,25 @@ def _comparison(case_id: str, records: dict[str, dict[str, Any]]) -> dict[str, A
             base_diagnostics.get("stop_reason") == "converged"
             and int(base_diagnostics.get("final_steady_streak", -1)) >= steady_steps
         ),
-        "pressure_linear_diagnostics": base_diagnostics.get(
-            "pressure_linear_diagnostics_complete"
-        )
-        is True,
-        "pressure_solve_convergence": base_diagnostics.get("pressure_solves_converged")
-        is True,
+        "pressure_linear_diagnostics": base_diagnostics.get("pressure_linear_diagnostics_complete") is True,
+        "pressure_solve_convergence": base_diagnostics.get("pressure_solves_converged") is True,
     }
     for variant, record in records.items():
         if variant == "baseline":
             continue
         diagnostics = record["diagnostics"]
         prefix = variant.replace("_", "-")
-        gates[f"{prefix}_steady_residual"] = float(
-            diagnostics["max_residual"]
-        ) <= steady_limit(record)
+        gates[f"{prefix}_steady_residual"] = float(diagnostics["max_residual"]) <= steady_limit(record)
         gates[f"{prefix}_mass_balance"] = max(
             float(diagnostics["volumetric_flow_rate_span"]),
             float(diagnostics.get("max_divergence_residual", 0.0)),
         ) <= float(spec["solver"]["mass_balance_max"])
-        gates[f"{prefix}_current_balance"] = float(
-            diagnostics["max_charge_balance_residual"]
-        ) <= float(spec["solver"]["current_balance_max"])
-        gates[f"{prefix}_boundary_current"] = float(
-            diagnostics["net_boundary_current_residual"]
-        ) <= float(spec["solver"]["current_balance_max"])
+        gates[f"{prefix}_current_balance"] = float(diagnostics["max_charge_balance_residual"]) <= float(
+            spec["solver"]["current_balance_max"]
+        )
+        gates[f"{prefix}_boundary_current"] = float(diagnostics["net_boundary_current_residual"]) <= float(
+            spec["solver"]["current_balance_max"]
+        )
         gates[f"{prefix}_sustained_stopping"] = (
             diagnostics.get("stop_reason") == "converged"
             and int(diagnostics.get("final_steady_streak", -1)) >= steady_steps
@@ -616,9 +595,7 @@ def _comparison(case_id: str, records: dict[str, dict[str, Any]]) -> dict[str, A
         gates[f"{prefix}_pressure_linear_diagnostics"] = (
             diagnostics.get("pressure_linear_diagnostics_complete") is True
         )
-        gates[f"{prefix}_pressure_solve_convergence"] = (
-            diagnostics.get("pressure_solves_converged") is True
-        )
+        gates[f"{prefix}_pressure_solve_convergence"] = diagnostics.get("pressure_solves_converged") is True
     result: dict[str, Any] = {
         "case_id": case_id,
         "complete": not missing,
@@ -626,18 +603,14 @@ def _comparison(case_id: str, records: dict[str, dict[str, Any]]) -> dict[str, A
         "gates": gates,
     }
     if "tight_tolerance" in records:
-        tight = np.asarray(
-            records["tight_tolerance"]["primary_observable"], dtype=float
-        )
+        tight = np.asarray(records["tight_tolerance"]["primary_observable"], dtype=float)
         tolerance_delta = float(np.max(np.abs(tight - baseline)) / uncertainty)
         result["tolerance_delta_uncertainty_fraction"] = tolerance_delta
         gates["tolerance_independence"] = tolerance_delta <= float(
             spec["solver"]["tolerance_independence_uncertainty_fraction_max"]
         )
     if "extended_iterations" in records:
-        extended = np.asarray(
-            records["extended_iterations"]["primary_observable"], dtype=float
-        )
+        extended = np.asarray(records["extended_iterations"]["primary_observable"], dtype=float)
         iteration_delta = float(np.max(np.abs(extended - baseline)) / uncertainty)
         result["iteration_delta_uncertainty_fraction"] = iteration_delta
         gates["iteration_independence"] = iteration_delta <= float(
@@ -663,8 +636,7 @@ def _parse_variant_restarts(values: list[str]) -> dict[str, Path]:
         variant, separator, raw_path = value.partition("=")
         if not separator or variant not in VARIANTS or not raw_path:
             raise ValueError(
-                "--variant-restart VARIANT=PATH must use one of "
-                f"{', '.join(VARIANTS)} followed by '=PATH'"
+                f"--variant-restart VARIANT=PATH must use one of {', '.join(VARIANTS)} followed by '=PATH'"
             )
         restarts[variant] = Path(raw_path)
     return restarts
@@ -677,16 +649,12 @@ def _parse_gpu_devices(value: str) -> tuple[str, ...]:
     return devices
 
 
-def _parse_acceptance_paths(
-    values: list[str], choices: tuple[str, ...], option: str
-) -> dict[str, Path]:
+def _parse_acceptance_paths(values: list[str], choices: tuple[str, ...], option: str) -> dict[str, Path]:
     paths: dict[str, Path] = {}
     for value in values:
         name, separator, raw_path = value.partition("=")
         if not separator or name not in choices or not raw_path or name in paths:
-            raise ValueError(
-                f"{option} NAME=PATH requires each of {', '.join(choices)} once"
-            )
+            raise ValueError(f"{option} NAME=PATH requires each of {', '.join(choices)} once")
         paths[name] = Path(raw_path)
     return paths
 
@@ -694,41 +662,27 @@ def _parse_acceptance_paths(
 def _freeze_acceptance(args) -> int:
     """Combine three completed mesh campaigns without rerunning a solver."""
 
-    mesh_paths = _parse_acceptance_paths(
-        args.acceptance_mesh, MESH_LEVELS, "--acceptance-mesh"
-    )
+    mesh_paths = _parse_acceptance_paths(args.acceptance_mesh, MESH_LEVELS, "--acceptance-mesh")
     if set(mesh_paths) != set(MESH_LEVELS):
-        raise ValueError(
-            "--acceptance-mesh requires coarse, medium, and fine campaigns"
-        )
-    freemhd_paths = _parse_acceptance_paths(
-        args.freemhd_record, CASE_IDS, "--freemhd-record"
-    )
+        raise ValueError("--acceptance-mesh requires coarse, medium, and fine campaigns")
+    freemhd_paths = _parse_acceptance_paths(args.freemhd_record, CASE_IDS, "--freemhd-record")
     fingerprint = _source_fingerprint()
     results = []
     for case_id in args.cases:
         mesh_campaigns = {}
         for level, directory in mesh_paths.items():
-            summary = json.loads(
-                (directory / "benchmark-b-independence.json").read_text()
-            )
+            summary = json.loads((directory / "benchmark-b-independence.json").read_text())
             if summary.get("mesh_level") != level:
                 raise ValueError(f"Benchmark B {level} campaign metadata do not match")
             if summary.get("source_fingerprint") != fingerprint:
                 raise ValueError(f"Benchmark B {level} campaign fingerprint mismatch")
             comparison = next(
-                (
-                    item
-                    for item in summary.get("cases", [])
-                    if item.get("case_id") == case_id
-                ),
+                (item for item in summary.get("cases", []) if item.get("case_id") == case_id),
                 None,
             )
             if comparison is None:
                 raise ValueError(f"Benchmark B {level} campaign lacks {case_id}")
-            baseline = json.loads(
-                (directory / "runs" / f"{case_id}-{level}-baseline.json").read_text()
-            )
+            baseline = json.loads((directory / "runs" / f"{case_id}-{level}-baseline.json").read_text())
             mesh_campaigns[level] = {
                 "source_fingerprint": summary.get("source_fingerprint"),
                 "baseline": baseline,
@@ -741,7 +695,9 @@ def _freeze_acceptance(args) -> int:
                 case_id,
                 mesh_campaigns,
                 freemhd,
-                matched_freemhd_artifact_root=record_path.resolve().parent if record_path is not None else None,
+                matched_freemhd_artifact_root=record_path.resolve().parent
+                if record_path is not None
+                else None,
             )
         )
     payload = {
@@ -786,9 +742,7 @@ def _gpu_child_command(args, case_id: str, variant: str) -> list[str]:
 def _run_gpu_wave(args, tasks: list[tuple[str, str]], devices: tuple[str, ...]) -> None:
     """Run independent case variants concurrently, one process per GPU."""
 
-    cache_dir = (
-        Path(tempfile.gettempdir()) / "lmx-jax-cache" / _source_fingerprint()[:16]
-    )
+    cache_dir = Path(tempfile.gettempdir()) / "lmx-jax-cache" / _source_fingerprint()[:16]
     for offset in range(0, len(tasks), len(devices)):
         processes = []
         for device, (case_id, variant) in zip(devices, tasks[offset:]):
@@ -824,9 +778,7 @@ def _run_gpu_wave(args, tasks: list[tuple[str, str]], devices: tuple[str, ...]) 
                 # comparison is unavailable; solver/runtime failures return 1.
                 if process.returncode not in {0, 2}:
                     detail = stderr.strip() or stdout.strip()
-                    raise RuntimeError(
-                        f"GPU worker failed for {case_id}/{variant}: {detail}"
-                    )
+                    raise RuntimeError(f"GPU worker failed for {case_id}/{variant}: {detail}")
                 elapsed = time.perf_counter() - started
                 print(
                     f"[GPU {device}] finished {case_id}/{variant} in {elapsed:.1f}s",
@@ -841,9 +793,7 @@ def _wave_physics_passes(args, tasks: list[tuple[str, str]]) -> bool:
     for case_id, variant in tasks:
         path = args.output / "runs" / f"{case_id}-{args.mesh_level}-{variant}.json"
         records.setdefault(case_id, {})[variant] = json.loads(path.read_text())
-    comparisons = [
-        _comparison(case_id, case_records) for case_id, case_records in records.items()
-    ]
+    comparisons = [_comparison(case_id, case_records) for case_id, case_records in records.items()]
     passed = all(all(item["gates"].values()) for item in comparisons)
     if not passed:
         print(
@@ -930,9 +880,7 @@ def _write_b2_evidence_plot(
     magnitude = np.hypot(bx, by) / b0
 
     fig, (field_ax, pressure_ax) = plt.subplots(1, 2, figsize=(12, 4.6))
-    image = field_ax.pcolormesh(
-        x_over_l, y, magnitude.T, shading="auto", cmap="Blues", vmin=0.0
-    )
+    image = field_ax.pcolormesh(x_over_l, y, magnitude.T, shading="auto", cmap="Blues", vmin=0.0)
     field_ax.streamplot(
         x_over_l,
         y,
@@ -985,15 +933,15 @@ def _write_b2_evidence_plot(
         va="top",
         color="#92400e",
         weight="bold",
-        bbox={"boxstyle": "round,pad=0.3", "facecolor": "#fef3c7", "edgecolor": "#f59e0b"},
+        bbox={
+            "boxstyle": "round,pad=0.3",
+            "facecolor": "#fef3c7",
+            "edgecolor": "#f59e0b",
+        },
     )
     fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.94))
     output.parent.mkdir(parents=True, exist_ok=True)
-    save_options = (
-        {"pil_kwargs": {"quality": 82, "method": 6}}
-        if output.suffix.lower() == ".webp"
-        else {}
-    )
+    save_options = {"pil_kwargs": {"quality": 82, "method": 6}} if output.suffix.lower() == ".webp" else {}
     fig.savefig(output, dpi=120, bbox_inches="tight", **save_options)
     plt.close(fig)
     return output
@@ -1143,34 +1091,22 @@ def main(argv: list[str] | None = None) -> int:
                 initialization_sha256 = None
                 explicit_restart = variant_restarts.get(variant)
                 if explicit_restart is not None:
-                    initial_bundle = load_extruded_restart_bundle(
-                        explicit_restart
-                    ).bundle
+                    initial_bundle = load_extruded_restart_bundle(explicit_restart).bundle
                     initialization = f"provided_restart:{explicit_restart}"
                     initialization_sha256 = _file_sha256(explicit_restart)
                 elif variant == "baseline" and args.initial_restart is not None:
-                    initial_bundle = load_extruded_restart_bundle(
-                        args.initial_restart
-                    ).bundle
+                    initial_bundle = load_extruded_restart_bundle(args.initial_restart).bundle
                     initialization = f"provided_restart:{args.initial_restart}"
                     initialization_sha256 = _file_sha256(args.initial_restart)
                 elif args.resume and partial_restart_path.is_file():
-                    initial_bundle = _load_partial_restart(
-                        partial_restart_path, progress_path, fingerprint
-                    )
+                    initial_bundle = _load_partial_restart(partial_restart_path, progress_path, fingerprint)
                     initialization = f"partial_restart:{partial_restart_path}"
                     initialization_sha256 = _file_sha256(partial_restart_path)
                 elif variant in {"tight_tolerance", "extended_iterations"}:
                     if baseline_bundle is None:
-                        baseline_restart = (
-                            args.output
-                            / "runs"
-                            / f"{case_id}-{args.mesh_level}-baseline.npz"
-                        )
+                        baseline_restart = args.output / "runs" / f"{case_id}-{args.mesh_level}-baseline.npz"
                         if baseline_restart.is_file():
-                            baseline_bundle = load_extruded_restart_bundle(
-                                baseline_restart
-                            ).bundle
+                            baseline_bundle = load_extruded_restart_bundle(baseline_restart).bundle
                             baseline_restart_sha256 = _file_sha256(baseline_restart)
                     initial_bundle = baseline_bundle
                     initialization_sha256 = baseline_restart_sha256
@@ -1208,8 +1144,7 @@ def main(argv: list[str] | None = None) -> int:
         "source_fingerprint": fingerprint,
         "mesh_level": args.mesh_level,
         "cases": comparisons,
-        "pass": bool(comparisons)
-        and all(item.get("pass") is True for item in comparisons),
+        "pass": bool(comparisons) and all(item.get("pass") is True for item in comparisons),
     }
     _atomic_json(args.output / "benchmark-b-independence.json", summary)
     print(json.dumps(summary, indent=2, sort_keys=True))

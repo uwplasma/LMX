@@ -17,7 +17,7 @@ keywords:
   - differentiable simulation
   - fusion engineering
 abstract: >-
-  LMX is a research code for incompressible, inductionless liquid-metal MHD.
-  Its stable surface covers verified fully developed duct flows; extruded,
-  turbulent, heat-transfer, and blanket workflows retain explicit research-stage
-  labels until their external validation gates pass.
+  LMX solves incompressible, inductionless liquid-metal MHD in fully developed
+  duct cross-sections and three-dimensional extruded ducts and pipes with
+  spatially varying imposed magnetic fields. It provides JAX execution,
+  analytical and manufactured verification, and reproducible FreeMHD comparison.

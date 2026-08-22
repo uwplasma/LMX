@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - only used on Python < 3.11
@@ -16,7 +17,6 @@ from .specs import (
     MagneticFieldSpec,
     OutputSpec,
     RegionSpec,
-    SolveMode,
     SolverConfig,
     TimeStepperConfig,
 )
@@ -87,7 +87,6 @@ class RestartSpec:
 @dataclass(frozen=True)
 class RunConfig:
     case: CaseSpec
-    solve_mode: SolveMode = "steady"
     logging: LoggingSpec = field(default_factory=LoggingSpec)
     restart: RestartSpec = field(default_factory=RestartSpec)
     fringing: FringingSpec = field(default_factory=FringingSpec)
@@ -105,7 +104,9 @@ def _require(mapping: dict[str, Any], key: str) -> Any:
     return mapping[key]
 
 
-def _optional_tuple(mapping: dict[str, Any], key: str, *, length: int | None = None, cast=float) -> tuple[Any, ...] | None:
+def _optional_tuple(
+    mapping: dict[str, Any], key: str, *, length: int | None = None, cast=float
+) -> tuple[Any, ...] | None:
     if key not in mapping:
         return None
     values = tuple(cast(value) for value in mapping[key])
@@ -172,7 +173,9 @@ def load_run_config(path: str | Path) -> RunConfig:
     boundaries_table = root.get("boundary_conditions", [])
 
     if field_table.get("kind") == "analytic":
-        raise ValueError("TOML input does not support analytic magnetic-field callables; use the Python API for that case")
+        raise ValueError(
+            "TOML input does not support analytic magnetic-field callables; use the Python API for that case"
+        )
 
     geometry = GeometrySpec(
         kind=str(_require(geometry_table, "kind")),
@@ -185,10 +188,13 @@ def load_run_config(path: str | Path) -> RunConfig:
         radius=None if geometry_table.get("radius") is None else float(geometry_table["radius"]),
         nr=None if geometry_table.get("nr") is None else int(geometry_table["nr"]),
         ntheta=None if geometry_table.get("ntheta") is None else int(geometry_table["ntheta"]),
-        wall_thickness=_optional_tuple(geometry_table, "wall_thickness", length=4, cast=float) or (0.0, 0.0, 0.0, 0.0),
+        wall_thickness=_optional_tuple(geometry_table, "wall_thickness", length=4, cast=float)
+        or (0.0, 0.0, 0.0, 0.0),
         wall_cells=_optional_tuple(geometry_table, "wall_cells", length=4, cast=int) or (0, 0, 0, 0),
         target_ha=None if geometry_table.get("target_ha") is None else float(geometry_table["target_ha"]),
-        target_side_layer=None if geometry_table.get("target_side_layer") is None else float(geometry_table["target_side_layer"]),
+        target_side_layer=None
+        if geometry_table.get("target_side_layer") is None
+        else float(geometry_table["target_side_layer"]),
     )
 
     magnetic_field = MagneticFieldSpec(
@@ -208,7 +214,9 @@ def load_run_config(path: str | Path) -> RunConfig:
         max_steps=int(_require(time_table, "max_steps")),
         outer_iterations=int(time_table.get("outer_iterations", 2)),
         potential_iterations=int(time_table.get("potential_iterations", 400)),
-        potential_tolerance=None if time_table.get("potential_tolerance") is None else float(time_table["potential_tolerance"]),
+        potential_tolerance=None
+        if time_table.get("potential_tolerance") is None
+        else float(time_table["potential_tolerance"]),
         potential_relaxation=float(time_table.get("potential_relaxation", 1.0)),
         potential_solver=str(time_table.get("potential_solver", "auto")),
         current_reconstruction=str(time_table.get("current_reconstruction", "cell_centered")),
@@ -223,15 +231,17 @@ def load_run_config(path: str | Path) -> RunConfig:
         checkpoint_stride=int(time_table.get("checkpoint_stride", 1)),
     )
 
-    compatibility_mode = case_table.get("solve_mode")
-    solver_mode = str(solver_table.get("mode", compatibility_mode or "steady"))
+    solver_mode = str(solver_table.get("mode", "steady"))
     if solver_mode not in {"steady", "transient"}:
         raise ValueError(f"Unsupported solve mode {solver_mode!r}")
-    if compatibility_mode is not None and str(compatibility_mode) != solver_mode:
-        raise ValueError("case.solve_mode and solver.mode disagree; use solver.mode as the public setting")
-
+    solver_kind = str(solver_table.get("kind", "fully_developed_inductionless"))
+    if solver_kind not in {
+        "fully_developed_inductionless",
+        "extruded_inductionless",
+    }:
+        raise ValueError(f"Unsupported solver kind {solver_kind!r}")
     solver = SolverConfig(
-        kind=str(solver_table.get("kind", "fully_developed_inductionless")),
+        kind=solver_kind,
         mode=solver_mode,
         linear_solver=str(solver_table.get("linear_solver", "auto")),
         preconditioner=str(solver_table.get("preconditioner", "jacobi")),
@@ -245,12 +255,6 @@ def load_run_config(path: str | Path) -> RunConfig:
         coupling_regularization=float(solver_table.get("coupling_regularization", 1.0e-8)),
         coupling_damping=float(solver_table.get("coupling_damping", 1.0)),
     )
-    if solver.kind == "reduced_inductionless":
-        raise ValueError(
-            "solver.kind='reduced_inductionless' is no longer supported; "
-            "use 'fully_developed_inductionless' or 'extruded_inductionless'"
-        )
-
     output_dir = output_table.get("directory")
     if output_dir is not None:
         output_dir = str((input_path.parent / str(output_dir)).resolve())
@@ -314,7 +318,6 @@ def load_run_config(path: str | Path) -> RunConfig:
 
     return RunConfig(
         case=case,
-        solve_mode=solver.mode,
         logging=logging,
         restart=restart,
         fringing=fringing,

@@ -43,18 +43,15 @@ from lmx.validation import (
     validation_summary,
 )
 
-
 # Inputs: paths, geometry, materials, field, mesh, and solver controls.  The two
 # path variables also accept environment overrides for scheduled validation.
-OUTPUT_DIR = Path(os.environ.get(
-    "LMX_FREEMHD_OBSERVABLE_OUTPUT",
-    "artifacts/examples/freemhd_closed_channel_observable_parity",
-))
-REFERENCE_ROOT = Path(
+OUTPUT_DIR = Path(
     os.environ.get(
-        "LMX_FREEMHD_PROCESSED_ROOT", default_closed_channel_reference_root()
+        "LMX_FREEMHD_OBSERVABLE_OUTPUT",
+        "artifacts/examples/freemhd_closed_channel_observable_parity",
     )
 )
+REFERENCE_ROOT = Path(os.environ.get("LMX_FREEMHD_PROCESSED_ROOT", default_closed_channel_reference_root()))
 CASES = ("shercliff", "hunt")
 HARTMANN_NUMBER = 20
 X_SLICE = "1m"
@@ -96,6 +93,7 @@ CASE_SETTINGS = {
 POTENTIAL_TOLERANCE = 1.0e-9
 COUPLING_ITERATIONS = 16
 OBSERVABLE_L2_TARGET = 1.0e-2
+
 
 def _build_problem(case_kind: str, target_velocity: float):
     """Build the editable public case, mesh, and analytical initial state."""
@@ -221,9 +219,7 @@ def _build_problem(case_kind: str, target_velocity: float):
         reference_phi_cell=(mesh.ny // 2, mesh.nz // 2),
     )
 
-    analytical = load_closed_channel_analytical(
-        case_kind, HARTMANN_NUMBER, REFERENCE_ROOT
-    )
+    analytical = load_closed_channel_analytical(case_kind, HARTMANN_NUMBER, REFERENCE_ROOT)
     y_profile = np.interp(mesh.y_centers, analytical.coordinate, analytical.midplane_y)
     z_profile = np.interp(mesh.z_centers, analytical.coordinate, analytical.midplane_z)
     velocity = np.outer(y_profile, z_profile)
@@ -296,9 +292,7 @@ def _continuum_velocity_audit(
 ) -> dict[str, object]:
     """Disclose analytical endpoint effects without changing accepted profiles."""
 
-    analytical = load_closed_channel_analytical(
-        case_kind, HARTMANN_NUMBER, REFERENCE_ROOT
-    )
+    analytical = load_closed_channel_analytical(case_kind, HARTMANN_NUMBER, REFERENCE_ROOT)
     coordinate = jnp.asarray(analytical.coordinate) / length_scale
     axes = {}
     for axis, raw_values in (
@@ -327,12 +321,8 @@ def _continuum_velocity_audit(
             "analytical_endpoint_values": [float(values[0]), float(values[-1])],
             "lmx_raw_analytical": error(cut["simulated"], values),
             "processed_freemhd_raw_analytical": error(cut["reference"], values),
-            "lmx_no_slip_endpoint_corrected_analytical": error(
-                cut["simulated"], no_slip
-            ),
-            "processed_freemhd_no_slip_endpoint_corrected_analytical": error(
-                cut["reference"], no_slip
-            ),
+            "lmx_no_slip_endpoint_corrected_analytical": error(cut["simulated"], no_slip),
+            "processed_freemhd_no_slip_endpoint_corrected_analytical": error(cut["reference"], no_slip),
         }
     return {"reference_path": analytical.path, "axes": axes}
 
@@ -380,9 +370,7 @@ def _side_jet_comparison(cut: dict[str, object]) -> dict[str, object]:
             abs(reference["positive_location"]),
             1.0e-20,
         ),
-        "peak_value_relative_error": abs(
-            simulated["peak_value"] - reference["peak_value"]
-        )
+        "peak_value_relative_error": abs(simulated["peak_value"] - reference["peak_value"])
         / max(abs(reference["peak_value"]), 1.0e-20),
         "peak_to_center_ratio_error": abs(
             simulated["peak_to_center_ratio"] - reference["peak_to_center_ratio"]
@@ -427,9 +415,7 @@ def _build_record(case_kind: str, case: CaseSpec, solution, spec) -> dict[str, o
         cuts = {}
         for axis in ("y", "z"):
             cuts[axis] = _profile_metrics(
-                extract_midplane_scalar_profile(
-                    solution, sim_field, axis=axis, fluid_only=True
-                ),
+                extract_midplane_scalar_profile(solution, sim_field, axis=axis, fluid_only=True),
                 extract_processed_profile(
                     reference,
                     axis=axis,
@@ -451,12 +437,8 @@ def _build_record(case_kind: str, case: CaseSpec, solution, spec) -> dict[str, o
     ):
         current_vector_audit[name] = {
             axis: _profile_metrics(
-                extract_midplane_scalar_profile(
-                    solution, sim_field, axis=axis, fluid_only=True
-                ),
-                extract_processed_profile(
-                    reference, axis=axis, field_name="J", component=component
-                ),
+                extract_midplane_scalar_profile(solution, sim_field, axis=axis, fluid_only=True),
+                extract_processed_profile(reference, axis=axis, field_name="J", component=component),
                 coordinate_scale=length_scale,
                 value_scale=scales["current"],
             )
@@ -485,9 +467,7 @@ def _build_record(case_kind: str, case: CaseSpec, solution, spec) -> dict[str, o
         "drive_mode": "flow_rate",
         "target_mean_velocity": float(case.initial_velocity),
         "target_mean_velocity_source": (
-            "matched_benchmark_spec"
-            if FLOW_RATE_TARGET_MEAN_VELOCITY is None
-            else "configured"
+            "matched_benchmark_spec" if FLOW_RATE_TARGET_MEAN_VELOCITY is None else "configured"
         ),
         "settings": {
             **settings,
@@ -509,9 +489,7 @@ def _build_record(case_kind: str, case: CaseSpec, solution, spec) -> dict[str, o
             / (current_scale / length_scale),
             "charge_balance_normalized": float(diagnostics["charge_balance_residual"])
             / (current_scale / length_scale),
-            "interface_current_residual_normalized": float(
-                diagnostics["interface_current_residual"]
-            )
+            "interface_current_residual_normalized": float(diagnostics["interface_current_residual"])
             / current_scale,
             "acceptance_target": acceptance,
         },
@@ -532,23 +510,17 @@ def _build_record(case_kind: str, case: CaseSpec, solution, spec) -> dict[str, o
             "simulated_mean_velocity": mean_velocity,
             "reference_mean_velocity": reference_mean,
             "processed_reference_mean_velocity": processed_mean,
-            "spec_to_processed_mean_velocity_relative_error": abs(
-                reference_mean - processed_mean
-            )
+            "spec_to_processed_mean_velocity_relative_error": abs(reference_mean - processed_mean)
             / max(abs(processed_mean), 1.0e-20),
             "mean_velocity_relative_error": abs(mean_velocity - reference_mean)
             / max(abs(reference_mean), 1.0e-20),
             "applied_pressure_gradient": pressure_applied,
             "reference_pressure_gradient": pressure_reference,
-            "pressure_gradient_relative_error": abs(
-                pressure_applied - pressure_reference
-            )
+            "pressure_gradient_relative_error": abs(pressure_applied - pressure_reference)
             / max(abs(pressure_reference), 1.0e-20),
         },
         "hunt_side_jet": (
-            _side_jet_comparison(observables["velocity"]["z"])
-            if case_kind == "hunt"
-            else None
+            _side_jet_comparison(observables["velocity"]["z"]) if case_kind == "hunt" else None
         ),
     }
 
@@ -561,15 +533,12 @@ def _observable_gate(records: list[dict[str, object]]):
     for record in records:
         observables = record.get("observables", {})
         for name in required:
-            observable = (
-                observables.get(name) if isinstance(observables, dict) else None
-            )
+            observable = observables.get(name) if isinstance(observables, dict) else None
             peak = max(
                 (
                     float(cut.get("reference_peak_abs", 1.0))
                     for axis in ("y", "z")
-                    if isinstance(observable, dict)
-                    and isinstance(cut := observable.get(axis), dict)
+                    if isinstance(observable, dict) and isinstance(cut := observable.get(axis), dict)
                 ),
                 default=1.0,
             )
@@ -584,9 +553,7 @@ def _observable_gate(records: list[dict[str, object]]):
                         }
                     )
                     continue
-                peak_fraction = float(cut.get("reference_peak_abs", peak)) / max(
-                    peak, 1.0e-20
-                )
+                peak_fraction = float(cut.get("reference_peak_abs", peak)) / max(peak, 1.0e-20)
                 l2_error = float(cut["l2_error"])
                 status = (
                     "low_signal"
@@ -620,9 +587,7 @@ def _observable_gate(records: list[dict[str, object]]):
         ),
         reverse=True,
     )
-    counts = {
-        status: sum(item["status"] == status for item in ranked) for status in order
-    }
+    counts = {status: sum(item["status"] == status for item in ranked) for status in order}
     return {
         "case_count": len(records),
         "cases": sorted(str(record["case_kind"]) for record in records),
@@ -656,9 +621,7 @@ for case_kind in CASES:
 plots = write_freemhd_observable_parity_plots(
     records,
     OUTPUT_DIR,
-    case_title=(
-        f"LMX vs FreeMHD normalized midplane observables (Ha={HARTMANN_NUMBER})"
-    ),
+    case_title=(f"LMX vs FreeMHD normalized midplane observables (Ha={HARTMANN_NUMBER})"),
 )
 observable_gate, offenders = _observable_gate(records)
 summary = {
@@ -672,9 +635,7 @@ summary = {
         str(record["case_kind"]): record["target_mean_velocity"] for record in records
     },
     "target_mean_velocity_source": (
-        "matched_benchmark_spec"
-        if FLOW_RATE_TARGET_MEAN_VELOCITY is None
-        else "configured"
+        "matched_benchmark_spec" if FLOW_RATE_TARGET_MEAN_VELOCITY is None else "configured"
     ),
     "settings": CASE_SETTINGS,
     "geometry": {

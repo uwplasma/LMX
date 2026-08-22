@@ -35,29 +35,24 @@ Source = "https://github.com/uwplasma/LMX"
 [project.optional-dependencies]
 dev = [
   "matplotlib",
-  "pillow",
   "pytest",
   "pytest-cov",
   "pytest-timeout",
   "pytest-xdist",
-  "magpylib-jax",
 ]
 docs = [
   "sphinx",
   "myst-parser",
   "furo",
   "sphinx-copybutton",
+  "sphinx-design",
 ]
 release = [
   "build",
   "twine",
 ]
-magnetic = [
-  "magpylib-jax",
-]
 visualization = [
   "matplotlib",
-  "pillow",
 ]
 
 [project.scripts]
@@ -98,3 +93,10 @@ exclude_also = [
   "if TYPE_CHECKING:",
   "raise NotImplementedError",
 ]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

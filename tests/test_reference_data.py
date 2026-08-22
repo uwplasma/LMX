@@ -9,8 +9,8 @@ from lmx.reference_data import (
     _interpolated_centerline_profile,
     _match_single,
     default_closed_channel_reference_root,
-    extract_processed_profile,
     extract_processed_midplane_profile,
+    extract_processed_profile,
     load_closed_channel_analytical,
     load_hunt_analytical,
     load_processed_slice,
@@ -19,7 +19,6 @@ from lmx.reference_data import (
     processed_slice_field_grid,
     processed_slice_point_mesh,
 )
-
 
 pytestmark = pytest.mark.unit
 
@@ -44,9 +43,7 @@ def test_load_closed_channel_analytical_parses_axes_and_pressure_drop(tmp_path: 
     analytical_root.mkdir(parents=True)
     path = analytical_root / "Shercliff_Analytical_Ha20_PresDrop2512.1961.txt"
     path.write_text("r\tu1\tu2\n-0.1\t0.0\t0.1\n0.1\t1.0\t0.9\n")
-    reference = load_closed_channel_analytical(
-        "shercliff", 20, tmp_path / "ClosedChannel"
-    )
+    reference = load_closed_channel_analytical("shercliff", 20, tmp_path / "ClosedChannel")
     assert reference.pressure_drop == pytest.approx(2512.1961)
     assert reference.midplane_z.tolist() == pytest.approx([0.0, 1.0])
     assert reference.midplane_y.tolist() == pytest.approx([0.1, 0.9])
@@ -84,9 +81,7 @@ def test_extract_processed_profile_returns_requested_field_component(tmp_path: P
             "1.0,0.0,5.0,50.0,51.0,0.5",
         ],
     )
-    y_profile = extract_processed_profile(
-        reference, axis="y", field_name="J", component=1
-    )
+    y_profile = extract_processed_profile(reference, axis="y", field_name="J", component=1)
     z_profile = extract_processed_profile(reference, axis="z", field_name="potE")
     assert y_profile["coordinate"].tolist() == pytest.approx([-1.0, 0.0, 1.0])
     assert y_profile["value"].tolist() == pytest.approx([40.0, 20.0, 50.0])
@@ -148,9 +143,7 @@ def test_processed_slice_grid_fills_missing_values_and_reports_bad_field(
 
 
 def test_processed_slice_area_mean_handles_single_sample(tmp_path: Path):
-    reference = _processed_slice(
-        tmp_path, "Points:1,Points:2,U:0\n0.0,0.0,4.0\n"
-    )
+    reference = _processed_slice(tmp_path, "Points:1,Points:2,U:0\n0.0,0.0,4.0\n")
 
     assert processed_slice_area_mean(reference) == pytest.approx(4.0)
 
@@ -211,9 +204,7 @@ def test_extract_processed_profile_interpolates_symmetric_near_center_planes(
         ],
     )
 
-    y_profile = extract_processed_profile(
-        reference, axis="y", field_name="J", component=1
-    )
+    y_profile = extract_processed_profile(reference, axis="y", field_name="J", component=1)
     y_midplane = extract_processed_midplane_profile(reference, axis="y")
     z_profile = extract_processed_profile(reference, axis="z", field_name="potE")
 
@@ -297,6 +288,8 @@ def test_centerline_profile_empty_one_sided_and_invalid_axes():
         extract_processed_midplane_profile(reference, axis="x")
     with pytest.raises(ValueError, match="Unsupported axis"):
         extract_processed_profile(reference, axis="x", field_name="U", component=0)
+
+
 def test_area_mean_empty_and_fill_noop():
     reference = ProcessedSliceReference(
         case_kind="empty",
@@ -310,7 +303,4 @@ def test_area_mean_empty_and_fill_noop():
     )
     assert processed_slice_area_mean(reference) == 0.0
     grid = np.asarray([[1.0, 2.0]])
-    assert (
-        _fill_missing_structured_values(grid, np.asarray([0.0]), np.asarray([0.0, 1.0]))
-        is grid
-    )
+    assert _fill_missing_structured_values(grid, np.asarray([0.0]), np.asarray([0.0, 1.0])) is grid

@@ -15,17 +15,29 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from lmx import (
-    WallLayer, dynamic_to_kinematic_viscosity, effective_pinhole_conductance_ratio,
-    generate_multilayer_duct_mesh, hartmann_number, interaction_parameter,
-    magnetic_reynolds_number, normal_stack_leakage_ratio, reynolds_number,
-    solve_steady, tangential_stack_conductance_ratio,
+    WallLayer,
+    dynamic_to_kinematic_viscosity,
+    effective_pinhole_conductance_ratio,
+    generate_multilayer_duct_mesh,
+    hartmann_number,
+    interaction_parameter,
+    magnetic_reynolds_number,
+    normal_stack_leakage_ratio,
+    reynolds_number,
+    solve_steady,
+    tangential_stack_conductance_ratio,
 )
 from lmx.specs import (
-    BoundaryCondition, CaseSpec, GeometrySpec, MagneticFieldSpec,
-    OutputSpec, RegionSpec, SolverConfig, TimeStepperConfig,
+    BoundaryCondition,
+    CaseSpec,
+    GeometrySpec,
+    MagneticFieldSpec,
+    OutputSpec,
+    RegionSpec,
+    SolverConfig,
+    TimeStepperConfig,
 )
 from lmx.validation import validation_summary
-
 
 # Inputs: edit material, geometry, wall, numerics, and output choices here.
 OUTPUT_DIR = Path("artifacts/examples/li_aln_wall_stack")
@@ -54,9 +66,7 @@ POTENTIAL_ITERATIONS = 40
 
 # Set up dimensional and reduced electrical properties.
 width = height = 2.0 * LENGTH_SCALE_M
-kinematic_viscosity = dynamic_to_kinematic_viscosity(
-    LITHIUM_DYNAMIC_VISCOSITY_PA_S, LITHIUM_DENSITY_KG_M3
-)
+kinematic_viscosity = dynamic_to_kinematic_viscosity(LITHIUM_DYNAMIC_VISCOSITY_PA_S, LITHIUM_DENSITY_KG_M3)
 model_layers = {
     "intact_aln": (
         WallLayer("aln", ALN_CONDUCTIVITY_S_M, ALN_THICKNESS_M, ALN_CELLS),
@@ -64,7 +74,8 @@ model_layers = {
     ),
     "bare_metal": (
         WallLayer(
-            METAL_NAME, METAL_CONDUCTIVITY_S_M,
+            METAL_NAME,
+            METAL_CONDUCTIVITY_S_M,
             ALN_THICKNESS_M + METAL_THICKNESS_M,
             ALN_CELLS + METAL_CELLS,
         ),
@@ -136,22 +147,28 @@ for model in WALL_MODELS:
     case = CaseSpec(
         name=f"li_aln_{model}",
         geometry=GeometrySpec(
-            kind="rect_duct", width=width, height=height,
-            length=LENGTH_SCALE_M, ny=FLUID_CELLS_Y, nz=FLUID_CELLS_Z,
+            kind="rect_duct",
+            width=width,
+            height=height,
+            length=LENGTH_SCALE_M,
+            ny=FLUID_CELLS_Y,
+            nz=FLUID_CELLS_Z,
         ),
         regions=(
             RegionSpec(
-                "fluid", "fluid", LITHIUM_CONDUCTIVITY_S_M,
-                LITHIUM_DENSITY_KG_M3, kinematic_viscosity,
+                "fluid",
+                "fluid",
+                LITHIUM_CONDUCTIVITY_S_M,
+                LITHIUM_DENSITY_KG_M3,
+                kinematic_viscosity,
             ),
         ),
-        magnetic_field=MagneticFieldSpec(
-            kind="constant", value=(0.0, MAGNETIC_FIELD_T, 0.0)
-        ),
+        magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, MAGNETIC_FIELD_T, 0.0)),
         boundary_conditions=(
             BoundaryCondition("walls", "no_slip"),
             BoundaryCondition(
-                "flow_rate", "inlet_flow_rate",
+                "flow_rate",
+                "inlet_flow_rate",
                 value=MEAN_VELOCITY_M_S * width * height,
                 axis="x",
             ),
@@ -182,12 +199,10 @@ for model in WALL_MODELS:
     face_current = float(solution.diagnostics.face_current_max_history[-1])
     spacing = min(float(np.min(mesh.dy)), float(np.min(mesh.dz)))
     diagnostics["charge_balance_relative"] = (
-        abs(float(diagnostics["charge_balance_residual"])) * spacing
-        / max(abs(face_current), 1.0e-30)
+        abs(float(diagnostics["charge_balance_residual"])) * spacing / max(abs(face_current), 1.0e-30)
     )
-    diagnostics["interface_current_relative"] = (
-        abs(float(diagnostics["interface_current_residual"]))
-        / max(abs(face_current), 1.0e-30)
+    diagnostics["interface_current_relative"] = abs(float(diagnostics["interface_current_residual"])) / max(
+        abs(face_current), 1.0e-30
     )
     results[model] = {
         "layers": [layer.__dict__ for layer in layers],
@@ -211,8 +226,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 summary = {
     "scope": "MHD electrical performance only",
     "nondimensional": nondimensional,
-    "inductionless_assumption_pass": nondimensional["magnetic_reynolds_number"]
-    < 1.0e-2,
+    "inductionless_assumption_pass": nondimensional["magnetic_reynolds_number"] < 1.0e-2,
     "pinhole_sweep": [
         {"fraction": fraction, "effective_conductance_ratio": conductance}
         for fraction, conductance in zip(PINHOLE_FRACTIONS, pinhole_conductance)

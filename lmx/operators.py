@@ -18,11 +18,7 @@ def apply_five_point_operator(
     south_field = jnp.pad(field[:, :-1], ((0, 0), (1, 0)))
     north_field = jnp.pad(field[:, 1:], ((0, 0), (0, 1)))
     return (
-        diagonal * field
-        - west * west_field
-        - east * east_field
-        - south * south_field
-        - north * north_field
+        diagonal * field - west * west_field - east * east_field - south * south_field - north * north_field
     )
 
 
@@ -56,11 +52,7 @@ def apply_poisson_operator(
     south_phi = jnp.pad(projected[:, :-1], ((0, 0), (1, 0)))
     north_phi = jnp.pad(projected[:, 1:], ((0, 0), (0, 1)))
     matrix_phi = (
-        diagonal * projected
-        - west * west_phi
-        - east * east_phi
-        - south * south_phi
-        - north * north_phi
+        diagonal * projected - west * west_phi - east * east_phi - south * south_phi - north * north_phi
     )
     return matrix_phi.at[anchor].set(phi[anchor])
 
@@ -134,7 +126,9 @@ def gradient_scalar(field: jnp.ndarray, mesh: StructuredMesh) -> tuple[jnp.ndarr
     return fy, fz
 
 
-def laplacian_scalar(field: jnp.ndarray, mesh: StructuredMesh, mask: jnp.ndarray | None = None) -> jnp.ndarray:
+def laplacian_scalar(
+    field: jnp.ndarray, mesh: StructuredMesh, mask: jnp.ndarray | None = None
+) -> jnp.ndarray:
     fluid_mask = jnp.ones_like(field, dtype=bool) if mask is None else mask
     dy = mesh.dy[:, None]
     dz = mesh.dz[None, :]
@@ -156,8 +150,14 @@ def laplacian_scalar(field: jnp.ndarray, mesh: StructuredMesh, mask: jnp.ndarray
     south_distance = jnp.where(south_connected, jnp.pad(delta_z[None, :], ((0, 0), (1, 0))), 0.5 * dz)
     north_distance = jnp.where(north_connected, jnp.pad(delta_z[None, :], ((0, 0), (0, 1))), 0.5 * dz)
 
-    flux_y = ((east_value - field) / jnp.maximum(east_distance, 1e-12) - (field - west_value) / jnp.maximum(west_distance, 1e-12)) / jnp.maximum(dy, 1e-12)
-    flux_z = ((north_value - field) / jnp.maximum(north_distance, 1e-12) - (field - south_value) / jnp.maximum(south_distance, 1e-12)) / jnp.maximum(dz, 1e-12)
+    flux_y = (
+        (east_value - field) / jnp.maximum(east_distance, 1e-12)
+        - (field - west_value) / jnp.maximum(west_distance, 1e-12)
+    ) / jnp.maximum(dy, 1e-12)
+    flux_z = (
+        (north_value - field) / jnp.maximum(north_distance, 1e-12)
+        - (field - south_value) / jnp.maximum(south_distance, 1e-12)
+    ) / jnp.maximum(dz, 1e-12)
     lap = flux_y + flux_z
     if mask is not None:
         lap = jnp.where(mask, lap, 0.0)

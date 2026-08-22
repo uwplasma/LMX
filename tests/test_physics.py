@@ -1,22 +1,24 @@
 from dataclasses import replace
 from pathlib import Path
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
+from lmx import solvers, validation
+from lmx.autodiff import (
+    build_hartmann_autodiff_problem,
+    hartmann_mean_velocity,
+    hartmann_mean_velocity_finite_difference_gradients,
+    hartmann_mean_velocity_gradients,
+    hartmann_profile_loss,
+    hartmann_profile_loss_gradients,
+    run_hartmann_profile_inverse_design,
+    solve_differentiable_hartmann,
+)
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.core import Diagnostics, MHDState, Solution
-from lmx.dean import (
-    DeanVelocityPoint,
-    bayat_rezai_dean_velocity,
-    bayat_rezai_lateral_reynolds,
-    compare_dean_velocity_points,
-    dean_number_from_reynolds,
-    dean_secondary_flow_field,
-    dean_velocity_reference_rows,
-    write_dean_literature_validation_plots,
-)
 from lmx.field_models import write_tabulated_field_npz
 from lmx.mesh import (
     generate_layered_duct_mesh,
@@ -29,9 +31,11 @@ from lmx.physics import (
     magnetic_field_components,
 )
 from lmx.reference_data import (
+    ClosedChannelAnalyticalReference,
     default_closed_channel_reference_root,
     load_closed_channel_analytical,
 )
+from lmx.solvers import _build_mesh, solve_steady, solve_transient
 from lmx.specs import (
     BoundaryCondition,
     CaseSpec,
@@ -40,19 +44,25 @@ from lmx.specs import (
     RegionSpec,
     TimeStepperConfig,
 )
-from lmx.solvers import _build_mesh, solve_steady, solve_transient
-import lmx.solvers as solvers
 from lmx.validation import (
     closed_channel_validation,
     combined_profile_error,
+    compare_normalized_profiles,
+    compare_profiles_with_shared_scale,
+    duct_layer_resolution_gate,
     duct_layer_resolution_metrics,
+    extract_midplane_scalar_profile,
     hartmann_acceptance,
     hartmann_analytic_profile,
     hartmann_validation,
+    validation_summary,
     write_acceptance_report,
+    write_analytic_comparison,
+    write_closed_channel_validation,
+    write_metrics_json,
+    write_profile_csv,
 )
 from lmx.wall_models import WallLayer
-
 
 _EXPECTED_HARTMANN_CENTERLINE = jnp.asarray(
     [
@@ -135,48 +145,6 @@ def test_closed_channel_centerline_regression(case, expected):
 
 
 @pytest.mark.unit
-def test_bayat_rezai_dean_velocity_correlation_matches_dimensionless_form():
-    dean = np.asarray([2.73, 6.82, 20.0])
-    velocity = bayat_rezai_dean_velocity(
-        dean, kinematic_viscosity=1.0e-6, largest_channel_dimension=150.0e-6
-    )
-    lateral_re = bayat_rezai_lateral_reynolds(dean)
-
-    assert np.all(velocity > 0.0)
-    assert np.allclose(velocity * 150.0e-6 / 1.0e-6, lateral_re)
-    assert dean_number_from_reynolds(100.0, 0.01) == pytest.approx(10.0)
-
-
-@pytest.mark.unit
-def test_dean_secondary_flow_field_is_scaled_and_finite():
-    y = np.linspace(-1.0, 1.0, 41)
-    z = np.linspace(-1.0, 1.0, 41)
-    field = dean_secondary_flow_field(y, z, tube_radius=1.0, target_rms_velocity=0.02)
-
-    assert field["rms_velocity"] == pytest.approx(0.02)
-    assert field["peak_velocity"] > field["rms_velocity"]
-    assert np.all(np.isfinite(field["speed"]))
-    assert np.all(np.asarray(field["speed"])[np.asarray(field["mask"]) < 0.5] == 0.0)
-
-
-@pytest.mark.unit
-def test_dean_literature_validation_rows_and_plots(tmp_path: Path):
-    points = [
-        DeanVelocityPoint(2.73, 0.15, 1.0e-6, 150.0e-6),
-        DeanVelocityPoint(6.82, 0.74, 1.0e-6, 150.0e-6),
-    ]
-    comparison = compare_dean_velocity_points(points)
-    rows = dean_velocity_reference_rows([2.73, 6.82])
-    plots = write_dean_literature_validation_plots(comparison, tmp_path)
-
-    assert comparison["validation_pass"] is True
-    assert len(rows) == 2
-    assert rows[0]["source"] == "Bayat & Rezai, Sci. Rep. 2017, Eq. 8"
-    assert [path.suffix for path in plots] == [".png", ".pdf"]
-    assert all(path.exists() and path.stat().st_size > 0 for path in plots)
-
-
-@pytest.mark.unit
 def test_hartmann_profile_is_wall_bounded_and_center_peaked():
     case = make_hartmann_case(ha=2.0, ny=12, nz=12)
     mesh = _build_mesh(case)
@@ -189,11 +157,115 @@ def test_hartmann_profile_is_wall_bounded_and_center_peaked():
     left_half = centerline[: centerline.shape[0] // 2 + 1]
     assert jnp.allclose(centerline[0], 0.0)
     assert jnp.allclose(centerline[-1], 0.0)
-    center_slice = centerline[
-        centerline.shape[0] // 2 - 1 : centerline.shape[0] // 2 + 1
-    ]
+    center_slice = centerline[centerline.shape[0] // 2 - 1 : centerline.shape[0] // 2 + 1]
     assert jnp.allclose(jnp.max(center_slice), jnp.max(centerline), atol=1e-6)
     assert jnp.all(jnp.diff(left_half) >= -5e-6)
+
+
+@pytest.mark.unit
+def test_validation_api_reports_profiles_metrics_and_artifacts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    case = make_hartmann_case(ha=5.0, ny=6, nz=6)
+    solution = _synthetic_solution(case, jnp.ones((case.geometry.ny, case.geometry.nz)))
+    solution = replace(
+        solution,
+        diagnostics=replace(
+            solution.diagnostics,
+            potential_residual_history=jnp.asarray([1.0e-7]),
+        ),
+    )
+    metrics = validation_summary(solution, case.name, ha=5.0)
+    assert "l2_error" not in validation_summary(solution, "shercliff")
+    scalar = extract_midplane_scalar_profile(solution, solution.state.jy, axis="z", fluid_only=True)
+    coordinate = jnp.asarray([-0.5, 0.0, 0.5])
+    reference_coordinate = jnp.asarray([-1.0, 0.0, 1.0])
+    normalized = compare_normalized_profiles(
+        coordinate,
+        jnp.asarray([0.0, 1.0, 0.0]),
+        reference_coordinate,
+        jnp.asarray([0.0, 2.0, 0.0]),
+        simulated_boundary_values=(0.0, 0.0),
+    )
+    assert compare_normalized_profiles(
+        reference_coordinate,
+        normalized.simulated,
+        reference_coordinate,
+        normalized.reference,
+    ).l2_error == pytest.approx(0.0)
+    shared = compare_profiles_with_shared_scale(
+        reference_coordinate,
+        normalized.simulated,
+        reference_coordinate,
+        normalized.reference,
+        coordinate_scale=1.0,
+        value_scale=1.0,
+        simulated_boundary_values=(0.0, 0.0),
+    )
+    assert compare_profiles_with_shared_scale(
+        reference_coordinate,
+        normalized.simulated,
+        reference_coordinate,
+        normalized.reference,
+        coordinate_scale=1.0,
+        value_scale=1.0,
+    ).l2_error == pytest.approx(0.0)
+    reference = ClosedChannelAnalyticalReference(
+        case_kind="hartmann",
+        ha=5,
+        coordinate=reference_coordinate,
+        midplane_y=jnp.asarray([0.0, 1.0, 0.0]),
+        midplane_z=jnp.asarray([0.0, 1.0, 0.0]),
+        pressure_drop=1.0,
+        path="synthetic",
+    )
+    monkeypatch.setattr(validation, "load_closed_channel_analytical", lambda *args: reference)
+    closed = closed_channel_validation(solution, "hartmann", 5)
+    unsupported = replace(case, magnetic_field=replace(case.magnetic_field, value=(1.0, 0.0, 0.0)))
+
+    assert metrics["potential_residual"] == pytest.approx(1.0e-7)
+    assert metrics["linear_residual"] == pytest.approx(0.0)
+    assert scalar["coordinate"].shape == scalar["value"].shape
+    assert shared.l2_error == pytest.approx(0.0)
+    assert combined_profile_error() == pytest.approx(0.0)
+    assert combined_profile_error(3.0, 4.0) == pytest.approx(12.5**0.5)
+    assert write_metrics_json(metrics, tmp_path / "metrics.json").exists()
+    assert write_profile_csv(tmp_path / "profile.csv", scalar).exists()
+    assert write_analytic_comparison(shared, tmp_path / "profile.json").exists()
+    assert write_closed_channel_validation(closed, tmp_path / "closed.json").exists()
+    assert duct_layer_resolution_gate(case, solution.mesh)["layer_resolution_supported"]
+    assert not duct_layer_resolution_gate(unsupported, solution.mesh)["layer_resolution_supported"]
+
+
+@pytest.mark.unit
+def test_validation_profiles_cover_walls_singletons_and_invalid_inputs():
+    hunt = make_hunt_case(ha=5.0, ny=8, nz=8, wall_cells=1)
+    hunt_mesh = _build_mesh(hunt)
+    hunt_solution = _synthetic_solution(hunt, jnp.ones(hunt_mesh.yz_shape))
+    profile = extract_midplane_scalar_profile(
+        hunt_solution, hunt_solution.state.jy, axis="y", fluid_only=True
+    )
+    assert profile["coordinate"].size < hunt_mesh.y_centers.size
+    assert duct_layer_resolution_gate(hunt, hunt_mesh)["layer_resolution_supported"]
+    unsupported = replace(
+        hunt,
+        magnetic_field=replace(hunt.magnetic_field, kind="analytic", value=None),
+    )
+    assert not duct_layer_resolution_gate(unsupported, hunt_mesh)["layer_resolution_supported"]
+
+    singleton = make_hartmann_case(ha=5.0, ny=3, nz=1)
+    singleton_solution = _synthetic_solution(singleton, jnp.ones((3, 1)))
+    for axis in ("y", "z"):
+        result = extract_midplane_scalar_profile(singleton_solution, singleton_solution.state.jy, axis=axis)
+        assert result["coordinate"].shape == result["value"].shape
+    with pytest.raises(ValueError, match="Unsupported axis"):
+        extract_midplane_scalar_profile(singleton_solution, singleton_solution.state.jy, axis="x")
+
+    values = jnp.ones((1,))
+    for name in ("coordinate_scale", "value_scale"):
+        kwargs = {"coordinate_scale": 1.0, "value_scale": 1.0, name: 0.0}
+        with pytest.raises(ValueError, match=f"{name} must be positive"):
+            compare_profiles_with_shared_scale(values, values, values, values, **kwargs)
 
 
 @pytest.mark.unit
@@ -231,9 +303,7 @@ def test_transient_solver_can_start_from_nonzero_initial_velocity(
         case,
         forcing=0.0,
         initial_velocity=0.5,
-        time_stepper=replace(
-            case.time_stepper, dt=1e-4, t_final=1e-4, max_steps=1, relaxation=1.0
-        ),
+        time_stepper=replace(case.time_stepper, dt=1e-4, t_final=1e-4, max_steps=1, relaxation=1.0),
     )
 
     def fake_fully_developed_case_step(**kwargs):
@@ -264,14 +334,10 @@ def test_transient_solver_can_start_from_nonzero_initial_velocity(
             1.0e-2,
         )
 
-    monkeypatch.setattr(
-        solvers, "_fully_developed_case_step", fake_fully_developed_case_step
-    )
+    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
 
     solution = solve_transient(case)
-    center_value = float(
-        solution.state.u[solution.state.u.shape[0] // 2, solution.state.u.shape[1] // 2]
-    )
+    center_value = float(solution.state.u[solution.state.u.shape[0] // 2, solution.state.u.shape[1] // 2])
     assert center_value > 0.0
     assert float(solution.state.u[0, 0]) == pytest.approx(0.0)
 
@@ -285,9 +351,7 @@ def test_hartmann_acceptance_report_and_writer(tmp_path: Path):
     profile = profile.at[0, :].set(0.0)
     profile = profile.at[-1, :].set(0.0)
     solution = _synthetic_solution(case, profile)
-    acceptance = hartmann_acceptance(
-        solution, ha=20.0, l2_threshold=0.05, linf_threshold=0.2
-    )
+    acceptance = hartmann_acceptance(solution, ha=20.0, l2_threshold=0.05, linf_threshold=0.2)
     path = write_acceptance_report(acceptance, tmp_path / "acceptance.json")
     assert path.exists()
     assert acceptance.passed is True
@@ -331,12 +395,7 @@ def test_small_shercliff_solution_matches_bundled_reference_profiles():
 
     assert comparison.y_profile.l2_error < 0.4
     assert comparison.z_profile.l2_error < 0.3
-    assert (
-        combined_profile_error(
-            comparison.y_profile.l2_error, comparison.z_profile.l2_error
-        )
-        < 0.36
-    )
+    assert combined_profile_error(comparison.y_profile.l2_error, comparison.z_profile.l2_error) < 0.36
 
 
 @pytest.mark.unit
@@ -436,20 +495,13 @@ def test_small_hunt_solution_matches_bundled_reference_profiles():
         residual=0.0,
     )
     solution = solve_steady(case, mesh=mesh, initial_state=initial_state)
-    comparison = closed_channel_validation(
-        solution, "hunt", 20, reference_root=reference_root
-    )
+    comparison = closed_channel_validation(solution, "hunt", 20, reference_root=reference_root)
     assert solution.diagnostics.potential_residual_history.size > 0
     # This routine gate stays intentionally small; the publication validation
     # examples use finer meshes for the <= O(1e-2) analytical overlays.
     assert comparison.y_profile.l2_error < 0.065
     assert comparison.z_profile.l2_error < 0.04
-    assert (
-        combined_profile_error(
-            comparison.y_profile.l2_error, comparison.z_profile.l2_error
-        )
-        < 0.055
-    )
+    assert combined_profile_error(comparison.y_profile.l2_error, comparison.z_profile.l2_error) < 0.055
 
 
 @pytest.mark.unit
@@ -491,15 +543,9 @@ def test_magnetic_field_components_support_analytic_and_tabulated_fields(
 
 @pytest.mark.unit
 def test_boundary_sides_support_aliases_and_csv_lists():
-    assert _boundary_sides(
-        BoundaryCondition("lr", "insulating", side="left_right")
-    ) == ("left", "right")
-    assert _boundary_sides(
-        BoundaryCondition("tb", "insulating", side="top_bottom")
-    ) == ("bottom", "top")
-    assert _boundary_sides(
-        BoundaryCondition("mix", "insulating", side="left, top")
-    ) == ("left", "top")
+    assert _boundary_sides(BoundaryCondition("lr", "insulating", side="left_right")) == ("left", "right")
+    assert _boundary_sides(BoundaryCondition("tb", "insulating", side="top_bottom")) == ("bottom", "top")
+    assert _boundary_sides(BoundaryCondition("mix", "insulating", side="left, top")) == ("left", "top")
     assert _boundary_sides(BoundaryCondition("none", "insulating")) == ()
 
 
@@ -518,19 +564,11 @@ def test_build_material_fields_handles_missing_solid_region_assignment_with_laye
             target_ha=5.0,
         ),
         regions=(
-            RegionSpec(
-                name="fluid", kind="fluid", conductivity=2.0, density=3.0, viscosity=4.0
-            ),
-            RegionSpec(
-                name="wall", kind="solid", conductivity=5.0, density=6.0, viscosity=7.0
-            ),
+            RegionSpec(name="fluid", kind="fluid", conductivity=2.0, density=3.0, viscosity=4.0),
+            RegionSpec(name="wall", kind="solid", conductivity=5.0, density=6.0, viscosity=7.0),
         ),
         magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, 0.0, 1.0)),
-        boundary_conditions=(
-            BoundaryCondition(
-                "bogus", "conducting_wall", region="missing", side="left"
-            ),
-        ),
+        boundary_conditions=(BoundaryCondition("bogus", "conducting_wall", region="missing", side="left"),),
         time_stepper=TimeStepperConfig(dt=0.1, t_final=0.1, max_steps=1),
     )
     mesh = generate_layered_duct_mesh(
@@ -596,3 +634,102 @@ def test_build_material_fields_uses_explicit_multilayer_mesh_sigma():
     assert float(
         fields.conductivity[mesh.region_ids == mesh.region_names.index("left:metal")][0]
     ) == pytest.approx(7.0)
+
+
+@pytest.fixture(scope="module")
+def hartmann_problem():
+    return build_hartmann_autodiff_problem(
+        ny=12,
+        nz=12,
+        macro_iterations=3,
+        potential_iterations=12,
+        velocity_iterations=16,
+    )
+
+
+def test_differentiable_hartmann_solution_returns_finite_fields(hartmann_problem):
+    u, phi = solve_differentiable_hartmann(hartmann_problem, forcing=1.0, hartmann_number=5.0)
+
+    assert u.shape == (12, 12)
+    assert phi.shape == (12, 12)
+    assert jnp.isfinite(u).all()
+    assert jnp.isfinite(phi).all()
+
+
+def test_hartmann_mean_velocity_is_differentiable(hartmann_problem):
+    value, gradient = jax.value_and_grad(
+        lambda ha: hartmann_mean_velocity(hartmann_problem, forcing=1.0, hartmann_number=ha)
+    )(5.0)
+
+    assert jnp.isfinite(value)
+    assert jnp.isfinite(gradient)
+
+
+def test_profile_loss_gradient_step_reduces_objective(hartmann_problem):
+    target_u, _ = solve_differentiable_hartmann(hartmann_problem, forcing=1.0, hartmann_number=9.0)
+    target_profile = target_u[:, target_u.shape[1] // 2]
+
+    def objective(ha):
+        return hartmann_profile_loss(
+            hartmann_problem,
+            forcing=1.0,
+            hartmann_number=ha,
+            target_profile=target_profile,
+        )
+
+    loss0, grad0 = jax.value_and_grad(objective)(4.0)
+    loss1 = objective(jnp.clip(4.0 - 2.0 * grad0, 0.5, 30.0))
+
+    assert jnp.isfinite(loss0)
+    assert jnp.isfinite(grad0)
+    assert float(loss1) <= float(loss0)
+
+
+def test_mean_velocity_gradients_match_finite_difference(hartmann_problem):
+    autodiff = hartmann_mean_velocity_gradients(hartmann_problem, forcing=1.1, hartmann_number=5.0)
+    finite_diff = hartmann_mean_velocity_finite_difference_gradients(
+        hartmann_problem, forcing=1.1, hartmann_number=5.0
+    )
+
+    assert jnp.isfinite(autodiff["d_mean_velocity_d_forcing"])
+    assert jnp.isfinite(autodiff["d_mean_velocity_d_ha"])
+    assert (
+        float(jnp.abs(autodiff["d_mean_velocity_d_forcing"] - finite_diff["d_mean_velocity_d_forcing"]))
+        < 5.0e-2
+    )
+    assert float(jnp.abs(autodiff["d_mean_velocity_d_ha"] - finite_diff["d_mean_velocity_d_ha"])) < 5.0e-2
+
+
+def test_profile_loss_gradients_are_finite(hartmann_problem):
+    target_u, _ = solve_differentiable_hartmann(hartmann_problem, forcing=1.0, hartmann_number=8.0)
+    target_profile = target_u[:, target_u.shape[1] // 2]
+
+    gradients = hartmann_profile_loss_gradients(
+        hartmann_problem,
+        forcing=0.7,
+        hartmann_number=4.5,
+        target_profile=target_profile,
+    )
+
+    assert jnp.isfinite(gradients["loss"])
+    assert jnp.isfinite(gradients["d_loss_d_forcing"])
+    assert jnp.isfinite(gradients["d_loss_d_ha"])
+
+
+def test_profile_inverse_design_reduces_loss(hartmann_problem):
+    target_u, _ = solve_differentiable_hartmann(hartmann_problem, forcing=1.0, hartmann_number=10.0)
+    target_profile = target_u[:, target_u.shape[1] // 2]
+
+    result = run_hartmann_profile_inverse_design(
+        hartmann_problem,
+        target_profile=target_profile,
+        forcing_init=0.4,
+        hartmann_init=4.0,
+        learning_rate_forcing=10.0,
+        learning_rate_ha=2.0,
+        steps=8,
+    )
+
+    assert len(result["history"]) == 8
+    assert result["history"][-1]["loss"] <= result["history"][0]["loss"]
+    assert jnp.isfinite(result["recovered_profile"]).all()

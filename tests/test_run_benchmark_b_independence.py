@@ -9,7 +9,6 @@ import pytest
 from lmx._fringing_types import ExtrudedFieldBundle
 from scripts import run_benchmark_b_independence as campaign
 
-
 pytestmark = pytest.mark.unit
 
 
@@ -20,33 +19,17 @@ def test_campaign_imports_lmx_from_its_own_source_tree():
 def test_variant_problem_applies_only_frozen_solver_control_changes():
     baseline = campaign._variant_problem("B1-fringing-pipe", "coarse", "baseline")
     tight = campaign._variant_problem("B1-fringing-pipe", "coarse", "tight_tolerance")
-    extended = campaign._variant_problem(
-        "B1-fringing-pipe", "coarse", "extended_iterations"
-    )
+    extended = campaign._variant_problem("B1-fringing-pipe", "coarse", "extended_iterations")
     thin = campaign._variant_problem("B1-fringing-pipe", "coarse", "thin_wall")
 
     assert tight.case.solver.coupling_tolerance == pytest.approx(
         0.5 * baseline.case.solver.coupling_tolerance
     )
-    assert (
-        tight.case.time_stepper.steady_tolerance
-        == baseline.case.time_stepper.steady_tolerance
-    )
-    assert (
-        tight.case.time_stepper.potential_iterations
-        == 2 * baseline.case.time_stepper.potential_iterations
-    )
-    assert (
-        tight.case.solver.coupling_iterations
-        == 4 * baseline.case.solver.coupling_iterations
-    )
-    assert (
-        extended.case.solver.coupling_iterations
-        == 2 * baseline.case.solver.coupling_iterations
-    )
-    assert (
-        extended.case.time_stepper.max_steps == 2 * baseline.case.time_stepper.max_steps
-    )
+    assert tight.case.time_stepper.steady_tolerance == baseline.case.time_stepper.steady_tolerance
+    assert tight.case.time_stepper.potential_iterations == 2 * baseline.case.time_stepper.potential_iterations
+    assert tight.case.solver.coupling_iterations == 4 * baseline.case.solver.coupling_iterations
+    assert extended.case.solver.coupling_iterations == 2 * baseline.case.solver.coupling_iterations
+    assert extended.case.time_stepper.max_steps == 2 * baseline.case.time_stepper.max_steps
     assert thin.case.geometry.wall_thickness[0] == pytest.approx(
         0.5 * baseline.case.geometry.wall_thickness[0]
     )
@@ -62,9 +45,7 @@ def test_variant_problem_applies_only_frozen_solver_control_changes():
     assert campaign._effective_iteration_limits(b2)["electric_iterations"] == 600
     assert b2.case.solver.coupling_min_relaxation == pytest.approx(2.0)
     assert (
-        campaign._variant_problem(
-            "B2-fringing-square", "coarse", "baseline", num_devices=2
-        ).case.geometry.nx
+        campaign._variant_problem("B2-fringing-square", "coarse", "baseline", num_devices=2).case.geometry.nx
         == 102
     )
 
@@ -75,11 +56,7 @@ def test_variant_problem_applies_only_frozen_solver_control_changes():
 def _record(observable, *, residual=1.0e-9, coupling_tolerance=None):
     return {
         "primary_observable": observable,
-        "controls": (
-            {}
-            if coupling_tolerance is None
-            else {"coupling_tolerance": coupling_tolerance}
-        ),
+        "controls": ({} if coupling_tolerance is None else {"coupling_tolerance": coupling_tolerance}),
         "diagnostics": {
             "max_residual": residual,
             "max_divergence_residual": 1.0e-5,
@@ -98,9 +75,7 @@ def _record(observable, *, residual=1.0e-9, coupling_tolerance=None):
 def test_comparison_enforces_tighter_variant_steady_tolerance():
     records = {
         "baseline": _record([0.1, 0.2, 0.1], residual=4.0e-5),
-        "tight_tolerance": _record(
-            [0.1, 0.2, 0.1], residual=3.0e-5, coupling_tolerance=2.5e-5
-        ),
+        "tight_tolerance": _record([0.1, 0.2, 0.1], residual=3.0e-5, coupling_tolerance=2.5e-5),
         "extended_iterations": _record([0.1, 0.2, 0.1]),
         "thin_wall": _record([0.1, 0.2, 0.1]),
     }
@@ -148,15 +123,11 @@ def test_comparison_applies_uncertainty_and_thin_wall_gates():
     assert failed["gates"]["pressure_solve_convergence"] is False
 
     records["baseline"] = _record([0.1, 0.2, 0.1])
-    del records["tight_tolerance"]["diagnostics"][
-        "pressure_linear_diagnostics_complete"
-    ]
+    del records["tight_tolerance"]["diagnostics"]["pressure_linear_diagnostics_complete"]
     failed = campaign._comparison("B2-fringing-square", records)
     assert failed["gates"]["tight-tolerance_pressure_linear_diagnostics"] is False
 
-    incomplete = campaign._comparison(
-        "B2-fringing-square", {"baseline": records["baseline"]}
-    )
+    incomplete = campaign._comparison("B2-fringing-square", {"baseline": records["baseline"]})
     assert incomplete["complete"] is False
     assert "thin_wall" in incomplete["missing_variants"]
 
@@ -177,9 +148,7 @@ def test_dry_run_writes_deterministic_campaign_plan(tmp_path: Path):
     payload = json.loads((output / "benchmark-b-independence.json").read_text())
     assert exit_code == 0
     assert payload["pass"] is False
-    assert payload["cases"] == [
-        {"case_id": "B1-fringing-pipe", "complete": False, "dry_run": True}
-    ]
+    assert payload["cases"] == [{"case_id": "B1-fringing-pipe", "complete": False, "dry_run": True}]
 
 
 def test_resume_rejects_checkpoint_from_another_fingerprint(tmp_path: Path):
@@ -201,9 +170,7 @@ def test_resume_rejects_checkpoint_from_another_fingerprint(tmp_path: Path):
         )
 
 
-def test_progress_writer_keeps_latest_atomic_partial_restart(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
+def test_progress_writer_keeps_latest_atomic_partial_restart(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     progress_path = tmp_path / "run.progress.json"
     restart_path = tmp_path / "run.partial.npz"
     monkeypatch.setattr(campaign, "_source_fingerprint", lambda: "source")
@@ -211,9 +178,7 @@ def test_progress_writer_keeps_latest_atomic_partial_restart(
     def fake_restart_writer(bundle, case, path):
         Path(path).write_bytes(bundle)
 
-    monkeypatch.setattr(
-        campaign, "write_extruded_bundle_restart_npz", fake_restart_writer
-    )
+    monkeypatch.setattr(campaign, "write_extruded_bundle_restart_npz", fake_restart_writer)
     writer = campaign._progress_writer(
         problem=SimpleNamespace(case=object()),
         case_id="B1-fringing-pipe",
@@ -267,9 +232,7 @@ def test_partial_restart_requires_matching_progress_provenance(
         "load_extruded_restart_bundle",
         lambda path: SimpleNamespace(bundle=bundle),
     )
-    assert (
-        campaign._load_partial_restart(restart_path, progress_path, "source") is bundle
-    )
+    assert campaign._load_partial_restart(restart_path, progress_path, "source") is bundle
 
     restart_path.write_bytes(b"changed")
     with pytest.raises(ValueError, match="checksum mismatch"):
@@ -289,18 +252,14 @@ def test_acceptance_observable_is_reloaded_from_persisted_restart(
         lambda path: SimpleNamespace(bundle=bundle),
     )
 
-    x, observable = campaign._load_restart_observable(
-        tmp_path / "accepted.npz", "B2-fringing-square"
-    )
+    x, observable = campaign._load_restart_observable(tmp_path / "accepted.npz", "B2-fringing-square")
 
     assert x == pytest.approx([-8.0, 0.0, 6.0])
     assert observable == pytest.approx([-1.0 / 540.0, 2.0 / 540.0, 1.0 / 540.0])
 
 
 def test_variant_restart_parser_is_explicit_and_rejects_invalid_values():
-    assert campaign._parse_variant_restarts(
-        ["thin_wall=/tmp/thin.npz", "baseline=/tmp/base.npz"]
-    ) == {
+    assert campaign._parse_variant_restarts(["thin_wall=/tmp/thin.npz", "baseline=/tmp/base.npz"]) == {
         "thin_wall": Path("/tmp/thin.npz"),
         "baseline": Path("/tmp/base.npz"),
     }
@@ -352,9 +311,7 @@ def test_acceptance_assembly_reuses_three_campaigns_without_solver(
 
     monkeypatch.setattr(campaign, "_evaluate_acceptance", evaluate)
     assert campaign.main(arguments) == 0
-    payload = json.loads(
-        (tmp_path / "accepted" / "benchmark-b-acceptance.json").read_text()
-    )
+    payload = json.loads((tmp_path / "accepted" / "benchmark-b-acceptance.json").read_text())
     assert payload["pass"] is True
 
 
@@ -530,13 +487,8 @@ def test_gpu_wave_assigns_one_variant_per_device(monkeypatch: pytest.MonkeyPatch
     )
 
     assert [item[1]["env"]["CUDA_VISIBLE_DEVICES"] for item in launches] == ["0", "1"]
-    assert all(
-        item[1]["env"]["XLA_PYTHON_CLIENT_PREALLOCATE"] == "false" for item in launches
-    )
-    assert all(
-        "lmx-jax-cache" in item[1]["env"]["JAX_COMPILATION_CACHE_DIR"]
-        for item in launches
-    )
+    assert all(item[1]["env"]["XLA_PYTHON_CLIENT_PREALLOCATE"] == "false" for item in launches)
+    assert all("lmx-jax-cache" in item[1]["env"]["JAX_COMPILATION_CACHE_DIR"] for item in launches)
     assert "baseline" in launches[0][0]
     assert "thin_wall" in launches[1][0]
     assert launches[0][0][-3:-1] == ["--checkpoint-interval", "8"]
@@ -547,12 +499,8 @@ def test_gpu_campaign_gates_restart_dependent_second_wave(
     monkeypatch: pytest.MonkeyPatch, physics_passes: bool
 ):
     waves = []
-    monkeypatch.setattr(
-        campaign, "_run_gpu_wave", lambda args, tasks, devices: waves.append(tasks)
-    )
-    monkeypatch.setattr(
-        campaign, "_wave_physics_passes", lambda args, tasks: physics_passes
-    )
+    monkeypatch.setattr(campaign, "_run_gpu_wave", lambda args, tasks, devices: waves.append(tasks))
+    monkeypatch.setattr(campaign, "_wave_physics_passes", lambda args, tasks: physics_passes)
     monkeypatch.setattr(campaign, "main", lambda argv=None: 7)
     args = SimpleNamespace(
         gpu_devices="0,1",
@@ -582,9 +530,7 @@ def test_b2_evidence_plot_mode_uses_only_existing_records(tmp_path, monkeypatch)
         by=campaign.np.ones((5, 4, 1)),
     )
     output = tmp_path / "evidence.webp"
-    monkeypatch.setattr(
-        campaign, "_run_record", lambda *args, **kwargs: pytest.fail("solver ran")
-    )
+    monkeypatch.setattr(campaign, "_run_record", lambda *args, **kwargs: pytest.fail("solver ran"))
     assert (
         campaign.main(
             [
@@ -603,9 +549,7 @@ def test_b2_evidence_plot_mode_uses_only_existing_records(tmp_path, monkeypatch)
     assert output.is_file() and output.stat().st_size < 100_000
 
 
-def test_gpu_wave_physics_gate_reads_worker_checkpoint(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
+def test_gpu_wave_physics_gate_reads_worker_checkpoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     runs = tmp_path / "runs"
     runs.mkdir()
     path = runs / "B2-fringing-square-coarse-baseline.json"

@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import ast
 from collections.abc import Callable
-import re
-import warnings
 from pathlib import Path
 
-from jax import config as jax_config
 import jax.numpy as jnp
 import numpy as np
+from jax import config as jax_config
 
 jax_config.update("jax_enable_x64", True)
 
@@ -16,65 +13,6 @@ try:
     from scipy.interpolate import RegularGridInterpolator
 except Exception:  # pragma: no cover - SciPy is a shipped dependency for normal environments.
     RegularGridInterpolator = None
-
-try:
-    import magpylib_jax as magpy
-except Exception:  # pragma: no cover - optional dependency in nonstandard environments.
-    magpy = None
-
-
-def load_wham_coil_model_script(
-    path: str | Path,
-    *,
-    radial_loops: int | None = None,
-    axial_loops: int | None = None,
-    preserve_ampere_turns: bool = True,
-) -> dict[str, float | int | str | bool]:
-    """Parse the WHAM coil-model script into LMX field-generation parameters.
-
-    The attached WHAM script defines two high-field coils with circular-current
-    loops. This parser extracts the physical dimensions and coil-center
-    separation while allowing examples to use a reduced loop count. When
-    ``preserve_ampere_turns`` is true, the reduced loop current is scaled to
-    keep total ampere-turns approximately fixed.
-    """
-
-    source = Path(path)
-    text = source.read_text(encoding="utf-8")
-    env = _safe_numeric_assignments(text)
-    required = ("dz_HF", "r_in_HF", "r_out_HF", "nz", "nr", "I_coil")
-    missing = [name for name in required if name not in env]
-    if missing:
-        raise ValueError(f"WHAM coil model is missing required assignments: {', '.join(missing)}")
-
-    coil_centers = _wham_coil_centers_from_script(text)
-    source_radial_loops = int(round(float(env["nr"])))
-    source_axial_loops = int(round(float(env["nz"])))
-    requested_radial_loops = source_radial_loops if radial_loops is None else max(int(radial_loops), 1)
-    requested_axial_loops = source_axial_loops if axial_loops is None else max(int(axial_loops), 1)
-    source_loop_current = float(env["I_coil"])
-    source_ampere_turns = source_loop_current * source_radial_loops * source_axial_loops
-    if preserve_ampere_turns:
-        current_scale = source_ampere_turns / (requested_radial_loops * requested_axial_loops)
-    else:
-        current_scale = source_loop_current
-    return {
-        "source_path": str(source),
-        "coil_axial_thickness": float(env["dz_HF"]),
-        "inner_radius": float(env["r_in_HF"]),
-        "outer_radius": float(env["r_out_HF"]),
-        "source_radial_loops": source_radial_loops,
-        "source_axial_loops": source_axial_loops,
-        "source_loop_current": source_loop_current,
-        "source_ampere_turns": source_ampere_turns,
-        "coil_center_negative": float(min(coil_centers)),
-        "coil_center_positive": float(max(coil_centers)),
-        "coil_separation": float(abs(max(coil_centers) - min(coil_centers))),
-        "radial_loops": requested_radial_loops,
-        "axial_loops": requested_axial_loops,
-        "current_scale": float(current_scale),
-        "preserve_ampere_turns": bool(preserve_ampere_turns),
-    }
 
 
 def make_divergence_free_cross_section_field(
@@ -111,13 +49,13 @@ def make_maxwell_consistent_fringe_field(
 
     def field(x: jnp.ndarray, y: jnp.ndarray, z: jnp.ndarray) -> jnp.ndarray:
         transverse = y if axis == "y" else z
-        continued = 0.5 * peak_field * (
-            1.0 - jnp.tanh(((x - center) + 1j * transverse) / transition_width)
-        )
+        continued = 0.5 * peak_field * (1.0 - jnp.tanh(((x - center) + 1j * transverse) / transition_width))
         zero = jnp.zeros_like(x)
-        components = ((jnp.imag(continued), jnp.real(continued), zero)
-                      if axis == "y" else
-                      (jnp.imag(continued), zero, jnp.real(continued)))
+        components = (
+            (jnp.imag(continued), jnp.real(continued), zero)
+            if axis == "y"
+            else (jnp.imag(continued), zero, jnp.real(continued))
+        )
         return jnp.stack(components, axis=-1)
 
     return field
@@ -144,185 +82,6 @@ def make_localized_divergence_free_obstacle_field(
         return jnp.stack([bx, by, bz], axis=-1)
 
     return field
-
-
-def sample_wham_mirror_field(
-    x: np.ndarray | jnp.ndarray,
-    y: np.ndarray | jnp.ndarray,
-    z: np.ndarray | jnp.ndarray,
-    *,
-    coil_separation: float | jnp.ndarray = 1.96,
-    current_scale: float = 2000.0 * 17.0 / 17.51,
-    inner_radius: float = 0.5 * 86.0e-3,
-    outer_radius: float = 0.5 * 730.0e-3,
-    coil_axial_thickness: float = 14.3e-3 * 8.0,
-    radial_loops: int = 24,
-    axial_loops: int = 8,
-    x_offset: float | jnp.ndarray = 0.0,
-    y_offset: float | jnp.ndarray = 0.0,
-    z_offset: float | jnp.ndarray = 0.0,
-) -> jnp.ndarray:
-    """Sample a differentiable WHAM-like mirror field with magpylib_jax.
-
-    The mirror axis is aligned with ``z`` following the attached WHAM coil-model
-    script. This is the right orientation for a pipe flowing along ``x`` and
-    crossing the mirror field transversely.
-    """
-
-    if magpy is None:
-        raise RuntimeError("magpylib_jax is required for WHAM mirror field generation")
-
-    x_arr = jnp.asarray(x, dtype=jnp.float32)
-    y_arr = jnp.asarray(y, dtype=jnp.float32)
-    z_arr = jnp.asarray(z, dtype=jnp.float32)
-    if x_arr.shape != y_arr.shape or x_arr.shape != z_arr.shape:
-        raise ValueError("x, y, and z arrays must share the same shape")
-
-    radial_loops = max(int(radial_loops), 1)
-    axial_loops = max(int(axial_loops), 1)
-    separation = jnp.asarray(coil_separation, dtype=jnp.float32)
-    current = jnp.asarray(current_scale, dtype=jnp.float32)
-    radii = jnp.linspace(inner_radius, outer_radius, radial_loops, dtype=jnp.float32)
-    axial_offsets = jnp.linspace(
-        -0.5 * coil_axial_thickness,
-        0.5 * coil_axial_thickness,
-        axial_loops,
-        dtype=jnp.float32,
-    )
-    x_shifted = x_arr + jnp.asarray(x_offset, dtype=jnp.float32)
-    y_shifted = y_arr + jnp.asarray(y_offset, dtype=jnp.float32)
-    z_shifted = z_arr + jnp.asarray(z_offset, dtype=jnp.float32)
-    points = jnp.stack([x_shifted.reshape(-1), y_shifted.reshape(-1), z_shifted.reshape(-1)], axis=-1)
-
-    sources = []
-    for coil_center in (-0.5 * separation, 0.5 * separation):
-        for axial_offset in axial_offsets:
-            z_center = coil_center + axial_offset
-            for radius in radii:
-                sources.append(
-                    magpy.current.Circle(
-                        current=current,
-                        diameter=2.0 * radius,
-                        position=(0.0, 0.0, z_center),
-                    )
-                )
-    collection = magpy.Collection(*sources)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", UserWarning)
-        field = jnp.asarray(magpy.getB(collection, points), dtype=jnp.float32)
-    return field.reshape(x_arr.shape + (3,))
-
-
-def sample_wham_mirror_axis_profile(
-    x: np.ndarray | jnp.ndarray,
-    *,
-    coil_separation: float | jnp.ndarray = 1.96,
-    current_scale: float = 2000.0 * 17.0 / 17.51,
-    inner_radius: float = 0.5 * 86.0e-3,
-    outer_radius: float = 0.5 * 730.0e-3,
-    coil_axial_thickness: float = 14.3e-3 * 8.0,
-    radial_loops: int = 24,
-    axial_loops: int = 8,
-    x_offset: float | jnp.ndarray = 0.0,
-    y_offset: float | jnp.ndarray = 0.0,
-    z_offset: float | jnp.ndarray = 0.0,
-) -> jnp.ndarray:
-    x_arr = jnp.asarray(x, dtype=jnp.float32)
-    zeros = jnp.zeros_like(x_arr)
-    field = sample_wham_mirror_field(
-        x_arr,
-        zeros,
-        zeros,
-        coil_separation=coil_separation,
-        current_scale=current_scale,
-        inner_radius=inner_radius,
-        outer_radius=outer_radius,
-        coil_axial_thickness=coil_axial_thickness,
-        radial_loops=radial_loops,
-        axial_loops=axial_loops,
-        x_offset=x_offset,
-        y_offset=y_offset,
-        z_offset=z_offset,
-    )
-    return field[..., 2]
-
-
-def wham_mirror_station_scale(
-    x: np.ndarray | jnp.ndarray,
-    *,
-    coil_separation: float | jnp.ndarray = 1.96,
-    current_scale: float = 2000.0 * 17.0 / 17.51,
-    inner_radius: float = 0.5 * 86.0e-3,
-    outer_radius: float = 0.5 * 730.0e-3,
-    coil_axial_thickness: float = 14.3e-3 * 8.0,
-    radial_loops: int = 24,
-    axial_loops: int = 8,
-    x_offset: float | jnp.ndarray = 0.0,
-    y_offset: float | jnp.ndarray = 0.0,
-    z_offset: float | jnp.ndarray = 0.0,
-) -> jnp.ndarray:
-    profile = sample_wham_mirror_axis_profile(
-        x,
-        coil_separation=coil_separation,
-        current_scale=current_scale,
-        inner_radius=inner_radius,
-        outer_radius=outer_radius,
-        coil_axial_thickness=coil_axial_thickness,
-        radial_loops=radial_loops,
-        axial_loops=axial_loops,
-        x_offset=x_offset,
-        y_offset=y_offset,
-        z_offset=z_offset,
-    )
-    magnitude = jnp.abs(profile)
-    return magnitude / jnp.maximum(jnp.max(magnitude), 1.0e-12)
-
-
-def write_wham_mirror_field_npz(
-    path: str | Path,
-    *,
-    x: np.ndarray,
-    y: np.ndarray,
-    z: np.ndarray,
-    coil_separation: float = 1.96,
-    current_scale: float = 2000.0 * 17.0 / 17.51,
-    inner_radius: float = 0.5 * 86.0e-3,
-    outer_radius: float = 0.5 * 730.0e-3,
-    coil_axial_thickness: float = 14.3e-3 * 8.0,
-    radial_loops: int = 24,
-    axial_loops: int = 8,
-    x_offset: float = 0.0,
-    y_offset: float = 0.0,
-    z_offset: float = 0.0,
-) -> Path:
-    xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
-    field = np.asarray(
-        sample_wham_mirror_field(
-            xx,
-            yy,
-            zz,
-            coil_separation=coil_separation,
-            current_scale=current_scale,
-            inner_radius=inner_radius,
-            outer_radius=outer_radius,
-            coil_axial_thickness=coil_axial_thickness,
-            radial_loops=radial_loops,
-            axial_loops=axial_loops,
-            x_offset=x_offset,
-            y_offset=y_offset,
-            z_offset=z_offset,
-        ),
-        dtype=float,
-    )
-    return write_tabulated_field_npz(
-        path,
-        x=np.asarray(x, dtype=float),
-        y=np.asarray(y, dtype=float),
-        z=np.asarray(z, dtype=float),
-        bx=field[..., 0],
-        by=field[..., 1],
-        bz=field[..., 2],
-    )
 
 
 def sample_cross_section_field(
@@ -402,12 +161,12 @@ def load_tabulated_field(path: str | Path) -> dict[str, np.ndarray]:
         return data
     if required_2d.issubset(keys):
         return data
-    raise ValueError(
-        "Tabulated magnetic-field NPZ must contain either y/z/bx/by/bz or x/y/z/bx/by/bz arrays"
-    )
+    raise ValueError("Tabulated magnetic-field NPZ must contain either y/z/bx/by/bz or x/y/z/bx/by/bz arrays")
 
 
-def tabulated_field_quality_metrics(path: str | Path) -> dict[str, float | bool | int | str]:
+def tabulated_field_quality_metrics(
+    path: str | Path,
+) -> dict[str, float | bool | int | str]:
     """Return interpolation, normalization, and divergence metrics for a field table."""
 
     data = load_tabulated_field(path)
@@ -442,7 +201,9 @@ def tabulated_field_quality_metrics(path: str | Path) -> dict[str, float | bool 
 
     node_error = np.asarray(sampled, dtype=float) - field
     interpolation_node_linf_error = float(np.max(np.abs(node_error)))
-    interpolation_node_l2_error = float(np.linalg.norm(node_error.reshape(-1)) / max(np.linalg.norm(field.reshape(-1)), 1.0e-12))
+    interpolation_node_l2_error = float(
+        np.linalg.norm(node_error.reshape(-1)) / max(np.linalg.norm(field.reshape(-1)), 1.0e-12)
+    )
     max_abs_divergence = float(np.max(np.abs(divergence)))
     rms_divergence = float(np.sqrt(np.mean(divergence**2)))
     divergence_to_field_ratio = rms_divergence / max(mean_field_magnitude, 1.0e-12)
@@ -454,7 +215,7 @@ def tabulated_field_quality_metrics(path: str | Path) -> dict[str, float | bool 
         and max_field_magnitude > 0.0
     )
     return {
-        "dimension": int(3 if has_x else 2),
+        "dimension": (3 if has_x else 2),
         "axis_names": ",".join(axis_names),
         "axis_monotonic": axis_monotonic,
         "cell_count": int(np.prod(magnitude.shape)),
@@ -560,67 +321,13 @@ def _component_interpolator(points: tuple[np.ndarray, ...], values: np.ndarray) 
     return RegularGridInterpolator(points, values, bounds_error=False, fill_value=None)
 
 
-def _interpolate_tabulated_field(
-    data: dict[str, np.ndarray], **coordinates: np.ndarray
-) -> np.ndarray:
+def _interpolate_tabulated_field(data: dict[str, np.ndarray], **coordinates: np.ndarray) -> np.ndarray:
     axes = tuple(np.asarray(data[name], dtype=float) for name in coordinates)
     values = tuple(np.asarray(value, dtype=float) for value in coordinates.values())
     points = np.stack([value.reshape(-1) for value in values], axis=-1)
     components: list[np.ndarray] = []
     for key in ("bx", "by", "bz"):
-        interpolator = _component_interpolator(
-            axes, np.asarray(data[key], dtype=float)
-        )
+        interpolator = _component_interpolator(axes, np.asarray(data[key], dtype=float))
         sampled = np.asarray(interpolator(points), dtype=float).reshape(values[0].shape)
         components.append(sampled)
     return np.stack(components, axis=-1)
-
-
-def _safe_numeric_assignments(text: str) -> dict[str, float]:
-    tree = ast.parse(text)
-    env: dict[str, float] = {}
-    for node in tree.body:
-        if not isinstance(node, ast.Assign):
-            continue
-        if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
-            continue
-        try:
-            env[node.targets[0].id] = _eval_numeric_ast(node.value, env)
-        except ValueError:
-            continue
-    return env
-
-
-def _eval_numeric_ast(node: ast.AST, env: dict[str, float]) -> float:
-    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
-        return float(node.value)
-    if isinstance(node, ast.Name) and node.id in env:
-        return float(env[node.id])
-    if isinstance(node, ast.UnaryOp):
-        value = _eval_numeric_ast(node.operand, env)
-        if isinstance(node.op, ast.USub):
-            return -value
-        if isinstance(node.op, ast.UAdd):
-            return value
-    if isinstance(node, ast.BinOp):
-        left = _eval_numeric_ast(node.left, env)
-        right = _eval_numeric_ast(node.right, env)
-        if isinstance(node.op, ast.Add):
-            return left + right
-        if isinstance(node.op, ast.Sub):
-            return left - right
-        if isinstance(node.op, ast.Mult):
-            return left * right
-        if isinstance(node.op, ast.Div):
-            return left / right
-        if isinstance(node.op, ast.Pow):
-            return left**right
-    raise ValueError("unsupported nonnumeric expression")
-
-
-def _wham_coil_centers_from_script(text: str) -> tuple[float, float]:
-    direct = re.search(r"HF1\.position\s*=\s*\([^,]+,\s*[^,]+,\s*([^)]+)\)", text)
-    copied = re.search(r"HF2\s*=\s*HF1\.copy\(position\s*=\s*\([^,]+,\s*[^,]+,\s*([^)]+)\)\)", text)
-    if not direct or not copied:
-        raise ValueError("WHAM coil model must define HF1.position and HF2 copy position")
-    return float(direct.group(1).strip()), float(copied.group(1).strip())

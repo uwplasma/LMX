@@ -6,10 +6,36 @@ from collections.abc import Callable
 from functools import partial
 
 import jax
-import numpy as np
-
 import jax.numpy as jnp
+import numpy as np
 from jax.scipy.linalg import cho_factor, cho_solve
+from solvax import (
+    additive_preconditioner as _solvax_additive_preconditioner,
+)
+from solvax import (
+    aitken_relaxation as _solvax_aitken_relaxation,
+)
+from solvax import (
+    anderson_mixing as _solvax_anderson_mixing,
+)
+from solvax import (
+    fixed_point_iteration as _solvax_fixed_point_iteration,
+)
+from solvax import (
+    galerkin_deflation as _solvax_galerkin_deflation,
+)
+from solvax import (
+    gmres as _solvax_gmres,
+)
+from solvax import (
+    jacobi as _solvax_jacobi,
+)
+from solvax import (
+    pcg_linear_solve as _solvax_pcg_linear_solve,
+)
+from solvax import (
+    tridiagonal_solve as _solvax_tridiagonal_solve,
+)
 
 from .core import Diagnostics, MHDState, Solution, require_finite
 from .mesh import (
@@ -28,19 +54,6 @@ from .operators import (
 from .physics import build_material_fields, magnetic_field_components
 from .runtime_logging import RestartLogInfo, SolverStepRecord
 from .specs import BoundaryCondition, CaseSpec
-
-from solvax import (
-    additive_preconditioner as _solvax_additive_preconditioner,
-    aitken_relaxation as _solvax_aitken_relaxation,
-    anderson_mixing as _solvax_anderson_mixing,
-    fixed_point_iteration as _solvax_fixed_point_iteration,
-    galerkin_deflation as _solvax_galerkin_deflation,
-    gmres as _solvax_gmres,
-    jacobi as _solvax_jacobi,
-    pcg_linear_solve as _solvax_pcg_linear_solve,
-    tridiagonal_solve as _solvax_tridiagonal_solve,
-)
-
 
 _POTENTIAL_ADDITIVE_LINE_MIN_CELLS = 110
 _POTENTIAL_ADDITIVE_LINE_DIAGONAL_RATIO = 3.0e4
@@ -71,19 +84,11 @@ def solve_poisson_jacobi_state(
         east_phi = jnp.pad(phi[1:, :], ((0, 1), (0, 0)))
         south_phi = jnp.pad(phi[:, :-1], ((0, 0), (1, 0)))
         north_phi = jnp.pad(phi[:, 1:], ((0, 0), (0, 1)))
-        updated = (
-            rhs
-            + west * west_phi
-            + east * east_phi
-            + south * south_phi
-            + north * north_phi
-        ) / diagonal
+        updated = (rhs + west * west_phi + east * east_phi + south * south_phi + north * north_phi) / diagonal
         return updated.at[anchor].set(0.0)
 
     def residual_norm(phi: jnp.ndarray) -> jnp.ndarray:
-        return poisson_residual_norm(
-            diagonal, west, east, south, north, rhs, phi, anchor
-        )
+        return poisson_residual_norm(diagonal, west, east, south, north, rhs, phi, anchor)
 
     fixed_steps = tolerance is None or tolerance <= 0.0
     solution = _solvax_fixed_point_iteration(
@@ -122,15 +127,11 @@ def solve_poisson_cg_state(
 
     phi0 = jnp.zeros_like(rhs) if initial is None else jnp.asarray(initial).at[anchor].set(0.0)
     if phi0.shape != rhs.shape:
-        raise ValueError(
-            "Poisson CG initial guess must match the right-hand side shape"
-        )
+        raise ValueError("Poisson CG initial guess must match the right-hand side shape")
     if residual_scale is not None:
         residual_scale = jnp.asarray(residual_scale)
         if residual_scale.shape != rhs.shape:
-            raise ValueError(
-                "Poisson CG residual scale must match the right-hand side shape"
-            )
+            raise ValueError("Poisson CG residual scale must match the right-hand side shape")
     tiny = jnp.asarray(jnp.finfo(rhs.dtype).tiny, dtype=rhs.dtype)
     inverse_diagonal = 1.0 / jnp.maximum(diagonal, tiny)
 
@@ -158,16 +159,10 @@ def solve_poisson_cg_state(
     )
     phi = solution.x.at[anchor].set(0.0)
     if residual_scale is None:
-        residual = poisson_residual_norm(
-            diagonal, west, east, south, north, rhs, phi, anchor
-        )
+        residual = poisson_residual_norm(diagonal, west, east, south, north, rhs, phi, anchor)
     else:
-        physical_residual = rhs - apply_five_point_operator(
-            diagonal, west, east, south, north, phi
-        )
-        residual = jnp.max(
-            jnp.abs(physical_residual) / jnp.maximum(residual_scale, tiny)
-        )
+        physical_residual = rhs - apply_five_point_operator(diagonal, west, east, south, north, phi)
+        residual = jnp.max(jnp.abs(physical_residual) / jnp.maximum(residual_scale, tiny))
     return phi, residual, solution.iterations
 
 
@@ -179,11 +174,7 @@ def _coupling_potential_tolerance(
     flexible: bool,
 ) -> float | None:
     """Use an inexact potential solve only while the fixed point is far away."""
-    if (
-        requested is None
-        or flexible
-        or velocity_residual <= 10.0 * coupling_tolerance
-    ):
+    if requested is None or flexible or velocity_residual <= 10.0 * coupling_tolerance:
         return requested
     return max(float(requested), _POTENTIAL_INEXACT_COUPLING_TOLERANCE)
 
@@ -223,9 +214,8 @@ def _potential_z_line_preconditioner(
     north: jnp.ndarray,
     anchor: tuple[int, int],
 ):
-    transposed = _potential_y_line_preconditioner(
-        diagonal.T, south.T, north.T, (anchor[1], anchor[0])
-    )
+    transposed = _potential_y_line_preconditioner(diagonal.T, south.T, north.T, (anchor[1], anchor[0]))
+
     def apply(residual: jnp.ndarray) -> jnp.ndarray:
         return transposed(residual.T).T
 
@@ -265,13 +255,9 @@ def _potential_deflated_line_preconditioner(
     elif mean_z >= 4.0 * max(mean_y, np.finfo(float).tiny):
         line = _potential_z_line_preconditioner(diagonal, south, north, anchor)
     else:
-        line = _potential_additive_line_preconditioner(
-            diagonal, west, east, south, north, anchor
-        )
+        line = _potential_additive_line_preconditioner(diagonal, west, east, south, north, anchor)
     fine_shape = diagonal.shape
-    coarse_shape = tuple(
-        (size - 1 + coarse_stride - 1) // coarse_stride + 1 for size in fine_shape
-    )
+    coarse_shape = tuple((size - 1 + coarse_stride - 1) // coarse_stride + 1 for size in fine_shape)
 
     def prolong(coarse: jnp.ndarray) -> jnp.ndarray:
         fine = jax.image.resize(coarse, fine_shape, method="linear")
@@ -283,18 +269,14 @@ def _potential_deflated_line_preconditioner(
         return jax.linear_transpose(prolong, coarse_zero)(fine)[0]
 
     def fine_matvec(field: jnp.ndarray) -> jnp.ndarray:
-        return apply_poisson_operator(
-            diagonal, west, east, south, north, field, anchor
-        )
+        return apply_poisson_operator(diagonal, west, east, south, north, field, anchor)
 
     def coarse_matvec(field: jnp.ndarray) -> jnp.ndarray:
         return restrict(fine_matvec(prolong(field)))
 
     coarse_size = coarse_shape[0] * coarse_shape[1]
     basis = jnp.eye(coarse_size, dtype=diagonal.dtype)
-    coarse_matrix = jax.vmap(
-        lambda column: coarse_matvec(column.reshape(coarse_shape)).reshape(-1)
-    )(basis).T
+    coarse_matrix = jax.vmap(lambda column: coarse_matvec(column.reshape(coarse_shape)).reshape(-1))(basis).T
     coarse_matrix = 0.5 * (coarse_matrix + coarse_matrix.T)
     coarse_factors = cho_factor(coarse_matrix, lower=True)
 
@@ -329,9 +311,7 @@ def _solve_potential_fgmres_state(
 
     def matvec_flat(vector: jnp.ndarray) -> jnp.ndarray:
         field = vector.reshape(shape)
-        return apply_poisson_operator(
-            diagonal, west, east, south, north, field, anchor
-        ).reshape(-1)
+        return apply_poisson_operator(diagonal, west, east, south, north, field, anchor).reshape(-1)
 
     def precondition_flat(vector: jnp.ndarray) -> jnp.ndarray:
         return preconditioner(vector.reshape(shape)).reshape(-1)
@@ -346,12 +326,8 @@ def _solve_potential_fgmres_state(
         max_restarts=10,
     )
     phi = solution.x.reshape(shape).at[anchor].set(0.0)
-    physical_residual = rhs - apply_five_point_operator(
-        diagonal, west, east, south, north, phi
-    )
-    residual = jnp.max(
-        jnp.abs(physical_residual) / jnp.maximum(residual_scale, 1.0e-30)
-    )
+    physical_residual = rhs - apply_five_point_operator(diagonal, west, east, south, north, phi)
+    residual = jnp.max(jnp.abs(physical_residual) / jnp.maximum(residual_scale, 1.0e-30))
     return phi, residual, solution.iterations
 
 
@@ -378,11 +354,7 @@ def _potential_fast_diagonalization_preconditioner(
     east_y = jnp.mean(east / dz[None, :], axis=1)
     south_z = jnp.mean(south / dy[:, None], axis=0)
     north_z = jnp.mean(north / dy[:, None], axis=0)
-    operator_z = (
-        jnp.diag(south_z + north_z)
-        + jnp.diag(-north_z[:-1], 1)
-        + jnp.diag(-south_z[1:], -1)
-    )
+    operator_z = jnp.diag(south_z + north_z) + jnp.diag(-north_z[:-1], 1) + jnp.diag(-south_z[1:], -1)
     inv_sqrt_dz = jax.lax.rsqrt(dz)
     eigenvectors_z, eigenvalues_z, _ = jnp.linalg.svd(
         inv_sqrt_dz[:, None] * operator_z * inv_sqrt_dz[None, :]
@@ -390,11 +362,7 @@ def _potential_fast_diagonalization_preconditioner(
     eigenvalues_z = eigenvalues_z[::-1]
     eigenvectors_z = eigenvectors_z[:, ::-1]
     modes_z = inv_sqrt_dz[:, None] * eigenvectors_z
-    line_diagonal = (
-        west_y[:, None]
-        + east_y[:, None]
-        + dy[:, None] * eigenvalues_z[None, :]
-    )
+    line_diagonal = west_y[:, None] + east_y[:, None] + dy[:, None] * eigenvalues_z[None, :]
     line_lower = jnp.broadcast_to(-west_y[:, None], line_diagonal.shape)
     line_upper = jnp.broadcast_to(-east_y[:, None], line_diagonal.shape)
     anchor_y = anchor[0]
@@ -413,9 +381,7 @@ def _potential_fast_diagonalization_preconditioner(
         compatible = residual.at[anchor].set(residual[anchor] - jnp.sum(residual))
         transformed = compatible @ modes_z
         transformed = transformed.at[anchor_y, 0].set(0.0)
-        solved_modes = _solvax_tridiagonal_solve(
-            line_lower, line_diagonal, line_upper, transformed
-        )
+        solved_modes = _solvax_tridiagonal_solve(line_lower, line_diagonal, line_upper, transformed)
         solved = solved_modes @ modes_z.T
         solved = solved - solved[anchor]
         return solved.at[anchor].set(0.0)
@@ -490,17 +456,13 @@ def _select_potential_preconditioner(
     positive = diagonal_host[diagonal_host > 0.0]
     diagonal_ratio = float(positive.max() / positive.min()) if positive.size else 1.0
     if diagonal_ratio >= _POTENTIAL_ADDITIVE_LINE_DIAGONAL_RATIO:
-        return _potential_deflated_line_preconditioner(
-            diagonal, west, east, south, north, anchor
-        )
+        return _potential_deflated_line_preconditioner(diagonal, west, east, south, north, anchor)
     if (
         min(diagonal.shape) < _POTENTIAL_ADDITIVE_LINE_MIN_CELLS
         and diagonal_ratio < _POTENTIAL_ADDITIVE_LINE_DIAGONAL_RATIO
     ):
         return None
-    return _potential_additive_line_preconditioner(
-        diagonal, west, east, south, north, anchor
-    )
+    return _potential_additive_line_preconditioner(diagonal, west, east, south, north, anchor)
 
 
 def _potential_preconditioner_for_materials(
@@ -526,13 +488,9 @@ def _potential_preconditioner_for_materials(
     if preconditioner is not None:
         return preconditioner, True
 
-    preconditioner = _select_potential_preconditioner(
-        diagonal, west, east, south, north, anchor
-    )
+    preconditioner = _select_potential_preconditioner(diagonal, west, east, south, north, anchor)
     if preconditioner is None:
-        preconditioner = _potential_additive_line_preconditioner(
-            diagonal, west, east, south, north, anchor
-        )
+        preconditioner = _potential_additive_line_preconditioner(diagonal, west, east, south, north, anchor)
     return preconditioner, False
 
 
@@ -585,9 +543,7 @@ def _bounded_time_step_count(*, start_time: float, dt: float, t_final: float, ma
     return min(int(max_steps), max(0, allowed_steps))
 
 
-def _interface_conductance(
-    mesh: StructuredMesh, sigma: jnp.ndarray, *, axis: int
-) -> jnp.ndarray:
+def _interface_conductance(mesh: StructuredMesh, sigma: jnp.ndarray, *, axis: int) -> jnp.ndarray:
     widths = (mesh.dy, mesh.dz)[axis]
     field = jnp.moveaxis(sigma, axis, 0)
     left_distance = 0.5 * widths[:-1, None]
@@ -612,9 +568,7 @@ def _face_conductance(
     return jnp.pad(conductance, lower_pad) / spacing, jnp.pad(conductance, upper_pad) / spacing
 
 
-def _face_emf(
-    mesh: StructuredMesh, sigma: jnp.ndarray, source: jnp.ndarray, *, axis: int
-) -> jnp.ndarray:
+def _face_emf(mesh: StructuredMesh, sigma: jnp.ndarray, source: jnp.ndarray, *, axis: int) -> jnp.ndarray:
     widths = (mesh.dy, mesh.dz)[axis]
     field = jnp.moveaxis(source, axis, 0)
     conductance = jnp.moveaxis(_interface_conductance(mesh, sigma, axis=axis), axis, 0)
@@ -645,7 +599,9 @@ def _connected_interface_diffusivity(
     right_distance = 0.5 * widths[1:, None]
     diffusivity_left = jnp.maximum(field[:-1], 1e-12)
     diffusivity_right = jnp.maximum(field[1:], 1e-12)
-    conductance = 1.0 / jnp.maximum(left_distance / diffusivity_left + right_distance / diffusivity_right, 1e-12)
+    conductance = 1.0 / jnp.maximum(
+        left_distance / diffusivity_left + right_distance / diffusivity_right, 1e-12
+    )
     return jnp.moveaxis(jnp.where(connected, conductance, 0.0), 0, axis)
 
 
@@ -744,13 +700,12 @@ def _solve_velocity_system(
     max_steps: int,
     tolerance: float,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    diagonal, west, east, south, north = _velocity_system_coefficients(mesh, diffusivity, reaction, active_mask)
+    diagonal, west, east, south, north = _velocity_system_coefficients(
+        mesh, diffusivity, reaction, active_mask
+    )
     rhs_masked = jnp.where(active_mask, rhs, 0.0)
     cell_metric = _cell_metric(mesh).astype(rhs_masked.dtype)
-    coefficients = tuple(
-        coefficient * cell_metric
-        for coefficient in (diagonal, west, east, south, north)
-    )
+    coefficients = tuple(coefficient * cell_metric for coefficient in (diagonal, west, east, south, north))
     rhs_scaled = rhs_masked * cell_metric
     initial_residual = five_point_residual_norm(
         *coefficients,
@@ -902,14 +857,16 @@ def _solve_potential(
         solver_residual = residual
     elif solver == "cg_volume":
         residual_scale = _cell_metric(mesh)
-        diagonal_scaled, west_scaled, east_scaled, south_scaled, north_scaled, rhs_scaled = _volume_scaled_potential_system(
-            mesh,
-            diagonal,
-            west,
-            east,
-            south,
-            north,
-            rhs,
+        diagonal_scaled, west_scaled, east_scaled, south_scaled, north_scaled, rhs_scaled = (
+            _volume_scaled_potential_system(
+                mesh,
+                diagonal,
+                west,
+                east,
+                south,
+                north,
+                rhs,
+            )
         )
         selected_preconditioner = (
             potential_preconditioner
@@ -996,8 +953,12 @@ def _compute_current_and_lorentz(
     if use_face_currents:
         uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
         uxb_z = jnp.where(fluid_mask, u * by, 0.0)
-        face_jy = _interface_conductance(mesh, sigma, axis=0) * (phi[:-1, :] - phi[1:, :]) + _face_emf(mesh, sigma, uxb_y, axis=0)
-        face_jz = _interface_conductance(mesh, sigma, axis=1) * (phi[:, :-1] - phi[:, 1:]) + _face_emf(mesh, sigma, uxb_z, axis=1)
+        face_jy = _interface_conductance(mesh, sigma, axis=0) * (phi[:-1, :] - phi[1:, :]) + _face_emf(
+            mesh, sigma, uxb_y, axis=0
+        )
+        face_jz = _interface_conductance(mesh, sigma, axis=1) * (phi[:, :-1] - phi[:, 1:]) + _face_emf(
+            mesh, sigma, uxb_z, axis=1
+        )
         face_jy_centered = 0.5 * (jnp.pad(face_jy, ((1, 0), (0, 0))) + jnp.pad(face_jy, ((0, 1), (0, 0))))
         face_jz_centered = 0.5 * (jnp.pad(face_jz, ((0, 0), (1, 0))) + jnp.pad(face_jz, ((0, 0), (0, 1))))
     if reconstruction == "face_averaged":
@@ -1093,10 +1054,9 @@ def _integral_diagnostics(
     face_jy, face_jz, _, _ = _face_current_components(mesh, sigma, fluid_mask, u, phi, by, bz)
     padded_face_jy = jnp.pad(face_jy, ((1, 1), (0, 0)))
     padded_face_jz = jnp.pad(face_jz, ((0, 0), (1, 1)))
-    div_current = (
-        (padded_face_jy[1:, :] - padded_face_jy[:-1, :]) / mesh.dy[:, None]
-        + (padded_face_jz[:, 1:] - padded_face_jz[:, :-1]) / mesh.dz[None, :]
-    )
+    div_current = (padded_face_jy[1:, :] - padded_face_jy[:-1, :]) / mesh.dy[:, None] + (
+        padded_face_jz[:, 1:] - padded_face_jz[:, :-1]
+    ) / mesh.dz[None, :]
     div_current_max = jnp.max(jnp.where(fluid_mask, jnp.abs(div_current), 0.0))
     charge_balance_residual = jnp.abs(jnp.sum(fluid_weight * div_current)) / fluid_total_weight
     gauge_residual = jnp.abs(phi[anchor])
@@ -1158,21 +1118,13 @@ def fully_developed_power_balance(case: CaseSpec, solution: Solution) -> dict[st
     face_area_y = mesh.dz[None, :]
     face_area_z = mesh.dy[:, None]
     joule_dissipation = jnp.sum(
-        face_area_y
-        * jnp.where(conductance_y > 0.0, face_jy**2 / jnp.maximum(conductance_y, 1.0e-30), 0.0)
+        face_area_y * jnp.where(conductance_y > 0.0, face_jy**2 / jnp.maximum(conductance_y, 1.0e-30), 0.0)
     ) + jnp.sum(
-        face_area_z
-        * jnp.where(conductance_z > 0.0, face_jz**2 / jnp.maximum(conductance_z, 1.0e-30), 0.0)
+        face_area_z * jnp.where(conductance_z > 0.0, face_jz**2 / jnp.maximum(conductance_z, 1.0e-30), 0.0)
     )
-    emf_field_y = jnp.where(
-        conductance_y > 0.0, emf_y / jnp.maximum(conductance_y, 1.0e-30), 0.0
-    )
-    emf_field_z = jnp.where(
-        conductance_z > 0.0, emf_z / jnp.maximum(conductance_z, 1.0e-30), 0.0
-    )
-    emf_power = jnp.sum(face_area_y * face_jy * emf_field_y) + jnp.sum(
-        face_area_z * face_jz * emf_field_z
-    )
+    emf_field_y = jnp.where(conductance_y > 0.0, emf_y / jnp.maximum(conductance_y, 1.0e-30), 0.0)
+    emf_field_z = jnp.where(conductance_z > 0.0, emf_z / jnp.maximum(conductance_z, 1.0e-30), 0.0)
+    emf_power = jnp.sum(face_area_y * face_jy * emf_field_y) + jnp.sum(face_area_z * face_jz * emf_field_z)
     lorentz_work = jnp.sum(fluid_metric * solution.state.lorentz_x * solution.state.u)
     flow_rate = jnp.sum(fluid_metric * solution.state.u)
     applied_forcing = (
@@ -1203,9 +1155,7 @@ def fully_developed_power_balance(case: CaseSpec, solution: Solution) -> dict[st
     network_electrical_residual = joule_dissipation - emf_power
     lorentz_transfer_residual = lorentz_work + emf_power
     mechanical_residual = pressure_power + lorentz_work - viscous_dissipation
-    electrical_scale = jnp.maximum(
-        jnp.maximum(jnp.abs(joule_dissipation), jnp.abs(lorentz_work)), 1.0e-30
-    )
+    electrical_scale = jnp.maximum(jnp.maximum(jnp.abs(joule_dissipation), jnp.abs(lorentz_work)), 1.0e-30)
     mechanical_scale = jnp.maximum(
         jnp.maximum(jnp.abs(pressure_power), jnp.abs(lorentz_work) + jnp.abs(viscous_dissipation)),
         1.0e-30,
@@ -1219,13 +1169,9 @@ def fully_developed_power_balance(case: CaseSpec, solution: Solution) -> dict[st
         "electrical_power_residual": float(electrical_residual),
         "electrical_power_relative_error": float(jnp.abs(electrical_residual) / electrical_scale),
         "network_electrical_residual": float(network_electrical_residual),
-        "network_electrical_relative_error": float(
-            jnp.abs(network_electrical_residual) / electrical_scale
-        ),
+        "network_electrical_relative_error": float(jnp.abs(network_electrical_residual) / electrical_scale),
         "lorentz_transfer_residual": float(lorentz_transfer_residual),
-        "lorentz_transfer_relative_error": float(
-            jnp.abs(lorentz_transfer_residual) / electrical_scale
-        ),
+        "lorentz_transfer_relative_error": float(jnp.abs(lorentz_transfer_residual) / electrical_scale),
         "mechanical_power_residual": float(mechanical_residual),
         "mechanical_power_relative_error": float(jnp.abs(mechanical_residual) / mechanical_scale),
     }
@@ -1251,8 +1197,12 @@ def _enforce_velocity_bc(
     direct_south = fluid_mask[:, 0]
     direct_north = fluid_mask[:, -1]
     if u.shape[0] > 1:
-        west_ratio = (mesh.y_centers[0] - mesh.y_faces[0]) / jnp.maximum(mesh.y_centers[1] - mesh.y_faces[0], 1e-12)
-        east_ratio = (mesh.y_faces[-1] - mesh.y_centers[-1]) / jnp.maximum(mesh.y_faces[-1] - mesh.y_centers[-2], 1e-12)
+        west_ratio = (mesh.y_centers[0] - mesh.y_faces[0]) / jnp.maximum(
+            mesh.y_centers[1] - mesh.y_faces[0], 1e-12
+        )
+        east_ratio = (mesh.y_faces[-1] - mesh.y_centers[-1]) / jnp.maximum(
+            mesh.y_faces[-1] - mesh.y_centers[-2], 1e-12
+        )
         west_scale = jnp.where(
             direct_west,
             west_ratio * fluid_mask[1, :].astype(u.dtype),
@@ -1266,8 +1216,12 @@ def _enforce_velocity_bc(
         u = u.at[0, :].set(jnp.where(direct_west, west_scale * u[1, :], u[0, :]))
         u = u.at[-1, :].set(jnp.where(direct_east, east_scale * u[-2, :], u[-1, :]))
     if u.shape[1] > 1:
-        south_ratio = (mesh.z_centers[0] - mesh.z_faces[0]) / jnp.maximum(mesh.z_centers[1] - mesh.z_faces[0], 1e-12)
-        north_ratio = (mesh.z_faces[-1] - mesh.z_centers[-1]) / jnp.maximum(mesh.z_faces[-1] - mesh.z_centers[-2], 1e-12)
+        south_ratio = (mesh.z_centers[0] - mesh.z_faces[0]) / jnp.maximum(
+            mesh.z_centers[1] - mesh.z_faces[0], 1e-12
+        )
+        north_ratio = (mesh.z_faces[-1] - mesh.z_centers[-1]) / jnp.maximum(
+            mesh.z_faces[-1] - mesh.z_centers[-2], 1e-12
+        )
         south_scale = jnp.where(
             direct_south,
             south_ratio * fluid_mask[:, 1].astype(u.dtype),
@@ -1583,16 +1537,12 @@ def _fully_developed_case_step(
     potential_flexible = False
     if potential_solver == "cg_volume":
         coefficients = _potential_coefficients(mesh, materials.conductivity)
-        scaled = _volume_scaled_potential_system(
-            mesh, *coefficients, jnp.zeros_like(u_previous)
-        )
-        potential_preconditioner, potential_flexible = (
-            _potential_preconditioner_for_materials(
-                mesh,
-                materials.conductivity,
-                *scaled[:5],
-                case.reference_phi_cell,
-            )
+        scaled = _volume_scaled_potential_system(mesh, *coefficients, jnp.zeros_like(u_previous))
+        potential_preconditioner, potential_flexible = _potential_preconditioner_for_materials(
+            mesh,
+            materials.conductivity,
+            *scaled[:5],
+            case.reference_phi_cell,
         )
     acceleration = case.solver.coupling_acceleration
     if acceleration not in {"none", "aitken", "anderson"}:
@@ -1613,9 +1563,7 @@ def _fully_developed_case_step(
     anderson_iterates: list[jnp.ndarray] = []
     anderson_residuals: list[jnp.ndarray] = []
     strict_potential_solves = 0
-    velocity_linear_tolerance = _nested_velocity_tolerance(
-        coupling_tolerance, u_previous.dtype
-    )
+    velocity_linear_tolerance = _nested_velocity_tolerance(coupling_tolerance, u_previous.dtype)
 
     if case.solver.time_scheme != "implicit_euler" and not steady_mode:
         raise NotImplementedError("fully_developed_inductionless currently supports implicit_euler only")
@@ -1689,30 +1637,34 @@ def _fully_developed_case_step(
             rhs_base = rhs_base + jnp.where(active_mask, u_previous / dt, 0.0)
         if target_mean_velocity is None:
             rhs = rhs_base + jnp.where(active_mask, forcing / materials.density, 0.0)
-            u_next, velocity_linear_residual, linear_iteration_count, linear_initial_residual = _solve_velocity_system(
-                mesh=mesh,
-                diffusivity=materials.viscosity,
-                reaction=reaction,
-                rhs=rhs,
-                active_mask=active_mask,
-                linear_solver=linear_solver,
-                preconditioner=preconditioner,
-                max_steps=max(case.time_stepper.max_steps, case.solver.coupling_iterations * 25),
-                tolerance=velocity_linear_tolerance,
+            u_next, velocity_linear_residual, linear_iteration_count, linear_initial_residual = (
+                _solve_velocity_system(
+                    mesh=mesh,
+                    diffusivity=materials.viscosity,
+                    reaction=reaction,
+                    rhs=rhs,
+                    active_mask=active_mask,
+                    linear_solver=linear_solver,
+                    preconditioner=preconditioner,
+                    max_steps=max(case.time_stepper.max_steps, case.solver.coupling_iterations * 25),
+                    tolerance=velocity_linear_tolerance,
+                )
             )
             applied_forcing = forcing
         else:
             unit_rhs = jnp.where(active_mask, 1.0 / materials.density, 0.0)
-            u_base, velocity_linear_residual, linear_iteration_count, linear_initial_residual = _solve_velocity_system(
-                mesh=mesh,
-                diffusivity=materials.viscosity,
-                reaction=reaction,
-                rhs=rhs_base,
-                active_mask=active_mask,
-                linear_solver=linear_solver,
-                preconditioner=preconditioner,
-                max_steps=max(case.time_stepper.max_steps, case.solver.coupling_iterations * 25),
-                tolerance=velocity_linear_tolerance,
+            u_base, velocity_linear_residual, linear_iteration_count, linear_initial_residual = (
+                _solve_velocity_system(
+                    mesh=mesh,
+                    diffusivity=materials.viscosity,
+                    reaction=reaction,
+                    rhs=rhs_base,
+                    active_mask=active_mask,
+                    linear_solver=linear_solver,
+                    preconditioner=preconditioner,
+                    max_steps=max(case.time_stepper.max_steps, case.solver.coupling_iterations * 25),
+                    tolerance=velocity_linear_tolerance,
+                )
             )
             u_sensitivity, _, _, sensitivity_initial_residual = _solve_velocity_system(
                 mesh=mesh,
@@ -1765,9 +1717,7 @@ def _fully_developed_case_step(
                 fluid_mask,
                 interpolate_direct_fluid_walls=case.geometry.kind == "rect_duct",
             )
-            u_next = _enforce_target_mean_velocity(
-                u_next, mesh, fluid_mask, target_mean_velocity
-            )
+            u_next = _enforce_target_mean_velocity(u_next, mesh, fluid_mask, target_mean_velocity)
         elif acceleration == "anderson":
             anderson_iterates.append(u_iter)
             anderson_residuals.append(fixed_point_residual)
@@ -1786,9 +1736,7 @@ def _fully_developed_case_step(
                 fluid_mask,
                 interpolate_direct_fluid_walls=case.geometry.kind == "rect_duct",
             )
-            u_next = _enforce_target_mean_velocity(
-                u_next, mesh, fluid_mask, target_mean_velocity
-            )
+            u_next = _enforce_target_mean_velocity(u_next, mesh, fluid_mask, target_mean_velocity)
         # Convergence is defined by the unrelaxed fixed-point residual at the
         # current iterate.  If it passes, retain that certified iterate rather
         # than returning the subsequently extrapolated Anderson/Aitken point,
@@ -1799,8 +1747,7 @@ def _fully_developed_case_step(
         auxiliary_converged = (
             strict_potential_solves >= _MIN_STRICT_POTENTIAL_COUPLING_SOLVES
             and float(potential_residual) <= _POTENTIAL_COUPLING_NORMALIZED_GATE
-            and float(linear_residual)
-            <= max(float(coupling_tolerance), _LINEAR_RESIDUAL_FLOOR)
+            and float(linear_residual) <= max(float(coupling_tolerance), _LINEAR_RESIDUAL_FLOOR)
         )
         if velocity_converged and auxiliary_converged:
             break
@@ -1886,8 +1833,7 @@ def _fully_developed_converged(
         potential_gate = case.time_stepper.steady_tolerance
     return bool(
         velocity_residual <= float(case.time_stepper.steady_tolerance)
-        and linear_residual
-        <= max(float(case.time_stepper.steady_tolerance), _LINEAR_RESIDUAL_FLOOR)
+        and linear_residual <= max(float(case.time_stepper.steady_tolerance), _LINEAR_RESIDUAL_FLOOR)
         and potential_residual <= float(potential_gate)
     )
 
@@ -1909,13 +1855,11 @@ def _solve_fully_developed(
     potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
     if potential_solver == "cg" and not _has_uniform_spacing(mesh):
         potential_solver = "cg_volume"
-    linear_solver = (
-        "solvax_pcg"
-        if case.solver.linear_solver == "auto"
-        else case.solver.linear_solver
-    )
+    linear_solver = "solvax_pcg" if case.solver.linear_solver == "auto" else case.solver.linear_solver
     if case.geometry.kind not in {"rect_duct", "layered_duct"}:
-        raise NotImplementedError(f"Solver {case.solver.kind!r} does not yet support geometry {case.geometry.kind!r}")
+        raise NotImplementedError(
+            f"Solver {case.solver.kind!r} does not yet support geometry {case.geometry.kind!r}"
+        )
     interpolate_direct_fluid_walls = case.geometry.kind == "rect_duct"
     initial_u, initial_phi, initial_jy, initial_jz, initial_lorentz, start_time = _initial_solver_state(
         case=case,
@@ -1983,7 +1927,9 @@ def _solve_fully_developed(
     raw_update_max_history: list[float] = []
     limiter_scale_history: list[float] = []
     limited_fraction_history: list[float] = []
-    pressure_proxy_reference_current = _pressure_proxy_reference_current(initial_diagnostics if append_diagnostics else None)
+    pressure_proxy_reference_current = _pressure_proxy_reference_current(
+        initial_diagnostics if append_diagnostics else None
+    )
     residual_value = float(initial_state.residual if initial_state is not None else 0.0)
     step_count = 0
 
@@ -2121,14 +2067,11 @@ def _solve_fully_developed(
             linear_initial_residual=float(linear_initial_residual),
         )
         step_count = step_index + 1
-        if (
-            steady_mode
-            and _fully_developed_converged(
-                case,
-                velocity_residual=residual_value,
-                linear_residual=float(linear_residual),
-                potential_residual=float(potential_residual),
-            )
+        if steady_mode and _fully_developed_converged(
+            case,
+            velocity_residual=residual_value,
+            linear_residual=float(linear_residual),
+            potential_residual=float(potential_residual),
         ):
             break
 
@@ -2164,34 +2107,150 @@ def _solve_fully_developed(
         residual=residual_value,
     )
     diagnostics = Diagnostics(
-        time_history=_concat_history(initial_diagnostics.time_history if initial_diagnostics is not None else None, jnp.asarray(time_history, dtype=float), append=append_diagnostics),
-        u_max_history=_concat_history(initial_diagnostics.u_max_history if initial_diagnostics is not None else None, jnp.asarray(u_max_history, dtype=float), append=append_diagnostics),
-        mean_velocity_history=_concat_history(initial_diagnostics.mean_velocity_history if initial_diagnostics is not None else None, jnp.asarray(mean_velocity_history, dtype=float), append=append_diagnostics),
-        applied_forcing_history=_concat_history(initial_diagnostics.applied_forcing_history if initial_diagnostics is not None else None, jnp.asarray(applied_forcing_history, dtype=float), append=append_diagnostics),
-        pressure_proxy_history=_concat_history(initial_diagnostics.pressure_proxy_history if initial_diagnostics is not None else None, jnp.asarray(pressure_proxy_history, dtype=float), append=append_diagnostics),
-        current_scaled_pressure_proxy_history=_concat_history(initial_diagnostics.current_scaled_pressure_proxy_history if initial_diagnostics is not None else None, jnp.asarray(current_scaled_pressure_proxy_history, dtype=float), append=append_diagnostics),
-        raw_update_max_history=_concat_history(initial_diagnostics.raw_update_max_history if initial_diagnostics is not None else None, jnp.asarray(raw_update_max_history, dtype=float), append=append_diagnostics),
-        limiter_scale_history=_concat_history(initial_diagnostics.limiter_scale_history if initial_diagnostics is not None else None, jnp.asarray(limiter_scale_history, dtype=float), append=append_diagnostics),
-        limited_fraction_history=_concat_history(initial_diagnostics.limited_fraction_history if initial_diagnostics is not None else None, jnp.asarray(limited_fraction_history, dtype=float), append=append_diagnostics),
-        residual_history=_concat_history(initial_diagnostics.residual_history if initial_diagnostics is not None else None, jnp.asarray(residual_history, dtype=float), append=append_diagnostics),
-        courant_like=_concat_history(initial_diagnostics.courant_like if initial_diagnostics is not None else None, jnp.asarray(courant_history, dtype=float), append=append_diagnostics),
-        ohmic_power=_concat_history(initial_diagnostics.ohmic_power if initial_diagnostics is not None else None, jnp.asarray(ohmic_history, dtype=float), append=append_diagnostics),
-        current_max_history=_concat_history(initial_diagnostics.current_max_history if initial_diagnostics is not None else None, jnp.asarray(current_max_history, dtype=float), append=append_diagnostics),
-        face_current_max_history=_concat_history(initial_diagnostics.face_current_max_history if initial_diagnostics is not None else None, jnp.asarray(face_current_max_history, dtype=float), append=append_diagnostics),
-        emf_max_history=_concat_history(initial_diagnostics.emf_max_history if initial_diagnostics is not None else None, jnp.asarray(emf_max_history, dtype=float), append=append_diagnostics),
-        lorentz_max_history=_concat_history(initial_diagnostics.lorentz_max_history if initial_diagnostics is not None else None, jnp.asarray(lorentz_max_history, dtype=float), append=append_diagnostics),
-        face_lorentz_max_history=_concat_history(initial_diagnostics.face_lorentz_max_history if initial_diagnostics is not None else None, jnp.asarray(face_lorentz_max_history, dtype=float), append=append_diagnostics),
-        potential_residual_history=_concat_history(initial_diagnostics.potential_residual_history if initial_diagnostics is not None else None, jnp.asarray(potential_history, dtype=float), append=append_diagnostics),
-        potential_iterations_history=_concat_history(initial_diagnostics.potential_iterations_history if initial_diagnostics is not None else None, jnp.asarray(potential_iteration_history, dtype=float), append=append_diagnostics),
-        linear_residual_history=_concat_history(initial_diagnostics.linear_residual_history if initial_diagnostics is not None else None, jnp.asarray(linear_residual_history, dtype=float), append=append_diagnostics),
-        linear_iterations_history=_concat_history(initial_diagnostics.linear_iterations_history if initial_diagnostics is not None else None, jnp.asarray(linear_iteration_history, dtype=float), append=append_diagnostics),
-        volumetric_flow_rate_history=_concat_history(initial_diagnostics.volumetric_flow_rate_history if initial_diagnostics is not None else None, jnp.asarray(volumetric_flow_rate_history, dtype=float), append=append_diagnostics),
-        mean_current_magnitude_history=_concat_history(initial_diagnostics.mean_current_magnitude_history if initial_diagnostics is not None else None, jnp.asarray(mean_current_magnitude_history, dtype=float), append=append_diagnostics),
-        lorentz_power_history=_concat_history(initial_diagnostics.lorentz_power_history if initial_diagnostics is not None else None, jnp.asarray(lorentz_power_history, dtype=float), append=append_diagnostics),
-        div_current_max_history=_concat_history(initial_diagnostics.div_current_max_history if initial_diagnostics is not None else None, jnp.asarray(div_current_max_history, dtype=float), append=append_diagnostics),
-        charge_balance_residual_history=_concat_history(initial_diagnostics.charge_balance_residual_history if initial_diagnostics is not None else None, jnp.asarray(charge_balance_residual_history, dtype=float), append=append_diagnostics),
-        gauge_residual_history=_concat_history(initial_diagnostics.gauge_residual_history if initial_diagnostics is not None else None, jnp.asarray(gauge_residual_history, dtype=float), append=append_diagnostics),
-        interface_current_residual_history=_concat_history(initial_diagnostics.interface_current_residual_history if initial_diagnostics is not None else None, jnp.asarray(interface_current_residual_history, dtype=float), append=append_diagnostics),
+        time_history=_concat_history(
+            initial_diagnostics.time_history if initial_diagnostics is not None else None,
+            jnp.asarray(time_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        u_max_history=_concat_history(
+            initial_diagnostics.u_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(u_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        mean_velocity_history=_concat_history(
+            initial_diagnostics.mean_velocity_history if initial_diagnostics is not None else None,
+            jnp.asarray(mean_velocity_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        applied_forcing_history=_concat_history(
+            initial_diagnostics.applied_forcing_history if initial_diagnostics is not None else None,
+            jnp.asarray(applied_forcing_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        pressure_proxy_history=_concat_history(
+            initial_diagnostics.pressure_proxy_history if initial_diagnostics is not None else None,
+            jnp.asarray(pressure_proxy_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        current_scaled_pressure_proxy_history=_concat_history(
+            initial_diagnostics.current_scaled_pressure_proxy_history
+            if initial_diagnostics is not None
+            else None,
+            jnp.asarray(current_scaled_pressure_proxy_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        raw_update_max_history=_concat_history(
+            initial_diagnostics.raw_update_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(raw_update_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        limiter_scale_history=_concat_history(
+            initial_diagnostics.limiter_scale_history if initial_diagnostics is not None else None,
+            jnp.asarray(limiter_scale_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        limited_fraction_history=_concat_history(
+            initial_diagnostics.limited_fraction_history if initial_diagnostics is not None else None,
+            jnp.asarray(limited_fraction_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        residual_history=_concat_history(
+            initial_diagnostics.residual_history if initial_diagnostics is not None else None,
+            jnp.asarray(residual_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        courant_like=_concat_history(
+            initial_diagnostics.courant_like if initial_diagnostics is not None else None,
+            jnp.asarray(courant_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        ohmic_power=_concat_history(
+            initial_diagnostics.ohmic_power if initial_diagnostics is not None else None,
+            jnp.asarray(ohmic_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        current_max_history=_concat_history(
+            initial_diagnostics.current_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(current_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        face_current_max_history=_concat_history(
+            initial_diagnostics.face_current_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(face_current_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        emf_max_history=_concat_history(
+            initial_diagnostics.emf_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(emf_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        lorentz_max_history=_concat_history(
+            initial_diagnostics.lorentz_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(lorentz_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        face_lorentz_max_history=_concat_history(
+            initial_diagnostics.face_lorentz_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(face_lorentz_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        potential_residual_history=_concat_history(
+            initial_diagnostics.potential_residual_history if initial_diagnostics is not None else None,
+            jnp.asarray(potential_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        potential_iterations_history=_concat_history(
+            initial_diagnostics.potential_iterations_history if initial_diagnostics is not None else None,
+            jnp.asarray(potential_iteration_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        linear_residual_history=_concat_history(
+            initial_diagnostics.linear_residual_history if initial_diagnostics is not None else None,
+            jnp.asarray(linear_residual_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        linear_iterations_history=_concat_history(
+            initial_diagnostics.linear_iterations_history if initial_diagnostics is not None else None,
+            jnp.asarray(linear_iteration_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        volumetric_flow_rate_history=_concat_history(
+            initial_diagnostics.volumetric_flow_rate_history if initial_diagnostics is not None else None,
+            jnp.asarray(volumetric_flow_rate_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        mean_current_magnitude_history=_concat_history(
+            initial_diagnostics.mean_current_magnitude_history if initial_diagnostics is not None else None,
+            jnp.asarray(mean_current_magnitude_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        lorentz_power_history=_concat_history(
+            initial_diagnostics.lorentz_power_history if initial_diagnostics is not None else None,
+            jnp.asarray(lorentz_power_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        div_current_max_history=_concat_history(
+            initial_diagnostics.div_current_max_history if initial_diagnostics is not None else None,
+            jnp.asarray(div_current_max_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        charge_balance_residual_history=_concat_history(
+            initial_diagnostics.charge_balance_residual_history if initial_diagnostics is not None else None,
+            jnp.asarray(charge_balance_residual_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        gauge_residual_history=_concat_history(
+            initial_diagnostics.gauge_residual_history if initial_diagnostics is not None else None,
+            jnp.asarray(gauge_residual_history, dtype=float),
+            append=append_diagnostics,
+        ),
+        interface_current_residual_history=_concat_history(
+            initial_diagnostics.interface_current_residual_history
+            if initial_diagnostics is not None
+            else None,
+            jnp.asarray(interface_current_residual_history, dtype=float),
+            append=append_diagnostics,
+        ),
     )
     solution = Solution(
         mesh=mesh,
@@ -2199,13 +2258,7 @@ def _solve_fully_developed(
         diagnostics=diagnostics,
         case_name=case.name,
         converged=steady_converged if steady_mode else None,
-        status=(
-            "converged"
-            if steady_converged
-            else "step_limit"
-            if steady_mode
-            else "completed"
-        ),
+        status=("converged" if steady_converged else "step_limit" if steady_mode else "completed"),
         steps=step_count,
     )
     if logger is not None:
@@ -2227,7 +2280,16 @@ def solve_transient(
 
     solver_kind = getattr(getattr(case, "solver", None), "kind", "fully_developed_inductionless")
     if solver_kind == "fully_developed_inductionless":
-        transient_case = case if case.solver.mode == "transient" else case.__class__(**{**case.__dict__, "solver": case.solver.__class__(**{**case.solver.__dict__, "mode": "transient"})})
+        transient_case = (
+            case
+            if case.solver.mode == "transient"
+            else case.__class__(
+                **{
+                    **case.__dict__,
+                    "solver": case.solver.__class__(**{**case.solver.__dict__, "mode": "transient"}),
+                }
+            )
+        )
         return _solve_fully_developed(
             transient_case,
             logger=logger,
@@ -2254,7 +2316,16 @@ def solve_steady(
 
     solver_kind = getattr(getattr(case, "solver", None), "kind", "fully_developed_inductionless")
     if solver_kind == "fully_developed_inductionless":
-        steady_case = case if case.solver.mode == "steady" else case.__class__(**{**case.__dict__, "solver": case.solver.__class__(**{**case.solver.__dict__, "mode": "steady"})})
+        steady_case = (
+            case
+            if case.solver.mode == "steady"
+            else case.__class__(
+                **{
+                    **case.__dict__,
+                    "solver": case.solver.__class__(**{**case.solver.__dict__, "mode": "steady"}),
+                }
+            )
+        )
         return _solve_fully_developed(
             steady_case,
             logger=logger,

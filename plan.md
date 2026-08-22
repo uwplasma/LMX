@@ -2,7 +2,7 @@
 
 **Status:** active
 
-**Last updated:** 2026-08-21
+**Last updated:** 2026-08-22
 
 **Purpose:** product goal, executable roadmap, decision register, and work log
 
@@ -80,16 +80,16 @@ remains intact until its acceptance decision is recorded here.
 
 | Capability | Mathematical/user contract | Current executable evidence | Current cost | Decision and Phase 0 gate |
 |---|---|---|---:|---|
-| Fully developed 2-D duct MHD | Inductionless Hartmann, Shercliff, and Hunt flow; rectangular/layered walls; pressure or flow drive; steady/transient | analytical profiles, conservation/power gates, high-Ha rows, closed-channel observations, `tests/test_solver.py`, `tests/test_validation.py` | 8 shared modules / about 5,119 lines | **protected, production**; freeze canonical outputs and convergence metadata |
-| Rectangular/layered 3-D fringing | Variable imposed field, electric-current closure, Lorentz force, momentum and face-flux pressure projection on extruded grids | manufactured operators, projection/divergence, restart, variable-field and B2 square-duct tests in `tests/test_fringing.py`; B2 spec/reference | 3 primary modules / about 8,643 lines | **protected, active development**; pass reduced 3-D gates and executed B2 FreeMHD smoke after every structural tranche |
-| Straight-pipe 3-D fringing | O-grid cylindrical metrics, conducting annulus, fixed-flow projection, variable field | manufactured pipe Poisson/diffusion/projection tests, B1 spec/reference, retained-modal benchmark, native S3 execution harness | shares fringing plus mesh/field code | **protected, active development**; preserve B1 numerical gates and establish a matched production parity claim before promotion |
-| FreeMHD parity | Matched equations, geometry, material, forcing, controls, native-output observation, and declared tolerances | B2 deterministic contract and two-update harness; B1/S3 execution observer; parser/forgery tests in `tests/test_freemhd.py` | `freemhd.py` + external adapter / about 3,676 lines | **protected validation boundary**; run pinned Docker smoke locally, then reduce to one contract/runner/observer/comparator path |
-| Bent-pipe/Dean flow | Mapped pipe plus low-Dean hydrodynamic limit and secondary-flow literature observables | mapped finite-state tests, low-De baseline, analytic literature utilities; independent production parity is incomplete | `dean.py` plus shared fringing/mesh code | **retain only mapped bent-pipe geometry as a fringing extension**; LMX 3-D owner; require metric/manufactured tests, low-De mesh convergence, and a named external target; remove standalone Dean report/plot adapters |
-| Magnetic obstacle | Localized imposed field in a 3-D rectangular channel with velocity, pressure, current, and wake observables | internal response/baseline tests and literature-curve adapters; independent field parity is incomplete | shared fringing plus external adapters | **retain as a 3-D fringing application**; LMX 3-D owner; keep field/flow/current observables and add executable external data; remove readiness proxies and literature-report machinery |
-| Q2D MHD | Spectral/finite-difference vorticity evolution, forcing, walls, energy and spectrum observables | modal energy gates and Q2DMHDfoam parsers/fixtures; quantitative turbulent parity is incomplete | `q2d.py` 1,614 lines plus adapter/report code | **remove after archive**; separate NumPy/SciPy solver family has no named production user or quantitative parity and does not exercise retained inductionless duct/fringing code |
-| WHAM mirror-pipe adapter | Branded builder and internal reduced validation around generic tabulated fields and pipe fringing | finite-state/bounded internal tests; no matched WHAM field/flow acceptance record | shared fringing/field code | **remove branded adapter after archive**; retain and document generic tabulated/vector-field plus straight-pipe capability, which can express a future validated WHAM case without product-specific proxy code |
-| Blanket reduced flow | Centerline/tube geometry, 1-D pressure budget, transient filling, sensitivities, and media | bounded numerical/unit/autodiff tests and internal plots; independent validation is incomplete | 2 modules / 2,274 lines plus media/tests | **remove after archive**; separate reduced model, geometry visualizer, and paper/media pipeline have no external validation owner and duplicate no protected 3-D capability |
-| Differentiable objectives | Gradients through selected physical solves and design observables | finite-difference/JVP/VJP tests across linear, 2-D, 3-D, and blanket paths | cross-cutting | **retain canonical Hartmann mean/profile objectives only in this refactor**; remove shadow 3-D projection, nonrectangular surrogate, WHAM, and blanket objectives; add 3-D gradients later only through the retained production solver |
+| Fully developed 2-D duct MHD | Inductionless Hartmann, Shercliff, and Hunt flow; rectangular/layered walls; pressure or flow drive; steady/transient | analytical profiles, conservation/power gates, high-Ha rows, closed-channel observations in `test_solver.py`, `test_physics.py`, and `test_reference_data.py` | shared core | **protected, production**; preserve canonical outputs and convergence metadata |
+| Rectangular/layered 3-D fringing | Variable imposed field, electric-current closure, Lorentz force, momentum and face-flux pressure projection on extruded grids | manufactured operators, projection/divergence, restart, variable-field and B2 square-duct tests in `test_fringing.py`; B2 spec/reference | shared 3-D core | **protected, active development**; pass reduced 3-D gates and executed B2 FreeMHD smoke after every structural tranche |
+| Straight-pipe 3-D fringing | O-grid cylindrical metrics, conducting annulus, fixed-flow projection, variable field | manufactured pipe Poisson/diffusion/projection tests, B1 spec/reference, retained-modal benchmark | shared 3-D core | **protected, active development**; preserve B1 internal/manufactured gates and establish a matched external parity claim before promotion |
+| FreeMHD parity | Matched equations, geometry, material, forcing, controls, native-output observation, and declared tolerances | B2 deterministic contract, two-update Docker harness, independent observers, and parser/forgery tests in `test_freemhd.py` | `freemhd.py` plus one external runner | **protected validation boundary**; retain the pinned B2 Docker path and add B1 only when its equations and observables can be matched end to end |
+| Bent-pipe flow | Mapped pipe plus low-Dean hydrodynamic limit | mapped finite-state and low-De baseline tests through the common 3-D solver | shared 3-D core | **retained as a 3-D geometry extension**; require metric/manufactured tests, low-De mesh convergence, and a named external target before a quantitative validation claim |
+| Magnetic obstacle | Localized imposed field in a 3-D rectangular channel with velocity, pressure, current, and wake observables | internal field-response and baseline tests through the common 3-D solver | shared 3-D core | **retained as a 3-D field application**; add executable external data before a quantitative validation claim |
+| Q2D MHD | Separate vorticity solver family | archived source and tests | none in live tree | **removed**; it had no named production user or quantitative parity and did not exercise the retained inductionless duct/fringing code |
+| Branded mirror-pipe adapter | Product-specific proxy around generic tabulated fields and pipe fringing | archived source and tests | none in live tree | **removed**; generic tabulated/vector-field and straight-pipe capabilities remain available for a future matched case |
+| Blanket reduced flow | Separate 1-D pressure-budget and filling model | archived source, tests, and media | none in live tree | **removed**; the standalone reduced model had no external validation owner and did not share the retained 3-D solver |
+| Differentiable objectives | Gradients through selected physical solves and design observables | finite-difference/JVP/VJP gates for canonical Hartmann objectives | `autodiff.py` plus shared core | **retain canonical Hartmann mean/profile objectives**; add 3-D gradients only through the retained production solver |
 | Reusable solver algebra | Krylov, fixed point, structured direct solves, preconditioners, projected/nullspace algebra | LMX unit/manufactured tests and overlapping SOLVAX APIs | portions of `solvers.py`/`fringing.py` | **move to SOLVAX when general**; retain LMX coefficient assembly and physics gates |
 
 Current costs overlap where capabilities share modules; they are navigation
@@ -705,14 +705,14 @@ fixed-point algebra, direct structured solve, or generic preconditioner.
   preserving one end-to-end path and the frozen gates at every tranche.
 - [ ] Consolidate FreeMHD code into a minimal case contract, Docker runner,
   native-output observer, and comparison layer outside the runtime wheel.
-- [ ] Remove duplicated reports, plots, fingerprints, frozen-output trees, and
+- [x] Remove duplicated reports, plots, fingerprints, frozen-output trees, and
   campaign adapters that do not contribute to a numerical gate.
-- [ ] For each research lane rejected in Phase 0, remove its implementation,
+- [x] For each research lane rejected in Phase 0, remove its implementation,
   exports, configuration, dependencies, tests, examples, scripts, docs, data,
   and claims together; preserve selected material in the verified archive.
 - [ ] For each retained research lane, give it the same compact API/result
   semantics and an explicit validation roadmap.
-- [ ] Verify installed-package discovery and wheel contents against the
+- [x] Verify installed-package discovery and wheel contents against the
   capability matrix.
 
 Exit: 3-D fringing and FreeMHD parity still pass, every remaining lane has a
@@ -753,14 +753,14 @@ demonstrated with a profile.
 
 ### Phase 5 — consolidate tests, examples, and tools
 
-- [ ] Build the target <= 14-file behavior-oriented test tree.
+- [x] Build the target <= 14-file behavior-oriented test tree.
 - [ ] Parameterize duplicated case setup and retain physical assertions.
-- [ ] Replace maintenance scripts with `lmx validate`, tests, or deletion.
+- [x] Replace maintenance scripts with `lmx validate`, tests, or deletion.
 - [ ] Implement the three-layer FreeMHD contract, local Docker smoke, and
   scheduled/release production validation workflow.
-- [ ] Keep no more than seven Python examples plus one TOML case, including one
+- [x] Keep no more than seven Python examples plus one TOML case, including one
   3-D fringing example and one external-validation example.
-- [ ] Make all examples fast, self-contained, editable, and CI-executed.
+- [x] Make all examples fast, self-contained, editable, and CI-executed.
 - [ ] Enforce source/file/size/media/API budgets in package tests.
 
 Exit: default suite is <= 90 seconds, coverage >=95%, Docker smoke passes when
@@ -769,14 +769,14 @@ source/tests/scripts meet their budgets.
 
 ### Phase 6 — rebuild docs and README
 
-- [ ] Delete the existing user-facing documentation tree and recreate the
+- [x] Delete the existing user-facing documentation tree and recreate the
   target information architecture from the stable API.
-- [ ] Write equations and equation-to-code mapping from primary sources.
-- [ ] Generate complete API reference from docstrings.
+- [x] Write equations and equation-to-code mapping from primary sources.
+- [x] Generate complete API reference from docstrings.
 - [ ] Write and execute four tutorials, including 3-D fringing, and focused
   how-to guides, including local FreeMHD Docker validation.
 - [ ] Publish validation with regenerated current-source evidence.
-- [ ] Create the product-first README and one compact validated hero visual.
+- [x] Create the product-first README and one compact validated hero visual.
 - [ ] Run the current-state prose scan, Sphinx `-W`, API coverage, and links.
 
 Exit: a new user can install, solve, interpret, validate, and extend LMX from
@@ -825,8 +825,8 @@ source all describe the same standalone API and commit.
 Every pull request must pass:
 
 ```console
-ruff check src tests examples
-ruff format --check src tests examples
+ruff check lmx tests examples scripts docs/conf.py
+ruff format --check lmx tests examples scripts docs/conf.py
 pytest -q -m "not docker and not production"
 sphinx-build -W -b html docs docs/_build/html
 python -m build
@@ -861,6 +861,9 @@ artifacts or release assets, not committed files.
 | D-013 | Remove branded WHAM proxy builders while retaining generic tabulated fields and straight-pipe fringing | The general capability can express a future WHAM case once matched evidence exists, without carrying product-specific unvalidated code now. |
 | D-014 | Retain only objectives differentiated through the canonical Hartmann path in this refactor | Shadow 3-D, nonrectangular surrogate, WHAM, and blanket objectives can report gradients of a different model than the production solver. |
 | D-015 | Use released SOLVAX native sparse solves instead of calling SciPy solvers from LMX | LMX owns MHD matrix assembly; reusable host factorization and solve behavior belongs to SOLVAX. |
+| D-016 | Use one explicit current restart-schema family for state, compact flux, Aitken, and Anderson checkpoints | A single fail-closed contract is easier to reason about, test, and document than internal format-version branches. |
+| D-017 | Keep the executed matched B2 Docker path and remove the private straight-pipe archive smoke | The private lane explicitly could not establish B1 equation/observable parity and duplicated the accepted B2 execution boundary; B1 remains protected by internal/manufactured gates until a genuinely matched external case exists. |
+| D-018 | Use Ruff with a 110-column limit for all maintained Python | The numerical expressions remain readable, every file has one formatter, and the format reduces line count without hand-compressed layouts. |
 
 ## Work log
 
@@ -1123,3 +1126,40 @@ surface, measurements, validation, decision, and next action.
   `/Users/rogeriojorge/local/tests/lmx-audit/lmx-phase1-no-linear-81e9122/b2`.
 - Next action: classify the remaining line, modal, deflation, projection, and
   fixed-flow algebra by reusable SOLVAX contract before the next deletion.
+
+### 2026-08-22 — capability trim and user-facing rebuild
+
+- Removed the separate Q2D, blanket, centerline-field, Dean report, scaling,
+  broad external-reporting, branded mirror-pipe, and shadow-autodiff surfaces
+  after the verified archive. Retained bent-pipe geometry, the low-De baseline,
+  magnetic-obstacle construction, generic fields, and the straight-pipe solver
+  as applications of the common 3-D path.
+- Deleted generated benchmark-result snapshots, unreferenced documentation
+  media, case testbeds, report/release/campaign scripts, and their proxy tests.
+  The live tree now contains 94 files, 24 package modules, 14 test files, four
+  maintenance scripts, eight curated examples, and 17 documentation pages.
+- Removed the private straight-pipe archive smoke because it did not match the
+  B1 production contract. The pinned, independently observed B2 Docker path is
+  the sole executed FreeMHD comparison; B1 retains its internal/manufactured
+  numerical gates and an explicit external-parity promotion requirement.
+- Replaced internal restart-format compatibility branches with four current
+  schemas: state, compact flux, Aitken, and Anderson. Writes reject partial
+  accelerator/diagnostic state and reads reject partial or unknown schemas.
+- Rebuilt README and documentation around the supported product, equations,
+  implementation map, first runs, tutorials, task guides, API/CLI reference,
+  validation, FreeMHD reproducibility, development architecture, and primary
+  literature. Sphinx passes with warnings treated as errors.
+- Standardized all maintained Python with Ruff at 110 columns. Ruff formatting
+  and fatal/import lint pass. Package source is 18,157 lines, tests are 12,635
+  lines, scripts are 3,232 lines, documentation media are 197,588 bytes, and
+  the live checkout is 1,739,118 bytes. The 15,000-line, 16-module, and
+  1,800-line-largest-module completion targets remain open; `fringing.py` is
+  currently 7,212 lines.
+- Ran all five coverage shards: 551 passed and five optional external-data
+  tests skipped. Exact combined line/branch coverage is 95.148307%. The
+  architecture/import, Sphinx, package build, Twine, and distribution-content
+  gates pass on the live sources. The wheel is 175,592 bytes with 37 members;
+  the source distribution is 163,607 bytes with 43 members.
+- Next action: commit the structural tranche, repeat the pinned B2 Docker smoke
+  on that exact commit, then decompose and consolidate the retained 3-D and
+  FreeMHD paths toward the final source/module ceilings.

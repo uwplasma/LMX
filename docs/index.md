@@ -1,86 +1,100 @@
-# LMX Documentation
+# LMX
 
-LMX is a JAX-native code for inductionless liquid-metal magnetohydrodynamics on
-structured meshes. The project is organized so that:
+LMX solves inductionless liquid-metal MHD in ducts with JAX. It provides
+analytical-reference fully developed flows and three-dimensional extruded duct
+and pipe models for spatially varying magnetic fields. LMX builds the physics;
+[SOLVAX](https://github.com/uwplasma/SOLVAX) supplies reusable numerical solvers.
 
-- a new user can install it quickly, run a benchmark case, and inspect output
-- an advanced user can trace every equation and numerical choice back to the
-  source files
-- a researcher can reproduce bounded validation and differentiable workflows
-  from Git, with large figure and movie bundles supplied by versioned releases
-
-## Highlights
-
-- fully developed laminar duct solvers for Hartmann, Shercliff, and Hunt flows
-- explicit multi-region conductivity treatment for layered duct walls
-- restartable CLI and TOML workflows
-- detailed runtime logging with initial/final residuals and conservation checks
-- strong-scaling benchmark tooling for CPU and GPU kernels
-- differentiable benchmark and inverse-design workflows in JAX
-- geometry preview and postprocessing utilities
-- 3D fringing-field workflows on rectangular ducts, layered ducts, and mapped
-  pipes
-
-## Read this first
-
-```{toctree}
-:maxdepth: 2
-:caption: Core Guides
-
-getting_started
-theory
-numerics
-geometry
-input_reference
-wall_models
-case_cookbook
-migration
-testing
+```{image} _static/fringing_solver_family.webp
+:alt: Rectangular-duct fringing-field solution
+:align: center
 ```
 
-## Validation, performance, and research workflows
+## Start here
+
+::::{grid} 1 2 2 2
+:gutter: 3
+
+:::{grid-item-card} Install and run
+:link: getting_started/install
+:link-type: doc
+Install LMX, select a JAX backend, and check the command line.
+:::
+
+:::{grid-item-card} First duct solve
+:link: getting_started/first_run
+:link-type: doc
+Solve and validate a Hartmann duct from Python or TOML.
+:::
+
+:::{grid-item-card} Three-dimensional fringing
+:link: tutorials/fringing
+:link-type: doc
+Build a spatially varying field and inspect charge and flow diagnostics.
+:::
+
+:::{grid-item-card} Validation
+:link: validation/index
+:link-type: doc
+See the analytical, numerical, and FreeMHD evidence for every claim.
+:::
+
+::::
 
 ```{toctree}
-:maxdepth: 2
-:caption: Validation and Research
+:hidden:
+:caption: Get started
 
-benchmark_matrix
-validation_report
-performance
-autodiff
-fringing
-external_benchmarks
+getting_started/install
+getting_started/first_run
 ```
-
-## Developer and maintenance notes
 
 ```{toctree}
-:maxdepth: 2
-:caption: Developer Material
+:hidden:
+:caption: Tutorials
 
-developer_guide
+tutorials/fully_developed
+tutorials/fringing
+tutorials/differentiation
 ```
 
-## What is implemented today
+```{toctree}
+:hidden:
+:caption: How-to guides
 
-- `fully_developed_inductionless`
-  - the default duct solver family
-- structured `rect_duct` and `layered_duct` cross-sections
-- mapped `pipe_ogrid` geometry/preview tooling
-- strong-scaling kernel benchmarks
-- differentiable Hartmann sensitivity and inverse-design workflows
-- fringing-field benchmark staging through stacked axial field bundles
+how_to/walls_and_fields
+how_to/restart_and_output
+```
 
-## What is next
+```{toctree}
+:hidden:
+:caption: Physics and numerics
 
-- replace the remaining local stationary iterations with released SOLVAX APIs
-- extend the passing primal and transpose gradient gates to new objectives
-- freeze and close the published pipe and square-duct fringing-field cases
-- rerun the same multi-minute fixed-work ladder for exact-core CPU or idle-host
-  GPU scaling only after fresh bound admission
+physics/equations
+physics/numerics
+```
 
-Useful anchors for that work include the [Samper et al. MHD validation
-ladder](https://www.scipedia.com/wd/images/b/b8/Draft_Samper_360028846_6045_art042.pdf),
-the [differentiable simulation review](https://mpan31415.github.io/assets/pdf/papers/2024/IEEEAccess24_DiffSim.pdf),
-[PhiFlow](https://proceedings.mlr.press/v235/holl24a.html), and
-[Diffrax adjoints](https://docs.kidger.site/diffrax/api/adjoints/).
+```{toctree}
+:hidden:
+:caption: Validation
+
+validation/index
+validation/freemhd
+```
+
+```{toctree}
+:hidden:
+:caption: Reference
+
+reference/api
+reference/cli
+reference/bibliography
+```
+
+```{toctree}
+:hidden:
+:caption: Development
+
+develop/architecture
+develop/contributing
+```

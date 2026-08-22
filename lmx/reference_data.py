@@ -38,6 +38,8 @@ def default_closed_channel_reference_root(reference_root: str | Path | None = No
     if preferred.exists():
         return preferred
     return repo_root / "external" / "FreeMHDPaperAllFigures" / "FreeMHDPaperAllFigures" / "ClosedChannel"
+
+
 def _match_single(patterns: list[str], reference_root: Path) -> Path:
     matches: list[Path] = []
     for pattern in patterns:
@@ -65,7 +67,9 @@ def processed_slice_reference_path(
     return _match_single(patterns, root)
 
 
-def load_closed_channel_analytical(case_kind: str, ha: int, reference_root: str | Path | None = None) -> ClosedChannelAnalyticalReference:
+def load_closed_channel_analytical(
+    case_kind: str, ha: int, reference_root: str | Path | None = None
+) -> ClosedChannelAnalyticalReference:
     """Load a bundled or user-supplied analytical closed-channel profile."""
 
     path = analytical_reference_path(case_kind, ha, reference_root)
@@ -92,13 +96,17 @@ def load_closed_channel_analytical(case_kind: str, ha: int, reference_root: str 
     )
 
 
-def load_shercliff_analytical(ha: int, reference_root: str | Path | None = None) -> ClosedChannelAnalyticalReference:
+def load_shercliff_analytical(
+    ha: int, reference_root: str | Path | None = None
+) -> ClosedChannelAnalyticalReference:
     """Load an analytical Shercliff profile at the requested Hartmann number."""
 
     return load_closed_channel_analytical("shercliff", ha, reference_root)
 
 
-def load_hunt_analytical(ha: int, reference_root: str | Path | None = None) -> ClosedChannelAnalyticalReference:
+def load_hunt_analytical(
+    ha: int, reference_root: str | Path | None = None
+) -> ClosedChannelAnalyticalReference:
     """Load an analytical Hunt profile at the requested Hartmann number."""
 
     return load_closed_channel_analytical("hunt", ha, reference_root)
@@ -128,13 +136,17 @@ def load_processed_slice(
     )
 
 
-def _processed_field_column(reference: ProcessedSliceReference, field_name: str, component: int | None) -> jnp.ndarray:
+def _processed_field_column(
+    reference: ProcessedSliceReference, field_name: str, component: int | None
+) -> jnp.ndarray:
     column_name = field_name if component is None else f"{field_name}:{component}"
     try:
         return reference.columns[column_name]
     except KeyError as exc:
         available = ", ".join(sorted(reference.columns))
-        raise KeyError(f"Processed slice {reference.path} has no column {column_name!r}; available columns: {available}") from exc
+        raise KeyError(
+            f"Processed slice {reference.path} has no column {column_name!r}; available columns: {available}"
+        ) from exc
 
 
 def _fill_missing_structured_values(grid: np.ndarray, y: np.ndarray, z: np.ndarray) -> np.ndarray:
@@ -267,16 +279,26 @@ def _interpolated_centerline_profile(
     upper = float(upper_candidates[np.argmin(upper_candidates)])
     lower_mask = np.isclose(cross_np, lower, atol=tolerance, rtol=0.0)
     upper_mask = np.isclose(cross_np, upper, atol=tolerance, rtol=0.0)
-    lower_coord, lower_values = _unique_plane_profile(jnp.asarray(profile_np[lower_mask]), jnp.asarray(values_np[lower_mask]))
-    upper_coord, upper_values = _unique_plane_profile(jnp.asarray(profile_np[upper_mask]), jnp.asarray(values_np[upper_mask]))
+    lower_coord, lower_values = _unique_plane_profile(
+        jnp.asarray(profile_np[lower_mask]), jnp.asarray(values_np[lower_mask])
+    )
+    upper_coord, upper_values = _unique_plane_profile(
+        jnp.asarray(profile_np[upper_mask]), jnp.asarray(values_np[upper_mask])
+    )
     coord = np.union1d(np.asarray(lower_coord, dtype=float), np.asarray(upper_coord, dtype=float))
-    lower_interp = np.interp(coord, np.asarray(lower_coord, dtype=float), np.asarray(lower_values, dtype=float))
-    upper_interp = np.interp(coord, np.asarray(upper_coord, dtype=float), np.asarray(upper_values, dtype=float))
+    lower_interp = np.interp(
+        coord, np.asarray(lower_coord, dtype=float), np.asarray(lower_values, dtype=float)
+    )
+    upper_interp = np.interp(
+        coord, np.asarray(upper_coord, dtype=float), np.asarray(upper_values, dtype=float)
+    )
     weight = (0.0 - lower) / (upper - lower)
     return jnp.asarray(coord), jnp.asarray((1.0 - weight) * lower_interp + weight * upper_interp)
 
 
-def extract_processed_midplane_profile(reference: ProcessedSliceReference, axis: str = "y") -> dict[str, jnp.ndarray]:
+def extract_processed_midplane_profile(
+    reference: ProcessedSliceReference, axis: str = "y"
+) -> dict[str, jnp.ndarray]:
     points_y = reference.columns["Points:1"]
     points_z = reference.columns["Points:2"]
     u_x = reference.columns["U:0"]

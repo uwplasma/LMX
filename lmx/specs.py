@@ -6,7 +6,6 @@ from typing import Callable, Literal
 
 import jax.numpy as jnp
 
-
 RegionKind = Literal["fluid", "solid"]
 GeometryKind = Literal["rect_duct", "layered_duct", "pipe_ogrid", "bent_pipe"]
 SolverKind = Literal["fully_developed_inductionless", "extruded_inductionless"]
@@ -22,9 +21,7 @@ BoundaryKind = Literal[
 ]
 MagneticFieldKind = Literal["constant", "analytic", "tabulated"]
 PotentialSolverKind = Literal["auto", "jacobi", "cg", "cg_volume"]
-CurrentReconstructionKind = Literal[
-    "cell_centered", "face_averaged", "hybrid_face_lorentz"
-]
+CurrentReconstructionKind = Literal["cell_centered", "face_averaged", "hybrid_face_lorentz"]
 VelocityUpdateLimiterKind = Literal["global_scale", "local_clip"]
 LinearSolverKind = Literal["auto", "cg", "solvax_pcg"]
 PreconditionerKind = Literal["none", "jacobi", "block_jacobi"]

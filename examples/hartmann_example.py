@@ -15,7 +15,6 @@ from lmx.io import write_solution_outputs
 from lmx.plotting import write_case_overview_plots
 from lmx.validation import hartmann_validation, validation_summary
 
-
 # Inputs: geometry, material properties, numerics, and output controls.
 OUTPUT_DIR = Path("artifacts/examples/hartmann")
 HARTMANN_NUMBER = 20.0

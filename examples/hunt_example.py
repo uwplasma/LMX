@@ -15,7 +15,6 @@ from lmx.io import write_solution_outputs
 from lmx.plotting import write_case_overview_plots
 from lmx.validation import closed_channel_validation, validation_summary
 
-
 # Inputs: geometry, wall model, material properties, numerics, and outputs.
 OUTPUT_DIR = Path("artifacts/examples/hunt")
 REFERENCE_ROOT: Path | None = None
@@ -86,9 +85,7 @@ case = replace(
 # Run the solve and optionally load an independent analytical comparison.
 solution = solve_steady(case)
 comparison = (
-    closed_channel_validation(
-        solution, "hunt", int(HARTMANN_NUMBER), reference_root=REFERENCE_ROOT
-    )
+    closed_channel_validation(solution, "hunt", int(HARTMANN_NUMBER), reference_root=REFERENCE_ROOT)
     if REFERENCE_ROOT is not None
     else None
 )
@@ -98,18 +95,10 @@ plots = (
         solution,
         OUTPUT_DIR,
         case_title=f"Hunt duct (Ha={HARTMANN_NUMBER:g})",
-        y_reference_coordinate=(
-            None if comparison is None else comparison.y_profile.coordinate
-        ),
-        y_reference_values=(
-            None if comparison is None else comparison.y_profile.reference
-        ),
-        z_reference_coordinate=(
-            None if comparison is None else comparison.z_profile.coordinate
-        ),
-        z_reference_values=(
-            None if comparison is None else comparison.z_profile.reference
-        ),
+        y_reference_coordinate=(None if comparison is None else comparison.y_profile.coordinate),
+        y_reference_values=(None if comparison is None else comparison.y_profile.reference),
+        z_reference_coordinate=(None if comparison is None else comparison.z_profile.coordinate),
+        z_reference_values=(None if comparison is None else comparison.z_profile.reference),
         reference_label="Analytical",
     )
     if WRITE_PLOTS

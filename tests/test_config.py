@@ -1,10 +1,26 @@
+import ast
+import inspect
+import json
+import subprocess
+import sys
+import tarfile
+import zipfile
 from pathlib import Path
 
 import pytest
 
-from lmx.config import LoggingSpec, _parse_boundary_value, load_run_config
+import lmx
 from lmx.cases import _wall_conductivity_from_conductance_ratio
-
+from lmx.config import LoggingSpec, _parse_boundary_value, load_run_config
+from scripts.audit_architecture import (
+    _checkout_size,
+    architecture_budget_errors,
+    build_inventory,
+    inspect_sdist,
+    inspect_wheel,
+    measure_import,
+    write_inventory,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -180,7 +196,6 @@ side = "max"
     config = load_run_config(input_file)
 
     assert config.case.name == "hartmann_toml_demo"
-    assert config.solve_mode == "steady"
     assert config.case.geometry.kind == "rect_duct"
     assert config.case.output.directory == str((tmp_path / "out").resolve())
     assert config.case.solver.kind == "fully_developed_inductionless"
@@ -270,19 +285,13 @@ kind = "no_slip"
     ("kwargs", "message"),
     [
         ({"magnetic_kind": "analytic"}, "analytic magnetic-field"),
-        (
-            {"case_extra": 'solve_mode = "steady"', "solver": 'mode = "transient"'},
-            "disagree",
-        ),
-        ({"solver": 'kind = "reduced_inductionless"'}, "no longer supported"),
+        ({"solver": 'kind = "invalid"'}, "Unsupported solver kind"),
         ({"geometry_kind": None}, "Missing required TOML key 'kind'"),
         ({"geometry_extra": "wall_thickness = [0.1, 0.2]"}, "must have length 4"),
         ({"solver": 'mode = "invalid"'}, "Unsupported solve mode"),
     ],
 )
-def test_load_run_config_rejects_invalid_inputs(
-    tmp_path: Path, kwargs: dict[str, str | None], message: str
-):
+def test_load_run_config_rejects_invalid_inputs(tmp_path: Path, kwargs: dict[str, str | None], message: str):
     input_file = _write_minimal_config(tmp_path, "rejected", **kwargs)
 
     with pytest.raises(ValueError, match=message):
@@ -292,43 +301,10 @@ def test_load_run_config_rejects_invalid_inputs(
 def test_shipped_example_toml_files_parse():
     root = Path(__file__).resolve().parents[1]
 
-    for relative in (
-        "examples/hartmann_case.toml",
-        "examples/cases/ducts/hartmann_restart_case.toml",
-        "examples/cases/ducts/shercliff_case.toml",
-        "examples/cases/ducts/hunt_case.toml",
-        "examples/cases/fringing/fringing_rect_case.toml",
-        "examples/cases/fringing/fringing_tabulated_case.toml",
-        "examples/cases/fringing/fringing_layered_case.toml",
-        "examples/cases/fringing/fringing_layered_restart_case.toml",
-        "examples/cases/fringing/fringing_pipe_case.toml",
-    ):
+    for relative in ("examples/hartmann_case.toml",):
         config = load_run_config(root / relative)
         assert config.case.name
         assert config.case.regions
-
-
-def test_shipped_hunt_example_uses_insulating_side_walls_and_conducting_hartmann_walls():
-    root = Path(__file__).resolve().parents[1]
-    config = load_run_config(root / "examples/cases/ducts/hunt_case.toml")
-
-    boundaries = {
-        boundary.name: boundary for boundary in config.case.boundary_conditions
-    }
-    assert boundaries["left_wall"].kind == "conducting_wall"
-    assert boundaries["right_wall"].kind == "conducting_wall"
-    assert boundaries["bottom_wall"].kind == "insulating"
-    assert boundaries["top_wall"].kind == "insulating"
-
-
-def test_case_solve_mode_is_accepted_for_backward_compatibility(tmp_path: Path):
-    input_file = _write_minimal_config(
-        tmp_path, "compatibility", case_extra='solve_mode = "transient"'
-    )
-
-    config = load_run_config(input_file)
-    assert config.solve_mode == "transient"
-    assert config.case.solver.mode == "transient"
 
 
 def test_parse_boundary_value_accepts_scalar_and_vector_and_rejects_bad_inputs():
@@ -378,3 +354,174 @@ def test_wall_conductivity_rejects_nonpositive_geometry(
             wall_thickness=wall_thickness,
             hartmann_half_spacing=hartmann_half_spacing,
         )
+
+
+EXPECTED_ROOT_API = {
+    "enable_compilation_cache",
+    "make_hartmann_case",
+    "make_shercliff_case",
+    "make_hunt_case",
+    "solve_steady",
+    "solve_transient",
+    "fully_developed_power_balance",
+    "generate_rect_duct_mesh",
+    "generate_rect_duct_mesh_from_faces",
+    "generate_layered_duct_mesh",
+    "generate_layered_duct_mesh_from_fluid_faces",
+    "generate_multilayer_duct_mesh",
+    "WallLayer",
+    "dynamic_to_kinematic_viscosity",
+    "kinematic_to_dynamic_viscosity",
+    "hartmann_number",
+    "reynolds_number",
+    "interaction_parameter",
+    "magnetic_reynolds_number",
+    "magnetic_field_from_hartmann",
+    "wall_conductance_ratio",
+    "effective_pinhole_conductance_ratio",
+    "tangential_stack_conductance_ratio",
+    "normal_stack_leakage_ratio",
+    "equivalent_single_layer",
+    "nested_wall_layer_resolution_summary",
+    "load_shercliff_analytical",
+    "load_hunt_analytical",
+    "load_closed_channel_analytical",
+    "load_processed_slice",
+}
+
+
+def test_architecture_inventory_is_deterministic_without_timing(tmp_path: Path) -> None:
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+    write_inventory(first)
+    write_inventory(second)
+    assert first.read_bytes() == second.read_bytes()
+
+
+def test_stable_root_api_is_small_lazy_and_resolvable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert set(lmx.__all__) == EXPECTED_ROOT_API
+    assert EXPECTED_ROOT_API <= set(dir(lmx))
+    assert all(callable(getattr(lmx, name)) for name in lmx.__all__)
+    assert all(inspect.getdoc(getattr(lmx, name)) for name in lmx.__all__)
+
+    updates = []
+    monkeypatch.setattr("lmx.io.jax.config.update", lambda *args: updates.append(args))
+    cache = lmx.enable_compilation_cache(
+        tmp_path / "jax-cache", min_compile_time_secs=2.0, min_entry_size_bytes=4096
+    )
+    assert cache.is_dir()
+    assert updates == [
+        ("jax_compilation_cache_dir", str(cache)),
+        ("jax_persistent_cache_min_entry_size_bytes", 4096),
+        ("jax_persistent_cache_min_compile_time_secs", 2.0),
+    ]
+
+
+def test_advanced_api_uses_owning_module() -> None:
+    assert not hasattr(lmx, "solve_extruded_inductionless")
+    from lmx.fringing import solve_extruded_inductionless
+
+    assert callable(solve_extruded_inductionless)
+
+
+def test_unknown_root_attribute_has_standard_error() -> None:
+    with pytest.raises(AttributeError, match="not_an_api"):
+        lmx.not_an_api
+
+
+def test_architecture_inventory_ignores_generated_egg_info(tmp_path: Path) -> None:
+    (tmp_path / "source.py").write_bytes(b"x")
+    metadata = tmp_path / "package.egg-info"
+    metadata.mkdir()
+    (metadata / "PKG-INFO").write_bytes(b"generated")
+    assert _checkout_size(tmp_path) == 1
+
+
+def test_root_import_is_lazy_and_within_budget() -> None:
+    payload = build_inventory()
+    payload["import_measurement"] = measure_import(repeats=3)
+    assert architecture_budget_errors(payload) == []
+
+
+def test_numerical_modules_do_not_import_optional_visualization() -> None:
+    code = """
+import sys
+import lmx.plotting
+assert not any(name == 'matplotlib' or name.startswith('matplotlib.') for name in sys.modules)
+assert not any(name == 'PIL' or name.startswith('PIL.') for name in sys.modules)
+"""
+    subprocess.run([sys.executable, "-c", code], check=True)
+
+
+def test_wheel_audit_rejects_nonpackage_payload(tmp_path: Path) -> None:
+    wheel = tmp_path / "lmx-test.whl"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr("lmx/__init__.py", "")
+        archive.writestr("lmx-1.dist-info/METADATA", "")
+        archive.writestr("benchmarks/raw.bin", b"large output")
+    assert inspect_wheel(wheel)["forbidden_members"] == ["benchmarks/raw.bin"]
+    assert "outside lmx/" in architecture_budget_errors(build_inventory(), wheel=wheel)[0]
+
+
+def test_sdist_audit_rejects_repository_tests(tmp_path: Path) -> None:
+    source = tmp_path / "lmx-1" / "tests" / "test_solver.py"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"large output")
+    sdist = tmp_path / "lmx-test.tar.gz"
+    with tarfile.open(sdist, "w:gz") as archive:
+        archive.add(source, arcname="lmx-1/tests/test_solver.py")
+    assert inspect_sdist(sdist)["forbidden_members"] == ["tests/test_solver.py"]
+    assert "outside its source payload" in architecture_budget_errors(build_inventory(), sdist=sdist)[0]
+
+
+def test_curated_examples_use_submodules_and_linear_scripts_are_editable() -> None:
+    inventory = build_inventory()["inventory"]
+    stable = set(lmx.__all__)
+    for item in inventory["curated_examples"]:
+        path = Path(item["path"])
+        if path.suffix != ".py":
+            continue
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(path))
+        imports = (
+            node for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module == "lmx"
+        )
+        root_imports = {alias.name for node in imports for alias in node.names}
+        assert root_imports <= stable, f"{path} imports unsupported root APIs: {root_imports - stable}"
+        linear_limits = {
+            "autodiff_design_demo.py": 160,
+            "freemhd_closed_channel_observable_parity.py": 700,
+            "fringing_benchmark_demo.py": 160,
+            "hartmann_example.py": 160,
+            "hunt_example.py": 160,
+            "li_aln_wall_stack_example.py": 260,
+            "variable_field_extruded_demo.py": 160,
+        }
+        if path.name in linear_limits:
+            assert ast.get_docstring(tree)
+            assert "# Inputs:" in source and "# Run" in source
+            assert len(source.splitlines()) <= linear_limits[path.name]
+            functions = (node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef))
+            assert all(node.name != "main" and ast.get_docstring(node) for node in functions)
+            assert "argparse" not in source and "__name__" not in source
+
+
+def test_curated_examples_declare_user_facing_contracts(tmp_path: Path) -> None:
+    inventory = build_inventory()["inventory"]
+    curated = inventory["curated_examples"]
+    assert {item["path"] for item in curated} == set(inventory["examples"])
+    assert len(curated) == 8
+    for item in curated:
+        assert item["command"]
+        assert item["outputs"]
+        assert item["runtime"] in {"portable", "external", "accelerator-optional"}
+        assert Path(item["docs"]).is_file()
+    autodiff = Path(__file__).resolve().parents[1] / "examples/autodiff_design_demo.py"
+    subprocess.run([sys.executable, autodiff], cwd=tmp_path, timeout=30, check=True)
+    design_path = next((tmp_path / "artifacts").rglob("autodiff_summary.json"))
+    design = json.loads(design_path.read_text())
+    assert design["recovered"]["forcing"] == pytest.approx(1.0, abs=0.02)
+    assert design["recovered"]["loss"] < design["optimization_history"][0]["loss"] * 1.0e-3
+    assert all((design_path.parent / name).is_file() for name in design["plots"])

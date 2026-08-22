@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import math
 
-
 MU0 = 4.0e-7 * math.pi
 
 
@@ -51,7 +50,11 @@ def hartmann_number(
     _require_positive("conductivity", conductivity)
     _require_positive("density", density)
     _require_positive("kinematic_viscosity", kinematic_viscosity)
-    return abs(float(magnetic_field)) * float(length_scale) * math.sqrt(float(conductivity) / (float(density) * float(kinematic_viscosity)))
+    return (
+        abs(float(magnetic_field))
+        * float(length_scale)
+        * math.sqrt(float(conductivity) / (float(density) * float(kinematic_viscosity)))
+    )
 
 
 def magnetic_field_from_hartmann(
@@ -68,7 +71,9 @@ def magnetic_field_from_hartmann(
     _require_positive("conductivity", conductivity)
     _require_positive("density", density)
     _require_positive("kinematic_viscosity", kinematic_viscosity)
-    return float(hartmann) / (float(length_scale) * math.sqrt(float(conductivity) / (float(density) * float(kinematic_viscosity))))
+    return float(hartmann) / (
+        float(length_scale) * math.sqrt(float(conductivity) / (float(density) * float(kinematic_viscosity)))
+    )
 
 
 def reynolds_number(*, velocity: float, length_scale: float, kinematic_viscosity: float) -> float:
@@ -93,7 +98,12 @@ def interaction_parameter(
     _require_positive("conductivity", conductivity)
     _require_positive("density", density)
     _require_positive("velocity", abs(velocity))
-    return float(conductivity) * float(magnetic_field) ** 2 * float(length_scale) / (float(density) * abs(float(velocity)))
+    return (
+        float(conductivity)
+        * float(magnetic_field) ** 2
+        * float(length_scale)
+        / (float(density) * abs(float(velocity)))
+    )
 
 
 def magnetic_reynolds_number(
@@ -125,7 +135,9 @@ def wall_conductance_ratio(
     _require_positive("length_scale", length_scale)
     if wall_conductivity < 0.0:
         raise ValueError("wall_conductivity must be non-negative")
-    return float(wall_conductivity) * float(wall_thickness) / (float(fluid_conductivity) * float(length_scale))
+    return (
+        float(wall_conductivity) * float(wall_thickness) / (float(fluid_conductivity) * float(length_scale))
+    )
 
 
 def normal_leakage_ratio(
@@ -142,7 +154,11 @@ def normal_leakage_ratio(
     _require_positive("length_scale", length_scale)
     if coating_conductivity < 0.0:
         raise ValueError("coating_conductivity must be non-negative")
-    return float(coating_conductivity) * float(length_scale) / (float(fluid_conductivity) * float(coating_thickness))
+    return (
+        float(coating_conductivity)
+        * float(length_scale)
+        / (float(fluid_conductivity) * float(coating_thickness))
+    )
 
 
 def _require_positive(name: str, value: float) -> None:

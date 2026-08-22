@@ -5,6 +5,7 @@ import json
 import shutil
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import jax.numpy as jnp
@@ -25,8 +26,8 @@ from .io import (
     load_restart_bundle,
     prepare_extruded_output_layout,
     validate_extruded_restart_bundle,
-    write_extruded_restart_npz,
     validate_restart_bundle,
+    write_extruded_restart_npz,
     write_extruded_solution_outputs,
     write_paraview,
     write_restart_npz,
@@ -41,13 +42,11 @@ from .validation import (
     extract_midplane_profile,
     hartmann_acceptance,
     hartmann_validation,
-    processed_slice_validation,
     validation_summary,
     write_acceptance_report,
     write_analytic_comparison,
     write_closed_channel_validation,
     write_metrics_json,
-    write_processed_slice_validation,
     write_profile_csv,
 )
 
@@ -141,13 +140,22 @@ def _solve_case_with_optional_logger(
         return solve_steady(case)
 
 
-def _runtime_summary(solution, case, out_dir: Path, outputs: dict[str, list[Path]], *, restart_info: dict[str, object] | None = None) -> dict[str, object]:
+def _runtime_summary(
+    solution,
+    case,
+    out_dir: Path,
+    outputs: dict[str, list[Path]],
+    *,
+    restart_info: dict[str, object] | None = None,
+) -> dict[str, object]:
     diag = getattr(solution, "diagnostics", None)
     geometry = getattr(getattr(case, "geometry", None), "kind", "unknown")
     u_field = getattr(solution.state, "u", jnp.asarray([0.0]))
+
     def _latest(name: str) -> float | None:
         history = getattr(diag, name, jnp.asarray([]))
         return float(history[-1]) if getattr(history, "size", 0) else None
+
     summary = {
         "case": case.name,
         "geometry": geometry,
@@ -172,9 +180,7 @@ def _runtime_summary(solution, case, out_dir: Path, outputs: dict[str, list[Path
         "interface_current_residual": _latest("interface_current_residual_history"),
         "output": _portable_path(out_dir),
         "generated_files": {
-            key: [_portable_path(path) for path in paths]
-            for key, paths in outputs.items()
-            if paths
+            key: [_portable_path(path) for path in paths] for key, paths in outputs.items() if paths
         },
     }
     if restart_info is not None:
@@ -215,9 +221,7 @@ def _runtime_summary_extruded(
         "field_mean_velocity_correlation": float(validation.field_mean_velocity_correlation),
         "output": _portable_path(out_dir),
         "generated_files": {
-            key: [_portable_path(path) for path in paths]
-            for key, paths in outputs.items()
-            if paths
+            key: [_portable_path(path) for path in paths] for key, paths in outputs.items() if paths
         },
     }
     if restart_info is not None:
@@ -247,14 +251,16 @@ def _run_config(config: RunConfig) -> dict[str, object]:
         output_dir = getattr(case.output, "directory", None)
     out_dir = Path(output_dir) if output_dir else Path.cwd() / "out" / case.name
     out_dir.mkdir(parents=True, exist_ok=True)
-    extruded_layout = prepare_extruded_output_layout(out_dir) if solver_kind == "extruded_inductionless" else None
+    extruded_layout = (
+        prepare_extruded_output_layout(out_dir) if solver_kind == "extruded_inductionless" else None
+    )
     logger = StreamingSolverLogger(config.logging) if config.logging.enabled else None
     log_handle = None
     log_path: Path | None = None
     if logger is not None:
         log_root = extruded_layout.logs_dir if extruded_layout is not None else out_dir
         log_path = default_log_path(log_root, case.name)
-        log_handle = open(log_path, "w", encoding="utf-8")
+        log_handle = open(log_path, "w", encoding="utf-8")  # noqa: SIM115
         logger.add_stream(log_handle)
     solve_start = time.perf_counter()
     if solver_kind == "extruded_inductionless":
@@ -297,7 +303,9 @@ def _run_config(config: RunConfig) -> dict[str, object]:
         )
         if config.restart.write_restart:
             restart_filename = config.restart.restart_filename or f"{case.name}_extruded_restart.npz"
-            restart_path = write_extruded_restart_npz(solution, case, extruded_layout.restart_dir / restart_filename)
+            restart_path = write_extruded_restart_npz(
+                solution, case, extruded_layout.restart_dir / restart_filename
+            )
             outputs.setdefault("restart", []).append(restart_path)
             if restart_summary is None:
                 restart_summary = {"enabled": False}
@@ -325,7 +333,12 @@ def _run_config(config: RunConfig) -> dict[str, object]:
         if config.restart.path is None:
             raise ValueError("Restart is enabled but no restart.path was provided")
         restart_bundle = load_restart_bundle(config.restart.path)
-        validate_restart_bundle(restart_bundle, mesh=_build_mesh(case), geometry_kind=case.geometry.kind, case_name=case.name)
+        validate_restart_bundle(
+            restart_bundle,
+            mesh=_build_mesh(case),
+            geometry_kind=case.geometry.kind,
+            case_name=case.name,
+        )
         initial_state = restart_bundle.state
         initial_diagnostics = restart_bundle.diagnostics
         restart_log_info = RestartLogInfo(
@@ -343,7 +356,7 @@ def _run_config(config: RunConfig) -> dict[str, object]:
     try:
         solution = _solve_case_with_optional_logger(
             case,
-            solve_mode=config.solve_mode,
+            solve_mode=case.solver.mode,
             logger=logger,
             initial_state=initial_state,
             initial_diagnostics=initial_diagnostics,
@@ -400,9 +413,7 @@ def main(argv: list[str] | None = None) -> int:
         epilog="A TOML case may also be passed directly: lmx CASE.toml",
         formatter_class=formatter,
     )
-    subparsers = parser.add_subparsers(
-        dest="command", title="commands", required=True
-    )
+    subparsers = parser.add_subparsers(dest="command", title="commands", required=True)
 
     run_parser = subparsers.add_parser(
         "run",
@@ -472,13 +483,10 @@ def main(argv: list[str] | None = None) -> int:
         description="Solve a duct case and write analytical or FreeMHD validation metrics.",
         formatter_class=formatter,
     )
-    validate_parser.add_argument(
-        "case", choices=["hartmann", "shercliff", "hunt"], help="Validation case."
-    )
+    validate_parser.add_argument("case", choices=["hartmann", "shercliff", "hunt"], help="Validation case.")
     validate_parser.add_argument("--ha", type=float, default=20.0, help="Hartmann number.")
     validate_parser.add_argument("--output", default="./out", help="Output directory.")
     validate_parser.add_argument("--reference-root", default="", help="FreeMHD data root.")
-    validate_parser.add_argument("--x-slice", default="1m", help="Processed slice label.")
     validate_parser.add_argument(
         "--hartmann-l2-threshold", type=float, default=0.05, help="Hartmann L2 gate."
     )
@@ -524,7 +532,9 @@ def main(argv: list[str] | None = None) -> int:
             payload["acceptance_l2_threshold"] = acceptance.l2_threshold
             payload["acceptance_linf_threshold"] = acceptance.linf_threshold
         elif args.reference_root:
-            comparison = closed_channel_validation(solution, args.case, int(args.ha), reference_root=args.reference_root)
+            comparison = closed_channel_validation(
+                solution, args.case, int(args.ha), reference_root=args.reference_root
+            )
             write_closed_channel_validation(comparison, out_dir / f"{case.name}_analytic.json")
             payload["y_l2_error"] = comparison.y_profile.l2_error
             payload["y_linf_error"] = comparison.y_profile.linf_error
@@ -538,30 +548,6 @@ def main(argv: list[str] | None = None) -> int:
                 comparison.y_profile.linf_error,
                 comparison.z_profile.linf_error,
             )
-            try:
-                slice_report = processed_slice_validation(
-                    solution,
-                    args.case,
-                    int(args.ha),
-                    x_slice=args.x_slice,
-                    reference_root=args.reference_root,
-                )
-            except FileNotFoundError:
-                slice_report = None
-            if slice_report is not None:
-                write_processed_slice_validation(slice_report, out_dir / f"{case.name}_slice.json")
-                payload["slice_y_l2_error"] = slice_report.y_profile.l2_error
-                payload["slice_y_linf_error"] = slice_report.y_profile.linf_error
-                payload["slice_z_l2_error"] = slice_report.z_profile.l2_error
-                payload["slice_z_linf_error"] = slice_report.z_profile.linf_error
-                payload["slice_combined_l2_error"] = combined_profile_error(
-                    slice_report.y_profile.l2_error,
-                    slice_report.z_profile.l2_error,
-                )
-                payload["slice_combined_linf_error"] = combined_profile_error(
-                    slice_report.y_profile.linf_error,
-                    slice_report.z_profile.linf_error,
-                )
         write_metrics_json(payload, out_dir / f"{case.name}_metrics.json")
         print(json.dumps(payload, indent=2))
         return 2 if getattr(solution, "converged", None) is False else 0
@@ -603,21 +589,18 @@ def main(argv: list[str] | None = None) -> int:
         return _summary_exit_code(summary)
 
     case = _build_case(args)
-    case = case.__class__(
-        **{
-            **case.__dict__,
-            "output": case.output.__class__(
-                **{
-                    **case.output.__dict__,
-                    "directory": args.output,
-                    "write_npz": True,
-                    "write_json_summary": True,
-                    "write_plots": args.plots,
-                }
-            ),
-        }
+    case = replace(
+        case,
+        solver=replace(case.solver, mode=args.mode),
+        output=replace(
+            case.output,
+            directory=args.output,
+            write_npz=True,
+            write_json_summary=True,
+            write_plots=args.plots,
+        ),
     )
-    config = RunConfig(case=case, solve_mode=args.mode)
+    config = RunConfig(case=case)
     logging = config.logging
     if args.quiet:
         logging = LoggingSpec.from_user_controls(
@@ -643,5 +626,5 @@ def main(argv: list[str] | None = None) -> int:
             step_stride=logging.step_stride,
         )
     if logging is not config.logging:
-        config = RunConfig(case=case, solve_mode=args.mode, logging=logging)
+        config = replace(config, logging=logging)
     return _summary_exit_code(_run_config(config))

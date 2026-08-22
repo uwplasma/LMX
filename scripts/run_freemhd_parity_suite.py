@@ -1,8 +1,6 @@
-#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict, replace
 import hashlib
 import json
 import math
@@ -12,7 +10,8 @@ import shutil
 import subprocess
 import sys
 import time
-import zipfile
+from dataclasses import asdict, replace
+from itertools import pairwise
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -20,7 +19,11 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lmx.benchmarks import build_benchmark_b_problem, load_benchmark_b_reference, load_benchmark_b_spec
+from lmx.benchmarks import (
+    build_benchmark_b_problem,
+    load_benchmark_b_reference,
+    load_benchmark_b_spec,
+)
 from lmx.freemhd import (
     artifact_sha256,
     infer_inlet_drive_mode,
@@ -40,203 +43,19 @@ from lmx.freemhd import (
 from lmx.reference_data import default_closed_channel_reference_root
 from lmx.units import hartmann_number
 
-
 DEFAULT_FREEMHD_INSTALL_DIR = Path("/Users/rogerio/local/tests/freemhd_install")
 DEFAULT_FREEMHD_SOURCE_REPO = Path("/Users/rogerio/local/tests/lmx_external_codes/FreeMHD")
 DEFAULT_PROCESSED_ROOT = default_closed_channel_reference_root()
 
-_S3_PIPE_ARCHIVE = {
-    "name": "S3_Buhler_Ha616.zip",
-    "drive_id": "1vrLEVOk2NzH6O_Qv80ze0BPM0kM0rYoF",
-    "size": 1_930_938_126,
-    "sha256": "6aa165e95275f29fd2d014c6ef3a91e4e8d80b16d82b3040d9d6b90ab74e6091",
-    "member_count": 315,
-    "expanded_bytes": 8_768_646_452,
-    "members": {
-        "system/blockMeshDict.m4": (9457, "4daad09ddaad1f8667e483edf0f08643c475244be247267d947de317d625d56b"),
-        "system/controlDict": (4411, "c229acce568c65b108de034b4c072c40ea224e12017fa50fdcb3878c69a1e3aa"),
-        "system/liquid/changeDictionaryDict": (6242, "13c643f2137e5166fb7e68793c0c19cb14a5dfd1e9e2f94881362d0bb20fae80"),
-        "system/liquid/setExprFieldsDict": (1447, "3df6afb74fdc744991e20c46406e430a1048504197b711c461e061912461dbef"),
-        "constant/liquid/thermophysicalProperties.liquidMetal": (1462, "5ac916feee7bf3c286d878500f198b270d770e61d14678bdb82d3c1f4eb787a9"),
-        "constant/solidWalls/thermophysicalProperties": (1380, "dfbea3db8730d4b19cf1e2ae7ad23134b3eea13d9a99a5648fb012afdb0e8d96"),
-        "postProcessing/vtkWrite/liquid/S3_Buhler_Ha616_CenterLine_3.08s.csv": (277389, "92a0f469b2c3f1ed7387e49c95d354e6ca10967a2a6fd06f94ad43d986e83e8e"),
-    },
-}
-
-_S3_PIPE_INPUT_MEMBERS = (
-    *(f"0/{name}" for name in ("B0", "U", "alpha.liquidMetal", "p", "p_rgh", "potE")),
-    "constant/g", "constant/regionProperties", "constant/liquid/fvOptions",
-    "constant/liquid/radiationProperties", "constant/liquid/thermophysicalProperties",
-    "constant/liquid/thermophysicalProperties.air", "constant/liquid/thermophysicalProperties.liquidMetal",
-    "constant/liquid/turbulenceProperties", "constant/solidWalls/radiationProperties",
-    "constant/solidWalls/thermophysicalProperties", "system/0/JxB", "system/0/T", "system/blockMeshDict",
-    "system/controlDict", "system/decomposeParDict", "system/fvSchemes", "system/fvSolution",
-    "system/liquid/codeDict",
-    *(f"system/{region}/{name}" for region in ("liquid", "solidWalls") for name in (
-        "changeDictionaryDict", "decomposeParDict", "fvSchemes", "fvSolution", "setExprFieldsDict"
-    )),
-)
-_S3_SOURCE_COMMIT = "14b54a3e8e1a05b6ee4c98331995abaaae96e7a5"
-_S3_RUNTIME_HA = 573.33628803877
-_S3_SMOKE_CLASS = "native-s3-reduced-pipe-harness-smoke"
-_S3_DENIALS = {
-    "full_s3_parity": False, "alex_b1_parity": False, "b1_formulation_match": False,
-    "steady_acceptance": False, "archived_observer_eligible": False,
-}
-_S3_LOCAL_AUTHORITY = {
-    "local_use_only": True, "redistribution_authorized": False,
-    "preflight_extraction_authorized": False,
-    "private_extraction_authority": "explicit local user invocation",
-}
-
 _FREEMHD_SOURCE_NAMES = (
-    "momentum", "electric", "limiter", "scheme_macro", "limiter_registration", "nvd", "vector_transform",
+    "momentum",
+    "electric",
+    "limiter",
+    "scheme_macro",
+    "limiter_registration",
+    "nvd",
+    "vector_transform",
 )
-
-
-def preflight_freemhd_s3_pipe_archive(archive: str | Path) -> dict[str, object]:
-    """Verify the public native-pipe archive without extracting or claiming B1 parity."""
-
-    source, expected, failed = Path(archive), _S3_PIPE_ARCHIVE, []
-    observed_sha256 = None
-    try:
-        if source.name != expected["name"]:
-            failed.append("archive.basename")
-        if source.is_symlink() or not source.is_file():
-            failed.append("archive.regular_file")
-        elif source.stat().st_size != expected["size"]:
-            failed.append("archive.size")
-        else:
-            observed_sha256 = artifact_sha256(source, "file")
-            if observed_sha256 != expected["sha256"]:
-                failed.append("archive.sha256")
-        if not failed:
-            with zipfile.ZipFile(source) as zipped:
-                entries = zipped.infolist()
-                if len(entries) != expected["member_count"]:
-                    failed.append("archive.member_count")
-                if sum(entry.file_size for entry in entries) != expected["expanded_bytes"]:
-                    failed.append("archive.expanded_bytes")
-                for name, (size, digest) in expected["members"].items():
-                    matches = [entry for entry in entries if entry.filename == name]
-                    if len(matches) != 1:
-                        failed.append(f"member.{name}.count")
-                    elif matches[0].file_size != size:
-                        failed.append(f"member.{name}.size")
-                    elif hashlib.sha256(zipped.read(matches[0])).hexdigest() != digest:
-                        failed.append(f"member.{name}.sha256")
-    except (OSError, RuntimeError, ValueError, zipfile.BadZipFile) as error:
-        failed.append(f"archive.error.{type(error).__name__}")
-    passed = not failed
-    return {
-        "schema_version": 1,
-        "archive": expected["name"],
-        "drive_id": expected["drive_id"],
-        "expected_sha256": expected["sha256"],
-        "observed_sha256": observed_sha256,
-        "preflight_pass": passed,
-        "failed_checks": failed,
-        "classification": "native-freemhd-pipe-regression" if passed else "unverified-user-archive",
-        "mesh_design_hartmann_number": 615.4967525064808,
-        "runtime_property_hartmann_number": _S3_RUNTIME_HA,
-        "alex_b1_parity": False,
-        "solver_executed": False,
-        "source_commit_available": False,
-        "archived_observer_eligible": False,
-        "extraction_authorized": False,
-    }
-
-
-def _extract_s3_pipe_inputs(archive: Path, destination: Path) -> None:
-    """Extract only fresh-run inputs from an already admitted private archive."""
-
-    with zipfile.ZipFile(archive) as zipped:
-        entries: dict[str, zipfile.ZipInfo] = {}
-        for entry in zipped.infolist():
-            name, pure = entry.filename, PurePosixPath(entry.filename)
-            canonical = pure.as_posix() + ("/" if entry.is_dir() else "")
-            mode = (entry.external_attr >> 16) & 0o170000
-            if (
-                not name or pure.is_absolute() or ".." in pure.parts or "\\" in name
-                or name != canonical or mode == 0o120000 or name in entries
-            ):
-                raise ValueError(f"Unsafe or duplicate S3 archive member: {name!r}")
-            entries[name] = entry
-        if missing := sorted(set(_S3_PIPE_INPUT_MEMBERS) - entries.keys()):
-            raise ValueError(f"S3 archive is missing fresh-run inputs: {missing}")
-        destination.mkdir(parents=True)
-        for name in _S3_PIPE_INPUT_MEMBERS:
-            entry, target = entries[name], destination / name
-            if entry.is_dir() or ((entry.external_attr >> 16) & 0o170000) not in {0, 0o100000}:
-                raise ValueError(f"S3 input is not a regular file: {name}")
-            target.parent.mkdir(parents=True, exist_ok=True)
-            with zipped.open(entry) as source, target.open("wb") as output:
-                shutil.copyfileobj(source, output)
-
-
-def _reduce_s3_pipe_input(destination: Path) -> None:
-    """Convert admitted S3 inputs into the deterministic 3,072-cell smoke."""
-
-    for name in ("T", "JxB"):
-        source, target = destination / "system/0" / name, destination / "0" / name
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(source, target)
-        if _replace(target, r"\btype\s+cyclic\s*;", "type calculated;") != 2:
-            raise ValueError(f"S3 {name} template does not have two axial cyclic patches")
-    shutil.rmtree(destination / "system/0")
-    mesh = destination / "system/blockMeshDict"
-    changed = (
-        _replace(mesh, r"\(52\s+52\s+194\)", "(8 8 8)"),
-        _replace(mesh, r"\(194\s+52\s+194\)", "(2 8 8)"),
-        _replace(mesh, r"(?m)^\s*simpleGrading\s+.*$", "    simpleGrading (1 1 1)"),
-    )
-    if changed != (5, 4, 9):
-        raise ValueError(f"S3 nine-block mesh signature differs: {changed}")
-    _write_foam(
-        destination / "system/controlDict",
-        """
-application epotMultiRegionInterFoam; startFrom startTime; startTime 0; stopAt endTime;
-endTime 2e-6; deltaT 1e-6; writeControl timeStep; writeInterval 1; purgeWrite 0;
-writeFormat ascii; writePrecision 16; writeCompression off; timeFormat general; timePrecision 16;
-runTimeModifiable false; adjustTimeStep off; maxCo 0.4; maxAlphaCo 0.3; maxDeltaT 1e-6;
-maxDi 1e10; BtStartTime 0; BtDuration 0; JConservativeForm true;
-OptimisationSwitches { fileHandler collated; maxThreadFileBufferSize 0; }
-functions {}
-""",
-    )
-    for region in ("", "liquid", "solidWalls"):
-        _write_foam(
-            destination / "system" / region / "decomposeParDict",
-            "numberOfSubdomains 2;\nmethod scotch;",
-        )
-
-
-def materialize_freemhd_s3_pipe_smoke(archive: str | Path, output_dir: str | Path) -> dict[str, object]:
-    """Materialize a private reduced S3 pipe smoke; never authorize B1 parity."""
-
-    source, destination = Path(archive).resolve(), Path(output_dir).resolve()
-    if destination.exists():
-        raise FileExistsError(f"Refusing to overwrite existing S3 input {destination}")
-    admission = preflight_freemhd_s3_pipe_archive(source)
-    if not admission["preflight_pass"]:
-        raise ValueError("S3 archive failed identity preflight; extraction denied")
-    try:
-        _extract_s3_pipe_inputs(source, destination)
-        _reduce_s3_pipe_input(destination)
-        manifest = {
-            "schema_version": 1, "classification": _S3_SMOKE_CLASS,
-            "archive_sha256": admission["observed_sha256"], "solver_updates": 2, "mpi_ranks": 2,
-            "case_tree_sha256_before_manifest": artifact_sha256(destination, "tree"),
-            "mesh_cells": {"liquid": 2560, "solidWalls": 512, "total": 3072},
-            "coordinates": {"axial_axis": "z", "radius_m": 0.04859, "z_over_radius": [-20.0, 20.0]},
-            "runtime_hartmann_number": admission["runtime_property_hartmann_number"],
-            **_S3_LOCAL_AUTHORITY, **_S3_DENIALS,
-        }
-        _write_json(destination / "s3-smoke-input.json", manifest)
-        return manifest
-    except Exception:
-        shutil.rmtree(destination, ignore_errors=True)
-        raise
 
 
 def audit_freemhd_case_against_spec(
@@ -253,10 +72,25 @@ def audit_freemhd_case_against_spec(
             if isinstance(expected, (int, float)) and isinstance(observed, (int, float))
             else observed == expected
         )
-        return {"name": name, "expected": expected, "observed": observed, "pass": passed}
+        return {
+            "name": name,
+            "expected": expected,
+            "observed": observed,
+            "pass": passed,
+        }
 
     root = Path(case_dir)
-    mesh = next((path for path in (root / "case/system/blockMeshDict", root / "system/blockMeshDict") if path.is_file()), None)
+    mesh = next(
+        (
+            path
+            for path in (
+                root / "case/system/blockMeshDict",
+                root / "system/blockMeshDict",
+            )
+            if path.is_file()
+        ),
+        None,
+    )
     declared_ha = None
     if mesh is not None and (match := re.search(r"\bHa\s+([0-9eE+.\-]+)\s*;", mesh.read_text())):
         declared_ha = float(match.group(1))
@@ -274,40 +108,72 @@ def audit_freemhd_case_against_spec(
         checks += [
             check("geometry.width", expected_geometry["width"], width),
             check("geometry.height", expected_geometry["height"], height),
-            check("geometry.wall_thickness", expected_geometry["wall_thickness"], thickness),
+            check(
+                "geometry.wall_thickness",
+                expected_geometry["wall_thickness"],
+                thickness,
+            ),
             check("geometry.wall_cells", expected_geometry["wall_cells"], wall_cells),
         ]
     expected_fluid = spec["fluid"]
     if fluid is None:
         checks.append(check("fluid.available", True, False))
     else:
-        checks += [check(f"fluid.{key}", expected_fluid[key], fluid[key]) for key in (
-            "conductivity", "density", "dynamic_viscosity", "kinematic_viscosity"
-        )]
+        checks += [
+            check(f"fluid.{key}", expected_fluid[key], fluid[key])
+            for key in (
+                "conductivity",
+                "density",
+                "dynamic_viscosity",
+                "kinematic_viscosity",
+            )
+        ]
     expected_field = tuple(map(float, spec["magnetic_field"]["vector"]))
     physical_ha = None
     if fluid is not None and b0 is not None and geometry is not None:
         physical_ha = hartmann_number(
             magnetic_field=math.sqrt(sum(value * value for value in b0)),
             length_scale=float(expected_geometry["length_scale"]),
-            conductivity=fluid["conductivity"], density=fluid["density"],
+            conductivity=fluid["conductivity"],
+            density=fluid["density"],
             kinematic_viscosity=fluid["kinematic_viscosity"],
         )
     expected_wall = spec["wall"]
     checks += [
         check("magnetic_field.vector", expected_field, b0),
-        check("mesh.declared_hartmann", spec["magnetic_field"]["hartmann_number"], declared_ha),
+        check(
+            "mesh.declared_hartmann",
+            spec["magnetic_field"]["hartmann_number"],
+            declared_ha,
+        ),
         check("physics.hartmann", spec["magnetic_field"]["hartmann_number"], physical_ha),
-        check("wall.conducting_wall_conductivity", expected_wall["conducting_wall_conductivity"], solid),
-        check("wall.insulating_wall_conductivity", expected_wall["insulating_wall_conductivity"], insulator),
+        check(
+            "wall.conducting_wall_conductivity",
+            expected_wall["conducting_wall_conductivity"],
+            solid,
+        ),
+        check(
+            "wall.insulating_wall_conductivity",
+            expected_wall["insulating_wall_conductivity"],
+            insulator,
+        ),
         check("drive.mode", spec["drive"]["mode"], infer_inlet_drive_mode(root)),
-        check("drive.target_flow_rate", spec["drive"].get("target_flow_rate"), infer_inlet_flow_rate(root)),
+        check(
+            "drive.target_flow_rate",
+            spec["drive"].get("target_flow_rate"),
+            infer_inlet_flow_rate(root),
+        ),
     ]
     failed = [item for item in checks if not item["pass"]]
     return {
-        "case_kind": case_kind, "spec_id": spec["id"], "spec_path": spec["path"],
-        "spec_sha256": spec["sha256"], "reference_case_dir": str(root),
-        "matched": not failed, "failed_check_count": len(failed), "checks": checks,
+        "case_kind": case_kind,
+        "spec_id": spec["id"],
+        "spec_path": spec["path"],
+        "spec_sha256": spec["sha256"],
+        "reference_case_dir": str(root),
+        "matched": not failed,
+        "failed_check_count": len(failed),
+        "checks": checks,
         "physical_hartmann_number": physical_ha,
         "declared_mesh_hartmann_number": declared_ha,
     }
@@ -327,7 +193,12 @@ def materialize_freemhd_source_snapshot(
     reference = load_benchmark_b_spec(case_id, spec_root)["free_mhd_discretization_reference"]
 
     def git(*args: str) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(["git", "-C", str(repository), *args], capture_output=True, text=True)
+        return subprocess.run(
+            ["git", "-C", str(repository), *args],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
 
     top, head = git("rev-parse", "--show-toplevel"), git("rev-parse", "HEAD")
     if top.returncode or Path(top.stdout.strip()).resolve() != repository:
@@ -340,7 +211,13 @@ def materialize_freemhd_source_snapshot(
         source_key = f"{name}_source"
         relative = reference.get(source_key)
         pure = PurePosixPath(relative) if isinstance(relative, str) else PurePosixPath()
-        if not pure.parts or pure.is_absolute() or ".." in pure.parts or relative != pure.as_posix() or "\\" in relative:
+        if (
+            not pure.parts
+            or pure.is_absolute()
+            or ".." in pure.parts
+            or relative != pure.as_posix()
+            or "\\" in relative
+        ):
             raise ValueError(f"Noncanonical FreeMHD source path for {source_key}")
         path = repository / relative
         try:
@@ -354,7 +231,10 @@ def materialize_freemhd_source_snapshot(
             raise ValueError(f"FreeMHD source is not a tracked regular file: {relative}")
         paths.append(relative)
         files[relative] = str(reference[f"{source_key}_sha256"])
-    if git("diff", "--quiet", "--", *paths).returncode or git("diff", "--cached", "--quiet", "--", *paths).returncode:
+    if (
+        git("diff", "--quiet", "--", *paths).returncode
+        or git("diff", "--cached", "--quiet", "--", *paths).returncode
+    ):
         raise ValueError("Frozen FreeMHD source paths have staged or unstaged changes")
     for relative, expected in files.items():
         if artifact_sha256(repository / relative, "file") != expected:
@@ -387,13 +267,17 @@ def materialize_lmx_source_snapshot(output_dir: str | Path) -> dict[str, object]
     scope = ("lmx", "pyproject.toml", "scripts/run_freemhd_parity_suite.py")
     status = subprocess.run(
         ("git", "-C", str(repo), "status", "--porcelain", "--", *scope),
-        check=True, capture_output=True, text=True,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout
     if status:
         raise ValueError("LMX source scope has staged or unstaged changes")
     files = subprocess.run(
         ("git", "-C", str(repo), "ls-files", "--", *scope),
-        check=True, capture_output=True, text=True,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.splitlines()
     destination.mkdir(parents=True)
     hashes = {}
@@ -406,7 +290,9 @@ def materialize_lmx_source_snapshot(output_dir: str | Path) -> dict[str, object]
         "schema_version": 1,
         "commit": subprocess.run(
             ("git", "-C", str(repo), "rev-parse", "HEAD"),
-            check=True, capture_output=True, text=True,
+            check=True,
+            capture_output=True,
+            text=True,
         ).stdout.strip(),
         "files": dict(sorted(hashes.items())),
     }
@@ -433,8 +319,11 @@ def _tiny_b2_problem(
         raise ValueError("Matched B2 shape requires nx >= 2 and three transverse fluid cells")
     case = replace(
         problem.case,
-        name=("alex_b2-fringing-square_harness-smoke" if executed_steps == 2
-              else "alex_b2-fringing-square_scaling-calibration"),
+        name=(
+            "alex_b2-fringing-square_harness-smoke"
+            if executed_steps == 2
+            else "alex_b2-fringing-square_scaling-calibration"
+        ),
         geometry=replace(
             problem.case.geometry,
             nx=nx,
@@ -522,9 +411,7 @@ def materialize_matched_b2_lmx_input(
     destination = Path(output_file)
     if destination.exists():
         raise FileExistsError(f"Refusing to overwrite existing LMX B2 input {destination}")
-    _, payload = _tiny_b2_problem(
-        spec_root, solver_shape=solver_shape, executed_steps=executed_steps
-    )
+    _, payload = _tiny_b2_problem(spec_root, solver_shape=solver_shape, executed_steps=executed_steps)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(
         json.dumps(payload, allow_nan=False, indent=2, sort_keys=True) + "\n",
@@ -559,11 +446,26 @@ def materialize_matched_b2_evaluator(output_file: str | Path) -> dict[str, objec
 
 
 _B2_SKELETON_FILES = (
-    "0/B0", "0/JxB", "0/T", "0/U", "0/alpha.liquidMetal", "0/p", "0/p_rgh", "0/potE",
-    "constant/g", "constant/regionProperties", "constant/liquid/thermophysicalProperties.liquidMetal",
-    "constant/solidWalls/thermophysicalProperties", "system/blockMeshDict", "system/controlDict",
-    "system/liquid/changeDictionaryDict", "system/liquid/fvSchemes", "system/liquid/fvSolution",
-    "system/solidWalls/changeDictionaryDict", "system/solidWalls/fvSchemes", "system/solidWalls/fvSolution",
+    "0/B0",
+    "0/JxB",
+    "0/T",
+    "0/U",
+    "0/alpha.liquidMetal",
+    "0/p",
+    "0/p_rgh",
+    "0/potE",
+    "constant/g",
+    "constant/regionProperties",
+    "constant/liquid/thermophysicalProperties.liquidMetal",
+    "constant/solidWalls/thermophysicalProperties",
+    "system/blockMeshDict",
+    "system/controlDict",
+    "system/liquid/changeDictionaryDict",
+    "system/liquid/fvSchemes",
+    "system/liquid/fvSolution",
+    "system/solidWalls/changeDictionaryDict",
+    "system/solidWalls/fvSchemes",
+    "system/solidWalls/fvSolution",
 )
 
 
@@ -585,7 +487,7 @@ def _write_foam(path: Path, body: str, *, class_name: str = "dictionary") -> Non
 
 def _b2_field_expression(anchor_count: int) -> str:
     labels = [chr(ord("a") + index) for index in range(anchor_count)]
-    slopes = [f"(b{right}-b{left})/(x{right}-x{left})" for left, right in zip(labels, labels[1:])]
+    slopes = [f"(b{right}-b{left})/(x{right}-x{left})" for left, right in pairwise(labels)]
     terms = [f"b{labels[0]}", f"{slopes[0]}*(x-x{labels[0]})"]
     terms += [
         f"({slopes[index]}-{slopes[index - 1]})*pos(x-x{labels[index]})*(x-x{labels[index]})"
@@ -649,7 +551,7 @@ mergePatchPairs ();
 def _b2_set_expr(reference: dict[str, object]) -> str:
     x_values = [float(value) for value in reference["x_over_L"]]
     b_values = [float(value) for value in reference["b_over_B0"]]
-    variables = ["\"x=pos().x()\"", "\"Bscale=sqrt(540)\""]
+    variables = ['"x=pos().x()"', '"Bscale=sqrt(540)"']
     variables += [f'"x{chr(97 + i)}={value:.17g}"' for i, value in enumerate(x_values)]
     variables += [f'"b{chr(97 + i)}={value:.17g}"' for i, value in enumerate(b_values)]
     anchors = {"x_over_L": x_values, "b_over_B0": b_values}
@@ -668,7 +570,7 @@ expressions
  {{
   field B0;
   dimensions [1 0 -2 0 0 -1 0];
-  variables ({' '.join(variables)});
+  variables ({" ".join(variables)});
   expression #{{ vector(0,Bscale*({_b2_field_expression(len(x_values))}),0) #}};
  }}
 );
@@ -679,9 +581,7 @@ def _b2_function_objects(sample_x: list[float]) -> str:
     """Return compact, replayable B2 pressure and boundary-flux observations."""
 
     points = "\n  ".join(
-        f"({x:.17g} {y:.17g} {z:.17g})"
-        for y, z in ((0.8, 0.0), (0.0, 0.8))
-        for x in sample_x
+        f"({x:.17g} {y:.17g} {z:.17g})" for y, z in ((0.8, 0.0), (0.0, 0.8)) for x in sample_x
     )
 
     def surface(name: str, patch: str, field: str, operation: str = "sum") -> str:
@@ -747,18 +647,31 @@ def materialize_matched_b2_freemhd_input(
         )
 
     mu = 540.0 / 2900.0**2
-    _write_foam(destination / "constant/g", "dimensions [0 1 -2 0 0 0 0];\nvalue (0 0 0);", class_name="uniformDimensionedVectorField")
-    _write_foam(destination / "constant/regionProperties", "regions ( fluid (liquid) solid (solidWalls) );")
+    _write_foam(
+        destination / "constant/g",
+        "dimensions [0 1 -2 0 0 0 0];\nvalue (0 0 0);",
+        class_name="uniformDimensionedVectorField",
+    )
+    _write_foam(
+        destination / "constant/regionProperties",
+        "regions ( fluid (liquid) solid (solidWalls) );",
+    )
     _write_foam(destination / "constant/liquid/fvOptions", "{}")
     _write_foam(destination / "constant/liquid/turbulenceProperties", "simulationType laminar;")
-    _write_foam(destination / "constant/liquid/thermophysicalProperties", "phases (liquidMetal air);\npMin 0;\nsigma [1 0 -2 0 0 0 0] 0;")
+    _write_foam(
+        destination / "constant/liquid/thermophysicalProperties",
+        "phases (liquidMetal air);\npMin 0;\nsigma [1 0 -2 0 0 0 0] 0;",
+    )
     fluid_body = f"""
 thermoType {{ type heRhoThermo; mixture pureMixture; transport const; thermo hConst; equationOfState rhoConst; specie specie; energy sensibleInternalEnergy; }}
 mixture {{ specie {{ molWeight 1; }} equationOfState {{ rho 1; }} thermodynamics {{ Cp 1; Cv 1; Hf 0; }} transport {{ mu {mu:.17g}; Pr 1; }} }}
 elcond [-1 -3 3 0 0 2 0] 1;
 """
     _write_foam(destination / "constant/liquid/thermophysicalProperties.liquidMetal", fluid_body)
-    _write_foam(destination / "constant/liquid/thermophysicalProperties.air", fluid_body.replace("elcond [-1 -3 3 0 0 2 0] 1;", "elcond [-1 -3 3 0 0 2 0] 0;"))
+    _write_foam(
+        destination / "constant/liquid/thermophysicalProperties.air",
+        fluid_body.replace("elcond [-1 -3 3 0 0 2 0] 1;", "elcond [-1 -3 3 0 0 2 0] 0;"),
+    )
     solid_body = """
 thermoType { type heSolidThermo; mixture pureMixture; transport constIso; thermo hConst; equationOfState rhoConst; specie specie; energy sensibleEnthalpy; }
 mixture { specie { molWeight 1; } transport { kappa 1; } thermodynamics { Hf 0; Cp 1; } equationOfState { rho 1; } }
@@ -778,10 +691,16 @@ lmxSteadyStepsRequired 3; {_b2_function_objects(sample_x)}
 """
     _write_foam(destination / "system/controlDict", control)
     _write_foam(destination / "system/blockMeshDict", _b2_block_mesh())
-    _write_foam(destination / "system/fvSchemes", "ddtSchemes {} gradSchemes {} divSchemes {} laplacianSchemes {} interpolationSchemes {} snGradSchemes {}")
+    _write_foam(
+        destination / "system/fvSchemes",
+        "ddtSchemes {} gradSchemes {} divSchemes {} laplacianSchemes {} interpolationSchemes {} snGradSchemes {}",
+    )
     _write_foam(destination / "system/fvSolution", "PIMPLE { nOuterCorrectors 1; }")
     for region in ("", "liquid", "solidWalls"):
-        _write_foam(destination / "system" / region / "decomposeParDict", "numberOfSubdomains 2;\nmethod scotch;")
+        _write_foam(
+            destination / "system" / region / "decomposeParDict",
+            "numberOfSubdomains 2;\nmethod scotch;",
+        )
 
     liquid_schemes = """
 ddtSchemes { default Euler; }
@@ -897,12 +816,16 @@ def materialize_matched_b2_preflight(
 
 
 def _run_matched_b2_lmx_direct(
-    problem, *, num_devices: int, capture_checkpoint: bool = True,
+    problem,
+    *,
+    num_devices: int,
+    capture_checkpoint: bool = True,
     phase_timing_callback=None,
 ):
     """Run fixed work with optional checkpoint capture or diagnostic phase timing."""
 
     import jax
+
     from lmx.fringing import solve_extruded_inductionless
 
     requested_steps = int(problem.case.time_stepper.max_steps)
@@ -914,9 +837,7 @@ def _run_matched_b2_lmx_direct(
         else {}
     )
     phase_options = (
-        {"phase_timing_callback": phase_timing_callback}
-        if phase_timing_callback is not None
-        else {}
+        {"phase_timing_callback": phase_timing_callback} if phase_timing_callback is not None else {}
     )
     direct = solve_extruded_inductionless(
         problem,
@@ -926,8 +847,11 @@ def _run_matched_b2_lmx_direct(
     )
     checkpoint = None
     if capture_checkpoint:
-        checkpoints = [item.checkpoint for item in progress
-            if item.step == checkpoint_step and item.checkpoint is not None]
+        checkpoints = [
+            item.checkpoint
+            for item in progress
+            if item.step == checkpoint_step and item.checkpoint is not None
+        ]
         if len(progress) != requested_steps or len(checkpoints) != 1:
             raise ValueError("LMX B2 direct path did not emit its midpoint checkpoint")
         checkpoint = checkpoints[0]
@@ -941,6 +865,7 @@ def _resume_matched_b2_lmx(problem, checkpoint, *, num_devices: int):
     """Replay the remaining updates from an exact matched-B2 checkpoint."""
 
     import jax
+
     from lmx.fringing import solve_extruded_inductionless
 
     requested_steps = int(problem.case.time_stepper.max_steps)
@@ -948,14 +873,18 @@ def _resume_matched_b2_lmx(problem, checkpoint, *, num_devices: int):
     remaining_steps = requested_steps - completed_steps
     if not 0 < completed_steps < requested_steps:
         raise ValueError("LMX B2 checkpoint does not split the requested trajectory")
-    replay = replace(problem, case=replace(problem.case, time_stepper=replace(
-        problem.case.time_stepper,
-        t_final=remaining_steps * problem.case.time_stepper.dt,
-        max_steps=remaining_steps,
-    )))
-    resumed = solve_extruded_inductionless(
-        replay, initial_bundle=checkpoint, num_devices=num_devices
-    ).bundle
+    replay = replace(
+        problem,
+        case=replace(
+            problem.case,
+            time_stepper=replace(
+                problem.case.time_stepper,
+                t_final=remaining_steps * problem.case.time_stepper.dt,
+                max_steps=remaining_steps,
+            ),
+        ),
+    )
+    resumed = solve_extruded_inductionless(replay, initial_bundle=checkpoint, num_devices=num_devices).bundle
     jax.block_until_ready((resumed.u, resumed.p, resumed.phi))
     if resumed.stopping_state[0] != requested_steps or resumed.stopping_state[2] != "step_limit":
         raise ValueError("LMX B2 resumed path did not complete the fixed-work trajectory")
@@ -981,11 +910,14 @@ def _write_matched_b2_lmx_output(
     _write_json(
         destination / "run.json",
         {
-            "schema_version": 1, "code": "LMX", "case_id": "B2-fringing-square",
+            "schema_version": 1,
+            "code": "LMX",
+            "case_id": "B2-fringing-square",
             "input_sha256": artifact_sha256(input_path, "file"),
             "evaluator_sha256": artifact_sha256(evaluator, "file"),
             "wall_seconds": wall_seconds,
-            "num_devices": num_devices, "float_precision": "float64",
+            "num_devices": num_devices,
+            "float_precision": "float64",
         },
     )
 
@@ -1001,29 +933,39 @@ def run_matched_b2_lmx_smoke(
 
     problem = load_matched_b2_lmx_input(input_path)
     started = time.perf_counter()
-    checkpoint, direct = _run_matched_b2_lmx_direct(
-        problem, num_devices=num_devices
-    )
-    resumed = _resume_matched_b2_lmx(
-        problem, checkpoint, num_devices=num_devices
-    )
+    checkpoint, direct = _run_matched_b2_lmx_direct(problem, num_devices=num_devices)
+    resumed = _resume_matched_b2_lmx(problem, checkpoint, num_devices=num_devices)
     wall_seconds = time.perf_counter() - started
     _write_matched_b2_lmx_output(
-        input_path, evaluator, output_dir, (checkpoint, direct, resumed),
-        num_devices=num_devices, wall_seconds=wall_seconds,
+        input_path,
+        evaluator,
+        output_dir,
+        (checkpoint, direct, resumed),
+        num_devices=num_devices,
+        wall_seconds=wall_seconds,
     )
     destination = Path(output_dir)
     return observe_lmx_b2_output(destination, input_path, evaluator)
 
 
 def _run_docker_smoke(
-    command: list[str], container: str, cidfile: Path, timeout_seconds: float, label: str
+    command: list[str],
+    container: str,
+    cidfile: Path,
+    timeout_seconds: float,
+    label: str,
 ) -> None:
     if cidfile.exists():
         raise FileExistsError(f"Refusing to replace existing Docker CID file {cidfile}")
     try:
         try:
-            subprocess.run(command, check=True, timeout=timeout_seconds, text=True, capture_output=True)
+            subprocess.run(
+                command,
+                check=True,
+                timeout=timeout_seconds,
+                text=True,
+                capture_output=True,
+            )
         except subprocess.TimeoutExpired as error:
             raise TimeoutError(f"{label} exceeded {timeout_seconds:g} seconds") from error
         except subprocess.CalledProcessError as error:
@@ -1031,188 +973,15 @@ def _run_docker_smoke(
             raise RuntimeError(f"{label} exited {error.returncode}:\n{output[-4000:]}") from error
     finally:
         try:
-            subprocess.run(["docker", "rm", "-f", container], check=False, capture_output=True, text=True)
+            subprocess.run(
+                ["docker", "rm", "-f", container],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
         except OSError:
             pass
         cidfile.unlink(missing_ok=True)
-
-
-def observe_freemhd_s3_pipe_smoke(
-    output_dir: str | Path, input_dir: str | Path, source_snapshot: str | Path
-) -> dict[str, object]:
-    """Fail closed on the compact two-update native-S3 harness output."""
-
-    root, case, source = Path(output_dir), Path(input_dir), Path(source_snapshot)
-    required = {"controlDict.used", "run.json", "run.log", "setup.log"}
-    if not root.is_dir() or {item.name for item in root.iterdir()} != required:
-        raise ValueError("FreeMHD S3 smoke output tree is incomplete")
-    metadata = json.loads((root / "run.json").read_text(encoding="utf-8"))
-    source_pin = json.loads((source / "source-pin.json").read_text(encoding="utf-8"))
-    input_manifest = json.loads((case / "s3-smoke-input.json").read_text(encoding="utf-8"))
-    expected = {"schema_version": 1, "classification": _S3_SMOKE_CLASS,
-                "input_sha256": artifact_sha256(case, "tree"),
-                "source_sha256": artifact_sha256(source, "tree"), "source_commit": _S3_SOURCE_COMMIT,
-                "nproc": 2, "float_precision": "float64"}
-    if (
-        set(metadata) != set(expected) | {"wall_seconds", "image_id"}
-        or any(metadata.get(key) != value for key, value in expected.items())
-        or source_pin.get("commit") != _S3_SOURCE_COMMIT
-        or input_manifest.get("classification") != _S3_SMOKE_CLASS
-        or input_manifest.get("archive_sha256") != _S3_PIPE_ARCHIVE["sha256"]
-        or not math.isclose(float(input_manifest.get("runtime_hartmann_number", math.nan)), _S3_RUNTIME_HA)
-        or input_manifest.get("mesh_cells") != {"liquid": 2560, "solidWalls": 512, "total": 3072}
-        or any(input_manifest.get(key) is not False for key in _S3_DENIALS)
-        or any(input_manifest.get(key) != value for key, value in _S3_LOCAL_AUTHORITY.items())
-        or re.fullmatch(r"sha256:[0-9a-f]{64}", str(metadata.get("image_id"))) is None
-        or not math.isfinite(float(metadata.get("wall_seconds", math.nan)))
-        or float(metadata["wall_seconds"]) < 0.0
-        or (root / "controlDict.used").read_bytes() != (case / "system/controlDict").read_bytes()
-    ):
-        raise ValueError("FreeMHD S3 smoke provenance differs")
-    control = (root / "controlDict.used").read_text(encoding="utf-8")
-    controls = ("startTime 0;", "endTime 2e-6;", "deltaT 1e-6;", "maxDeltaT 1e-6;",
-                "writeInterval 1;", "adjustTimeStep off;")
-    if not all(value in control for value in controls) or "numberOfSubdomains 2;" not in (
-        case / "system/decomposeParDict"
-    ).read_text():
-        raise ValueError("FreeMHD S3 smoke controls differ")
-    setup = (root / "setup.log").read_text(encoding="utf-8")
-    cells = [int(value) for value in re.findall(r"Number of cells =\s*(\d+)", setup)]
-    if cells != [1280, 1280, 256, 256] or not all(re.search(pattern, setup) for pattern in (
-        r"Number of regions:\s*2", r"(?m)^0\s+2560\s*$", r"(?m)^1\s+512\s*$"
-    )):
-        raise ValueError("FreeMHD S3 reduced mesh or decomposition differs")
-    log = (root / "run.log").read_text(encoding="utf-8")
-    fatal = ("FOAM FATAL", "Segmentation fault", "MPI_ABORT", "killed")
-    if any(marker.lower() in log.lower() for marker in fatal) or re.search(
-        r"(?im)^(?!.*trapping enabled).*Floating point exception", log
-    ) or re.search(
-        r"(?i)(?:^|[\s=,(])(?:nan|[-+]?inf)(?:$|[\s,;)])", log
-    ):
-        raise ValueError("FreeMHD S3 smoke log reports a fatal or nonfinite failure")
-    times = np.asarray([float(value) for value in re.findall(r"(?m)^Time = ([0-9eE+.\-]+)\s*$", log)])
-    courant = np.asarray([
-        [float(mean), float(maximum)]
-        for line in log.splitlines() if line.startswith("Region: liquid Courant Number mean:")
-        for mean, maximum in re.findall(r"mean:\s*([0-9eE+.\-]+)\s+max:\s*([0-9eE+.\-]+)", line)
-    ])[-2:]
-    solves = [(field, float(final)) for field, final in re.findall(
-        r"Solving for ([^,\n]+), Initial residual =\s*[0-9eE+.\-]+, "
-        r"Final residual =\s*([0-9eE+.\-]+), No Iterations\s+\d+", log
-    )]
-    fields, residuals = [name for name, _ in solves], np.asarray([value for _, value in solves])
-    if (
-        not np.array_equal(times, (1e-6, 2e-6))
-        or courant.shape != (2, 2) or not np.all(np.isfinite(courant)) or np.any(courant[:, 1] > 0.4)
-        or residuals.size == 0 or not np.all(np.isfinite(residuals)) or np.any(residuals < 0.0)
-        or fields.count("potE") != 4 or fields.count("p_rgh") != 6
-        or re.search(r"(?m)^End\s*$", log) is None
-    ):
-        raise ValueError("FreeMHD S3 two-update execution shape differs")
-    return {
-        "schema_version": 1, "classification": _S3_SMOKE_CLASS,
-        "execution_pass": True, "steps": 2, "dt": [1e-6, 1e-6],
-        "cells": {"liquid": 2560, "solidWalls": 512, "total": 3072},
-        "courant_max": float(np.max(courant[:, 1])),
-        "residual_max": {field: max(value for name, value in solves if name == field) for field in set(fields)},
-        "solver_executed": True, "image_repository_head_verified": True,
-        "source_snapshot_role": "provenance-only", "archive_sha256": input_manifest["archive_sha256"],
-        "input_sha256": metadata["input_sha256"], "source_sha256": metadata["source_sha256"],
-        "source_commit": metadata["source_commit"], "image_id": metadata["image_id"],
-        "wall_seconds": metadata["wall_seconds"],
-        "runtime_hartmann_number": input_manifest["runtime_hartmann_number"],
-        **_S3_LOCAL_AUTHORITY, **_S3_DENIALS,
-    }
-
-
-def run_freemhd_s3_pipe_smoke(
-    input_dir: str | Path, source_snapshot: str | Path, output_dir: str | Path, *,
-    image: str = "freemhd-install:latest", timeout_seconds: float = 600.0,
-) -> dict[str, object]:
-    """Execute with an immutable image and provenance-only source snapshot."""
-
-    case, source, destination = map(lambda value: Path(value).resolve(), (input_dir, source_snapshot, output_dir))
-    if destination.exists():
-        raise FileExistsError(f"Refusing to overwrite existing FreeMHD S3 output {destination}")
-    if timeout_seconds <= 0.0 or timeout_seconds > 600.0 or not image.strip():
-        raise ValueError("FreeMHD S3 smoke requires a positive timeout no greater than 600 seconds")
-    source_pin = json.loads((source / "source-pin.json").read_text(encoding="utf-8"))
-    if source_pin.get("commit") != _S3_SOURCE_COMMIT:
-        raise ValueError("FreeMHD S3 smoke source snapshot is not pinned")
-    inspected = subprocess.run(
-        ["docker", "image", "inspect", image, "--format", "{{.Id}}"],
-        check=True, capture_output=True, text=True,
-    ).stdout.strip()
-    if re.fullmatch(r"sha256:[0-9a-f]{64}", inspected) is None:
-        raise ValueError("FreeMHD Docker image did not resolve to an immutable ID")
-    input_sha, source_sha = artifact_sha256(case, "tree"), artifact_sha256(source, "tree")
-    destination.mkdir(parents=True)
-    cidfile = destination / ".docker.cid"
-    container = f"lmx-s3-{os.getpid()}-{time.time_ns()}"
-    shell = f"""
-source /usr/lib/openfoam/openfoam2206/etc/bashrc
-set -euo pipefail
-test "$(git -C /opt/FreeMHD-src rev-parse HEAD)" = {_S3_SOURCE_COMMIT}
-work="$(mktemp -d /tmp/lmx-s3.XXXXXX)"
-rsync -a /input/ "$work/" && cd "$work"
-{{
-  blockMesh -fileHandler collated
-  splitMeshRegions -cellZonesOnly -overwrite -fileHandler collated
-  for region in liquid solidWalls; do
-    changeDictionary -region "$region" -fileHandler collated
-    setExprFields -region "$region" -fileHandler collated
-  done
-  decomposePar -allRegions -force -fileHandler collated
-}} > /output/setup.log 2>&1
-cp system/controlDict /output/controlDict.used
-mpirun -np 2 epotMultiRegionInterFoam -parallel > /output/run.log 2>&1
-"""
-    command = [
-        "docker", "run", "--rm", "--platform", "linux/amd64", "--name", container,
-        "--cidfile", str(cidfile), "--user", f"{os.getuid()}:{os.getgid()}", "--env", "HOME=/tmp",
-        "--network", "none", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
-        "--pids-limit", "512", "--memory", "4g", "--cpus", "2",
-        "--mount", f"type=bind,src={case},dst=/input,readonly",
-        "--mount", f"type=bind,src={destination},dst=/output",
-        "--entrypoint", "/bin/bash", inspected, "-lc", shell,
-    ]
-    started = time.perf_counter()
-    _run_docker_smoke(command, container, cidfile, timeout_seconds, "FreeMHD S3 smoke")
-    if artifact_sha256(case, "tree") != input_sha or artifact_sha256(source, "tree") != source_sha:
-        raise ValueError("FreeMHD S3 inputs changed during execution")
-    _write_json(destination / "run.json", {
-        "schema_version": 1, "classification": _S3_SMOKE_CLASS,
-        "input_sha256": input_sha, "source_sha256": source_sha,
-        "source_commit": _S3_SOURCE_COMMIT, "wall_seconds": time.perf_counter() - started,
-        "nproc": 2, "image_id": inspected, "float_precision": "float64",
-    })
-    return observe_freemhd_s3_pipe_smoke(destination, case, source)
-
-
-def run_freemhd_s3_pipe_smoke_bundle(
-    archive: str | Path, source_repo: str | Path, output_dir: str | Path, *,
-    image: str = "freemhd-install:latest", timeout_seconds: float = 600.0,
-) -> dict[str, object]:
-    """Build and run provenance-only S3 evidence without a B1 formulation claim."""
-
-    destination = Path(output_dir)
-    if destination.exists():
-        raise FileExistsError(f"Refusing to overwrite existing FreeMHD S3 bundle {destination}")
-    destination.mkdir(parents=True)
-    try:
-        materialize_freemhd_s3_pipe_smoke(archive, destination / "freemhd_input")
-        materialize_freemhd_source_snapshot(
-            source_repo, destination / "freemhd_source", case_id="B1-fringing-pipe"
-        )
-        report = run_freemhd_s3_pipe_smoke(
-            destination / "freemhd_input", destination / "freemhd_source",
-            destination / "freemhd_output", image=image, timeout_seconds=timeout_seconds,
-        )
-        _write_json(destination / "report.json", report)
-        return report
-    except Exception:
-        shutil.rmtree(destination, ignore_errors=True)
-        raise
 
 
 def run_matched_b2_freemhd_smoke(
@@ -1259,21 +1028,41 @@ for name in {objects}; do
 done
 """
     command = [
-        "docker", "run", "--rm", "--name", container, "--cidfile", str(cidfile),
-        "--mount", f"type=bind,src={source},dst=/input,readonly",
-        "--mount", f"type=bind,src={destination},dst=/output",
-        "--entrypoint", "/bin/bash", image, "-lc", shell,
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        container,
+        "--cidfile",
+        str(cidfile),
+        "--mount",
+        f"type=bind,src={source},dst=/input,readonly",
+        "--mount",
+        f"type=bind,src={destination},dst=/output",
+        "--entrypoint",
+        "/bin/bash",
+        image,
+        "-lc",
+        shell,
     ]
     started = time.perf_counter()
     _run_docker_smoke(command, container, cidfile, timeout_seconds, "FreeMHD B2 smoke")
     if artifact_sha256(source, "tree") != input_sha:
         raise ValueError("FreeMHD B2 input changed during execution")
-    _write_json(destination / "run.json", {
-        "schema_version": 1, "code": "FreeMHD", "case_id": "B2-fringing-square",
-        "input_sha256": input_sha, "evaluator_sha256": artifact_sha256(evaluator, "file"),
-        "wall_seconds": time.perf_counter() - started, "nproc": nproc,
-        "image": image, "float_precision": "float64",
-    })
+    _write_json(
+        destination / "run.json",
+        {
+            "schema_version": 1,
+            "code": "FreeMHD",
+            "case_id": "B2-fringing-square",
+            "input_sha256": input_sha,
+            "evaluator_sha256": artifact_sha256(evaluator, "file"),
+            "wall_seconds": time.perf_counter() - started,
+            "nproc": nproc,
+            "image": image,
+            "float_precision": "float64",
+        },
+    )
     return observe_freemhd_b2_output(destination, source, evaluator)
 
 
@@ -1308,12 +1097,14 @@ def run_matched_b2_smoke_bundle(
     lmx = run_matched_b2_lmx_smoke(paths["lmx_input"], paths["evaluator"], paths["lmx_output"])
     limits = load_benchmark_b_spec("B2-fringing-square")["harness_smoke_execution"]
     lmx_failed = (
-        lmx["steps"] != 2 or lmx["stop_reason"] != "step_limit"
+        lmx["steps"] != 2
+        or lmx["stop_reason"] != "step_limit"
         or any(abs(value - 1.0 / 540000.0) > limits["dt_absolute_tolerance"] for value in lmx["dt"])
         or max(lmx["courant_max"]) > limits["courant_max"]
-        or any(lmx[name] > limits[f"{name}_max"] for name in (
-            "mass_balance", "current_balance", "interface_current_balance"
-        ))
+        or any(
+            lmx[name] > limits[f"{name}_max"]
+            for name in ("mass_balance", "current_balance", "interface_current_balance")
+        )
         or lmx["interface_current_activity"] < limits["interface_current_activity_min"]
         or lmx["restart_max_abs"] > limits["restart_absolute_tolerance"]
     )
@@ -1323,8 +1114,12 @@ def run_matched_b2_smoke_bundle(
     if remaining <= 0.0:
         raise TimeoutError("LMX B2 smoke exhausted the shared execution budget")
     run_matched_b2_freemhd_smoke(
-        paths["freemhd_input"], paths["evaluator"], paths["freemhd_output"],
-        image=image, nproc=nproc, timeout_seconds=remaining,
+        paths["freemhd_input"],
+        paths["evaluator"],
+        paths["freemhd_output"],
+        image=image,
+        nproc=nproc,
+        timeout_seconds=remaining,
     )
     artifacts = {}
     for name, path in paths.items():
@@ -1336,7 +1131,9 @@ def run_matched_b2_smoke_bundle(
         }
     spec_path = Path(__file__).resolve().parents[1] / "lmx/data/benchmarks/specs/alex-b2-square.toml"
     record = {
-        "schema_version": 3, "case_id": "B2-fringing-square", "acceptance_role": "harness-smoke",
+        "schema_version": 3,
+        "case_id": "B2-fringing-square",
+        "acceptance_role": "harness-smoke",
         "contract": {
             "lmx": observe_lmx_b2_contract(paths["lmx_input"], paths["evaluator"]),
             "freemhd": observe_freemhd_b2_contract(
@@ -1390,10 +1187,20 @@ def materialize_matched_freemhd_case(
         if re.search(r"\bB0\s*\{", path.read_text(encoding="utf-8")):
             changed[path.relative_to(destination).as_posix()] = _replace(path, old_b0, f"( {vector} )")
 
-    velocity, flow_rate = float(spec["drive"]["reference_mean_velocity"]), float(spec["drive"]["target_flow_rate"])
-    for path in (destination / "0/liquid/U", destination / "system/liquid/changeDictionaryDict"):
+    velocity, flow_rate = (
+        float(spec["drive"]["reference_mean_velocity"]),
+        float(spec["drive"]["target_flow_rate"]),
+    )
+    for path in (
+        destination / "0/liquid/U",
+        destination / "system/liquid/changeDictionaryDict",
+    ):
         count = _replace(path, r"(?<![0-9.])0\.9725(?![0-9.])", f"{velocity:.16g}")
-        count += _replace(path, r"(volumetricFlowRate\s+(?:constant\s+)?)[0-9eE+.\-]+", rf"\g<1>{flow_rate:.16g}")
+        count += _replace(
+            path,
+            r"(volumetricFlowRate\s+(?:constant\s+)?)[0-9eE+.\-]+",
+            rf"\g<1>{flow_rate:.16g}",
+        )
         changed[path.relative_to(destination).as_posix()] = count
 
     fluid = spec["fluid"]
@@ -1401,16 +1208,24 @@ def materialize_matched_freemhd_case(
     substitutions = (
         (r"(\brho\s+)[0-9eE+.\-]+(\s*;)", float(fluid["density"])),
         (r"(\bmu\s+)[0-9eE+.\-]+(\s*;)", float(fluid["dynamic_viscosity"])),
-        (r"(\belcond(?:\s+\[[^\]]+\])?\s*)[0-9eE+.\-]+(\s*;)", float(fluid["conductivity"])),
+        (
+            r"(\belcond(?:\s+\[[^\]]+\])?\s*)[0-9eE+.\-]+(\s*;)",
+            float(fluid["conductivity"]),
+        ),
     )
     changed[liquid.relative_to(destination).as_posix()] = sum(
         _replace(liquid, pattern, rf"\g<1>{value:.16g}\g<2>") for pattern, value in substitutions
     )
     wall = spec["wall"]
-    for region, conductivity in (("solidWalls", wall["conducting_wall_conductivity"]), ("insulator", wall["insulating_wall_conductivity"])):
+    for region, conductivity in (
+        ("solidWalls", wall["conducting_wall_conductivity"]),
+        ("insulator", wall["insulating_wall_conductivity"]),
+    ):
         path = destination / "constant" / region / "thermophysicalProperties"
         changed[path.relative_to(destination).as_posix()] = _replace(
-            path, r"(\belcond\s+)[0-9eE+.\-]+(\s*;)", rf"\g<1>{float(conductivity):.16g}\g<2>"
+            path,
+            r"(\belcond\s+)[0-9eE+.\-]+(\s*;)",
+            rf"\g<1>{float(conductivity):.16g}\g<2>",
         )
 
     geometry = spec["geometry"]
@@ -1519,9 +1334,7 @@ def _max_metric(records: list[dict[str, Any]], path: tuple[str | None, ...]) -> 
             for value in values
             if isinstance(value, dict)
             for child in (
-                value.values()
-                if segment is None
-                else ([value[segment]] if segment in value else [])
+                value.values() if segment is None else ([value[segment]] if segment in value else [])
             )
         ]
     return max(map(float, values)) if values else None
@@ -1577,9 +1390,15 @@ def run_suite(
             transient_summary = transient.run_freemhd_closed_channel_parity()
             summary["runs"]["closed_channel_parity"] = transient_summary
             summary["sample_output"] = str(transient.OUTPUT_DIR)
-            summary["parity_output"] = str(transient.OUTPUT_DIR / "freemhd_closed_channel_parity_summary.json")
+            summary["parity_output"] = str(
+                transient.OUTPUT_DIR / "freemhd_closed_channel_parity_summary.json"
+            )
             records = list(transient_summary.get("records", []))
-            for key, target in (("y_l2_error", y_errors), ("z_l2_error", z_errors), ("u_max_abs_diff", u_diffs)):
+            for key, target in (
+                ("y_l2_error", y_errors),
+                ("z_l2_error", z_errors),
+                ("u_max_abs_diff", u_diffs),
+            ):
                 value = _max_metric(records, (key,))
                 if value is not None:
                     target.append(value)
@@ -1592,7 +1411,9 @@ def run_suite(
 
     if has_processed_reference:
         observable_output = output / "closed_channel_observable_parity"
-        observable_script = Path(__file__).resolve().parents[1] / "examples" / "freemhd_closed_channel_observable_parity.py"
+        observable_script = (
+            Path(__file__).resolve().parents[1] / "examples" / "freemhd_closed_channel_observable_parity.py"
+        )
         subprocess.run(
             [sys.executable, str(observable_script)],
             check=True,
@@ -1646,19 +1467,10 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="run and independently validate the exact two-update LMX/FreeMHD smoke",
     )
-    mode.add_argument(
-        "--freemhd-s3-preflight",
-        type=Path,
-        metavar="ARCHIVE",
-        help="verify the public native-pipe archive without extracting it",
+    parser.add_argument(
+        "--freemhd-image",
+        default=os.environ.get("LMX_FREEMHD_IMAGE", "freemhd-install:latest"),
     )
-    mode.add_argument(
-        "--freemhd-s3-smoke",
-        type=Path,
-        metavar="ARCHIVE",
-        help="privately extract and run the reduced two-update native-pipe smoke",
-    )
-    parser.add_argument("--freemhd-image", default=os.environ.get("LMX_FREEMHD_IMAGE", "freemhd-install:latest"))
     parser.add_argument("--nproc", type=int, default=2)
     parser.add_argument("--smoke-timeout", type=float, default=600.0)
     parser.add_argument(
@@ -1678,20 +1490,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    if args.freemhd_s3_preflight:
-        report = preflight_freemhd_s3_pipe_archive(args.freemhd_s3_preflight)
-        _write_json(args.output / "freemhd-s3-preflight.json", report)
-        print(json.dumps(report, indent=2, sort_keys=True))
-        return 0 if report["preflight_pass"] else 2
-    if args.freemhd_s3_smoke:
-        if args.nproc != 2:
-            parser.error("--freemhd-s3-smoke requires --nproc 2")
-        report = run_freemhd_s3_pipe_smoke_bundle(
-            args.freemhd_s3_smoke, args.freemhd_source_repo, args.output,
-            image=args.freemhd_image, timeout_seconds=args.smoke_timeout,
-        )
-        print(json.dumps(report, indent=2, sort_keys=True))
-        return 0
     if args.materialize:
         manifest = materialize_matched_freemhd_case(
             args.freemhd_install_dir / "cases" / f"{args.materialize}_demo",

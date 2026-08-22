@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import replace
-from functools import lru_cache, partial
 import hashlib
 import math
+from collections.abc import Callable
+from dataclasses import replace
+from functools import cache, partial
 from time import perf_counter
 
 import jax
@@ -14,7 +14,8 @@ import jax.numpy as jnp
 import numpy as np
 from jax.scipy.fft import dct, idct
 from jax.scipy.linalg import solve_triangular
-from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from jax.sharding import Mesh, NamedSharding
+from jax.sharding import PartitionSpec as P
 from solvax import (
     KrylovSolution,
     additive_tridiagonal_line_preconditioner,
@@ -36,6 +37,15 @@ try:
 except Exception:  # pragma: no cover - SciPy should be present in shipped environments.
     sparse = None
 
+from ._fringing_types import (
+    EXTRUDED_HISTORY_WIDTHS,
+    ExtrudedFieldBundle,
+    ExtrudedInductionlessProblem,
+    ExtrudedInductionlessSolution,
+    ExtrudedInductionlessValidation,
+    ExtrudedIterationProgress,
+    FringingProfile,
+)
 from .cases import _ha_to_b, make_shercliff_case
 from .core import require_finite
 from .field_models import load_tabulated_field, sample_tabulated_field_volume
@@ -56,61 +66,31 @@ from .specs import (
     SolverConfig,
     TimeStepperConfig,
 )
-from ._fringing_types import (
-    EXTRUDED_HISTORY_WIDTHS,
-    ExtrudedFieldBundle,
-    ExtrudedInductionlessProblem,
-    ExtrudedInductionlessSolution,
-    ExtrudedInductionlessValidation,
-    ExtrudedIterationProgress,
-    FringingProfile,
-)
-
-
-MAGNETIC_OBSTACLE_LITERATURE_REFERENCES: dict[str, dict[str, object]] = {
-    "cuevas_smolentsev_abdou_q2d": {
-        "label": "Cuevas, Smolentsev, Abdou quasi-2D magnetic obstacle",
-        "url": "https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/on-the-flow-past-a-magnetic-obstacle/F4185BE5315273DBA9D1C53DD49990AA",
-        "model_class": "quasi_2d_rectangular_channel",
-        "required_observables": [
-            "centerline_velocity_deficit",
-            "wake_recovery",
-            "pressure_drop_or_drag_proxy",
-            "current_closure",
-            "vorticity_or_recirculation_structure",
-        ],
-    },
-    "votyakov_zienicke_kolesnikov_jfm": {
-        "label": "Votyakov, Zienicke, Kolesnikov constrained magnetic obstacle",
-        "url": "https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/constrained-flow-around-a-magnetic-obstacle/DFD706B066E0B0C7E8598544E1783BC0",
-        "model_class": "3d_rectangular_channel_with_experimental_comparison",
-        "required_observables": [
-            "centerline_velocity_deficit",
-            "wake_recovery",
-            "pressure_drop",
-            "cross_sectional_distortion",
-            "recirculation_topology",
-        ],
-    },
-    "andreev_kolesnikov_thess_experiment": {
-        "label": "Andreev, Kolesnikov, Thess nonuniform-field channel experiment",
-        "url": "https://doi.org/10.1063/1.2213639",
-        "model_class": "rectangular_channel_experiment",
-        "required_observables": [
-            "ultrasound_velocity_profiles",
-            "magnet_position_response",
-            "pressure_drop",
-            "wake_structure",
-        ],
-    },
-}
 
 _EXTRUDED_NUMERICAL_RESULTS = (
-    "x", "y", "z", "field_scale", "u", "v", "w", "p", "phi", "jx", "jy", "jz",
-    "lorentz_x", "lorentz_y", "lorentz_z", "residual",
-    "volumetric_flow_rate", "mean_velocity", "axial_current",
-    "wall_current_leakage", "current_scaled_pressure_proxy",
-    "charge_balance_residual", "boundary_current_residual",
+    "x",
+    "y",
+    "z",
+    "field_scale",
+    "u",
+    "v",
+    "w",
+    "p",
+    "phi",
+    "jx",
+    "jy",
+    "jz",
+    "lorentz_x",
+    "lorentz_y",
+    "lorentz_z",
+    "residual",
+    "volumetric_flow_rate",
+    "mean_velocity",
+    "axial_current",
+    "wall_current_leakage",
+    "current_scaled_pressure_proxy",
+    "charge_balance_residual",
+    "boundary_current_residual",
     "axial_pressure_loss_gradient",
     "transverse_pressure_difference",
 )
@@ -165,26 +145,14 @@ def _canonical_shell_widths(widths: jnp.ndarray, lower: int, upper: int) -> jnp.
     """Map explicit wall cells to the frozen B2 mixed-dimensional shell."""
 
     if lower:
-        widths = widths.at[:lower].multiply(
-            ALEX_B2_CANONICAL_SHELL_THICKNESS / jnp.sum(widths[:lower])
-        )
+        widths = widths.at[:lower].multiply(ALEX_B2_CANONICAL_SHELL_THICKNESS / jnp.sum(widths[:lower]))
     if upper < widths.size:
-        widths = widths.at[upper:].multiply(
-            ALEX_B2_CANONICAL_SHELL_THICKNESS / jnp.sum(widths[upper:])
-        )
+        widths = widths.at[upper:].multiply(ALEX_B2_CANONICAL_SHELL_THICKNESS / jnp.sum(widths[upper:]))
     return widths
 
 
-def magnetic_obstacle_literature_reference_cases() -> dict[str, dict[str, object]]:
-    return {
-        key: {**value} for key, value in MAGNETIC_OBSTACLE_LITERATURE_REFERENCES.items()
-    }
-
-
 def _broadcast_cross_section(values: jnp.ndarray, nx: int) -> jnp.ndarray:
-    return jnp.broadcast_to(
-        jnp.asarray(values, dtype=float)[None, :, :], (nx,) + tuple(values.shape)
-    )
+    return jnp.broadcast_to(jnp.asarray(values, dtype=float)[None, :, :], (nx,) + tuple(values.shape))
 
 
 def _harmonic_mean(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
@@ -223,9 +191,7 @@ def _thin_wall_interface_mean(
     return jnp.where(interface, collapsed, base)
 
 
-def _coerce_spacing_vector(
-    spacing: float | jnp.ndarray, size: int, *, dtype
-) -> jnp.ndarray:
+def _coerce_spacing_vector(spacing: float | jnp.ndarray, size: int, *, dtype) -> jnp.ndarray:
     values = jnp.asarray(spacing, dtype=dtype)
     if values.ndim == 0:
         return jnp.full((size,), values, dtype=dtype)
@@ -242,9 +208,7 @@ def _spacing_vector(spacing: float | jnp.ndarray, size: int, *, dtype) -> jnp.nd
     return values
 
 
-def _nonuniform_axis_gradient(
-    field: jnp.ndarray, widths: jnp.ndarray, *, axis: int
-) -> jnp.ndarray:
+def _nonuniform_axis_gradient(field: jnp.ndarray, widths: jnp.ndarray, *, axis: int) -> jnp.ndarray:
     """Cell-centred derivative with homogeneous-Neumann boundary values."""
 
     result = jnp.zeros_like(field)
@@ -267,22 +231,14 @@ def _nonuniform_axis_laplacian(
 
     center_distance = 0.5 * (widths[:-1] + widths[1:])
     if axis == 1:
-        flux = jnp.zeros(
-            (field.shape[0], field.shape[1] + 1, field.shape[2]), dtype=field.dtype
-        )
-        flux = flux.at[:, 1:-1, :].set(
-            (field[:, 1:, :] - field[:, :-1, :]) / center_distance[None, :, None]
-        )
+        flux = jnp.zeros((field.shape[0], field.shape[1] + 1, field.shape[2]), dtype=field.dtype)
+        flux = flux.at[:, 1:-1, :].set((field[:, 1:, :] - field[:, :-1, :]) / center_distance[None, :, None])
         if mode == "dirichlet":
             flux = flux.at[:, 0, :].set(field[:, 0, :] / (0.5 * widths[0]))
             flux = flux.at[:, -1, :].set(-field[:, -1, :] / (0.5 * widths[-1]))
         return (flux[:, 1:, :] - flux[:, :-1, :]) / widths[None, :, None]
-    flux = jnp.zeros(
-        (field.shape[0], field.shape[1], field.shape[2] + 1), dtype=field.dtype
-    )
-    flux = flux.at[:, :, 1:-1].set(
-        (field[:, :, 1:] - field[:, :, :-1]) / center_distance[None, None, :]
-    )
+    flux = jnp.zeros((field.shape[0], field.shape[1], field.shape[2] + 1), dtype=field.dtype)
+    flux = flux.at[:, :, 1:-1].set((field[:, :, 1:] - field[:, :, :-1]) / center_distance[None, None, :])
     if mode == "dirichlet":
         flux = flux.at[:, :, 0].set(field[:, :, 0] / (0.5 * widths[0]))
         flux = flux.at[:, :, -1].set(-field[:, :, -1] / (0.5 * widths[-1]))
@@ -290,7 +246,11 @@ def _nonuniform_axis_laplacian(
 
 
 def _neighbor_fields(
-    field: jnp.ndarray, *, mode_x: str, mode_y: str, mode_z: str,
+    field: jnp.ndarray,
+    *,
+    mode_x: str,
+    mode_y: str,
+    mode_z: str,
     sharding: NamedSharding | None = None,
 ) -> tuple[jnp.ndarray, ...]:
     def shifted(value, axis, forward, mode):
@@ -299,22 +259,30 @@ def _neighbor_fields(
         boundary = edge if mode == "neumann" else jnp.zeros_like(edge)
         parts = (moved[1:], boundary[None]) if forward else (boundary[None], moved[:-1])
         return jnp.moveaxis(jnp.concatenate(parts), 0, axis)
+
     if sharding is None:
         x_west, x_east = (shifted(field, 0, side, mode_x) for side in (False, True))
     else:  # pragma: no cover - forced-device/hardware gates
         count = sharding.mesh.size
+
         def axial(value):
             index = jax.lax.axis_index("x")
             west = jax.lax.ppermute(value[-1], "x", tuple((i, i + 1) for i in range(count - 1)))
             east = jax.lax.ppermute(value[0], "x", tuple((i, i - 1) for i in range(1, count)))
             if mode_x == "neumann":
-                west, east = (jnp.where(index == 0, value[0], west),
-                    jnp.where(index == count - 1, value[-1], east))
-            return (jnp.concatenate((west[None], value[:-1])),
-                jnp.concatenate((value[1:], east[None])))
-        x_west, x_east = jax.shard_map(axial, mesh=sharding.mesh,
-            in_specs=sharding.spec, out_specs=(sharding.spec, sharding.spec),
-            check_vma=False)(field)
+                west, east = (
+                    jnp.where(index == 0, value[0], west),
+                    jnp.where(index == count - 1, value[-1], east),
+                )
+            return (jnp.concatenate((west[None], value[:-1])), jnp.concatenate((value[1:], east[None])))
+
+        x_west, x_east = jax.shard_map(
+            axial,
+            mesh=sharding.mesh,
+            in_specs=sharding.spec,
+            out_specs=(sharding.spec, sharding.spec),
+            check_vma=False,
+        )(field)
     y_south, y_north = (shifted(field, 1, side, mode_y) for side in (False, True))
     z_bottom, z_top = (shifted(field, 2, side, mode_z) for side in (False, True))
     return x_west, x_east, y_south, y_north, z_bottom, z_top
@@ -340,8 +308,7 @@ def _laplacian_3d(
     dy_values = jnp.asarray(dy)
     dz_values = jnp.asarray(dz)
     y_term = (
-        (y_south - 2.0 * field + y_north)
-        / jnp.maximum(dy_values**2, 1.0e-12)
+        (y_south - 2.0 * field + y_north) / jnp.maximum(dy_values**2, 1.0e-12)
         if dy_values.ndim == 0
         else _nonuniform_axis_laplacian(
             field,
@@ -351,8 +318,7 @@ def _laplacian_3d(
         )
     )
     z_term = (
-        (z_bottom - 2.0 * field + z_top)
-        / jnp.maximum(dz_values**2, 1.0e-12)
+        (z_bottom - 2.0 * field + z_top) / jnp.maximum(dz_values**2, 1.0e-12)
         if dz_values.ndim == 0
         else _nonuniform_axis_laplacian(
             field,
@@ -401,9 +367,7 @@ def _gradient_3d(
     return d_dx, d_dy, d_dz
 
 
-def _enforce_velocity_bc_3d(
-    field: jnp.ndarray, active_mask: jnp.ndarray | None = None
-) -> jnp.ndarray:
+def _enforce_velocity_bc_3d(field: jnp.ndarray, active_mask: jnp.ndarray | None = None) -> jnp.ndarray:
     bounded = field.at[:, 0, :].set(0.0)
     bounded = bounded.at[:, -1, :].set(0.0)
     bounded = bounded.at[:, :, 0].set(0.0)
@@ -424,17 +388,13 @@ def _enforce_stationwise_flow_rate_3d(
     target_flow_rate: float | None = None,
     relaxation: float = 1.0,
 ) -> jnp.ndarray:
-    active_area = jnp.maximum(
-        jnp.sum(jnp.where(active_mask, cell_area, 0.0), axis=(1, 2)), 1.0e-20
-    )
+    active_area = jnp.maximum(jnp.sum(jnp.where(active_mask, cell_area, 0.0), axis=(1, 2)), 1.0e-20)
     station_flow_rate = jnp.sum(jnp.where(active_mask, u * cell_area, 0.0), axis=(1, 2))
     if target_flow_rate is None:
         target = jnp.mean(station_flow_rate)
     else:
         target = jnp.asarray(target_flow_rate, dtype=u.dtype)
-    correction = (relaxation * (station_flow_rate - target) / active_area)[
-        :, None, None
-    ]
+    correction = (relaxation * (station_flow_rate - target) / active_area)[:, None, None]
     corrected = jnp.where(active_mask, u - correction, 0.0)
     return corrected
 
@@ -470,9 +430,7 @@ def _apply_fixed_flow_pressure_constraint(
         u + multiplier[:, None, None] * unit_pressure_response,
         0.0,
     )
-    pressure_loss_gradient = (
-        jnp.asarray(base_pressure_loss_gradient, dtype=u.dtype) + multiplier
-    )
+    pressure_loss_gradient = jnp.asarray(base_pressure_loss_gradient, dtype=u.dtype) + multiplier
     return corrected, pressure_loss_gradient
 
 
@@ -486,9 +444,7 @@ def _cross_duct_pressure_difference(
     """Return side-minus-top pressure at adjacent wall-midpoint taps."""
 
     if {magnetic_axis, side_axis} != {1, 2}:
-        raise ValueError(
-            "magnetic_axis and side_axis must be distinct members of {1, 2}"
-        )
+        raise ValueError("magnetic_axis and side_axis must be distinct members of {1, 2}")
 
     if len(active_mask.addressable_shards) == 1 and not bool(jnp.any(active_mask)):
         raise ValueError("Pressure difference requires active fluid boundary cells")
@@ -517,23 +473,17 @@ def _cross_duct_pressure_difference_kernel(
         high = jnp.max(jnp.where(active_line, indices[None, :], -1), axis=1)
         if wall_axis == 2:
             values = jnp.take_along_axis(p, high[:, None, None], axis=2)[:, :, 0]
-            mask = jnp.take_along_axis(active_mask, high[:, None, None], axis=2)[
-                :, :, 0
-            ]
+            mask = jnp.take_along_axis(active_mask, high[:, None, None], axis=2)[:, :, 0]
         else:
             values = jnp.take_along_axis(p, high[:, None, None], axis=1)[:, 0, :]
-            mask = jnp.take_along_axis(active_mask, high[:, None, None], axis=1)[
-                :, 0, :
-            ]
+            mask = jnp.take_along_axis(active_mask, high[:, None, None], axis=1)[:, 0, :]
         orthogonal_size = values.shape[1]
         orthogonal_index = jnp.arange(orthogonal_size, dtype=p.dtype)[None, :]
         center_index = 0.5 * (orthogonal_size - 1)
         distance = jnp.where(mask, jnp.abs(orthogonal_index - center_index), jnp.inf)
         closest = jnp.min(distance, axis=1, keepdims=True)
         tap_mask = mask & (distance <= closest + 1.0e-12)
-        return jnp.sum(jnp.where(tap_mask, values, 0.0), axis=1) / jnp.maximum(
-            jnp.sum(tap_mask, axis=1), 1
-        )
+        return jnp.sum(jnp.where(tap_mask, values, 0.0), axis=1) / jnp.maximum(jnp.sum(tap_mask, axis=1), 1)
 
     top_pressure = high_wall_midpoint(magnetic_axis)
     side_pressure = high_wall_midpoint(side_axis)
@@ -576,8 +526,12 @@ def _jacobi_fixed_point(
 ) -> tuple[jnp.ndarray, float, int, float]:
     initial_residual = float(residual_norm(field))
     solution = fixed_point_iteration(
-        update, field, residual_norm=residual_norm, rtol=0.0,
-        atol=tolerance, max_steps=iterations,
+        update,
+        field,
+        residual_norm=residual_norm,
+        rtol=0.0,
+        atol=tolerance,
+        max_steps=iterations,
     )
     require_finite(stage, potential=solution.x, residual=solution.residual_norm)
     return solution.x, float(solution.residual_norm), int(solution.iterations), initial_residual
@@ -603,11 +557,7 @@ def _poisson_jacobi_3d(
             tolerance=tolerance,
         )
     rhs_compatible = rhs - jnp.mean(rhs)
-    diagonal = (
-        2.0 / max(dx**2, 1.0e-12)
-        + 2.0 / max(dy**2, 1.0e-12)
-        + 2.0 / max(dz**2, 1.0e-12)
-    )
+    diagonal = 2.0 / max(dx**2, 1.0e-12) + 2.0 / max(dy**2, 1.0e-12) + 2.0 / max(dz**2, 1.0e-12)
     field = jnp.zeros_like(rhs_compatible)
 
     def update(field):
@@ -642,7 +592,11 @@ def _poisson_jacobi_3d(
         )
 
     return _jacobi_fixed_point(
-        update, field, residual_norm, iterations=iterations, tolerance=tolerance,
+        update,
+        field,
+        residual_norm,
+        iterations=iterations,
+        tolerance=tolerance,
         stage="3-D Poisson iteration",
     )
 
@@ -660,14 +614,10 @@ def _variable_coefficient_poisson_jacobi_3d(
 ) -> tuple[jnp.ndarray, float, int, float]:
     dy_widths = _spacing_vector(dy, rhs.shape[1], dtype=rhs.dtype)
     dz_widths = _spacing_vector(dz, rhs.shape[2], dtype=rhs.dtype)
-    volume_weights = jnp.broadcast_to(
-        dy_widths[None, :, None] * dz_widths[None, None, :], rhs.shape
-    )
+    volume_weights = jnp.broadcast_to(dy_widths[None, :, None] * dz_widths[None, None, :], rhs.shape)
     rhs_compatible = rhs - jnp.sum(rhs * volume_weights) / jnp.sum(volume_weights)
-    coef_x_w, coef_x_e, coef_y_s, coef_y_n, coef_z_b, coef_z_t = (
-        _variable_diffusion_coefficients_3d(
-            conductivity, dx=dx, dy=dy_widths, dz=dz_widths
-        )
+    coef_x_w, coef_x_e, coef_y_s, coef_y_n, coef_z_b, coef_z_t = _variable_diffusion_coefficients_3d(
+        conductivity, dx=dx, dy=dy_widths, dz=dz_widths
     )
     diagonal = coef_x_w + coef_x_e + coef_y_s + coef_y_n + coef_z_b + coef_z_t
     diagonal = jnp.maximum(diagonal, 1.0e-12)
@@ -677,6 +627,7 @@ def _variable_coefficient_poisson_jacobi_3d(
         field = jnp.asarray(initial_field, dtype=rhs_compatible.dtype)
         require_finite("3-D Poisson initial state", potential=field)
         field = field - jnp.sum(field * volume_weights) / jnp.sum(volume_weights)
+
     def update(field):
         x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
             field,
@@ -710,7 +661,11 @@ def _variable_coefficient_poisson_jacobi_3d(
         )
 
     return _jacobi_fixed_point(
-        update, field, residual_norm, iterations=iterations, tolerance=tolerance,
+        update,
+        field,
+        residual_norm,
+        iterations=iterations,
+        tolerance=tolerance,
         stage="3-D variable Poisson iteration",
     )
 
@@ -730,8 +685,8 @@ def _variable_coefficient_residual_3d(
         mode_y="neumann",
         mode_z="neumann",
     )
-    coef_x_w, coef_x_e, coef_y_s, coef_y_n, coef_z_b, coef_z_t = (
-        _variable_diffusion_coefficients_3d(conductivity, dx=dx, dy=dy, dz=dz)
+    coef_x_w, coef_x_e, coef_y_s, coef_y_n, coef_z_b, coef_z_t = _variable_diffusion_coefficients_3d(
+        conductivity, dx=dx, dy=dy, dz=dz
     )
     operator = (
         coef_x_w * (x_west - field)
@@ -852,9 +807,7 @@ def _variable_coefficient_poisson_sparse_3d(
     nx, ny, nz = conductivity_np.shape
     dy_widths_np = np.asarray(_spacing_vector(dy, ny, dtype=rhs.dtype), dtype=float)
     dz_widths_np = np.asarray(_spacing_vector(dz, nz, dtype=rhs.dtype), dtype=float)
-    volume_weights = np.broadcast_to(
-        dy_widths_np[None, :, None] * dz_widths_np[None, None, :], rhs_np.shape
-    )
+    volume_weights = np.broadcast_to(dy_widths_np[None, :, None] * dz_widths_np[None, None, :], rhs_np.shape)
     rhs_compatible = rhs_np - np.sum(rhs_np * volume_weights) / np.sum(volume_weights)
     coefficients = tuple(
         np.asarray(value, dtype=float)
@@ -929,9 +882,9 @@ def _variable_coefficient_poisson_sparse_3d(
     x0 = np.zeros(size, dtype=float)
     if initial_field is not None:
         initial_np = np.asarray(initial_field, dtype=float).reshape(-1)
-        x0 = initial_np - np.sum(
-            initial_np.reshape(rhs_compatible.shape) * volume_weights
-        ) / np.sum(volume_weights)
+        x0 = initial_np - np.sum(initial_np.reshape(rhs_compatible.shape) * volume_weights) / np.sum(
+            volume_weights
+        )
         x0 = np.asarray(x0, dtype=float).reshape(-1)
         x0[0] = 0.0
     initial_residual = float(
@@ -1000,16 +953,24 @@ def _rectangular_fluid_bounds(fluid_mask: jnp.ndarray) -> tuple[int, int, int, i
     return y0, y1, z0, z1
 
 
-def _axial_mean_preconditioner_3d(volume: jnp.ndarray, coef_x_w: jnp.ndarray, coef_x_e: jnp.ndarray, *, gauge: bool = True,
-    field_sharding: NamedSharding | None = None):
+def _axial_mean_preconditioner_3d(
+    volume: jnp.ndarray,
+    coef_x_w: jnp.ndarray,
+    coef_x_e: jnp.ndarray,
+    *,
+    gauge: bool = True,
+    field_sharding: NamedSharding | None = None,
+):
     """Invert the Galerkin operator for cross-section-constant axial modes."""
     _, ny, nz = volume.shape
     normalization = math.sqrt(ny * nz)
-    west, east = (-jnp.sum(volume * coefficient, axis=(1, 2)) / (ny * nz)
-        for coefficient in (coef_x_w, coef_x_e))
+    west, east = (
+        -jnp.sum(volume * coefficient, axis=(1, 2)) / (ny * nz) for coefficient in (coef_x_w, coef_x_e)
+    )
     diagonal, gauge_vector = -(west + east), jnp.sum(volume, axis=(1, 2)) / normalization
     if gauge:
         diagonal, east = diagonal.at[0].set(1.0), east.at[0].set(0.0)
+
     def solve_coarse(system):
         lower, center, upper, weights, reduced = jnp.moveaxis(system, -1, 0)
         if gauge:
@@ -1017,14 +978,19 @@ def _axial_mean_preconditioner_3d(volume: jnp.ndarray, coef_x_w: jnp.ndarray, co
             reduced = (reduced - coefficient * weights).at[0].set(0.0)
         correction = tridiagonal_solve(lower, center, upper, reduced)
         if gauge:
-            correction += (coefficient * normalization * jnp.sum(weights) - jnp.vdot(weights, correction)) / jnp.sum(weights)
+            correction += (
+                coefficient * normalization * jnp.sum(weights) - jnp.vdot(weights, correction)
+            ) / jnp.sum(weights)
         return correction
+
     replicated = None if field_sharding is None else NamedSharding(field_sharding.mesh, P())
     coarse_solve = jax.jit(solve_coarse, in_shardings=replicated, out_shardings=replicated)
+
     def apply(residual: jnp.ndarray) -> jnp.ndarray:
         reduced = jnp.sum(residual, axis=(1, 2)) / normalization
         correction = coarse_solve(jnp.stack((west, diagonal, east, gauge_vector, reduced), axis=-1))
         return jnp.broadcast_to(correction[:, None, None] / normalization, residual.shape)
+
     return apply
 
 
@@ -1047,14 +1013,9 @@ def _region_interpolation(
         local_widths = widths[start:stop]
         local_centers = centers[start:stop]
         groups = jnp.minimum(jnp.arange(size) * count // size, count - 1)
-        coarse_widths = (
-            jnp.zeros(count, dtype=widths.dtype).at[groups].add(local_widths)
-        )
+        coarse_widths = jnp.zeros(count, dtype=widths.dtype).at[groups].add(local_widths)
         coarse_centers = (
-            jnp.zeros(count, dtype=widths.dtype)
-            .at[groups]
-            .add(local_widths * local_centers)
-            / coarse_widths
+            jnp.zeros(count, dtype=widths.dtype).at[groups].add(local_widths * local_centers) / coarse_widths
         )
         high = jnp.clip(jnp.searchsorted(coarse_centers, local_centers), 1, count - 1)
         high = jnp.where(count == 1, 0, high)
@@ -1062,9 +1023,7 @@ def _region_interpolation(
         span = jnp.where(count == 1, 1.0, coarse_centers[high] - coarse_centers[low])
         left_parts.append(low + offset)
         right_parts.append(high + offset)
-        weight_parts.append(
-            jnp.clip((local_centers - coarse_centers[low]) / span, 0.0, 1.0)
-        )
+        weight_parts.append(jnp.clip((local_centers - coarse_centers[low]) / span, 0.0, 1.0))
         offset += count
     return (
         jnp.concatenate(left_parts),
@@ -1128,9 +1087,7 @@ def _transverse_modal_correction_3d(
 
     coarse_size = ncy * ncz
     basis = jnp.eye(coarse_size, dtype=volume.dtype).reshape((coarse_size, ncy, ncz))
-    stiffness = jax.vmap(
-        lambda column: galerkin(transverse_matvec, column).reshape(-1)
-    )(basis).T
+    stiffness = jax.vmap(lambda column: galerkin(transverse_matvec, column).reshape(-1))(basis).T
     mass = jax.vmap(
         lambda column: galerkin(
             lambda field: volume_cross * coefficient[0] * field / dx**2,
@@ -1146,9 +1103,7 @@ def _transverse_modal_correction_3d(
     whitened_gauge = solve_triangular(mass_factor, coarse_volume, lower=True)
     gauge_eigenvalue = jnp.dot(modes[:, 0], whitened_gauge) ** 2 / jnp.sum(volume_cross)
 
-    axial_eigenvalues = 2.0 - 2.0 * jnp.cos(
-        jnp.pi * jnp.arange(nx, dtype=volume.dtype) / nx
-    )
+    axial_eigenvalues = 2.0 - 2.0 * jnp.cos(jnp.pi * jnp.arange(nx, dtype=volume.dtype) / nx)
     denominators = axial_eigenvalues[:, None] + jnp.maximum(eigenvalues[None], 0.0)
     denominators = denominators.at[0, 0].add(gauge_eigenvalue)
 
@@ -1165,9 +1120,7 @@ def _transverse_modal_correction_3d(
 
     if sharding is not None:  # pragma: no cover - exercised by hardware gates
         replicated = NamedSharding(sharding.mesh, P())
-        coarse_solve = jax.jit(
-            solve_global, in_shardings=replicated, out_shardings=replicated
-        )
+        coarse_solve = jax.jit(solve_global, in_shardings=replicated, out_shardings=replicated)
         reshard_coarse = jax.jit(
             lambda value: value,
             in_shardings=replicated,
@@ -1256,9 +1209,7 @@ def _finalize_local_pressure_solve(
     local_residual = local_residual_fn(field)
     final_linear_residual = linear_rhs - matvec(field)
     residual_norm = jnp.linalg.norm(final_linear_residual)
-    relative_residual_norm = residual_norm / jnp.maximum(
-        jnp.linalg.norm(linear_rhs), jnp.asarray(1.0e-30)
-    )
+    relative_residual_norm = residual_norm / jnp.maximum(jnp.linalg.norm(linear_rhs), jnp.asarray(1.0e-30))
     converged = jnp.max(jnp.abs(local_residual)) <= local_tolerance
     return (
         field,
@@ -1309,19 +1260,13 @@ def _solvax_pressure_poisson_duct(
         raise ValueError(f"Unsupported axial pressure mode {axial_pressure_mode!r}")
     mixed_axial_pressure = axial_pressure_mode == _MIXED_AXIAL_PRESSURE_MODE
     if mixed_axial_pressure and transverse_coarse_bounds is not None:
-        raise ValueError(
-            "Mixed axial pressure does not support the Neumann coarse correction"
-        )
+        raise ValueError("Mixed axial pressure does not support the Neumann coarse correction")
 
     dy_widths = _coerce_spacing_vector(dy, rhs.shape[1], dtype=rhs.dtype)
     dz_widths = _coerce_spacing_vector(dz, rhs.shape[2], dtype=rhs.dtype)
-    volume = jnp.broadcast_to(
-        dy_widths[None, :, None] * dz_widths[None, None, :], rhs.shape
-    )
+    volume = jnp.broadcast_to(dy_widths[None, :, None] * dz_widths[None, None, :], rhs.shape)
     volume_sum = jnp.sum(volume)
-    solved_rhs = (
-        rhs if mixed_axial_pressure else rhs - jnp.sum(rhs * volume) / volume_sum
-    )
+    solved_rhs = rhs if mixed_axial_pressure else rhs - jnp.sum(rhs * volume) / volume_sum
     coefficients = _variable_diffusion_coefficients_3d(
         mobility,
         dx=dx,
@@ -1333,9 +1278,7 @@ def _solvax_pressure_poisson_duct(
     coef_x_w, coef_x_e, coef_y_s, coef_y_n, coef_z_b, coef_z_t = coefficients
     if mixed_axial_pressure:
         outlet = jnp.arange(rhs.shape[0])[:, None, None] == rhs.shape[0] - 1
-        coef_x_e = jnp.where(
-            outlet, 2.0 * mobility[-1] / max(dx**2, 1.0e-12), coef_x_e
-        )
+        coef_x_e = jnp.where(outlet, 2.0 * mobility[-1] / max(dx**2, 1.0e-12), coef_x_e)
         coefficients = (
             coef_x_w,
             coef_x_e,
@@ -1382,11 +1325,12 @@ def _solvax_pressure_poisson_duct(
     )
     if not include_axial_line:
         directions = directions[1:]
-    line_precondition = additive_tridiagonal_line_preconditioner(
-        diagonal, directions
-    )
+    line_precondition = additive_tridiagonal_line_preconditioner(diagonal, directions)
     axial_precondition = _axial_mean_preconditioner_3d(
-        volume, coef_x_w, coef_x_e, gauge=not mixed_axial_pressure,
+        volume,
+        coef_x_w,
+        coef_x_e,
+        gauge=not mixed_axial_pressure,
         field_sharding=field_sharding,
     )
 
@@ -1411,19 +1355,13 @@ def _solvax_pressure_poisson_duct(
         )
 
         def precondition(residual):
-            return (
-                line_precondition(residual)
-                + axial_precondition(residual)
-                + coarse_correction(residual)
-            )
+            return line_precondition(residual) + axial_precondition(residual) + coarse_correction(residual)
 
     linear_rhs = -volume * solved_rhs
     effective_rtol = tolerance
     effective_atol = tolerance
     if local_tolerance is not None:
-        volume_min = (
-            float(jnp.min(volume)) if local_volume_min is None else local_volume_min
-        )
+        volume_min = float(jnp.min(volume)) if local_volume_min is None else local_volume_min
         local_absolute_target = volume_min * local_tolerance
         effective_rtol = 0.0
         effective_atol = min(tolerance, local_absolute_target)
@@ -1489,19 +1427,28 @@ def _solvax_implicit_momentum_duct(
     volume = dx_widths[:, None, None] * dy_widths[None, :, None] * dz_widths[None, None, :]
     widths = (dx_widths, dy_widths, dz_widths)
     setup = frozen_setup or _frozen_duct_momentum_setup(
-        velocity, density, viscosity, rho_phi, boundary_velocity, widths,
-        dx=dx, prescribed_inlet=prescribed_inlet)
+        velocity,
+        density,
+        viscosity,
+        rho_phi,
+        boundary_velocity,
+        widths,
+        dx=dx,
+        prescribed_inlet=prescribed_inlet,
+    )
     _, coefficients, diffusion_sink, inlet_sink, weights, _ = setup
     inlet_cells = jnp.arange(shape[0])[:, None, None] == 0
     zero_patches = tuple(jnp.zeros_like(value) for value in boundary_velocity)
     prescribed_patches = (boundary_velocity[0], zero_patches[1], *boundary_velocity[2:])
-    boundary_action, _ = _duct_momentum_transport(jnp.zeros_like(velocity), rho_phi,
-        weights, prescribed_patches, widths, coefficients, diffusion_sink)
+    boundary_action, _ = _duct_momentum_transport(
+        jnp.zeros_like(velocity), rho_phi, weights, prescribed_patches, widths, coefficients, diffusion_sink
+    )
 
     def matvec(field: jnp.ndarray) -> jnp.ndarray:
         homogeneous_patches = (zero_patches[0], field[-1], *zero_patches[2:])
-        convection, diffusion = _duct_momentum_transport(field, rho_phi, weights,
-            homogeneous_patches, widths, coefficients, diffusion_sink)
+        convection, diffusion = _duct_momentum_transport(
+            field, rho_phi, weights, homogeneous_patches, widths, coefficients, diffusion_sink
+        )
         return volume[..., None] * (density[..., None] * field + dt * (convection - diffusion))
 
     diagonal = volume * (density + dt * (sum(coefficients) + diffusion_sink))
@@ -1523,14 +1470,18 @@ def _solvax_implicit_momentum_duct(
 
     def krylov(operator, rhs):
         solution = gmres(
-            operator, rhs, x0=jnp.zeros_like(rhs), precond=precondition,
-            restart=restart, rtol=tolerance, atol=tolerance,
-            max_restarts=max(1, math.ceil(iterations / restart)))
+            operator,
+            rhs,
+            x0=jnp.zeros_like(rhs),
+            precond=precondition,
+            restart=restart,
+            rtol=tolerance,
+            atol=tolerance,
+            max_restarts=max(1, math.ceil(iterations / restart)),
+        )
         return solution.x, (solution.residual_norm, solution.converged)
 
-    solved, (residual, converged) = linear_solve(
-        flat_matvec, flat_rhs, krylov, has_aux=True
-    )
+    solved, (residual, converged) = linear_solve(flat_matvec, flat_rhs, krylov, has_aux=True)
     return solved.reshape(shape), residual, converged
 
 
@@ -1538,7 +1489,8 @@ def _cell_limited_least_squares_gradient_duct(
     field: jnp.ndarray,
     boundary_values: tuple[jnp.ndarray, ...],
     widths: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
-    *, axial_neighbours: tuple[jnp.ndarray, jnp.ndarray] | None = None,
+    *,
+    axial_neighbours: tuple[jnp.ndarray, jnp.ndarray] | None = None,
 ) -> tuple[jnp.ndarray, ...]:
     """Return limited gradients; optional axial neighbours are cell-aligned."""
     gradients, neighbours = [], []
@@ -1556,9 +1508,7 @@ def _cell_limited_least_squares_gradient_duct(
         fraction = width[1:] / (width[:-1] + width[1:])
         lo_weight = jnp.concatenate((jnp.ones(1), fraction))[(slice(None), *trailing)]
         hi_weight = jnp.concatenate((1.0 - fraction, jnp.ones(1)))[(slice(None), *trailing)]
-        gradient = (lo_weight * (values - lo) / dm + hi_weight * (hi - values) / dp) / (
-            lo_weight + hi_weight
-        )
+        gradient = (lo_weight * (values - lo) / dm + hi_weight * (hi - values) / dp) / (lo_weight + hi_weight)
         gradients.append(jnp.moveaxis(gradient, 0, axis))
         neighbours.extend((jnp.moveaxis(lo, 0, axis), jnp.moveaxis(hi, 0, axis)))
     local = jnp.stack((field, *neighbours))
@@ -1571,9 +1521,7 @@ def _cell_limited_least_squares_gradient_duct(
         for extrapolate in (-half_step, half_step):
             delta = jnp.where(extrapolate > 0.0, maximum - field, minimum - field)
             ratio = delta / jnp.where(jnp.abs(extrapolate) > 1.0e-15, extrapolate, 1.0)
-            bounded = jnp.where(
-                jnp.abs(extrapolate) > 1.0e-15, jnp.minimum(ratio, 1.0), 1.0
-            )
+            bounded = jnp.where(jnp.abs(extrapolate) > 1.0e-15, jnp.minimum(ratio, 1.0), 1.0)
             limiter = jnp.minimum(limiter, bounded)
     return tuple(limiter * gradient for gradient in gradients)
 
@@ -1583,19 +1531,22 @@ def _explicit_deviatoric_stress_duct(
     dynamic_viscosity: jnp.ndarray,
     boundary_velocity: tuple[jnp.ndarray, ...],
     widths: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
-    *, gradient: jnp.ndarray | None = None,
+    *,
+    gradient: jnp.ndarray | None = None,
     axial_tractions: tuple[jnp.ndarray, jnp.ndarray] | None = None,
 ) -> jnp.ndarray:
     """Return limited ``div(mu*dev2(T(grad(U))))``; injections are cell-aligned."""
     if gradient is None:
-        gradient = jnp.stack(_cell_limited_least_squares_gradient_duct(
-            velocity, boundary_velocity, widths), axis=-2)
+        gradient = jnp.stack(
+            _cell_limited_least_squares_gradient_duct(velocity, boundary_velocity, widths), axis=-2
+        )
     identity = jnp.eye(3, dtype=velocity.dtype)
 
     def traction(value, coefficient, axis):
         trace = jnp.trace(value, axis1=-2, axis2=-1)
         deviatoric = value[..., :, axis] - (2.0 / 3.0) * trace[..., None] * identity[axis]
         return coefficient[..., None] * deviatoric
+
     correction = jnp.zeros_like(velocity)
     for axis, width in enumerate(widths):
         if axis == 0 and axial_tractions is not None:
@@ -1604,10 +1555,11 @@ def _explicit_deviatoric_stress_duct(
         cell_traction = traction(gradient, dynamic_viscosity, axis)
         patch_tractions = []
         for side, index in ((0, 0), (1, -1)):
-            normal = (2 * side - 1) * (
-                boundary_velocity[2 * axis + side]
-                - jnp.take(velocity, index, axis=axis)
-            ) / (0.5 * width[index])
+            normal = (
+                (2 * side - 1)
+                * (boundary_velocity[2 * axis + side] - jnp.take(velocity, index, axis=axis))
+                / (0.5 * width[index])
+            )
             patch_tractions.append(
                 traction(
                     jnp.take(gradient, index, axis=axis).at[..., axis, :].set(normal),
@@ -1624,9 +1576,7 @@ def _explicit_deviatoric_stress_duct(
                 patch_tractions[1][None],
             )
         )
-        correction += jnp.moveaxis(
-            jnp.diff(faces, axis=0) / width[:, None, None, None], 0, axis
-        )
+        correction += jnp.moveaxis(jnp.diff(faces, axis=0) / width[:, None, None, None], 0, axis)
     return correction
 
 
@@ -1635,18 +1585,18 @@ def _limited_linear_vector_face_weights_duct(
     rho_phi: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
     boundary_velocity: tuple[jnp.ndarray, ...],
     widths: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
-    *, gradient: tuple[jnp.ndarray, ...] | None = None,
+    *,
+    gradient: tuple[jnp.ndarray, ...] | None = None,
 ) -> tuple[jnp.ndarray, ...]:
     """Freeze v2206 vector weights, optionally from precomputed gradients."""
     q = jnp.sum(velocity**2, axis=-1)
     gradients = gradient
     if gradients is None:
         gradients = _cell_limited_least_squares_gradient_duct(
-            q, tuple(jnp.sum(value**2, axis=-1) for value in boundary_velocity), widths)
+            q, tuple(jnp.sum(value**2, axis=-1) for value in boundary_velocity), widths
+        )
     weights = []
-    for axis, (width, gradient, face_flux) in enumerate(
-        zip(widths, gradients, rho_phi, strict=True)
-    ):
+    for axis, (width, gradient, face_flux) in enumerate(zip(widths, gradients, rho_phi, strict=True)):
         values = jnp.moveaxis(q, axis, 0)
         gradient = jnp.moveaxis(gradient, axis, 0)
         distance = 0.5 * (width[:-1] + width[1:])[:, None, None]
@@ -1665,7 +1615,12 @@ def _limited_linear_vector_face_weights_duct(
 
 
 def _limited_linear_convection_matrix_action_duct(
-    field, rho_phi, weights, boundary_values, widths, *,
+    field,
+    rho_phi,
+    weights,
+    boundary_values,
+    widths,
+    *,
     neighbours: tuple[jnp.ndarray, jnp.ndarray] | None = None,
     axial_fluxes: tuple[jnp.ndarray, jnp.ndarray] | None = None,
     axial_weights: tuple[jnp.ndarray, jnp.ndarray] | None = None,
@@ -1680,63 +1635,76 @@ def _limited_linear_convection_matrix_action_duct(
     for axis, (face_flux, weight) in enumerate(zip(rho_phi, weights, strict=True)):
         if axis == 0 and axial_fluxes is not None:
             assert neighbours is not None and axial_weights is not None
-            west = axial_weights[0][..., None] * neighbours[0] + (
-                1.0 - axial_weights[0][..., None]) * field
-            east = axial_weights[1][..., None] * field + (
-                1.0 - axial_weights[1][..., None]) * neighbours[1]
-            action += (axial_fluxes[1][..., None] * east
-                       - axial_fluxes[0][..., None] * west) / volume[..., None]
+            west = axial_weights[0][..., None] * neighbours[0] + (1.0 - axial_weights[0][..., None]) * field
+            east = axial_weights[1][..., None] * field + (1.0 - axial_weights[1][..., None]) * neighbours[1]
+            action += (axial_fluxes[1][..., None] * east - axial_fluxes[0][..., None] * west) / volume[
+                ..., None
+            ]
             continue
         values = jnp.moveaxis(field, axis, 0)
         weight = jnp.moveaxis(weight, axis, 0)[..., None]
         interpolated = weight * values[:-1] + (1.0 - weight) * values[1:]
-        faces = jnp.concatenate((boundary_values[2 * axis][None], interpolated,
-                                 boundary_values[2 * axis + 1][None]))
+        faces = jnp.concatenate(
+            (boundary_values[2 * axis][None], interpolated, boundary_values[2 * axis + 1][None])
+        )
         divergence = jnp.diff(jnp.moveaxis(face_flux, axis, 0)[..., None] * faces, axis=0)
         action += jnp.moveaxis(divergence, 0, axis) / volume[..., None]
     return action
 
 
 def _frozen_duct_momentum_setup(
-    velocity, density, viscosity, rho_phi, boundary_velocity, widths, *, dx,
+    velocity,
+    density,
+    viscosity,
+    rho_phi,
+    boundary_velocity,
+    widths,
+    *,
+    dx,
     prescribed_inlet=True,
 ):
     """Own frozen diffusion, limiter, and packed velocity/q gradients."""
     q = jnp.sum(velocity**2, axis=-1)
     packed = jnp.concatenate((velocity, q[..., None]), axis=-1)
-    packed_patches = tuple(jnp.concatenate((patch,
-        jnp.sum(patch**2, axis=-1, keepdims=True)), axis=-1) for patch in boundary_velocity)
+    packed_patches = tuple(
+        jnp.concatenate((patch, jnp.sum(patch**2, axis=-1, keepdims=True)), axis=-1)
+        for patch in boundary_velocity
+    )
     gradients = _cell_limited_least_squares_gradient_duct(packed, packed_patches, widths)
     dynamic_viscosity = density * viscosity
-    coefficients = _variable_diffusion_coefficients_3d(dynamic_viscosity, dx=dx,
-        dy=widths[1], dz=widths[2], validated_spacing=True)
+    coefficients = _variable_diffusion_coefficients_3d(
+        dynamic_viscosity, dx=dx, dy=widths[1], dz=widths[2], validated_spacing=True
+    )
     wall_sink = jnp.zeros_like(density)
     for axis, width in ((1, widths[1]), (2, widths[2])):
         for index in (0, -1):
             cells = [slice(None)] * 3
             cells[axis] = index
             cells = tuple(cells)
-            wall_sink = wall_sink.at[cells].add(dynamic_viscosity[cells]
-                / (0.5 * width[index] ** 2))
+            wall_sink = wall_sink.at[cells].add(dynamic_viscosity[cells] / (0.5 * width[index] ** 2))
     inlet_cells = jnp.arange(density.shape[0])[:, None, None] == 0
-    inlet_sink = (jnp.where(inlet_cells, 2.0 * dynamic_viscosity[0] / dx**2, 0.0)
-        if prescribed_inlet else jnp.zeros_like(density))
-    weights = _limited_linear_vector_face_weights_duct(velocity, rho_phi,
-        boundary_velocity, widths,
-        gradient=tuple(value[..., 3] for value in gradients))
+    inlet_sink = (
+        jnp.where(inlet_cells, 2.0 * dynamic_viscosity[0] / dx**2, 0.0)
+        if prescribed_inlet
+        else jnp.zeros_like(density)
+    )
+    weights = _limited_linear_vector_face_weights_duct(
+        velocity, rho_phi, boundary_velocity, widths, gradient=tuple(value[..., 3] for value in gradients)
+    )
     velocity_gradient = jnp.stack(gradients, axis=-2)[..., :3]
-    return (dynamic_viscosity, coefficients, wall_sink + inlet_sink, inlet_sink,
-        weights, velocity_gradient)
+    return (dynamic_viscosity, coefficients, wall_sink + inlet_sink, inlet_sink, weights, velocity_gradient)
 
 
-def _duct_momentum_transport(field, rho_phi, weights, boundary_values, widths,
-                             coefficients, diffusion_sink):
+def _duct_momentum_transport(field, rho_phi, weights, boundary_values, widths, coefficients, diffusion_sink):
     """Return the shared frozen convection and homogeneous diffusion actions."""
     neighbours = _neighbor_fields(field, mode_x="neumann", mode_y="neumann", mode_z="neumann")
-    diffusion = sum(c[..., None] * (n - field) for c, n in zip(
-        coefficients, neighbours, strict=True)) - diffusion_sink[..., None] * field
+    diffusion = (
+        sum(c[..., None] * (n - field) for c, n in zip(coefficients, neighbours, strict=True))
+        - diffusion_sink[..., None] * field
+    )
     convection = _limited_linear_convection_matrix_action_duct(
-        field, rho_phi, weights, boundary_values, widths)
+        field, rho_phi, weights, boundary_values, widths
+    )
     return convection, diffusion
 
 
@@ -1750,51 +1718,78 @@ def _unpack_duct_mass_flux(rho_phi_plus, rho_phi_inlet):
 
 
 def _compact_duct_courant_numbers(
-    rho_phi_plus, rho_phi_inlet, density, *, dt, dx, dy, dz, sharding=None,
+    rho_phi_plus,
+    rho_phi_inlet,
+    density,
+    *,
+    dt,
+    dx,
+    dy,
+    dz,
+    sharding=None,
 ):
     """Return OpenFOAM-style volume-mean and maximum mass-flux Courant numbers."""
 
     east, north, top = rho_phi_plus
-    west = _neighbor_fields(east, mode_x="dirichlet", mode_y="neumann",
-        mode_z="neumann", sharding=sharding)[0]
-    west = jnp.where(jnp.arange(density.shape[0])[:, None, None] == 0,
-        rho_phi_inlet, west)
+    west = _neighbor_fields(east, mode_x="dirichlet", mode_y="neumann", mode_z="neumann", sharding=sharding)[
+        0
+    ]
+    west = jnp.where(jnp.arange(density.shape[0])[:, None, None] == 0, rho_phi_inlet, west)
     south = jnp.concatenate((jnp.zeros_like(north[:, :1]), north[:, :-1]), axis=1)
     bottom = jnp.concatenate((jnp.zeros_like(top[:, :, :1]), top[:, :, :-1]), axis=2)
     widths = _coerce_spacing_vector(dx, density.shape[0], dtype=density.dtype)
-    volume = (jnp.ones_like(density) * widths[:, None, None]
-        * dy[None, :, None] * dz[None, None, :])
+    volume = jnp.ones_like(density) * widths[:, None, None] * dy[None, :, None] * dz[None, None, :]
     sum_phi = sum(map(jnp.abs, (west, east, south, north, bottom, top))) / density
     if sharding is not None:  # pragma: no cover - forced-device/hardware gates
+
         def reduce(local_sum, local_volume):
             total_sum = jax.lax.psum(jnp.sum(local_sum), "x")
             total_volume = jax.lax.psum(jnp.sum(local_volume), "x")
             maximum = jax.lax.pmax(jnp.max(local_sum / local_volume), "x")
             return 0.5 * dt * total_sum / total_volume, 0.5 * dt * maximum
-        return jax.shard_map(reduce, mesh=sharding.mesh,
-            in_specs=(sharding.spec, sharding.spec), out_specs=(P(), P()),
-            check_vma=False)(sum_phi, volume)
+
+        return jax.shard_map(
+            reduce,
+            mesh=sharding.mesh,
+            in_specs=(sharding.spec, sharding.spec),
+            out_specs=(P(), P()),
+            check_vma=False,
+        )(sum_phi, volume)
     return 0.5 * dt * jnp.sum(sum_phi) / jnp.sum(volume), 0.5 * dt * jnp.max(sum_phi / volume)
 
 
-def _initialize_duct_mass_flux(
-    velocity, density, inlet_velocity, *, dx, dy, dz, sharding=None
-):
+def _initialize_duct_mass_flux(velocity, density, inlet_velocity, *, dx, dy, dz, sharding=None):
     """Pack oriented, area-integrated ``linearInterpolate(rho*U)&Sf`` faces."""
     momentum = density[..., None] * velocity
     area_x = dy[:, None] * dz[None, :]
     inlet = density[0] * inlet_velocity[..., 0] * area_x
     axial = momentum[..., 0]
-    plus_x = 0.5 * (axial + _neighbor_fields(axial, mode_x="neumann",
-        mode_y="neumann", mode_z="neumann", sharding=sharding)[1]) * area_x
+    plus_x = (
+        0.5
+        * (
+            axial
+            + _neighbor_fields(
+                axial, mode_x="neumann", mode_y="neumann", mode_z="neumann", sharding=sharding
+            )[1]
+        )
+        * area_x
+    )
     wy = (dy[1:] / (dy[:-1] + dy[1:]))[None, :, None]
-    plus_y = jnp.concatenate((
-        wy * momentum[:, :-1, :, 1] + (1.0 - wy) * momentum[:, 1:, :, 1],
-        jnp.zeros_like(momentum[:, :1, :, 1])), axis=1) * (dx * dz[None, None, :])
+    plus_y = jnp.concatenate(
+        (
+            wy * momentum[:, :-1, :, 1] + (1.0 - wy) * momentum[:, 1:, :, 1],
+            jnp.zeros_like(momentum[:, :1, :, 1]),
+        ),
+        axis=1,
+    ) * (dx * dz[None, None, :])
     wz = (dz[1:] / (dz[:-1] + dz[1:]))[None, None, :]
-    plus_z = jnp.concatenate((
-        wz * momentum[:, :, :-1, 2] + (1.0 - wz) * momentum[:, :, 1:, 2],
-        jnp.zeros_like(momentum[:, :, :1, 2])), axis=2) * (dx * dy[None, :, None])
+    plus_z = jnp.concatenate(
+        (
+            wz * momentum[:, :, :-1, 2] + (1.0 - wz) * momentum[:, :, 1:, 2],
+            jnp.zeros_like(momentum[:, :, :1, 2]),
+        ),
+        axis=2,
+    ) * (dx * dy[None, :, None])
     return plus_x, plus_y, plus_z, inlet
 
 
@@ -1802,42 +1797,48 @@ def _flow_rate_inlet_profile(axial_velocity, face_area, target):
     """Evaluate the OpenFOAM-style flow-rate inlet normal velocity."""
     profile = jnp.maximum(axial_velocity, 0.0)
     estimated = jnp.sum(profile * face_area)
-    return jnp.where(estimated > 0.5 * target,
+    return jnp.where(
+        estimated > 0.5 * target,
         profile * target / jnp.maximum(estimated, 1.0e-20),
-        profile + (target - estimated) / jnp.sum(face_area))
+        profile + (target - estimated) / jnp.sum(face_area),
+    )
 
 
 def _duct_pressure_face_corrections(
-    pressure, mobility, *, dx, dy, dz, mixed_axial_pressure, field_sharding=None,
+    pressure,
+    mobility,
+    *,
+    dx,
+    dy,
+    dz,
+    mixed_axial_pressure,
+    field_sharding=None,
 ):
     """Return the projection's three oriented pressure-velocity corrections."""
 
     def axial_neighbors(value):
-        return _neighbor_fields(value, mode_x="neumann", mode_y="neumann",
-            mode_z="neumann", sharding=field_sharding)[:2]
+        return _neighbor_fields(
+            value, mode_x="neumann", mode_y="neumann", mode_z="neumann", sharding=field_sharding
+        )[:2]
 
-    pressure_east, mobility_east = (
-        axial_neighbors(value)[1] for value in (pressure, mobility)
-    )
-    correction_x = (-_harmonic_mean(mobility_east, mobility)
-        * (pressure_east - pressure) / max(dx, 1.0e-12))
+    pressure_east, mobility_east = (axial_neighbors(value)[1] for value in (pressure, mobility))
+    correction_x = -_harmonic_mean(mobility_east, mobility) * (pressure_east - pressure) / max(dx, 1.0e-12)
     if mixed_axial_pressure:
         outlet_correction = mobility[-1] * pressure[-1] / max(0.5 * dx, 1.0e-12)
-        outlet_cells = (jnp.arange(pressure.shape[0])[:, None, None]
-            == pressure.shape[0] - 1)
+        outlet_cells = jnp.arange(pressure.shape[0])[:, None, None] == pressure.shape[0] - 1
         correction_x = jnp.where(outlet_cells, outlet_correction, correction_x)
 
     transverse = []
     for axis, width in ((1, dy), (2, dz)):
-        values, coefficient = (jnp.moveaxis(field, axis, 0)
-            for field in (pressure, mobility))
+        values, coefficient = (jnp.moveaxis(field, axis, 0) for field in (pressure, mobility))
         face_coefficient = _harmonic_mean(coefficient[1:], coefficient[:-1])
         distance = 0.5 * (width[:-1] + width[1:])
-        correction = jnp.zeros(
-            (values.shape[0] + 1, *values.shape[1:]), dtype=pressure.dtype)
+        correction = jnp.zeros((values.shape[0] + 1, *values.shape[1:]), dtype=pressure.dtype)
         correction = correction.at[1:-1].set(
-            -face_coefficient * (values[1:] - values[:-1])
-            / distance.reshape((-1,) + (1,) * (values.ndim - 1)))
+            -face_coefficient
+            * (values[1:] - values[:-1])
+            / distance.reshape((-1,) + (1,) * (values.ndim - 1))
+        )
         transverse.append(jnp.moveaxis(correction, 0, axis))
     return correction_x, *transverse
 
@@ -1867,9 +1868,7 @@ def _face_flux_pressure_projection_duct(
     if inlet_flow_rate is not None and inlet_flow_rate <= 0.0:
         raise ValueError("Inlet flow rate must be positive")
 
-    y0, y1, z0, z1 = (
-        _rectangular_fluid_bounds(fluid_mask) if fluid_bounds is None else fluid_bounds
-    )
+    y0, y1, z0, z1 = _rectangular_fluid_bounds(fluid_mask) if fluid_bounds is None else fluid_bounds
     us = u[:, y0:y1, z0:z1]
     vs = v[:, y0:y1, z0:z1]
     ws = w[:, y0:y1, z0:z1]
@@ -1879,9 +1878,12 @@ def _face_flux_pressure_projection_duct(
     nx, ny, nz = us.shape
     inlet_cells = jnp.arange(nx)[:, None, None] == 0
     outlet_cells = jnp.arange(nx)[:, None, None] == nx - 1
+
     def axial_neighbors(value):
-        return _neighbor_fields(value, mode_x="neumann", mode_y="neumann",
-            mode_z="neumann", sharding=field_sharding)[:2]
+        return _neighbor_fields(
+            value, mode_x="neumann", mode_y="neumann", mode_z="neumann", sharding=field_sharding
+        )[:2]
+
     uf_plus = 0.5 * (us + axial_neighbors(us)[1])
     uf_inlet = us[0]
     vf = jnp.zeros((nx, ny + 1, nz), dtype=v.dtype)
@@ -1910,14 +1912,10 @@ def _face_flux_pressure_projection_duct(
         dz=dzs,
         iterations=iterations,
         tolerance=tolerance,
-        initial_field=(
-            None if initial_pressure is None else initial_pressure[:, y0:y1, z0:z1]
-        ),
+        initial_field=(None if initial_pressure is None else initial_pressure[:, y0:y1, z0:z1]),
         single_reduction=single_reduction,
         include_axial_line=include_axial_line,
-        axial_pressure_mode=(
-            _MIXED_AXIAL_PRESSURE_MODE if mixed_axial_pressure else "neumann"
-        ),
+        axial_pressure_mode=(_MIXED_AXIAL_PRESSURE_MODE if mixed_axial_pressure else "neumann"),
         field_sharding=field_sharding,
     )
     pressure = pressure_result[0]
@@ -1959,18 +1957,16 @@ def _face_flux_pressure_projection_duct(
     active_mask = fluid_mask[:, y0:y1, z0:z1]
     area = face_area[None, :, :]
     active_area = jnp.sum(jnp.where(active_mask, area, 0.0), axis=(1, 2))
-    mean_pressure = (
-        jnp.sum(jnp.where(active_mask, pressure * area, 0.0), axis=(1, 2)) / active_area
-    )
+    mean_pressure = jnp.sum(jnp.where(active_mask, pressure * area, 0.0), axis=(1, 2)) / active_area
     mean_pressure_east = axial_neighbors(mean_pressure[:, None, None])[1][:, 0, 0]
     pressure_loss_plus = -(mean_pressure_east - mean_pressure) / max(dx, 1.0e-12)
-    pressure_loss_plus = jnp.where(outlet_cells[:, 0, 0],
-        mean_pressure[-1] / max(0.5 * dx, 1.0e-12), pressure_loss_plus)
-    pressure_loss = 0.5 * (jnp.concatenate((jnp.zeros((1,), dtype=pressure.dtype),
-        pressure_loss_plus[:-1])) + pressure_loss_plus)
-    flow_error = jnp.maximum(
-        jnp.abs(inlet_flow - inlet_flow_rate), jnp.abs(outlet_flow - inlet_flow_rate)
+    pressure_loss_plus = jnp.where(
+        outlet_cells[:, 0, 0], mean_pressure[-1] / max(0.5 * dx, 1.0e-12), pressure_loss_plus
     )
+    pressure_loss = 0.5 * (
+        jnp.concatenate((jnp.zeros((1,), dtype=pressure.dtype), pressure_loss_plus[:-1])) + pressure_loss_plus
+    )
+    flow_error = jnp.maximum(jnp.abs(inlet_flow - inlet_flow_rate), jnp.abs(outlet_flow - inlet_flow_rate))
     rho_x = 0.5 * (rhos + axial_neighbors(rhos)[1])
     wy = (dys[1:] / (dys[:-1] + dys[1:]))[None, :, None]
     rho_y = jnp.concatenate((wy * rhos[:, :-1] + (1.0 - wy) * rhos[:, 1:], rhos[:, -1:]), axis=1)
@@ -1987,9 +1983,20 @@ def _face_flux_pressure_projection_duct(
         pressure_result[2],
         pressure_result[5],
     )
-    return (full_u, full_v, full_w, full_p, pressure_loss, divergence_norm,
-        flow_error, rho_phi_x, rho_phi_y, rho_phi_z, rho_phi_inlet,
-        *linear_diagnostics)
+    return (
+        full_u,
+        full_v,
+        full_w,
+        full_p,
+        pressure_loss,
+        divergence_norm,
+        flow_error,
+        rho_phi_x,
+        rho_phi_y,
+        rho_phi_z,
+        rho_phi_inlet,
+        *linear_diagnostics,
+    )
 
 
 def _duct_momentum_defect(
@@ -2015,29 +2022,31 @@ def _duct_momentum_defect(
     dx_widths = jnp.full((shape[0],), dx, dtype=velocity.dtype)
     widths = (dx_widths, dy, dz)
     face_area = dy[:, None] * dz[None, :]
-    inlet_patch = velocity[0].at[..., 0].set(
-        rho_phi_inlet / (density[0] * face_area))
-    zero_y, zero_z = (jnp.zeros_like(velocity[:, 0]),
-        jnp.zeros_like(velocity[:, :, 0]))
+    inlet_patch = velocity[0].at[..., 0].set(rho_phi_inlet / (density[0] * face_area))
+    zero_y, zero_z = (jnp.zeros_like(velocity[:, 0]), jnp.zeros_like(velocity[:, :, 0]))
     boundary_velocity = (inlet_patch, velocity[-1], zero_y, zero_y, zero_z, zero_z)
     rho_phi = _unpack_duct_mass_flux(rho_phi_plus, rho_phi_inlet)
-    setup = _frozen_duct_momentum_setup(velocity, density, viscosity, rho_phi,
-        boundary_velocity, widths, dx=dx)
+    setup = _frozen_duct_momentum_setup(
+        velocity, density, viscosity, rho_phi, boundary_velocity, widths, dx=dx
+    )
     dynamic_viscosity, coefficients, diffusion_sink, inlet_sink, weights, gradient = setup
-    convection, diffusion = _duct_momentum_transport(velocity, rho_phi, weights,
-        boundary_velocity, widths, coefficients, diffusion_sink)
+    convection, diffusion = _duct_momentum_transport(
+        velocity, rho_phi, weights, boundary_velocity, widths, coefficients, diffusion_sink
+    )
     inlet_cells = jnp.arange(shape[0])[:, None, None] == 0
     inlet_velocity = jnp.where(inlet_cells[..., None], inlet_patch, 0.0)
     diffusion += inlet_sink[..., None] * inlet_velocity
     deviatoric_stress = _explicit_deviatoric_stress_duct(
-        velocity, dynamic_viscosity, boundary_velocity, widths, gradient=gradient)
+        velocity, dynamic_viscosity, boundary_velocity, widths, gradient=gradient
+    )
 
     mobility = dt / jnp.maximum(density, 1.0e-20)
     correction_x, correction_y, correction_z = _duct_pressure_face_corrections(
-        pressure, mobility, dx=dx, dy=dy, dz=dz, mixed_axial_pressure=True,
-        field_sharding=field_sharding)
-    correction_x_west = _neighbor_fields(correction_x, mode_x="neumann",
-        mode_y="neumann", mode_z="neumann", sharding=field_sharding)[0]
+        pressure, mobility, dx=dx, dy=dy, dz=dz, mixed_axial_pressure=True, field_sharding=field_sharding
+    )
+    correction_x_west = _neighbor_fields(
+        correction_x, mode_x="neumann", mode_y="neumann", mode_z="neumann", sharding=field_sharding
+    )[0]
     correction_x_west = jnp.where(inlet_cells, 0.0, correction_x_west)
     pressure_velocity = jnp.stack(
         (
@@ -2047,9 +2056,13 @@ def _duct_momentum_defect(
         ),
         axis=-1,
     )
-    residual = (convection - diffusion - deviatoric_stress
+    residual = (
+        convection
+        - diffusion
+        - deviatoric_stress
         - lorentz_force.at[..., 0].add(forcing)
-        - density[..., None] * pressure_velocity / dt)
+        - density[..., None] * pressure_velocity / dt
+    )
     component_maxima = jnp.max(jnp.abs(residual), axis=(0, 1, 2)) / force_scale
     return jnp.concatenate((component_maxima, jnp.max(component_maxima)[None]))
 
@@ -2154,15 +2167,12 @@ def _sample_station_magnetic_field(
             jnp.broadcast_to(y[None, :, :], shape),
             jnp.broadcast_to(z[None, :, :], shape),
         )
-    x_coords = np.asarray(
-        case.geometry.length * jnp.linspace(0.0, 1.0, nx), dtype=float
-    )
+    x_coords = np.asarray(case.geometry.length * jnp.linspace(0.0, 1.0, nx), dtype=float)
     if case.magnetic_field.kind == "constant":
         base_field = case.magnetic_field.value or (0.0, 0.0, 0.0)
         shape = (nx, ny, nz)
         return tuple(
-            jnp.broadcast_to(field_scale[:, None, None] * float(value), shape)
-            for value in base_field
+            jnp.broadcast_to(field_scale[:, None, None] * float(value), shape) for value in base_field
         )
     if case.magnetic_field.kind == "analytic":
         if case.magnetic_field.fn is None:
@@ -2185,9 +2195,7 @@ def _sample_station_magnetic_field(
             z=np.broadcast_to(np.asarray(z)[None, :, :], shape),
         )
         if "x" not in table:
-            sampled = sampled * np.asarray(
-                field_scale[:, None, None, None], dtype=float
-            )
+            sampled = sampled * np.asarray(field_scale[:, None, None, None], dtype=float)
         return (
             jnp.asarray(sampled[..., 0], dtype=float),
             jnp.asarray(sampled[..., 1], dtype=float),
@@ -2239,9 +2247,7 @@ def _bundle_station_history(
         ),
         axis=1,
     )
-    return tuple(
-        dict(zip(names, map(float, row), strict=True)) for row in np.asarray(columns)
-    )
+    return tuple(dict(zip(names, map(float, row), strict=True)) for row in np.asarray(columns))
 
 
 @jax.jit
@@ -2312,9 +2318,7 @@ def _conservative_current_fluxes_3d(
 
 
 @jax.jit
-def _station_axial_current_from_fluxes(
-    fx: jnp.ndarray, cell_area: jnp.ndarray
-) -> jnp.ndarray:
+def _station_axial_current_from_fluxes(fx: jnp.ndarray, cell_area: jnp.ndarray) -> jnp.ndarray:
     face_axial_current = jnp.sum(fx * cell_area[None, :, :], axis=(1, 2))
     return 0.5 * (face_axial_current[1:] + face_axial_current[:-1])
 
@@ -2359,9 +2363,7 @@ def _conservative_current_diagnostics_3d(
     # Integrating the conservative cell divergence gives the complete boundary
     # flux for each axial control-volume slab. This is the discrete divergence
     # theorem and avoids mixing global inlet/outlet fluxes into every station.
-    boundary_residual = jnp.abs(
-        jnp.sum(div_j * cross_section_area[None, :, :], axis=(1, 2)) * dx
-    )
+    boundary_residual = jnp.abs(jnp.sum(div_j * cross_section_area[None, :, :], axis=(1, 2)) * dx)
     return div_j, wall_leakage, boundary_residual
 
 
@@ -2449,9 +2451,7 @@ def _pipe_laplacian_3d(
         widths = _spacing_vector(dr_values, field.shape[1], dtype=field.dtype)
         r_values = jnp.asarray(r, dtype=field.dtype)
         r_centers = r_values[0, :, 0] if r_values.ndim == 3 else r_values.reshape(-1)
-        r_faces = jnp.concatenate(
-            [jnp.zeros((1,), dtype=field.dtype), jnp.cumsum(widths)]
-        )
+        r_faces = jnp.concatenate([jnp.zeros((1,), dtype=field.dtype), jnp.cumsum(widths)])
         safe_r = jnp.broadcast_to(r_centers[None, :, None], field.shape)
     else:
         widths = None
@@ -2459,41 +2459,26 @@ def _pipe_laplacian_3d(
     x_west = jnp.concatenate([field[:1], field[:-1]], axis=0)
     x_east = jnp.concatenate([field[1:], field[-1:]], axis=0)
     r_inner = jnp.concatenate([field[:, :1, :], field[:, :-1, :]], axis=1)
-    outer_ghost = (
-        jnp.zeros_like(field[:, -1:, :]) if outer_dirichlet else field[:, -1:, :]
-    )
+    outer_ghost = jnp.zeros_like(field[:, -1:, :]) if outer_dirichlet else field[:, -1:, :]
     r_outer = jnp.concatenate([field[:, 1:, :], outer_ghost], axis=1)
     theta_prev, theta_next = _pipe_theta_neighbors(field)
     dxx = (x_west - 2.0 * field + x_east) / max(dx**2, 1.0e-12)
     radial_step = dr_values if widths is None else jnp.asarray(1.0)
-    drr = (r_inner - 2.0 * field + r_outer) / jnp.maximum(
-        radial_step**2, 1.0e-12
-    )
+    drr = (r_inner - 2.0 * field + r_outer) / jnp.maximum(radial_step**2, 1.0e-12)
     d_dr = (r_outer - r_inner) / jnp.maximum(2.0 * radial_step, 1.0e-12)
-    dtheta2 = (theta_prev - 2.0 * field + theta_next) / jnp.maximum(
-        (safe_r**2) * dtheta**2, 1.0e-12
-    )
+    dtheta2 = (theta_prev - 2.0 * field + theta_next) / jnp.maximum((safe_r**2) * dtheta**2, 1.0e-12)
     if widths is None:
         lap = dxx + drr + d_dr / safe_r + dtheta2
         return lap.at[:, 0, :].set(
-            dxx[:, 0, :]
-            + 2.0
-            * (field[:, 1, :] - field[:, 0, :])
-            / jnp.maximum(dr_values**2, 1.0e-12)
+            dxx[:, 0, :] + 2.0 * (field[:, 1, :] - field[:, 0, :]) / jnp.maximum(dr_values**2, 1.0e-12)
         )
-    radial_flux = jnp.zeros(
-        (field.shape[0], field.shape[1] + 1, field.shape[2]), dtype=field.dtype
-    )
+    radial_flux = jnp.zeros((field.shape[0], field.shape[1] + 1, field.shape[2]), dtype=field.dtype)
     center_distance = 0.5 * (widths[:-1] + widths[1:])
     radial_flux = radial_flux.at[:, 1:-1, :].set(
-        r_faces[None, 1:-1, None]
-        * (field[:, 1:, :] - field[:, :-1, :])
-        / center_distance[None, :, None]
+        r_faces[None, 1:-1, None] * (field[:, 1:, :] - field[:, :-1, :]) / center_distance[None, :, None]
     )
     if outer_dirichlet:
-        radial_flux = radial_flux.at[:, -1, :].set(
-            r_faces[-1] * (-field[:, -1, :]) / (0.5 * widths[-1])
-        )
+        radial_flux = radial_flux.at[:, -1, :].set(r_faces[-1] * (-field[:, -1, :]) / (0.5 * widths[-1]))
     radial_term = (radial_flux[:, 1:, :] - radial_flux[:, :-1, :]) / jnp.maximum(
         r_centers[None, :, None] * widths[None, :, None], 1.0e-20
     )
@@ -2522,33 +2507,23 @@ def _pipe_divergence_3d(
         safe_r = jnp.maximum(r, 0.5 * float(dr_values))
     djx_dx = _pipe_gradient_3d(jx, dx=dx, dr=dr, dtheta=dtheta, r=r)[0]
     if widths is not None:
-        radial_face = jnp.zeros(
-            (jr.shape[0], jr.shape[1] + 1, jr.shape[2]), dtype=jr.dtype
-        )
-        radial_face = radial_face.at[:, 1:-1, :].set(
-            0.5 * (jr[:, 1:, :] + jr[:, :-1, :])
-        )
+        radial_face = jnp.zeros((jr.shape[0], jr.shape[1] + 1, jr.shape[2]), dtype=jr.dtype)
+        radial_face = radial_face.at[:, 1:-1, :].set(0.5 * (jr[:, 1:, :] + jr[:, :-1, :]))
         radial_term = (
             r_faces[None, 1:, None] * radial_face[:, 1:, :]
             - r_faces[None, :-1, None] * radial_face[:, :-1, :]
         ) / jnp.maximum(r_centers[None, :, None] * widths[None, :, None], 1.0e-20)
         theta_prev, theta_next = _pipe_theta_neighbors(jtheta)
-        theta_term = (theta_next - theta_prev) / jnp.maximum(
-            2.0 * dtheta * safe_r, 1.0e-12
-        )
+        theta_term = (theta_next - theta_prev) / jnp.maximum(2.0 * dtheta * safe_r, 1.0e-12)
         return djx_dx + radial_term + theta_term
     rjr = safe_r * jr
     rjr_inner = jnp.concatenate([rjr[:, :1, :], rjr[:, :-1, :]], axis=1)
     rjr_outer = jnp.concatenate([rjr[:, 1:, :], rjr[:, -1:, :]], axis=1)
-    radial_term = (rjr_outer - rjr_inner) / jnp.maximum(
-        2.0 * float(dr_values) * safe_r, 1.0e-12
-    )
+    radial_term = (rjr_outer - rjr_inner) / jnp.maximum(2.0 * float(dr_values) * safe_r, 1.0e-12)
     theta_prev, theta_next = _pipe_theta_neighbors(jtheta)
     theta_term = (theta_next - theta_prev) / jnp.maximum(2.0 * dtheta * safe_r, 1.0e-12)
     divergence = djx_dx + radial_term + theta_term
-    return divergence.at[:, 0, :].set(
-        djx_dx[:, 0, :] + 2.0 * jr[:, 1, :] / max(float(dr_values), 1.0e-12)
-    )
+    return divergence.at[:, 0, :].set(djx_dx[:, 0, :] + 2.0 * jr[:, 1, :] / max(float(dr_values), 1.0e-12))
 
 
 def _pipe_radial_fluid_count(fluid_mask: jnp.ndarray) -> int:
@@ -2589,9 +2564,7 @@ def _pipe_variable_diffusion_coefficients_3d(
     )
 
     sigma_r = _harmonic_mean(coefficient[:, 1:, :], coefficient[:, :-1, :])
-    radial_face_factor = r_faces[1:-1][None, :, None] / jnp.maximum(
-        radial_distance[None, :, None], 1.0e-20
-    )
+    radial_face_factor = r_faces[1:-1][None, :, None] / jnp.maximum(radial_distance[None, :, None], 1.0e-20)
     coef_r_inner = (
         jnp.zeros_like(coefficient)
         .at[:, 1:, :]
@@ -2618,9 +2591,7 @@ def _pipe_variable_diffusion_coefficients_3d(
     )
 
     sigma_theta_out = _harmonic_mean(coefficient, jnp.roll(coefficient, -1, axis=2))
-    coef_theta_out = sigma_theta_out / jnp.maximum(
-        r_centers[None, :, None] ** 2 * dtheta**2, 1.0e-20
-    )
+    coef_theta_out = sigma_theta_out / jnp.maximum(r_centers[None, :, None] ** 2 * dtheta**2, 1.0e-20)
     coef_theta_in = jnp.roll(coef_theta_out, 1, axis=2)
     return (
         coef_x_w,
@@ -2689,9 +2660,7 @@ def _separable_pressure_poisson_pipe(
     modal_rate = (
         radial_rate[:, None, None]
         + 2.0 * sigma[:, None, None] * (1.0 - jnp.cos(x_wave))[None, :, None] / dx**2
-        + 2.0
-        * theta_outer[0, :, 0][:, None, None]
-        * (1.0 - jnp.cos(theta_wave))[None, None, :]
+        + 2.0 * theta_outer[0, :, 0][:, None, None] * (1.0 - jnp.cos(theta_wave))[None, None, :]
     )
     radial_volume = r_centers * radial_widths * dtheta
     diagonal = radial_volume[:, None, None] * modal_rate
@@ -2704,9 +2673,7 @@ def _separable_pressure_poisson_pipe(
         diagonal.shape,
     )
     modal_rhs = jnp.moveaxis(
-        jnp.fft.rfft(
-            dct(-volume * rhs_compatible, type=2, norm="ortho", axis=0), axis=2
-        ),
+        jnp.fft.rfft(dct(-volume * rhs_compatible, type=2, norm="ortho", axis=0), axis=2),
         1,
         0,
     )
@@ -2727,18 +2694,13 @@ def _separable_pressure_poisson_pipe(
     )
     field = field - jnp.sum(field * volume) / volume_sum
     local_residual = jnp.max(
-        jnp.abs(
-            _apply_pipe_diffusion_coefficients_3d(field, coefficients) - rhs_compatible
-        )
+        jnp.abs(_apply_pipe_diffusion_coefficients_3d(field, coefficients) - rhs_compatible)
     )
     linear_rhs = -volume * rhs_compatible
     linear_residual = jnp.linalg.norm(
-        -volume * _apply_pipe_diffusion_coefficients_3d(field, coefficients)
-        - linear_rhs
+        -volume * _apply_pipe_diffusion_coefficients_3d(field, coefficients) - linear_rhs
     )
-    relative_residual = linear_residual / jnp.maximum(
-        jnp.linalg.norm(linear_rhs), 1.0e-30
-    )
+    relative_residual = linear_residual / jnp.maximum(jnp.linalg.norm(linear_rhs), 1.0e-30)
     converged = local_residual <= tolerance
     return (
         field,
@@ -2776,9 +2738,7 @@ def _solvax_pressure_poisson_pipe(
 
     radial_widths = jnp.diff(r_faces)
     volume = jnp.broadcast_to(
-        r_centers[None, :, None]
-        * radial_widths[None, :, None]
-        * jnp.asarray(dtheta, dtype=rhs.dtype),
+        r_centers[None, :, None] * radial_widths[None, :, None] * jnp.asarray(dtheta, dtype=rhs.dtype),
         rhs.shape,
     )
     volume_sum = jnp.sum(volume)
@@ -2806,9 +2766,7 @@ def _solvax_pressure_poisson_pipe(
     precondition = additive_tridiagonal_line_preconditioner(
         diagonal,
         directions,
-        periodic_last_axis=(
-            (-volume * coef_t_i, -volume * coef_t_o) if include_theta_line else None
-        ),
+        periodic_last_axis=((-volume * coef_t_i, -volume * coef_t_o) if include_theta_line else None),
     )
 
     linear_rhs = -volume * rhs_compatible
@@ -2863,15 +2821,10 @@ def _solve_pipe_diffusion_system(
     coef_x_w, coef_x_e, coef_r_i, coef_r_o, _, _ = coefficients
 
     def matvec(field: jnp.ndarray) -> jnp.ndarray:
-        diffusion = (
-            _apply_pipe_diffusion_coefficients_3d(field, coefficients)
-            - wall_sink * field
-        )
+        diffusion = _apply_pipe_diffusion_coefficients_3d(field, coefficients) - wall_sink * field
         return volume * (mass_coefficient * field - diffusion_coefficient * diffusion)
 
-    diagonal = volume * (
-        mass_coefficient + diffusion_coefficient * (sum(coefficients) + wall_sink)
-    )
+    diagonal = volume * (mass_coefficient + diffusion_coefficient * (sum(coefficients) + wall_sink))
     directions = (
         (
             0,
@@ -2999,13 +2952,9 @@ def _pipe_face_divergence(
     widths = jnp.diff(r_faces)
     return (
         (uf[1:] - uf[:-1]) / max(dx, 1.0e-12)
-        + (
-            r_faces[None, 1:, None] * vf[:, 1:, :]
-            - r_faces[None, :-1, None] * vf[:, :-1, :]
-        )
+        + (r_faces[None, 1:, None] * vf[:, 1:, :] - r_faces[None, :-1, None] * vf[:, :-1, :])
         / jnp.maximum(r_centers[None, :, None] * widths[None, :, None], 1.0e-20)
-        + (wf - jnp.roll(wf, 1, axis=2))
-        / jnp.maximum(r_centers[None, :, None] * dtheta, 1.0e-20)
+        + (wf - jnp.roll(wf, 1, axis=2)) / jnp.maximum(r_centers[None, :, None] * dtheta, 1.0e-20)
     )
 
 
@@ -3022,9 +2971,7 @@ def _pipe_pressure_face_correction(
     nx, nr, ntheta = pressure.shape
     correction_x = jnp.zeros((nx + 1, nr, ntheta), dtype=pressure.dtype)
     correction_x = correction_x.at[1:-1].set(
-        -_harmonic_mean(mobility[1:], mobility[:-1])
-        * (pressure[1:] - pressure[:-1])
-        / max(dx, 1.0e-12)
+        -_harmonic_mean(mobility[1:], mobility[:-1]) * (pressure[1:] - pressure[:-1]) / max(dx, 1.0e-12)
     )
     correction_r = jnp.zeros((nx, nr + 1, ntheta), dtype=pressure.dtype)
     correction_r = correction_r.at[:, 1:-1, :].set(
@@ -3074,9 +3021,7 @@ def _pipe_retained_modal_factors(
     cell_area = cell_area[:, :, 0]
     coefficients = tuple(coefficient[:, :, 0] for coefficient in momentum_coefficients)
     momentum_sink = momentum_sink[:, :, 0]
-    face_area = jnp.concatenate(
-        (cell_area[:1], 0.5 * (cell_area[:-1] + cell_area[1:]), cell_area[-1:])
-    )
+    face_area = jnp.concatenate((cell_area[:1], 0.5 * (cell_area[:-1] + cell_area[1:]), cell_area[-1:]))
     radial_weights = cell_area[0]
 
     def pressure_faces(pressure, coefficient, phase):
@@ -3093,10 +3038,7 @@ def _pipe_retained_modal_factors(
             / jnp.diff(r_centers)[None, :]
         )
         azimuthal = (
-            -coefficient
-            * (phase - 1.0)
-            * pressure
-            / jnp.maximum(r_centers[None, :] * dtheta, 1.0e-20)
+            -coefficient * (phase - 1.0) * pressure / jnp.maximum(r_centers[None, :] * dtheta, 1.0e-20)
         )
         return axial, radial, azimuthal
 
@@ -3112,9 +3054,7 @@ def _pipe_retained_modal_factors(
         axial_faces = axial_faces.at[1:-1].set(0.5 * (axial[1:] + axial[:-1]))
         axial_faces = axial_faces.at[0].set(axial[0]).at[-1].set(axial[-1])
         radial_faces = jnp.zeros((nx, nr + 1), dtype=radial.dtype)
-        radial_faces = radial_faces.at[:, 1:-1].set(
-            0.5 * (radial[:, 1:] + radial[:, :-1])
-        )
+        radial_faces = radial_faces.at[:, 1:-1].set(0.5 * (radial[:, 1:] + radial[:, :-1]))
         return axial_faces, radial_faces, 0.5 * (1.0 + phase) * azimuthal
 
     def momentum_inverse(rhs, phase):
@@ -3130,9 +3070,7 @@ def _pipe_retained_modal_factors(
         ).real
         lower = -coef_r_i
         upper = -coef_r_o
-        solve_args = tuple(
-            jnp.swapaxes(array, 0, 1) for array in (lower, diagonal, upper, rhs)
-        )
+        solve_args = tuple(jnp.swapaxes(array, 0, 1) for array in (lower, diagonal, upper, rhs))
         solved = tridiagonal_solve(*solve_args[:3], solve_args[3].real) + 1j * (
             tridiagonal_solve(*solve_args[:3], solve_args[3].imag)
         )
@@ -3143,16 +3081,12 @@ def _pipe_retained_modal_factors(
             (axial[1:] - axial[:-1]) / max(dx, 1.0e-12)
             + (r_faces[None, 1:] * radial[:, 1:] - r_faces[None, :-1] * radial[:, :-1])
             / jnp.maximum(r_centers[None, :] * radial_widths[None, :], 1.0e-20)
-            + (1.0 - 1.0 / phase)
-            * azimuthal
-            / jnp.maximum(r_centers[None, :] * dtheta, 1.0e-20)
+            + (1.0 - 1.0 / phase) * azimuthal / jnp.maximum(r_centers[None, :] * dtheta, 1.0e-20)
         )
 
     def modal_action(radial_pressure, source, phase, zero_mean):
         if zero_mean:
-            final = -jnp.sum(radial_pressure * radial_weights[:-1]) / jnp.maximum(
-                radial_weights[-1], 1.0e-20
-            )
+            final = -jnp.sum(radial_pressure * radial_weights[:-1]) / jnp.maximum(radial_weights[-1], 1.0e-20)
             radial_pressure = jnp.concatenate((radial_pressure, final[None]))
         pressure = jnp.zeros((nx, nr), dtype=jnp.result_type(mobility, 1j))
         pressure = pressure.at[source].set(radial_pressure)
@@ -3162,9 +3096,7 @@ def _pipe_retained_modal_factors(
 
         direct_faces = pressure_faces(pressure, pressure_mobility, phase)
         reconstructed = velocity_faces(*face_cells(*direct_faces, phase), phase)
-        stabilization = tuple(
-            direct - recovered for direct, recovered in zip(direct_faces, reconstructed)
-        )
+        stabilization = tuple(direct - recovered for direct, recovered in zip(direct_faces, reconstructed))
         axial = stabilization[0]
         if zero_mean:
             axial = axial - jnp.sum(axial * face_area, axis=1)[:, None] / jnp.maximum(
@@ -3179,25 +3111,18 @@ def _pipe_retained_modal_factors(
             phase,
         )
         if zero_mean:
-            result = result - jnp.sum(result * cell_area, axis=1)[
-                :, None
-            ] / jnp.maximum(jnp.sum(cell_area, axis=1)[:, None], 1.0e-20)
+            result = result - jnp.sum(result * cell_area, axis=1)[:, None] / jnp.maximum(
+                jnp.sum(cell_area, axis=1)[:, None], 1.0e-20
+            )
             return result[:, :-1]
         return result
 
     def factor_mode(mode, size, zero_mean):
         phase = 1.0 if zero_mean else jnp.exp(2j * jnp.pi * mode / ntheta)
         jacobian = jax.jit(
-            jax.jacfwd(
-                lambda pressure, source: modal_action(
-                    pressure, source, phase, zero_mean
-                )
-            )
+            jax.jacfwd(lambda pressure, source: modal_action(pressure, source, phase, zero_mean))
         )
-        actions = tuple(
-            jacobian(jnp.zeros((size,), dtype=mobility.dtype), source)
-            for source in range(nx)
-        )
+        actions = tuple(jacobian(jnp.zeros((size,), dtype=mobility.dtype), source) for source in range(nx))
         if zero_mean:
             actions = tuple(action.real for action in actions)
         empty = jnp.zeros((size, size), dtype=actions[0].dtype)
@@ -3231,9 +3156,7 @@ def _solve_pipe_retained_modal_factors(factors, residual):
     return jnp.concatenate(
         (
             radial,
-            jnp.stack((solved.real, -solved.imag), axis=1).reshape(
-                (residual.shape[0], -1)
-            ),
+            jnp.stack((solved.real, -solved.imag), axis=1).reshape((residual.shape[0], -1)),
         ),
         axis=1,
     )
@@ -3259,8 +3182,7 @@ def _steady_stokes_projection_pipe(
     max_restarts: int = 8,
     flow_response_matrix: jnp.ndarray | None = None,
     pressure_preconditioner_mobility: jnp.ndarray | None = None,
-    apply_momentum_inverse_components: Callable[[jnp.ndarray], jnp.ndarray]
-    | None = None,
+    apply_momentum_inverse_components: Callable[[jnp.ndarray], jnp.ndarray] | None = None,
     modal_momentum_coefficients: tuple[jnp.ndarray, ...] | None = None,
     modal_momentum_sink: jnp.ndarray | None = None,
     modal_stabilization: bool = False,
@@ -3283,27 +3205,19 @@ def _steady_stokes_projection_pipe(
     sqrt_area = jnp.sqrt(jnp.maximum(flat_area, 1.0e-30))
     gauge = sqrt_area / jnp.linalg.norm(sqrt_area, axis=1, keepdims=True)
     householder = gauge.at[:, -1].add(-1.0)
-    householder_scale = 2.0 / jnp.maximum(
-        jnp.sum(householder**2, axis=1, keepdims=True), 1.0e-30
-    )
+    householder_scale = 2.0 / jnp.maximum(jnp.sum(householder**2, axis=1, keepdims=True), 1.0e-30)
 
     def reflect(field):
-        return field - householder_scale * householder * jnp.sum(
-            householder * field, axis=1, keepdims=True
-        )
+        return field - householder_scale * householder * jnp.sum(householder * field, axis=1, keepdims=True)
 
     def unpack_pressure(reduced):
         reduced = reduced.reshape((u.shape[0], cross_section_size - 1))
         if modal_stabilization:
             transformed = reflect(
-                jnp.concatenate(
-                    (reduced, jnp.zeros((u.shape[0], 1), dtype=reduced.dtype)), axis=1
-                )
+                jnp.concatenate((reduced, jnp.zeros((u.shape[0], 1), dtype=reduced.dtype)), axis=1)
             )
             return (transformed / sqrt_area).reshape(u.shape)
-        final = -jnp.sum(reduced * flat_area[:, :-1], axis=1) / jnp.maximum(
-            flat_area[:, -1], 1.0e-20
-        )
+        final = -jnp.sum(reduced * flat_area[:, :-1], axis=1) / jnp.maximum(flat_area[:, -1], 1.0e-20)
         return jnp.concatenate((reduced, final[:, None]), axis=1).reshape(u.shape)
 
     def reduce_field(field):
@@ -3340,12 +3254,9 @@ def _steady_stokes_projection_pipe(
             r_centers=r_centers,
             dtheta=dtheta,
         )
-        reconstructed_faces = _pipe_velocity_faces(
-            *_pipe_face_velocity_cells(*pressure_faces)
-        )
+        reconstructed_faces = _pipe_velocity_faces(*_pipe_face_velocity_cells(*pressure_faces))
         stabilization = tuple(
-            direct - reconstructed
-            for direct, reconstructed in zip(pressure_faces, reconstructed_faces)
+            direct - reconstructed for direct, reconstructed in zip(pressure_faces, reconstructed_faces)
         )
         face_area = jnp.concatenate(
             (
@@ -3362,25 +3273,20 @@ def _steady_stokes_projection_pipe(
         axial = axial.at[0].set(0.0).at[-1].set(0.0)
         stabilization = (axial, *stabilization[1:])
         return tuple(
-            exact + correction
-            for exact, correction in zip(_pipe_velocity_faces(*response), stabilization)
+            exact + correction for exact, correction in zip(_pipe_velocity_faces(*response), stabilization)
         )
 
     def constraints(state_u, state_v, state_w, *, faces=None):
         divergence = _pipe_face_divergence(
-            *(
-                _pipe_velocity_faces(state_u, state_v, state_w)
-                if faces is None
-                else faces
-            ),
+            *(_pipe_velocity_faces(state_u, state_v, state_w) if faces is None else faces),
             dx=dx,
             r_faces=r_faces,
             r_centers=r_centers,
             dtheta=dtheta,
         )
-        mean_divergence = jnp.sum(
-            divergence * cell_area, axis=(1, 2), keepdims=True
-        ) / jnp.maximum(area_sum, 1.0e-20)
+        mean_divergence = jnp.sum(divergence * cell_area, axis=(1, 2), keepdims=True) / jnp.maximum(
+            area_sum, 1.0e-20
+        )
         flow = jnp.sum(state_u * cell_area, axis=(1, 2))
         return jnp.concatenate((reduce_field(divergence - mean_divergence), flow))
 
@@ -3417,9 +3323,7 @@ def _steady_stokes_projection_pipe(
 
     if modal_stabilization:
         if modal_momentum_coefficients is None or modal_momentum_sink is None:
-            raise ValueError(
-                "modal stabilization requires retained-modal coefficients and sink"
-            )
+            raise ValueError("modal stabilization requires retained-modal coefficients and sink")
         radial_weights = jnp.sum(cell_area, axis=2)
         coarse_pressure_size = u.shape[0] * (u.shape[1] - 1)
         modal_modes = (1, 2, 3, 4)
@@ -3440,9 +3344,7 @@ def _steady_stokes_projection_pipe(
                 u.shape,
             )
             offset = coarse_pressure_size
-            modes = coarse[offset : offset + mode_size].reshape(
-                (2, len(modal_modes), u.shape[0], u.shape[1])
-            )
+            modes = coarse[offset : offset + mode_size].reshape((2, len(modal_modes), u.shape[0], u.shape[1]))
             pressure = (
                 pressure
                 + jnp.einsum("mxr,mt->xrt", modes[0], mode_cosine)
@@ -3477,9 +3379,9 @@ def _steady_stokes_projection_pipe(
         def modal_restrict(residual):
             coarse = restrict(residual)
             radial = coarse[:coarse_pressure_size].reshape((u.shape[0], u.shape[1] - 1))
-            modes = coarse[
-                coarse_pressure_size : coarse_pressure_size + mode_size
-            ].reshape((2, len(modal_modes), u.shape[0], u.shape[1]))
+            modes = coarse[coarse_pressure_size : coarse_pressure_size + mode_size].reshape(
+                (2, len(modal_modes), u.shape[0], u.shape[1])
+            )
             return jnp.concatenate(
                 (radial, jnp.transpose(modes, (2, 0, 1, 3)).reshape((u.shape[0], -1))),
                 axis=1,
@@ -3507,23 +3409,17 @@ def _steady_stokes_projection_pipe(
 
         def modal_prolong(local):
             coarse = jnp.zeros((coarse_size,), dtype=u.dtype)
-            coarse = coarse.at[:coarse_pressure_size].set(
-                local[:, : u.shape[1] - 1].reshape(-1)
+            coarse = coarse.at[:coarse_pressure_size].set(local[:, : u.shape[1] - 1].reshape(-1))
+            modes = local[:, u.shape[1] - 1 :].reshape((u.shape[0], 2, len(modal_modes), u.shape[1]))
+            coarse = coarse.at[coarse_pressure_size : coarse_pressure_size + mode_size].set(
+                jnp.transpose(modes, (1, 2, 0, 3)).reshape(-1)
             )
-            modes = local[:, u.shape[1] - 1 :].reshape(
-                (u.shape[0], 2, len(modal_modes), u.shape[1])
-            )
-            coarse = coarse.at[
-                coarse_pressure_size : coarse_pressure_size + mode_size
-            ].set(jnp.transpose(modes, (1, 2, 0, 3)).reshape(-1))
             return prolong(coarse)
 
         def precondition(residual):
             local = local_precondition(residual)
             modal_residual = modal_restrict(residual - schur(local))
-            modal_correction = _solve_pipe_retained_modal_factors(
-                modal_factors, modal_residual
-            )
+            modal_correction = _solve_pipe_retained_modal_factors(modal_factors, modal_residual)
             candidate = local + modal_prolong(modal_correction)
             flow_residual = (residual - schur(candidate))[pressure_size:]
             flow_response = (
@@ -3531,9 +3427,7 @@ def _steady_stokes_projection_pipe(
                 if flow_response_matrix is not None
                 else flow_residual / jnp.maximum(jnp.mean(response_flow), 1.0e-20)
             )
-            return candidate + jnp.zeros_like(candidate).at[pressure_size:].set(
-                flow_response
-            )
+            return candidate + jnp.zeros_like(candidate).at[pressure_size:].set(flow_response)
 
     else:
         precondition = local_precondition
@@ -3585,9 +3479,7 @@ def _steady_stokes_projection_pipe(
             atol=pilot_tolerance,
             max_restarts=1,
         )
-        pilot_passes = (
-            physical_constraint_residual(pilot.x, linear_rhs) <= physical_tolerance
-        )
+        pilot_passes = physical_constraint_residual(pilot.x, linear_rhs) <= physical_tolerance
 
         def accept_pilot(_):
             return pilot
@@ -3640,9 +3532,7 @@ def _steady_stokes_projection_pipe(
             .set(jnp.linalg.solve(flow_response_matrix, flow_delta))
         )
         flow_refinement = velocity_response(flow_refinement_state)
-        correction = tuple(
-            base + delta for base, delta in zip(correction, flow_refinement)
-        )
+        correction = tuple(base + delta for base, delta in zip(correction, flow_refinement))
         projected = tuple(base + delta for base, delta in zip((u, v, w), correction))
         pressure_loss = pressure_loss + flow_refinement_state[pressure_size:]
         refined_state = pressure_solution.x + flow_refinement_state
@@ -3659,8 +3549,7 @@ def _steady_stokes_projection_pipe(
     if modal_stabilization:
         response_faces = rhie_chow_faces(pressure, correction)
         projected_faces = tuple(
-            base + response
-            for base, response in zip(_pipe_velocity_faces(u, v, w), response_faces)
+            base + response for base, response in zip(_pipe_velocity_faces(u, v, w), response_faces)
         )
     final_divergence = _pipe_face_divergence(
         *projected_faces,
@@ -3669,17 +3558,15 @@ def _steady_stokes_projection_pipe(
         r_centers=r_centers,
         dtheta=dtheta,
     )
-    final_mean_divergence = jnp.sum(
-        final_divergence * cell_area, axis=(1, 2), keepdims=True
-    ) / jnp.maximum(area_sum, 1.0e-30)
+    final_mean_divergence = jnp.sum(final_divergence * cell_area, axis=(1, 2), keepdims=True) / jnp.maximum(
+        area_sum, 1.0e-30
+    )
     final_mean_free_divergence = final_divergence - final_mean_divergence
     divergence_residual = jnp.max(jnp.abs(final_mean_free_divergence))
     flow_residual = jnp.max(jnp.abs(final_flow - target_flow_rate))
     normalized_flow_residual = flow_residual / jnp.maximum(jnp.mean(area_sum), 1.0e-30)
     physical_residual = jnp.maximum(divergence_residual, normalized_flow_residual)
-    convergence_tolerance = (
-        pressure_tolerance if physical_tolerance is None else physical_tolerance
-    )
+    convergence_tolerance = pressure_tolerance if physical_tolerance is None else physical_tolerance
     pressure_solution = KrylovSolution(
         pressure_solution.x,
         physical_residual,
@@ -3717,11 +3604,7 @@ def _face_flux_pressure_projection_pipe(
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Project mapped-pipe velocity using the same cylindrical face flux."""
 
-    count = (
-        _pipe_radial_fluid_count(fluid_mask)
-        if radial_fluid_count is None
-        else radial_fluid_count
-    )
+    count = _pipe_radial_fluid_count(fluid_mask) if radial_fluid_count is None else radial_fluid_count
     us = u[:, :count, :]
     vs = v[:, :count, :]
     ws = w[:, :count, :]
@@ -3748,9 +3631,7 @@ def _face_flux_pressure_projection_pipe(
         dtheta=dtheta,
         iterations=iterations,
         tolerance=tolerance,
-        initial_field=(
-            None if initial_pressure is None else initial_pressure[:, :count, :]
-        ),
+        initial_field=(None if initial_pressure is None else initial_pressure[:, :count, :]),
         include_theta_line=include_theta_line,
     )
 
@@ -3821,31 +3702,25 @@ def _fixed_flow_face_flux_projection_pipe(
         target_flow_rate=target_flow_rate,
         base_pressure_loss_gradient=base_pressure_loss_gradient,
     )
-    projected_u, projected_v, projected_w, pressure, divergence = (
-        _face_flux_pressure_projection_pipe(
-            constrained_u,
-            v,
-            w,
-            rho,
-            fluid_mask,
-            dt=dt,
-            dx=dx,
-            r_faces=r_faces,
-            r_centers=r_centers,
-            dtheta=dtheta,
-            iterations=iterations,
-            tolerance=tolerance,
-            radial_fluid_count=radial_fluid_count,
-            initial_pressure=initial_pressure,
-            include_theta_line=include_theta_line,
-        )
+    projected_u, projected_v, projected_w, pressure, divergence = _face_flux_pressure_projection_pipe(
+        constrained_u,
+        v,
+        w,
+        rho,
+        fluid_mask,
+        dt=dt,
+        dx=dx,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=dtheta,
+        iterations=iterations,
+        tolerance=tolerance,
+        radial_fluid_count=radial_fluid_count,
+        initial_pressure=initial_pressure,
+        include_theta_line=include_theta_line,
     )
-    projected_flow = jnp.sum(
-        jnp.where(fluid_mask, projected_u * cell_area, 0.0), axis=(1, 2)
-    )
-    response_flow = jnp.sum(
-        jnp.where(fluid_mask, unit_pressure_response * cell_area, 0.0), axis=(1, 2)
-    )
+    projected_flow = jnp.sum(jnp.where(fluid_mask, projected_u * cell_area, 0.0), axis=(1, 2))
+    response_flow = jnp.sum(jnp.where(fluid_mask, unit_pressure_response * cell_area, 0.0), axis=(1, 2))
     mean_response = jnp.mean(response_flow)
     if float(jnp.abs(mean_response)) <= 1.0e-20:
         raise ValueError("Fixed-flow pipe pressure response must be nonzero")
@@ -3858,12 +3733,8 @@ def _fixed_flow_face_flux_projection_pipe(
         0.0,
     )
     pressure_loss_gradient = pressure_loss_gradient + global_multiplier
-    final_flow = jnp.sum(
-        jnp.where(fluid_mask, projected_u * cell_area, 0.0), axis=(1, 2)
-    )
-    flow_error = jnp.max(
-        jnp.abs(final_flow - jnp.asarray(target_flow_rate, dtype=u.dtype))
-    )
+    final_flow = jnp.sum(jnp.where(fluid_mask, projected_u * cell_area, 0.0), axis=(1, 2))
+    flow_error = jnp.max(jnp.abs(final_flow - jnp.asarray(target_flow_rate, dtype=u.dtype)))
     return (
         projected_u,
         projected_v,
@@ -3928,7 +3799,11 @@ def _pipe_poisson_jacobi_3d(
         )
 
     return _jacobi_fixed_point(
-        update, field, residual_norm, iterations=iterations, tolerance=tolerance,
+        update,
+        field,
+        residual_norm,
+        iterations=iterations,
+        tolerance=tolerance,
         stage="3-D pipe Poisson iteration",
     )
 
@@ -3955,9 +3830,7 @@ def _pipe_conservative_current_fluxes_3d(
     uxb_face_x = 0.5 * (uxb_x[1:] + uxb_x[:-1])
     fx = fx.at[1:-1].set(sigma_x * (-phi_grad_x + uxb_face_x))
 
-    dr_centers = jnp.maximum(
-        0.5 * (jnp.diff(r_faces)[1:] + jnp.diff(r_faces)[:-1]), 1.0e-12
-    )
+    dr_centers = jnp.maximum(0.5 * (jnp.diff(r_faces)[1:] + jnp.diff(r_faces)[:-1]), 1.0e-12)
     sigma_r = _harmonic_mean(sigma[:, 1:, :], sigma[:, :-1, :])
     phi_grad_r = (phi[:, 1:, :] - phi[:, :-1, :]) / dr_centers[None, :, None]
     uxb_face_r = 0.5 * (uxb_r[:, 1:, :] + uxb_r[:, :-1, :])
@@ -3997,8 +3870,7 @@ def _pipe_conservative_current_diagnostics_3d(
     )
     dr = jnp.diff(r_faces)
     radial_term = (
-        r_faces[None, 1:, None] * fr[:, 1:, :]
-        - r_faces[None, :-1, None] * fr[:, :-1, :]
+        r_faces[None, 1:, None] * fr[:, 1:, :] - r_faces[None, :-1, None] * fr[:, :-1, :]
     ) / jnp.maximum(r_centers[None, :, None] * dr[None, :, None], 1.0e-12)
     theta_term = (ftheta - jnp.roll(ftheta, 1, axis=2)) / jnp.maximum(
         r_centers[None, :, None] * dtheta, 1.0e-12
@@ -4008,9 +3880,7 @@ def _pipe_conservative_current_diagnostics_3d(
     wall_leakage = jnp.sum(jnp.abs(fr[:, -1, :]) * wall_area, axis=1)
     yz_area = r_centers[:, None] * dr[:, None] * dtheta
     boundary_residual = jnp.abs(
-        -jnp.sum(fx[0] * yz_area)
-        + jnp.sum(fx[-1] * yz_area)
-        + jnp.sum(fr[:, -1, :] * wall_area, axis=1)
+        -jnp.sum(fx[0] * yz_area) + jnp.sum(fx[-1] * yz_area) + jnp.sum(fr[:, -1, :] * wall_area, axis=1)
     )
     return div_j, wall_leakage, boundary_residual
 
@@ -4040,8 +3910,7 @@ def _pipe_conservative_emf_rhs_3d(
     )
     dr = jnp.diff(r_faces)
     radial_term = (
-        r_faces[None, 1:, None] * fr[:, 1:, :]
-        - r_faces[None, :-1, None] * fr[:, :-1, :]
+        r_faces[None, 1:, None] * fr[:, 1:, :] - r_faces[None, :-1, None] * fr[:, :-1, :]
     ) / jnp.maximum(r_centers[None, :, None] * dr[None, :, None], 1.0e-12)
     theta_term = (ftheta - jnp.roll(ftheta, 1, axis=2)) / jnp.maximum(
         r_centers[None, :, None] * dtheta, 1.0e-12
@@ -4129,11 +3998,7 @@ def _pipe_poisson_sparse_3d(
                         jnp.asarray(sigma_cell), jnp.asarray(sigma_np[i, j - 1, k])
                     ).item()
                     dr_face = max(0.5 * (dr_np[j - 1] + dr_np[j]), 1.0e-12)
-                    coeff = (
-                        r_faces_np[j]
-                        * sigma_face
-                        / max(r_centers_np[j] * dr_np[j] * dr_face, 1.0e-12)
-                    )
+                    coeff = r_faces_np[j] * sigma_face / max(r_centers_np[j] * dr_np[j] * dr_face, 1.0e-12)
                     diagonal += coeff
                     rows.append(row)
                     cols.append(flat(i, j - 1, k))
@@ -4144,9 +4009,7 @@ def _pipe_poisson_sparse_3d(
                     ).item()
                     dr_face = max(0.5 * (dr_np[j] + dr_np[j + 1]), 1.0e-12)
                     coeff = (
-                        r_faces_np[j + 1]
-                        * sigma_face
-                        / max(r_centers_np[j] * dr_np[j] * dr_face, 1.0e-12)
+                        r_faces_np[j + 1] * sigma_face / max(r_centers_np[j] * dr_np[j] * dr_face, 1.0e-12)
                     )
                     diagonal += coeff
                     rows.append(row)
@@ -4161,12 +4024,8 @@ def _pipe_poisson_sparse_3d(
                 sigma_next = _harmonic_mean(
                     jnp.asarray(sigma_cell), jnp.asarray(sigma_np[i, j, k_next])
                 ).item()
-                theta_coeff_prev = sigma_prev / max(
-                    r_centers_np[j] ** 2 * dtheta**2, 1.0e-12
-                )
-                theta_coeff_next = sigma_next / max(
-                    r_centers_np[j] ** 2 * dtheta**2, 1.0e-12
-                )
+                theta_coeff_prev = sigma_prev / max(r_centers_np[j] ** 2 * dtheta**2, 1.0e-12)
+                theta_coeff_next = sigma_next / max(r_centers_np[j] ** 2 * dtheta**2, 1.0e-12)
                 diagonal += theta_coeff_prev + theta_coeff_next
                 rows.append(row)
                 cols.append(flat(i, j, k_prev))
@@ -4234,11 +4093,7 @@ def _enforce_pipe_velocity_bc(
             w = w.at[:, interface_index, :].set(ratio * w[:, interface_index - 1, :])
             v = v.at[:, interface_index, :].set(0.0)
     elif r_centers is not None and r_faces is not None and u.shape[1] > 1:
-        outer_ratio = (
-            0.9
-            * (r_faces[-1] - r_centers[-1])
-            / jnp.maximum(r_faces[-1] - r_centers[-2], 1.0e-12)
-        )
+        outer_ratio = 0.9 * (r_faces[-1] - r_centers[-1]) / jnp.maximum(r_faces[-1] - r_centers[-2], 1.0e-12)
         u = u.at[:, -1, :].set(outer_ratio * u[:, -2, :])
         w = w.at[:, -1, :].set(outer_ratio * w[:, -2, :])
     else:
@@ -4287,9 +4142,7 @@ def build_square_duct_extruded_problem(
     exit_center: float = 4.5,
     transition_width: float = 0.35,
 ) -> ExtrudedInductionlessProblem:
-    case = make_shercliff_case(
-        ha=ha_peak, width=width, height=height, ny=ny, nz=nz
-    )
+    case = make_shercliff_case(ha=ha_peak, width=width, height=height, ny=ny, nz=nz)
     case = replace(
         case,
         geometry=replace(case.geometry, length=length, nx=nx_stations),
@@ -4366,54 +4219,6 @@ def build_magnetic_obstacle_rect_extruded_problem(
         ),
     )
     return replace(problem, case=case)
-
-
-def build_wham_mirror_pipe_extruded_problem(
-    *,
-    table_path: str,
-    radius: float = 0.25,
-    nr: int = 18,
-    ntheta: int = 48,
-    length: float = 1.4,
-    nx_stations: int = 25,
-    conductivity: float = 1.0,
-    density: float = 1.0,
-    viscosity: float = 1.0,
-    forcing: float = 1.0,
-) -> ExtrudedInductionlessProblem:
-    problem = build_pipe_ogrid_extruded_problem(
-        ha_peak=1.0,
-        radius=radius,
-        nr=nr,
-        ntheta=ntheta,
-        length=length,
-        nx_stations=nx_stations,
-        entry_center=0.3 * length,
-        exit_center=0.7 * length,
-        transition_width=0.08 * length,
-        conductivity=conductivity,
-        density=density,
-        viscosity=viscosity,
-    )
-    return ExtrudedInductionlessProblem(
-        case=replace(
-            problem.case,
-            name="wham_mirror_pipe",
-            magnetic_field=MagneticFieldSpec(
-                kind="tabulated", table_path=str(table_path)
-            ),
-            forcing=forcing,
-            notes=(
-                "Pipe crossing a tabulated WHAM-like mirror field. "
-                "This is the current stronger Benchmark D inductionless baseline."
-            ),
-        ),
-        profile=FringingProfile(
-            x=problem.profile.x,
-            field_scale=jnp.ones_like(problem.profile.field_scale),
-            axis="z",
-        ),
-    )
 
 
 def build_layered_duct_extruded_problem(
@@ -4610,26 +4415,18 @@ def validate_bent_pipe_low_de_baseline(
     if bent_geometry.kind != "bent_pipe":
         raise ValueError("Bent-pipe validation requires a bent_pipe solution")
     if straight_solution.problem.case.geometry.kind != "pipe_ogrid":
-        raise ValueError(
-            "Bent-pipe validation requires a straight pipe_ogrid comparison solution"
-        )
+        raise ValueError("Bent-pipe validation requires a straight pipe_ogrid comparison solution")
     if bent_solution.bundle.u.shape != straight_solution.bundle.u.shape:
-        raise ValueError(
-            "Bent and straight comparison bundles must share the same shape"
-        )
+        raise ValueError("Bent and straight comparison bundles must share the same shape")
 
     bent_bundle = bent_solution.bundle
     straight_bundle = straight_solution.bundle
     mid_index = int(bent_bundle.u.shape[0] // 2)
     bent_mid = bent_bundle.u[mid_index]
     straight_mid = straight_bundle.u[mid_index]
-    bent_secondary_mid = jnp.sqrt(
-        bent_bundle.v[mid_index] ** 2 + bent_bundle.w[mid_index] ** 2
-    )
+    bent_secondary_mid = jnp.sqrt(bent_bundle.v[mid_index] ** 2 + bent_bundle.w[mid_index] ** 2)
     reference_norm = jnp.maximum(jnp.linalg.norm(straight_mid), 1.0e-12)
-    cross_section_l2_error = float(
-        jnp.linalg.norm(bent_mid - straight_mid) / reference_norm
-    )
+    cross_section_l2_error = float(jnp.linalg.norm(bent_mid - straight_mid) / reference_norm)
 
     r = jnp.asarray(bent_bundle.y, dtype=float)
     signed_r, bent_cut = _signed_pipe_cut(bent_mid, r, theta_index=0)
@@ -4638,18 +4435,14 @@ def validate_bent_pipe_low_de_baseline(
     centerline_l2_error = float(jnp.linalg.norm(bent_cut - straight_cut) / cut_norm)
     axial_scale = float(jnp.maximum(jnp.mean(jnp.abs(bent_mid)), 1.0e-12))
     peak_axial_scale = float(jnp.maximum(jnp.max(jnp.abs(bent_mid)), 1.0e-12))
-    secondary_flow_rms_ratio = float(
-        jnp.sqrt(jnp.mean(bent_secondary_mid**2)) / axial_scale
-    )
+    secondary_flow_rms_ratio = float(jnp.sqrt(jnp.mean(bent_secondary_mid**2)) / axial_scale)
     secondary_flow_peak_ratio = float(jnp.max(bent_secondary_mid) / peak_axial_scale)
     bent_cut_abs = jnp.abs(bent_cut)
     straight_cut_abs = jnp.abs(straight_cut)
     bent_weight = jnp.maximum(jnp.sum(bent_cut_abs), 1.0e-12)
     straight_weight = jnp.maximum(jnp.sum(straight_cut_abs), 1.0e-12)
     bent_velocity_centroid = float(jnp.sum(signed_r * bent_cut_abs) / bent_weight)
-    straight_velocity_centroid = float(
-        jnp.sum(signed_r * straight_cut_abs) / straight_weight
-    )
+    straight_velocity_centroid = float(jnp.sum(signed_r * straight_cut_abs) / straight_weight)
     velocity_centroid_shift = bent_velocity_centroid - straight_velocity_centroid
     radius_scale = float(jnp.maximum(jnp.max(jnp.abs(signed_r)), 1.0e-12))
     normalized_velocity_centroid_shift = float(velocity_centroid_shift / radius_scale)
@@ -4662,24 +4455,16 @@ def validate_bent_pipe_low_de_baseline(
     mean_velocity = float(jnp.mean(jnp.abs(bent_bundle.mean_velocity)))
     diameter = 2.0 * float(bent_geometry.radius or 0.5 * bent_geometry.width)
     reynolds_number = float(
-        (region.density or 1.0)
-        * mean_velocity
-        * diameter
-        / max(region.viscosity or 1.0, 1.0e-12)
+        (region.density or 1.0) * mean_velocity * diameter / max(region.viscosity or 1.0, 1.0e-12)
     )
     curvature_ratio = float(
-        (bent_geometry.radius or 0.5 * bent_geometry.width)
-        / max(bent_geometry.bend_radius or 1.0, 1.0e-12)
+        (bent_geometry.radius or 0.5 * bent_geometry.width) / max(bent_geometry.bend_radius or 1.0, 1.0e-12)
     )
     dean_number = float(reynolds_number * np.sqrt(max(curvature_ratio, 0.0)))
     throughput_span = float(bent_solution.validation.volumetric_flow_rate_span)
-    max_charge_balance_residual = float(
-        bent_solution.validation.max_charge_balance_residual
-    )
+    max_charge_balance_residual = float(bent_solution.validation.max_charge_balance_residual)
     max_wall_current_leakage = float(bent_solution.validation.max_wall_current_leakage)
-    net_boundary_current_residual = float(
-        bent_solution.validation.net_boundary_current_residual
-    )
+    net_boundary_current_residual = float(bent_solution.validation.net_boundary_current_residual)
     bounded_charge_balance_tolerance = 5.0e-2
     research_grade_charge_balance_tolerance = 1.0e-3
     research_grade_charge_balance_pass = bool(
@@ -4735,32 +4520,18 @@ def validate_variable_field_extruded_solution(
         raise ValueError(
             "Variable-field extruded validation currently supports rectangular and layered ducts only"
         )
-    field_metrics = _variable_field_metrics(
-        solution, field_ny=field_ny, field_nz=field_nz
-    )
+    field_metrics = _variable_field_metrics(solution, field_ny=field_ny, field_nz=field_nz)
     validation = solution.validation
     finite_velocity = bool(np.isfinite(np.asarray(solution.bundle.u, dtype=float)).all())
     field_scale = np.asarray(solution.bundle.field_scale, dtype=float)
     mean_velocity = np.asarray(solution.bundle.mean_velocity, dtype=float)
-    current_proxy = np.asarray(
-        solution.bundle.current_scaled_pressure_proxy, dtype=float
-    )
+    current_proxy = np.asarray(solution.bundle.current_scaled_pressure_proxy, dtype=float)
     field_velocity_correlation = float(
         _safe_correlation(jnp.asarray(field_scale), jnp.asarray(mean_velocity))
     )
-    velocity_change = (
-        float(np.max(mean_velocity) - np.min(mean_velocity))
-        if mean_velocity.size
-        else 0.0
-    )
-    current_proxy_change = (
-        float(np.max(current_proxy) - np.min(current_proxy))
-        if current_proxy.size
-        else 0.0
-    )
-    charge_limit = (
-        5.0e-2 if solution.problem.case.geometry.kind == "rect_duct" else 2.0e-1
-    )
+    velocity_change = float(np.max(mean_velocity) - np.min(mean_velocity)) if mean_velocity.size else 0.0
+    current_proxy_change = float(np.max(current_proxy) - np.min(current_proxy)) if current_proxy.size else 0.0
+    charge_limit = 5.0e-2 if solution.problem.case.geometry.kind == "rect_duct" else 2.0e-1
     validation_pass = bool(
         finite_velocity
         and field_metrics["rms_divergence"] <= 5.0e-2
@@ -4779,9 +4550,7 @@ def validate_variable_field_extruded_solution(
         "current_proxy_change": current_proxy_change,
         "max_charge_balance_residual": float(validation.max_charge_balance_residual),
         "max_wall_current_leakage": float(validation.max_wall_current_leakage),
-        "net_boundary_current_residual": float(
-            validation.net_boundary_current_residual
-        ),
+        "net_boundary_current_residual": float(validation.net_boundary_current_residual),
         "validation_pass": validation_pass,
     }
 
@@ -4793,30 +4562,15 @@ def validate_variable_field_pipe_solution(
     field_nz: int = 81,
 ) -> dict[str, float | bool]:
     if solution.problem.case.geometry.kind not in {"pipe_ogrid", "bent_pipe"}:
-        raise ValueError(
-            "Variable-field pipe validation currently supports pipe_ogrid and bent_pipe only"
-        )
-    field_metrics = _variable_field_metrics(
-        solution, field_ny=field_ny, field_nz=field_nz
-    )
+        raise ValueError("Variable-field pipe validation currently supports pipe_ogrid and bent_pipe only")
+    field_metrics = _variable_field_metrics(solution, field_ny=field_ny, field_nz=field_nz)
     validation = solution.validation
     mean_velocity = np.asarray(solution.bundle.mean_velocity, dtype=float)
-    current_proxy = np.asarray(
-        solution.bundle.current_scaled_pressure_proxy, dtype=float
-    )
-    velocity_change = (
-        float(np.max(mean_velocity) - np.min(mean_velocity))
-        if mean_velocity.size
-        else 0.0
-    )
-    current_proxy_change = (
-        float(np.max(current_proxy) - np.min(current_proxy))
-        if current_proxy.size
-        else 0.0
-    )
+    current_proxy = np.asarray(solution.bundle.current_scaled_pressure_proxy, dtype=float)
+    velocity_change = float(np.max(mean_velocity) - np.min(mean_velocity)) if mean_velocity.size else 0.0
+    current_proxy_change = float(np.max(current_proxy) - np.min(current_proxy)) if current_proxy.size else 0.0
     divergence_ratio = float(
-        field_metrics["rms_divergence"]
-        / max(field_metrics["mean_field_magnitude"], 1.0e-12)
+        field_metrics["rms_divergence"] / max(field_metrics["mean_field_magnitude"], 1.0e-12)
     )
     validation_pass = bool(
         divergence_ratio <= 8.0e-2
@@ -4832,9 +4586,7 @@ def validate_variable_field_pipe_solution(
         "current_proxy_change": current_proxy_change,
         "max_charge_balance_residual": float(validation.max_charge_balance_residual),
         "max_wall_current_leakage": float(validation.max_wall_current_leakage),
-        "net_boundary_current_residual": float(
-            validation.net_boundary_current_residual
-        ),
+        "net_boundary_current_residual": float(validation.net_boundary_current_residual),
         "validation_pass": validation_pass,
     }
 
@@ -4883,9 +4635,7 @@ def _variable_field_metrics(
             "rms_divergence": float(np.sqrt(np.mean(div**2))),
             "mean_field_magnitude": float(np.mean(magnitude)),
         }
-    raise ValueError(
-        "Variable-field validation currently supports analytic and tabulated magnetic fields"
-    )
+    raise ValueError("Variable-field validation currently supports analytic and tabulated magnetic fields")
 
 
 def validate_magnetic_obstacle_baseline(
@@ -4895,16 +4645,12 @@ def validate_magnetic_obstacle_baseline(
     field_nz: int = 81,
 ) -> dict[str, float | bool | str]:
     if solution.problem.case.geometry.kind != "rect_duct":
-        raise ValueError(
-            "Magnetic-obstacle baseline currently supports rectangular ducts only"
-        )
+        raise ValueError("Magnetic-obstacle baseline currently supports rectangular ducts only")
     if (
         solution.problem.case.magnetic_field.kind != "analytic"
         or solution.problem.case.magnetic_field.fn is None
     ):
-        raise ValueError(
-            "Magnetic-obstacle baseline requires an analytic magnetic field"
-        )
+        raise ValueError("Magnetic-obstacle baseline requires an analytic magnetic field")
 
     from .field_models import cross_section_divergence_metrics
 
@@ -4924,17 +4670,14 @@ def validate_magnetic_obstacle_baseline(
     peak_index = int(np.argmax(field_scale)) if field_scale.size else 0
     inlet_reference = float(mean_velocity[0]) if mean_velocity.size else 0.0
     obstacle_velocity_deficit = (
-        float(inlet_reference - mean_velocity[peak_index])
-        if mean_velocity.size
-        else 0.0
+        float(inlet_reference - mean_velocity[peak_index]) if mean_velocity.size else 0.0
     )
     current_proxy_peak = float(np.max(current_proxy)) if current_proxy.size else 0.0
     field_velocity_correlation = float(
         _safe_correlation(jnp.asarray(field_scale), jnp.asarray(mean_velocity))
     )
     divergence_to_field_ratio = float(
-        field_metrics["rms_divergence"]
-        / max(field_metrics["mean_field_magnitude"], 1.0e-12)
+        field_metrics["rms_divergence"] / max(field_metrics["mean_field_magnitude"], 1.0e-12)
     )
     field_quality_pass = bool(divergence_to_field_ratio <= 2.5e-2)
     conservation_pass = bool(
@@ -4947,9 +4690,7 @@ def validate_magnetic_obstacle_baseline(
         and current_proxy_peak > 1.0e-8
         and field_velocity_correlation < -0.2
     )
-    validation_pass = bool(
-        field_quality_pass and conservation_pass and response_observable_pass
-    )
+    validation_pass = bool(field_quality_pass and conservation_pass and response_observable_pass)
     return {
         **field_metrics,
         "divergence_to_field_ratio": divergence_to_field_ratio,
@@ -4958,406 +4699,13 @@ def validate_magnetic_obstacle_baseline(
         "field_velocity_correlation": field_velocity_correlation,
         "max_charge_balance_residual": float(validation.max_charge_balance_residual),
         "max_wall_current_leakage": float(validation.max_wall_current_leakage),
-        "net_boundary_current_residual": float(
-            validation.net_boundary_current_residual
-        ),
+        "net_boundary_current_residual": float(validation.net_boundary_current_residual),
         "field_quality_pass": field_quality_pass,
         "conservation_pass": conservation_pass,
         "response_observable_pass": response_observable_pass,
         "reference_kind": "none",
         "external_reference_available": False,
         "research_grade_validation_pass": False,
-        "validation_pass": validation_pass,
-    }
-
-
-def validate_magnetic_obstacle_benchmark(
-    solution: ExtrudedInductionlessSolution,
-    reference_solution: ExtrudedInductionlessSolution,
-    *,
-    field_ny: int = 81,
-    field_nz: int = 81,
-) -> dict[str, float | bool | str]:
-    if solution.problem.case.geometry.kind != "rect_duct":
-        raise ValueError(
-            "Magnetic-obstacle benchmark currently supports rectangular ducts only"
-        )
-    if reference_solution.problem.case.geometry.kind != "rect_duct":
-        raise ValueError(
-            "Magnetic-obstacle benchmark reference must be a rectangular duct"
-        )
-    if solution.bundle.u.shape != reference_solution.bundle.u.shape:
-        raise ValueError(
-            "Benchmark and reference solutions must share the same stacked field shape"
-        )
-
-    baseline = validate_magnetic_obstacle_baseline(
-        solution, field_ny=field_ny, field_nz=field_nz
-    )
-    bundle = solution.bundle
-    reference_bundle = reference_solution.bundle
-    divergence_ratio = float(baseline["divergence_to_field_ratio"])
-    field_scale = np.asarray(bundle.field_scale, dtype=float)
-    mean_velocity = np.asarray(bundle.mean_velocity, dtype=float)
-    ref_mean_velocity = np.asarray(reference_bundle.mean_velocity, dtype=float)
-    current_proxy = np.asarray(bundle.current_scaled_pressure_proxy, dtype=float)
-    pressure_span = np.max(np.asarray(bundle.p, dtype=float), axis=(1, 2)) - np.min(
-        np.asarray(bundle.p, dtype=float), axis=(1, 2)
-    )
-    reference_pressure_span = np.max(
-        np.asarray(reference_bundle.p, dtype=float), axis=(1, 2)
-    ) - np.min(np.asarray(reference_bundle.p, dtype=float), axis=(1, 2))
-    peak_index = int(np.argmax(field_scale)) if field_scale.size else 0
-
-    denom = np.maximum(np.abs(ref_mean_velocity), 1.0e-12)
-    velocity_deficit_ratio = np.maximum(
-        (ref_mean_velocity - mean_velocity) / denom, 0.0
-    )
-    peak_velocity_deficit_ratio = (
-        float(np.max(velocity_deficit_ratio)) if velocity_deficit_ratio.size else 0.0
-    )
-    peak_station_velocity_deficit_ratio = (
-        float(velocity_deficit_ratio[peak_index])
-        if velocity_deficit_ratio.size
-        else 0.0
-    )
-    wake_recovery_ratio = (
-        float(mean_velocity[-1] / max(mean_velocity[0], 1.0e-12))
-        if mean_velocity.size
-        else 0.0
-    )
-
-    pressure_excess = np.maximum(pressure_span - reference_pressure_span, 0.0)
-    pressure_excess_proxy = (
-        float(
-            np.trapezoid(pressure_excess, np.asarray(bundle.x, dtype=float))
-            / max(float(bundle.x[-1] - bundle.x[0]), 1.0e-12)
-        )
-        if pressure_excess.size > 1
-        else 0.0
-    )
-    peak_pressure_excess = (
-        float(np.max(pressure_excess)) if pressure_excess.size else 0.0
-    )
-    current_proxy_peak = (
-        float(np.max(np.abs(current_proxy))) if current_proxy.size else 0.0
-    )
-    integrated_velocity_deficit_ratio = (
-        float(
-            np.trapezoid(velocity_deficit_ratio, np.asarray(bundle.x, dtype=float))
-            / max(float(bundle.x[-1] - bundle.x[0]), 1.0e-12)
-        )
-        if velocity_deficit_ratio.size > 1
-        else 0.0
-    )
-
-    mid_y = int(bundle.u.shape[1] // 2)
-    mid_z = int(bundle.u.shape[2] // 2)
-    y_cut = np.asarray(bundle.u[peak_index, :, mid_z], dtype=float)
-    y_cut_ref = np.asarray(reference_bundle.u[peak_index, :, mid_z], dtype=float)
-    z_cut = np.asarray(bundle.u[peak_index, mid_y, :], dtype=float)
-    z_cut_ref = np.asarray(reference_bundle.u[peak_index, mid_y, :], dtype=float)
-    y_l2_distortion = float(
-        np.linalg.norm(y_cut - y_cut_ref) / max(np.linalg.norm(y_cut_ref), 1.0e-12)
-    )
-    z_l2_distortion = float(
-        np.linalg.norm(z_cut - z_cut_ref) / max(np.linalg.norm(z_cut_ref), 1.0e-12)
-    )
-    shared_cut_scale = max(
-        float(np.max(np.abs(y_cut_ref))),
-        float(np.max(np.abs(z_cut_ref))),
-        float(np.max(np.abs(y_cut))),
-        float(np.max(np.abs(z_cut))),
-        1.0e-12,
-    )
-    y_peak_cut_abs_error = float(np.max(np.abs(y_cut - y_cut_ref)) / shared_cut_scale)
-    z_peak_cut_abs_error = float(np.max(np.abs(z_cut - z_cut_ref)) / shared_cut_scale)
-    peak_crosscut_distortion = max(y_l2_distortion, z_l2_distortion)
-
-    center_velocity = np.asarray(bundle.u[:, mid_y, mid_z], dtype=float)
-    ref_center_velocity = np.asarray(reference_bundle.u[:, mid_y, mid_z], dtype=float)
-    center_velocity_deficit_ratio = np.maximum(
-        (ref_center_velocity - center_velocity)
-        / np.maximum(np.abs(ref_center_velocity), 1.0e-12),
-        0.0,
-    )
-    peak_centerline_deficit_ratio = (
-        float(np.max(center_velocity_deficit_ratio))
-        if center_velocity_deficit_ratio.size
-        else 0.0
-    )
-    peak_centerline_station_deficit_ratio = (
-        float(center_velocity_deficit_ratio[peak_index])
-        if center_velocity_deficit_ratio.size
-        else 0.0
-    )
-    recovery_station = float(bundle.x[-1]) if len(bundle.x) else 0.0
-    if center_velocity_deficit_ratio.size:
-        threshold = max(0.1 * peak_centerline_deficit_ratio, 1.0e-6)
-        tail = np.where(center_velocity_deficit_ratio[peak_index:] <= threshold)[0]
-        if tail.size:
-            recovery_station = float(bundle.x[peak_index + int(tail[0])])
-
-    validation_pass = bool(
-        divergence_ratio <= 2.5e-2
-        and baseline["max_charge_balance_residual"] <= 5.0e-2
-        and baseline["net_boundary_current_residual"] <= 1.0e-8
-        and baseline["max_wall_current_leakage"] <= 1.0e-8
-        and peak_velocity_deficit_ratio >= 1.0e-2
-        and peak_station_velocity_deficit_ratio >= 5.0e-3
-        and peak_pressure_excess >= 1.0e-3
-        and pressure_excess_proxy >= 1.0e-3
-        and current_proxy_peak >= 1.0e-2
-        and y_l2_distortion >= 5.0e-3
-        and z_l2_distortion >= 5.0e-3
-        and wake_recovery_ratio > 0.8
-    )
-    return {
-        **baseline,
-        "divergence_to_field_ratio": divergence_ratio,
-        "peak_velocity_deficit_ratio": peak_velocity_deficit_ratio,
-        "peak_station_velocity_deficit_ratio": peak_station_velocity_deficit_ratio,
-        "integrated_velocity_deficit_ratio": integrated_velocity_deficit_ratio,
-        "peak_centerline_deficit_ratio": peak_centerline_deficit_ratio,
-        "peak_centerline_station_deficit_ratio": peak_centerline_station_deficit_ratio,
-        "recovery_station": recovery_station,
-        "wake_recovery_ratio": wake_recovery_ratio,
-        "peak_pressure_excess": peak_pressure_excess,
-        "pressure_excess_proxy": pressure_excess_proxy,
-        "y_l2_distortion": y_l2_distortion,
-        "z_l2_distortion": z_l2_distortion,
-        "y_peak_cut_abs_error": y_peak_cut_abs_error,
-        "z_peak_cut_abs_error": z_peak_cut_abs_error,
-        "peak_crosscut_distortion": peak_crosscut_distortion,
-        "reference_kind": "matched_no_field_lmx",
-        "external_reference_available": False,
-        "internal_response_pass": validation_pass,
-        "research_grade_validation_pass": False,
-        "benchmark_pass": validation_pass,
-    }
-
-
-def validate_magnetic_obstacle_literature_slice(
-    solution: ExtrudedInductionlessSolution,
-    reference_solution: ExtrudedInductionlessSolution,
-    *,
-    field_ny: int = 81,
-    field_nz: int = 81,
-) -> dict[str, float | bool | str]:
-    benchmark = validate_magnetic_obstacle_benchmark(
-        solution,
-        reference_solution,
-        field_ny=field_ny,
-        field_nz=field_nz,
-    )
-    x = np.asarray(solution.bundle.x, dtype=float)
-    peak_index = (
-        int(np.argmax(np.asarray(solution.bundle.field_scale, dtype=float)))
-        if len(solution.bundle.x)
-        else 0
-    )
-    peak_station = float(x[peak_index]) if x.size else 0.0
-    outlet_station = float(x[-1]) if x.size else 0.0
-    recovery_distance = max(float(benchmark["recovery_station"]) - peak_station, 0.0)
-    normalized_recovery_distance = recovery_distance / max(
-        outlet_station - peak_station, 1.0e-12
-    )
-    literature_shape_gate = bool(
-        benchmark["benchmark_pass"]
-        and benchmark["peak_centerline_deficit_ratio"] >= 0.2
-        and benchmark["integrated_velocity_deficit_ratio"] >= 1.0e-2
-        and benchmark["peak_crosscut_distortion"] >= 1.0e-1
-        and benchmark["pressure_excess_proxy"] >= 5.0e-2
-        and 0.0 <= normalized_recovery_distance <= 1.0
-    )
-    return {
-        **benchmark,
-        "peak_station": peak_station,
-        "outlet_station": outlet_station,
-        "recovery_distance": recovery_distance,
-        "normalized_recovery_distance": normalized_recovery_distance,
-        "literature_shape_gate": literature_shape_gate,
-        "external_reference_available": False,
-        "research_grade_validation_pass": False,
-        "literature_status": "internal_lmx_response_only",
-        "literature_pass": False,
-    }
-
-
-def validate_magnetic_obstacle_external_readiness(
-    solution: ExtrudedInductionlessSolution,
-    *,
-    reference_case: str = "votyakov_zienicke_kolesnikov_jfm",
-    field_ny: int = 81,
-    field_nz: int = 81,
-) -> dict[str, object]:
-    """Report literature-facing magnetic-obstacle observables without claiming parity."""
-
-    references = magnetic_obstacle_literature_reference_cases()
-    if reference_case not in references:
-        available = ", ".join(sorted(references))
-        raise ValueError(
-            f"Unknown magnetic-obstacle reference case {reference_case!r}; available: {available}"
-        )
-    baseline = validate_magnetic_obstacle_baseline(
-        solution, field_ny=field_ny, field_nz=field_nz
-    )
-    bundle = solution.bundle
-    x = np.asarray(bundle.x, dtype=float)
-    field_scale = np.asarray(bundle.field_scale, dtype=float)
-    mean_velocity = np.asarray(bundle.mean_velocity, dtype=float)
-    pressure_proxy = np.asarray(bundle.current_scaled_pressure_proxy, dtype=float)
-    peak_index = int(np.argmax(field_scale)) if field_scale.size else 0
-    inlet_velocity = float(mean_velocity[0]) if mean_velocity.size else 0.0
-    minimum_velocity = float(np.min(mean_velocity)) if mean_velocity.size else 0.0
-    min_velocity_index = int(np.argmin(mean_velocity)) if mean_velocity.size else 0
-    center_velocity_deficit = (
-        float(inlet_velocity - mean_velocity[peak_index]) if mean_velocity.size else 0.0
-    )
-    centerline_deficit_ratio = center_velocity_deficit / max(
-        abs(inlet_velocity), 1.0e-20
-    )
-    minimum_centerline_velocity_ratio = minimum_velocity / max(
-        abs(inlet_velocity), 1.0e-20
-    )
-    recovery_ratio = (
-        float(mean_velocity[-1] / max(abs(inlet_velocity), 1.0e-20))
-        if mean_velocity.size
-        else 0.0
-    )
-    integrated_pressure_proxy = (
-        float(np.trapezoid(pressure_proxy, x) / max(float(x[-1] - x[0]), 1.0e-12))
-        if pressure_proxy.size > 1 and x.size > 1
-        else 0.0
-    )
-    recovery_index = peak_index
-    if mean_velocity.size and x.size:
-        deficit_scale = max(abs(center_velocity_deficit), 1.0e-20)
-        recovery_threshold = inlet_velocity - 0.05 * deficit_scale
-        downstream = np.flatnonzero(mean_velocity[peak_index:] >= recovery_threshold)
-        recovery_index = (
-            peak_index + int(downstream[0])
-            if downstream.size
-            else len(mean_velocity) - 1
-        )
-    downstream_length = max(float(x[-1] - x[peak_index]), 1.0e-12) if x.size else 1.0
-    recovery_distance = (
-        max(float(x[recovery_index] - x[peak_index]), 0.0) if x.size else 0.0
-    )
-    normalized_recovery_distance = recovery_distance / downstream_length
-    observable_payload = {
-        "centerline_velocity_deficit": center_velocity_deficit,
-        "centerline_velocity_deficit_ratio": centerline_deficit_ratio,
-        "minimum_centerline_velocity": minimum_velocity,
-        "minimum_centerline_velocity_ratio": minimum_centerline_velocity_ratio,
-        "minimum_velocity_station": float(x[min_velocity_index]) if x.size else 0.0,
-        "peak_field_station": float(x[peak_index]) if x.size else 0.0,
-        "recovery_station": float(x[recovery_index]) if x.size else 0.0,
-        "wake_recovery_ratio": recovery_ratio,
-        "normalized_recovery_distance": normalized_recovery_distance,
-        "pressure_drop_proxy": integrated_pressure_proxy,
-        "current_proxy_peak": float(baseline["current_proxy_peak"]),
-        "field_velocity_correlation": float(baseline["field_velocity_correlation"]),
-        "max_charge_balance_residual": float(baseline["max_charge_balance_residual"]),
-    }
-    measured_observables = sorted(observable_payload)
-    required_observables = list(references[reference_case]["required_observables"])
-    missing_observables = [
-        observable
-        for observable in required_observables
-        if observable
-        not in {
-            "centerline_velocity_deficit",
-            "wake_recovery",
-            "pressure_drop_or_drag_proxy",
-            "pressure_drop",
-            "current_closure",
-        }
-    ]
-    return {
-        "reference_case": reference_case,
-        "reference": references[reference_case],
-        "measured_observables": measured_observables,
-        "required_observables": required_observables,
-        "missing_observables": missing_observables,
-        "observables": observable_payload,
-        "external_reference_available": False,
-        "research_grade_validation_pass": False,
-        "validation_status": "literature_target_registered_no_digitized_reference",
-    }
-
-
-def validate_wham_mirror_pipe_baseline(
-    solution: ExtrudedInductionlessSolution,
-) -> dict[str, float | bool]:
-    if solution.problem.case.geometry.kind != "pipe_ogrid":
-        raise ValueError(
-            "WHAM mirror pipe validation currently supports pipe_ogrid only"
-        )
-    if (
-        solution.problem.case.magnetic_field.kind != "tabulated"
-        or solution.problem.case.magnetic_field.table_path is None
-    ):
-        raise ValueError(
-            "WHAM mirror pipe validation requires a tabulated magnetic field"
-        )
-
-    bundle = solution.bundle
-    validation = solution.validation
-    x = np.asarray(bundle.x, dtype=float)
-    zeros = np.zeros_like(x)
-    centerline_field = np.asarray(
-        sample_tabulated_field_volume(
-            solution.problem.case.magnetic_field.table_path,
-            x=x,
-            y=zeros,
-            z=zeros,
-        ),
-        dtype=float,
-    )
-    bz_profile = centerline_field[..., 2]
-    field_scale = np.abs(bz_profile) / max(float(np.max(np.abs(bz_profile))), 1.0e-12)
-    mean_velocity = np.asarray(bundle.mean_velocity, dtype=float)
-    current_proxy = np.asarray(bundle.current_scaled_pressure_proxy, dtype=float)
-    pressure_span = np.max(np.asarray(bundle.p, dtype=float), axis=(1, 2)) - np.min(
-        np.asarray(bundle.p, dtype=float), axis=(1, 2)
-    )
-    peak_index = int(np.argmax(field_scale)) if field_scale.size else 0
-    obstacle_velocity_deficit = (
-        float(mean_velocity[0] - mean_velocity[peak_index])
-        if mean_velocity.size
-        else 0.0
-    )
-    field_velocity_correlation = float(
-        _safe_correlation(jnp.asarray(field_scale), jnp.asarray(mean_velocity))
-    )
-    current_proxy_peak = (
-        float(np.max(np.abs(current_proxy))) if current_proxy.size else 0.0
-    )
-    pressure_drop_proxy = (
-        float(np.trapezoid(pressure_span, x) / max(x[-1] - x[0], 1.0e-12))
-        if pressure_span.size > 1
-        else 0.0
-    )
-    validation_pass = bool(
-        validation.max_charge_balance_residual <= 6.0e-2
-        and validation.net_boundary_current_residual <= 1.0e-8
-        and validation.max_wall_current_leakage <= 1.0e-8
-        and obstacle_velocity_deficit > 1.0e-8
-        and current_proxy_peak > 1.0e-6
-        and pressure_drop_proxy > 1.0e-8
-        and field_velocity_correlation < -0.2
-    )
-    return {
-        "obstacle_velocity_deficit": obstacle_velocity_deficit,
-        "current_proxy_peak": current_proxy_peak,
-        "field_velocity_correlation": field_velocity_correlation,
-        "pressure_drop_proxy": pressure_drop_proxy,
-        "max_charge_balance_residual": float(validation.max_charge_balance_residual),
-        "max_wall_current_leakage": float(validation.max_wall_current_leakage),
-        "net_boundary_current_residual": float(
-            validation.net_boundary_current_residual
-        ),
         "validation_pass": validation_pass,
     }
 
@@ -5397,14 +4745,10 @@ def _shard_extruded_fields(
         return fields
     devices = jax.devices()
     if not 1 <= num_devices <= len(devices):
-        raise ValueError(
-            f"Requested {num_devices} devices, but only {len(devices)} are visible."
-        )
+        raise ValueError(f"Requested {num_devices} devices, but only {len(devices)} are visible.")
     axial_size = fields[0].shape[0]
     if axial_size % num_devices:
-        raise ValueError(
-            f"Axial cell count {axial_size} must be divisible by {num_devices} devices."
-        )
+        raise ValueError(f"Axial cell count {axial_size} must be divisible by {num_devices} devices.")
     sharding = _axial_field_sharding(num_devices)
     # JAX 0.6.x CUDA can leave non-primary shards uninitialized when directly
     # resharding a single-GPU array. Stage each global initial field once on the
@@ -5412,14 +4756,33 @@ def _shard_extruded_fields(
     return tuple(jax.device_put(np.asarray(field), sharding) for field in fields)
 
 
-def _iteration_history_arrays(residual, component, pressure, electric, potential,
-                              courant=None, pressure_linear=None, momentum_defect=None):
+def _iteration_history_arrays(
+    residual,
+    component,
+    pressure,
+    electric,
+    potential,
+    courant=None,
+    pressure_linear=None,
+    momentum_defect=None,
+):
     """Build consistently shaped outer-iteration histories."""
-    values = (residual, momentum_defect or (), component, pressure,
-        pressure_linear or (), electric, potential, courant or ())
-    return {name: jnp.asarray(value, dtype=float).reshape((-1, width)) if width
-        else jnp.asarray(value, dtype=float) for (name, width), value in
-        zip(EXTRUDED_HISTORY_WIDTHS, values, strict=True)}
+    values = (
+        residual,
+        momentum_defect or (),
+        component,
+        pressure,
+        pressure_linear or (),
+        electric,
+        potential,
+        courant or (),
+    )
+    return {
+        name: jnp.asarray(value, dtype=float).reshape((-1, width))
+        if width
+        else jnp.asarray(value, dtype=float)
+        for (name, width), value in zip(EXTRUDED_HISTORY_WIDTHS, values, strict=True)
+    }
 
 
 def _iteration_checkpoint_bundle(
@@ -5445,9 +4808,7 @@ def _iteration_checkpoint_bundle(
     rho_phi_plus: jnp.ndarray | None = None,
     rho_phi_inlet: jnp.ndarray | None = None,
     aitken_state: tuple[jnp.ndarray | None, float, int] | None = None,
-    anderson_state: tuple[
-        jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray
-    ] | None = None,
+    anderson_state: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray] | None = None,
     stopping_state: tuple[int, int, str] = (0, 0, "not_recorded"),
     courant_history: list[tuple[float, float, float]] | None = None,
     momentum_defect_history: list[float] | None = None,
@@ -5472,18 +4833,21 @@ def _iteration_checkpoint_bundle(
         geometry_kind=case.geometry.kind,
         solver_kind=case.solver.kind,
         axial_pressure_loss_gradient=(
-            jnp.zeros_like(x)
-            if axial_pressure_loss_gradient is None
-            else axial_pressure_loss_gradient
+            jnp.zeros_like(x) if axial_pressure_loss_gradient is None else axial_pressure_loss_gradient
         ),
         transverse_pressure_difference=(
-            jnp.zeros_like(x)
-            if transverse_pressure_difference is None
-            else transverse_pressure_difference
+            jnp.zeros_like(x) if transverse_pressure_difference is None else transverse_pressure_difference
         ),
-        **_iteration_history_arrays(residual_history, component_history,
-            pressure_history, electric_history, potential_history, courant_history,
-            pressure_linear_history, momentum_defect_history),
+        **_iteration_history_arrays(
+            residual_history,
+            component_history,
+            pressure_history,
+            electric_history,
+            potential_history,
+            courant_history,
+            pressure_linear_history,
+            momentum_defect_history,
+        ),
     )
 
 
@@ -5503,8 +4867,7 @@ def _emit_iteration_progress(
     if callback is None:
         return
     write_checkpoint = bool(
-        checkpoint_interval
-        and (step % checkpoint_interval == 0 or converged or step == total_steps)
+        checkpoint_interval and (step % checkpoint_interval == 0 or converged or step == total_steps)
     )
     callback(
         ExtrudedIterationProgress(
@@ -5541,15 +4904,13 @@ def _synchronized_phase(
     return measured
 
 
-@lru_cache(maxsize=None)
+@cache
 def _axial_field_sharding(num_devices: int) -> NamedSharding:
     """Return one process-stable axial mesh for compilation and repeat reuse."""
 
     devices = jax.devices()
     if not 1 <= num_devices <= len(devices):
-        raise ValueError(
-            f"Requested {num_devices} devices, but only {len(devices)} are visible."
-        )
+        raise ValueError(f"Requested {num_devices} devices, but only {len(devices)} are visible.")
     mesh = Mesh(np.asarray(devices[:num_devices], dtype=object), ("x",))
     return NamedSharding(mesh, P("x", None, None))
 
@@ -5566,28 +4927,24 @@ def _solve_extruded_projection(
     case = problem.case
     mesh = _cross_section_mesh(case)
     use_alex_b2_finite_volume = (
-        case.name.startswith("alex_b2-fringing-square_")
-        and case.geometry.kind == "layered_duct"
+        case.name.startswith("alex_b2-fringing-square_") and case.geometry.kind == "layered_duct"
     )
     use_alex_b1_finite_volume = (
-        case.name.startswith("alex_b1-fringing-pipe_")
-        and case.geometry.kind == "pipe_ogrid"
+        case.name.startswith("alex_b1-fringing-pipe_") and case.geometry.kind == "pipe_ogrid"
     )
     use_compatible_steady_b1 = use_alex_b1_finite_volume
-    if case.name.startswith("alex_") and not (
-        use_alex_b1_finite_volume or use_alex_b2_finite_volume
-    ):
+    if case.name.startswith("alex_") and not (use_alex_b1_finite_volume or use_alex_b2_finite_volume):
         raise NotImplementedError(
             "Unsupported ALEX production case; only the frozen B1 pipe and B2 square "
             "finite-volume paths are implemented"
         )
     if num_devices is not None and num_devices > 1 and not use_alex_b2_finite_volume:
-        raise NotImplementedError(
-            "Production spatial sharding currently supports the ALEX B2 duct path"
-        )
-    if (use_alex_b2_finite_volume
-            and case.solver.coupling_acceleration == "anderson"
-            and case.solver.coupling_history_depth != 2):
+        raise NotImplementedError("Production spatial sharding currently supports the ALEX B2 duct path")
+    if (
+        use_alex_b2_finite_volume
+        and case.solver.coupling_acceleration == "anderson"
+        and case.solver.coupling_history_depth != 2
+    ):
         raise ValueError("B2 conservative Anderson mixing requires history depth 2")
     if case.geometry.kind in {"pipe_ogrid", "bent_pipe"}:
         materials = build_material_fields(case, mesh)
@@ -5603,12 +4960,8 @@ def _solve_extruded_projection(
         sigma = _broadcast_cross_section(materials.conductivity, nx)
         rho = _broadcast_cross_section(materials.density, nx)
         nu = _broadcast_cross_section(materials.viscosity, nx)
-        fluid_mask = (
-            _broadcast_cross_section(materials.fluid_mask.astype(float), nx) > 0.5
-        )
-        radial_fluid_count = (
-            _pipe_radial_fluid_count(fluid_mask) if use_alex_b1_finite_volume else None
-        )
+        fluid_mask = _broadcast_cross_section(materials.fluid_mask.astype(float), nx) > 0.5
+        radial_fluid_count = _pipe_radial_fluid_count(fluid_mask) if use_alex_b1_finite_volume else None
         rr = jnp.broadcast_to(jnp.maximum(r[None, :, None], 0.5 * dr), (nx, nr, ntheta))
         theta_grid = jnp.broadcast_to(theta[None, None, :], (nx, nr, ntheta))
         forcing = float(case.forcing)
@@ -5692,11 +5045,7 @@ def _solve_extruded_projection(
         )
         inverse_diffusive_scale = float(
             jnp.max(nu)
-            * (
-                1.0 / max(dx**2, 1.0e-12)
-                + 1.0 / max(min_dr**2, 1.0e-12)
-                + 1.0 / max(min_arc**2, 1.0e-12)
-            )
+            * (1.0 / max(dx**2, 1.0e-12) + 1.0 / max(min_dr**2, 1.0e-12) + 1.0 / max(min_arc**2, 1.0e-12))
         )
         inverse_electromagnetic_scale = float(
             jnp.max(
@@ -5726,8 +5075,7 @@ def _solve_extruded_projection(
             if initial_bundle is not None or case.initial_velocity != 0.0
             else None
         )
-        outer_steps = min(case.time_stepper.max_steps,
-                          max(6, case.solver.coupling_iterations * 2))
+        outer_steps = min(case.time_stepper.max_steps, max(6, case.solver.coupling_iterations * 2))
         poisson_iterations = (
             case.time_stepper.potential_iterations
             if use_alex_b1_finite_volume
@@ -5738,20 +5086,14 @@ def _solve_extruded_projection(
         electric_tolerance = min(poisson_tolerance, 1.0e-12)
         projection_iterations = max(poisson_iterations, 4000)
         projection_tolerance = min(poisson_tolerance, 1.0e-12)
-        momentum_iterations = max(
-            poisson_iterations, 2000 if use_compatible_steady_b1 else 400
-        )
+        momentum_iterations = max(poisson_iterations, 2000 if use_compatible_steady_b1 else 400)
         momentum_tolerance = min(poisson_tolerance, 1.0e-10)
-        velocity_limit = max(
-            5.0, 2.0 * math.sqrt(float(case.geometry.target_ha or 1.0))
-        )
+        velocity_limit = max(5.0, 2.0 * math.sqrt(float(case.geometry.target_ha or 1.0)))
         scalar_limit = max(
             20.0,
             2.0 * float(jnp.max(bx**2 + by**2 + bz**2)),
         )
-        electric_potential_scale = max(
-            1.0, math.sqrt(float(jnp.max(bx**2 + by**2 + bz**2)))
-        )
+        electric_potential_scale = max(1.0, math.sqrt(float(jnp.max(bx**2 + by**2 + bz**2))))
         residual_by_step: list[float] = []
         component_residual_by_step: list[tuple[float, ...]] = []
         pressure_residual_by_step: list[float] = []
@@ -5788,9 +5130,7 @@ def _solve_extruded_projection(
                 use_compatible_steady_b1,
             )
 
-            def diffusion_system_solve(
-                linear_rhs, volume, coefficients, wall_sink, initial
-            ):
+            def diffusion_system_solve(linear_rhs, volume, coefficients, wall_sink, initial):
                 return _solve_pipe_diffusion_system(
                     linear_rhs,
                     volume,
@@ -5803,17 +5143,11 @@ def _solve_extruded_projection(
                     tolerance=momentum_tolerance,
                 )
 
-            diffusion_system_solve = _reuse_fringing_jit(
-                kernel_key, jax.jit(diffusion_system_solve)
-            )
+            diffusion_system_solve = _reuse_fringing_jit(kernel_key, jax.jit(diffusion_system_solve))
             steady_reaction = (
                 2.0
                 * sigma[:, :count, :]
-                * (
-                    bx[:, :count, :] ** 2
-                    + br[:, :count, :] ** 2
-                    + btheta[:, :count, :] ** 2
-                )
+                * (bx[:, :count, :] ** 2 + br[:, :count, :] ** 2 + btheta[:, :count, :] ** 2)
                 / rho[:, :count, :]
                 if use_compatible_steady_b1
                 else None
@@ -5839,9 +5173,7 @@ def _solve_extruded_projection(
                         )
                     )
                 )
-                steady_rate_diagonal = (
-                    sum(steady_coefficients) + wall_sink + steady_reaction
-                )
+                steady_rate_diagonal = sum(steady_coefficients) + wall_sink + steady_reaction
                 pressure_preconditioner_mobility = 1.0 / jnp.maximum(
                     rho[:, :count, :] * steady_rate_diagonal, 1.0e-20
                 )
@@ -5877,9 +5209,7 @@ def _solve_extruded_projection(
                     tolerance=momentum_tolerance,
                     initial_field=initial,
                     reaction=steady_reaction,
-                    _system_solve=(
-                        None if use_compatible_steady_b1 else diffusion_system_solve
-                    ),
+                    _system_solve=(None if use_compatible_steady_b1 else diffusion_system_solve),
                 )
 
             if use_compatible_steady_b1:
@@ -5893,30 +5223,19 @@ def _solve_extruded_projection(
                     jax.jit(momentum_solve),
                 )
             response_rhs = (1.0 if use_compatible_steady_b1 else dt) / rho[:, :count, :]
-            response_fluid, _, _ = momentum_solve(
-                response_rhs, jnp.zeros_like(response_rhs)
-            )
+            response_fluid, _, _ = momentum_solve(response_rhs, jnp.zeros_like(response_rhs))
             if not use_compatible_steady_b1:
                 response_cross_section = jnp.mean(response_fluid, axis=0, keepdims=True)
-                response_fluid = jnp.broadcast_to(
-                    response_cross_section, response_fluid.shape
-                )
+                response_fluid = jnp.broadcast_to(response_cross_section, response_fluid.shape)
                 flow_response_matrix = None
             else:
-                basis_rhs = (
-                    jnp.eye(nx, dtype=u.dtype)[:, :, None, None]
-                    / rho[None, :, :count, :]
-                )
+                basis_rhs = jnp.eye(nx, dtype=u.dtype)[:, :, None, None] / rho[None, :, :count, :]
                 zero = jnp.zeros_like(response_fluid)
-                basis_response = jnp.stack(
-                    tuple(momentum_solve(rhs, zero)[0] for rhs in basis_rhs)
-                )
+                basis_response = jnp.stack(tuple(momentum_solve(rhs, zero)[0] for rhs in basis_rhs))
                 flow_response_matrix = jnp.sum(
                     basis_response * fluid_cell_area[None, :, :count, :], axis=(2, 3)
                 ).T
-            unit_pressure_response = (
-                jnp.zeros_like(u).at[:, :count, :].set(response_fluid)
-            )
+            unit_pressure_response = jnp.zeros_like(u).at[:, :count, :].set(response_fluid)
         else:
             unit_pressure_response, _, _ = _enforce_pipe_velocity_bc(
                 jnp.where(fluid_mask, dt / rho, 0.0),
@@ -5959,9 +5278,7 @@ def _solve_extruded_projection(
                 dp_dr = jnp.zeros_like(p)
                 dp_dtheta = jnp.zeros_like(p)
             else:
-                dp_dx, dp_dr, dp_dtheta = _pipe_gradient_3d(
-                    p, dx=dx, dr=dr, dtheta=dtheta, r=rr
-                )
+                dp_dx, dp_dr, dp_dtheta = _pipe_gradient_3d(p, dx=dx, dr=dr, dtheta=dtheta, r=rr)
                 laplacian_u = _pipe_laplacian_3d(u, dx=dx, dr=dr, dtheta=dtheta, r=rr)
                 laplacian_v = _pipe_laplacian_3d(v, dx=dx, dr=dr, dtheta=dtheta, r=rr)
                 laplacian_w = _pipe_laplacian_3d(w, dx=dx, dr=dr, dtheta=dtheta, r=rr)
@@ -5970,26 +5287,17 @@ def _solve_extruded_projection(
                 faces = r_faces[: count + 1]
                 centers = r[:count]
                 rhs_u = u[:, :count, :] + dt * (
-                    forcing / rho[:, :count, :]
-                    + lorentz_x[:, :count, :] / rho[:, :count, :]
+                    forcing / rho[:, :count, :] + lorentz_x[:, :count, :] / rho[:, :count, :]
                 )
-                rhs_v = v[:, :count, :] + dt * (
-                    lorentz_r[:, :count, :] / rho[:, :count, :]
-                )
-                rhs_w = w[:, :count, :] + dt * (
-                    lorentz_theta[:, :count, :] / rho[:, :count, :]
-                )
+                rhs_v = v[:, :count, :] + dt * (lorentz_r[:, :count, :] / rho[:, :count, :])
+                rhs_w = w[:, :count, :] + dt * (lorentz_theta[:, :count, :] / rho[:, :count, :])
                 if use_compatible_steady_b1:
-                    rhs_u = (forcing + lorentz_x[:, :count, :]) / rho[
+                    rhs_u = (forcing + lorentz_x[:, :count, :]) / rho[:, :count, :] + steady_reaction * u[
                         :, :count, :
-                    ] + steady_reaction * u[:, :count, :]
-                    rhs_v = (
-                        lorentz_r[:, :count, :] / rho[:, :count, :]
-                        + steady_reaction * v[:, :count, :]
-                    )
+                    ]
+                    rhs_v = lorentz_r[:, :count, :] / rho[:, :count, :] + steady_reaction * v[:, :count, :]
                     rhs_w = (
-                        lorentz_theta[:, :count, :] / rho[:, :count, :]
-                        + steady_reaction * w[:, :count, :]
+                        lorentz_theta[:, :count, :] / rho[:, :count, :] + steady_reaction * w[:, :count, :]
                     )
                 u_fluid, _, _ = momentum_solve(rhs_u, u[:, :count, :])
                 v_fluid, _, _ = momentum_solve(rhs_v, v[:, :count, :])
@@ -5998,13 +5306,9 @@ def _solve_extruded_projection(
                 v_star = jnp.zeros_like(v).at[:, :count, :].set(v_fluid)
                 w_star = jnp.zeros_like(w).at[:, :count, :].set(w_fluid)
             else:
-                u_star = u + dt * (
-                    laplacian_u * nu + forcing / rho + lorentz_x / rho - dp_dx / rho
-                )
+                u_star = u + dt * (laplacian_u * nu + forcing / rho + lorentz_x / rho - dp_dx / rho)
                 v_star = v + dt * (laplacian_v * nu + lorentz_r / rho - dp_dr / rho)
-                w_star = w + dt * (
-                    laplacian_w * nu + lorentz_theta / rho - dp_dtheta / rho
-                )
+                w_star = w + dt * (laplacian_w * nu + lorentz_theta / rho - dp_dtheta / rho)
             if not use_compatible_steady_b1:
                 u_star = _clip_state(u_star, velocity_limit)
                 v_star = _clip_state(v_star, velocity_limit)
@@ -6033,27 +5337,17 @@ def _solve_extruded_projection(
                         pressure_iterations=projection_iterations,
                         pressure_tolerance=momentum_tolerance,
                         flow_response_matrix=flow_response_matrix,
-                        pressure_preconditioner_mobility=(
-                            pressure_preconditioner_mobility
-                        ),
+                        pressure_preconditioner_mobility=(pressure_preconditioner_mobility),
                         modal_momentum_coefficients=steady_coefficients,
                         modal_momentum_sink=wall_sink + steady_reaction,
                         modal_stabilization=True,
                         modal_factor_key=modal_factor_key,
                         physical_tolerance=ALEX_BALANCE_TOLERANCE,
                     )
-                    u_next = (
-                        jnp.zeros_like(u).at[:, :count, :].set(steady_projection[0])
-                    )
-                    v_next = (
-                        jnp.zeros_like(v).at[:, :count, :].set(steady_projection[1])
-                    )
-                    w_next = (
-                        jnp.zeros_like(w).at[:, :count, :].set(steady_projection[2])
-                    )
-                    p_corr = (
-                        jnp.zeros_like(p).at[:, :count, :].set(steady_projection[3])
-                    )
+                    u_next = jnp.zeros_like(u).at[:, :count, :].set(steady_projection[0])
+                    v_next = jnp.zeros_like(v).at[:, :count, :].set(steady_projection[1])
+                    w_next = jnp.zeros_like(w).at[:, :count, :].set(steady_projection[2])
+                    p_corr = jnp.zeros_like(p).at[:, :count, :].set(steady_projection[3])
                     axial_pressure_loss_gradient = forcing + steady_projection[4]
                     projected_divergence_norm = steady_projection[5]
                     fixed_flow_error = steady_projection[6]
@@ -6101,9 +5395,7 @@ def _solve_extruded_projection(
                     r_faces=r_faces,
                     fluid_mask=fluid_mask,
                 )
-                divergence = _pipe_divergence_3d(
-                    u_star, v_star, w_star, dx=dx, dr=dr, dtheta=dtheta, r=rr
-                )
+                divergence = _pipe_divergence_3d(u_star, v_star, w_star, dx=dx, dr=dr, dtheta=dtheta, r=rr)
                 pressure_rhs = (rho / max(dt, 1.0e-12)) * divergence
                 p_corr, _, _, _ = _pipe_poisson_sparse_3d(
                     -pressure_rhs,
@@ -6117,9 +5409,7 @@ def _solve_extruded_projection(
                     initial_field=phi,
                 )
                 p_corr = _clip_state(p_corr, scalar_limit)
-                dpc_dx, dpc_dr, dpc_dtheta = _pipe_gradient_3d(
-                    p_corr, dx=dx, dr=dr, dtheta=dtheta, r=rr
-                )
+                dpc_dx, dpc_dr, dpc_dtheta = _pipe_gradient_3d(p_corr, dx=dx, dr=dr, dtheta=dtheta, r=rr)
                 u_next = _clip_state(u_star - (dt / rho) * dpc_dx, velocity_limit)
                 v_next = _clip_state(v_star - (dt / rho) * dpc_dr, velocity_limit)
                 w_next = _clip_state(w_star - (dt / rho) * dpc_dtheta, velocity_limit)
@@ -6140,15 +5430,13 @@ def _solve_extruded_projection(
                     )
                     axial_pressure_loss_gradient = jnp.full((nx,), forcing, dtype=float)
                 else:
-                    u_next, axial_pressure_loss_gradient = (
-                        _apply_fixed_flow_pressure_constraint(
-                            u_next,
-                            unit_pressure_response=unit_pressure_response,
-                            active_mask=fluid_mask,
-                            cell_area=fluid_cell_area,
-                            target_flow_rate=target_flow_rate,
-                            base_pressure_loss_gradient=forcing,
-                        )
+                    u_next, axial_pressure_loss_gradient = _apply_fixed_flow_pressure_constraint(
+                        u_next,
+                        unit_pressure_response=unit_pressure_response,
+                        active_mask=fluid_mask,
+                        cell_area=fluid_cell_area,
+                        target_flow_rate=target_flow_rate,
+                        base_pressure_loss_gradient=forcing,
                     )
                 u_next, v_next, w_next = _enforce_pipe_velocity_bc(
                     u_next,
@@ -6160,9 +5448,7 @@ def _solve_extruded_projection(
                 )
                 projected_divergence_norm = jnp.asarray(jnp.nan)
                 fixed_flow_error = jnp.asarray(0.0)
-            p = _clip_state(
-                p_corr if use_alex_b1_finite_volume else p + p_corr, scalar_limit
-            )
+            p = _clip_state(p_corr if use_alex_b1_finite_volume else p + p_corr, scalar_limit)
 
             uxb_x = v_next * btheta - w_next * br
             uxb_r = w_next * bx - u_next * btheta
@@ -6279,9 +5565,7 @@ def _solve_extruded_projection(
             )
             jx = _clip_state(0.5 * (fx[1:] + fx[:-1]), scalar_limit)
             jr = _clip_state(0.5 * (fr[:, 1:, :] + fr[:, :-1, :]), scalar_limit)
-            jtheta = _clip_state(
-                0.5 * (ftheta + jnp.roll(ftheta, 1, axis=2)), scalar_limit
-            )
+            jtheta = _clip_state(0.5 * (ftheta + jnp.roll(ftheta, 1, axis=2)), scalar_limit)
             lorentz_x = jr * btheta - jtheta * br
             lorentz_r = jtheta * bx - jx * btheta
             lorentz_theta = jx * br - jr * bx
@@ -6340,9 +5624,7 @@ def _solve_extruded_projection(
             )
             if use_alex_b1_finite_volume and not converged and step + 1 < outer_steps:
                 current_state = jnp.stack((u, v, w, phi_previous)) / fixed_point_scale
-                mapped_state = (
-                    jnp.stack((u_next, v_next, w_next, phi)) / fixed_point_scale
-                )
+                mapped_state = jnp.stack((u_next, v_next, w_next, phi)) / fixed_point_scale
                 fixed_point_residual = mapped_state - current_state
                 if case.solver.coupling_acceleration == "anderson":
                     fixed_point_iterates.append(current_state)
@@ -6365,9 +5647,7 @@ def _solve_extruded_projection(
                             min_relaxation=case.solver.coupling_min_relaxation,
                             max_relaxation=case.solver.coupling_max_relaxation,
                         )
-                    accelerated = (
-                        current_state + fixed_point_relaxation * fixed_point_residual
-                    )
+                    accelerated = current_state + fixed_point_relaxation * fixed_point_residual
                     previous_fixed_point_residual = fixed_point_residual
                 else:
                     accelerated = mapped_state
@@ -6473,9 +5753,13 @@ def _solve_extruded_projection(
             ),
             axial_pressure_loss_gradient=axial_pressure_loss_gradient,
             transverse_pressure_difference=jnp.zeros((nx,), dtype=float),
-            **_iteration_history_arrays(residual_by_step, component_residual_by_step,
-                pressure_residual_by_step, electric_linear_by_step,
-                potential_residual_by_step),
+            **_iteration_history_arrays(
+                residual_by_step,
+                component_residual_by_step,
+                pressure_residual_by_step,
+                electric_linear_by_step,
+                potential_residual_by_step,
+            ),
         )
     materials = build_material_fields(case, mesh)
     x = jnp.asarray(mesh.x_centers, dtype=float)
@@ -6491,9 +5775,7 @@ def _solve_extruded_projection(
     rho = _broadcast_cross_section(materials.density, nx)
     nu = _broadcast_cross_section(materials.viscosity, nx)
     fluid_mask = _broadcast_cross_section(materials.fluid_mask.astype(float), nx) > 0.5
-    fluid_bounds = (
-        _rectangular_fluid_bounds(fluid_mask) if use_alex_b2_finite_volume else None
-    )
+    fluid_bounds = _rectangular_fluid_bounds(fluid_mask) if use_alex_b2_finite_volume else None
     if use_alex_b2_finite_volume:
         y0, y1, z0, z1 = fluid_bounds
         dy = _canonical_shell_widths(dy, y0, y1)
@@ -6520,9 +5802,7 @@ def _solve_extruded_projection(
 
     if initial_bundle is not None:
         if initial_bundle.u.shape != (nx, ny, nz):
-            raise ValueError(
-                "Extruded restart bundle shape does not match the current duct problem"
-            )
+            raise ValueError("Extruded restart bundle shape does not match the current duct problem")
         u = jnp.asarray(initial_bundle.u, dtype=float)
         v = jnp.asarray(initial_bundle.v, dtype=float)
         w = jnp.asarray(initial_bundle.w, dtype=float)
@@ -6610,22 +5890,15 @@ def _solve_extruded_projection(
             or not isinstance(inlet[0].value, (int, float))
             or outlet[0].value != 0.0
         ):
-            raise ValueError(
-                "ALEX B2 requires one inlet flow rate and zero outlet pressure"
-            )
+            raise ValueError("ALEX B2 requires one inlet flow rate and zero outlet pressure")
         target_flow_rate = float(inlet[0].value)
     else:
         target_flow_rate = (
-            float(
-                jnp.mean(
-                    jnp.sum(jnp.where(fluid_mask, u * cell_area, 0.0), axis=(1, 2))
-                )
-            )
+            float(jnp.mean(jnp.sum(jnp.where(fluid_mask, u * cell_area, 0.0), axis=(1, 2))))
             if initial_bundle is not None or case.initial_velocity != 0.0
             else None
         )
-    outer_steps = min(case.time_stepper.max_steps,
-                      max(6, case.solver.coupling_iterations * 2))
+    outer_steps = min(case.time_stepper.max_steps, max(6, case.solver.coupling_iterations * 2))
     poisson_iterations = (
         case.time_stepper.potential_iterations
         if use_alex_b2_finite_volume
@@ -6643,57 +5916,78 @@ def _solve_extruded_projection(
         20.0,
         2.0 * float(jnp.max(bx**2 + by**2 + bz**2)),
     )
-    electric_potential_scale = max(
-        1.0, math.sqrt(float(jnp.max(bx**2 + by**2 + bz**2)))
+    electric_potential_scale = max(1.0, math.sqrt(float(jnp.max(bx**2 + by**2 + bz**2))))
+    history_names = (
+        "iteration_residual_history",
+        "iteration_component_residual_history",
+        "iteration_pressure_residual_history",
+        "iteration_electric_linear_history",
+        "iteration_potential_residual_history",
     )
-    history_names = ("iteration_residual_history", "iteration_component_residual_history",
-        "iteration_pressure_residual_history", "iteration_electric_linear_history",
-        "iteration_potential_residual_history")
-    histories = tuple([] if initial_bundle is None else np.asarray(
-        getattr(initial_bundle, name, jnp.zeros((0,)))).tolist() for name in history_names)
+    histories = tuple(
+        [] if initial_bundle is None else np.asarray(getattr(initial_bundle, name, jnp.zeros((0,)))).tolist()
+        for name in history_names
+    )
     if len({len(history) for history in histories}) != 1:
         raise ValueError("B2 restart iteration histories have inconsistent lengths")
-    (residual_by_step, component_residual_by_step, pressure_residual_by_step,
-        electric_linear_by_step, potential_residual_by_step) = histories
+    (
+        residual_by_step,
+        component_residual_by_step,
+        pressure_residual_by_step,
+        electric_linear_by_step,
+        potential_residual_by_step,
+    ) = histories
     completed_steps = len(residual_by_step)
-    momentum_defect_by_step = ([] if initial_bundle is None else
-        np.asarray(initial_bundle.iteration_momentum_defect_history).tolist())
+    momentum_defect_by_step = (
+        []
+        if initial_bundle is None
+        else np.asarray(initial_bundle.iteration_momentum_defect_history).tolist()
+    )
     if use_alex_b2_finite_volume and len(momentum_defect_by_step) != completed_steps:
-        raise ValueError(
-            "B2 restart predates the electromagnetic momentum-defect contract"
-        )
-    pressure_linear_by_step = ([] if initial_bundle is None else np.asarray(
-        getattr(initial_bundle, "iteration_pressure_linear_history",
-            jnp.zeros((0, 5)))).tolist())
+        raise ValueError("B2 restart predates the electromagnetic momentum-defect contract")
+    pressure_linear_by_step = (
+        []
+        if initial_bundle is None
+        else np.asarray(
+            getattr(initial_bundle, "iteration_pressure_linear_history", jnp.zeros((0, 5)))
+        ).tolist()
+    )
     if completed_steps and not pressure_linear_by_step:
-        pressure_linear_by_step = [
-            [math.nan, math.nan, 0.0, 0.0, -1.0]
-        ] * completed_steps
+        pressure_linear_by_step = [[math.nan, math.nan, 0.0, 0.0, -1.0]] * completed_steps
     if len(pressure_linear_by_step) != completed_steps:
         raise ValueError("B2 restart pressure-linear history has inconsistent length")
-    courant_by_step = ([] if initial_bundle is None else np.asarray(getattr(
-        initial_bundle, "iteration_courant_history", jnp.zeros((0, 3)))).tolist())
+    courant_by_step = (
+        []
+        if initial_bundle is None
+        else np.asarray(getattr(initial_bundle, "iteration_courant_history", jnp.zeros((0, 3)))).tolist()
+    )
     if completed_steps and not courant_by_step:
         courant_by_step = [[-1.0, -1.0, -1.0]] * completed_steps
     if len(courant_by_step) != completed_steps:
         raise ValueError("B2 restart CFL histories have inconsistent lengths")
     previous_fixed_point_residual: jnp.ndarray | None = None
-    fixed_aitken_relaxation = (float(case.solver.coupling_min_relaxation)
-        if use_alex_b2_finite_volume and case.solver.coupling_acceleration == "aitken"
+    fixed_aitken_relaxation = (
+        float(case.solver.coupling_min_relaxation)
+        if use_alex_b2_finite_volume
+        and case.solver.coupling_acceleration == "aitken"
         and case.solver.coupling_min_relaxation == case.solver.coupling_max_relaxation
-        else None)
-    restart_stopping = ((0, 0, "not_recorded") if initial_bundle is None else
-        getattr(initial_bundle, "stopping_state", (0, 0, "not_recorded")))
+        else None
+    )
+    restart_stopping = (
+        (0, 0, "not_recorded")
+        if initial_bundle is None
+        else getattr(initial_bundle, "stopping_state", (0, 0, "not_recorded"))
+    )
     if restart_stopping[0] not in (0, completed_steps):
         raise ValueError("B2 restart stopping state has inconsistent step count")
     steady_streak = int(restart_stopping[1])
     fixed_point_relaxation = jnp.asarray(1.0, dtype=u.dtype)
     restart_aitken = None if initial_bundle is None else getattr(initial_bundle, "aitken_state", None)
     if use_alex_b2_finite_volume and restart_aitken is not None:
-        previous_fixed_point_residual, fixed_point_relaxation, legacy_streak = restart_aitken
+        previous_fixed_point_residual, fixed_point_relaxation, stored_streak = restart_aitken
         if restart_stopping[2] == "not_recorded":
-            steady_streak = legacy_streak
-        elif steady_streak != legacy_streak:
+            steady_streak = stored_streak
+        elif steady_streak != stored_streak:
             raise ValueError("B2 restart stopping and Aitken streaks disagree")
         fixed_point_relaxation = jnp.asarray(fixed_point_relaxation, dtype=u.dtype)
         if fixed_aitken_relaxation is not None:
@@ -6704,21 +5998,25 @@ def _solve_extruded_projection(
                 raise ValueError("B2 restart Aitken residual has inconsistent shape")
     previous_anderson_mapped = previous_anderson_residual = None
     previous_anderson_flux = previous_anderson_inlet = None
-    restart_anderson = (None if initial_bundle is None else
-        getattr(initial_bundle, "anderson_state", None))
-    if (use_alex_b2_finite_volume
-            and case.solver.coupling_acceleration == "anderson"):
+    restart_anderson = None if initial_bundle is None else getattr(initial_bundle, "anderson_state", None)
+    if use_alex_b2_finite_volume and case.solver.coupling_acceleration == "anderson":
         if completed_steps and restart_anderson is None:
             raise ValueError("B2 Anderson restart is missing accelerator state")
         if restart_anderson is not None:
-            if len(restart_anderson) != 4 or any(
-                    value is None for value in restart_anderson):
+            if len(restart_anderson) != 4 or any(value is None for value in restart_anderson):
                 raise ValueError("B2 Anderson restart state must be all-or-none")
-            (previous_anderson_mapped, previous_anderson_residual,
-                previous_anderson_flux, previous_anderson_inlet) = (
-                    jnp.asarray(value, dtype=u.dtype) for value in restart_anderson)
-            if (previous_anderson_mapped.shape != (4, nx, ny, nz)
-                    or previous_anderson_residual.shape != (4, nx, ny, nz)):
+            (
+                previous_anderson_mapped,
+                previous_anderson_residual,
+                previous_anderson_flux,
+                previous_anderson_inlet,
+            ) = (jnp.asarray(value, dtype=u.dtype) for value in restart_anderson)
+            if previous_anderson_mapped.shape != (4, nx, ny, nz) or previous_anderson_residual.shape != (
+                4,
+                nx,
+                ny,
+                nz,
+            ):
                 raise ValueError("B2 restart Anderson field state has inconsistent shape")
     fixed_point_scale = jnp.asarray(
         [
@@ -6735,12 +6033,13 @@ def _solve_extruded_projection(
         local_dy = dy[y0:y1]
         local_dz = dz[z0:z1]
         field_sharding = u.sharding if num_devices is not None else None
-        replicated_sharding = (None if field_sharding is None else
-            NamedSharding(field_sharding.mesh, P()))
-        flux_sharding = (None if field_sharding is None else
-            NamedSharding(field_sharding.mesh, P(None, "x", None, None)))
-        vector_sharding = (None if field_sharding is None else
-            NamedSharding(field_sharding.mesh, P("x", None, None, None)))
+        replicated_sharding = None if field_sharding is None else NamedSharding(field_sharding.mesh, P())
+        flux_sharding = (
+            None if field_sharding is None else NamedSharding(field_sharding.mesh, P(None, "x", None, None))
+        )
+        vector_sharding = (
+            None if field_sharding is None else NamedSharding(field_sharding.mesh, P("x", None, None, None))
+        )
         kernel_key = (
             field_sharding,
             u.shape,
@@ -6763,72 +6062,102 @@ def _solve_extruded_projection(
         fluid = next(region for region in case.regions if region.kind == "fluid")
         prescribed_field = case.magnetic_field.value or (0.0, 0.0, 0.0)
         reference_speed = target_flow_rate / float(jnp.sum(face_area))
-        electromagnetic_force_scale = (fluid.conductivity * reference_speed
-            * sum(float(component) ** 2 for component in prescribed_field))
+        electromagnetic_force_scale = (
+            fluid.conductivity
+            * reference_speed
+            * sum(float(component) ** 2 for component in prescribed_field)
+        )
         if electromagnetic_force_scale <= 0.0:
             raise ValueError("ALEX B2 requires a positive electromagnetic force scale")
-        kernel_key = (*kernel_key, electromagnetic_force_scale,
-            case.solver.coupling_regularization, case.solver.coupling_damping)
+        kernel_key = (
+            *kernel_key,
+            electromagnetic_force_scale,
+            case.solver.coupling_regularization,
+            case.solver.coupling_damping,
+        )
         restart_flux = None if initial_bundle is None else initial_bundle.rho_phi_plus
         restart_inlet = None if initial_bundle is None else initial_bundle.rho_phi_inlet
         if (restart_flux is None) != (restart_inlet is None):
             raise ValueError("B2 restart requires both compact flux arrays")
 
         def initialize_flux(u0, v0, w0, density):
-            velocity = jnp.stack((u0[:, y0:y1, z0:z1],
-                v0[:, y0:y1, z0:z1], w0[:, y0:y1, z0:z1]), axis=-1)
+            velocity = jnp.stack((u0[:, y0:y1, z0:z1], v0[:, y0:y1, z0:z1], w0[:, y0:y1, z0:z1]), axis=-1)
             density = density[:, y0:y1, z0:z1]
-            inlet = velocity[0].at[..., 0].set(_flow_rate_inlet_profile(
-                velocity[0, ..., 0], face_area, target_flow_rate))
+            inlet = (
+                velocity[0]
+                .at[..., 0]
+                .set(_flow_rate_inlet_profile(velocity[0, ..., 0], face_area, target_flow_rate))
+            )
             return _initialize_duct_mass_flux(
-                velocity, density, inlet, dx=dx, dy=local_dy, dz=local_dz,
-                sharding=field_sharding)
+                velocity, density, inlet, dx=dx, dy=local_dy, dz=local_dz, sharding=field_sharding
+            )
 
         def momentum_solve(velocity, force, density, viscosity, rho_phi_plus, rho_phi_inlet):
-            local_velocity, local_density, local_viscosity = (field[:, y0:y1, z0:z1]
-                for field in (velocity, density, viscosity))
-            inlet_patch = local_velocity[0].at[..., 0].set(
-                rho_phi_inlet / (local_density[0] * face_area))
-            zero_y, zero_z = (jnp.zeros_like(local_velocity[:, 0]),
-                jnp.zeros_like(local_velocity[:, :, 0]))
-            boundary_velocity = (inlet_patch, local_velocity[-1],
-                zero_y, zero_y, zero_z, zero_z)
+            local_velocity, local_density, local_viscosity = (
+                field[:, y0:y1, z0:z1] for field in (velocity, density, viscosity)
+            )
+            inlet_patch = local_velocity[0].at[..., 0].set(rho_phi_inlet / (local_density[0] * face_area))
+            zero_y, zero_z = (jnp.zeros_like(local_velocity[:, 0]), jnp.zeros_like(local_velocity[:, :, 0]))
+            boundary_velocity = (inlet_patch, local_velocity[-1], zero_y, zero_y, zero_z, zero_z)
             widths = (jnp.full((nx,), dx), local_dy, local_dz)
             rho_phi = _unpack_duct_mass_flux(rho_phi_plus, rho_phi_inlet)
-            setup = _frozen_duct_momentum_setup(local_velocity, local_density,
-                local_viscosity, rho_phi, boundary_velocity, widths, dx=dx)
+            setup = _frozen_duct_momentum_setup(
+                local_velocity, local_density, local_viscosity, rho_phi, boundary_velocity, widths, dx=dx
+            )
             local_force = force[:, y0:y1, z0:z1] + _explicit_deviatoric_stress_duct(
-                local_velocity, setup[0], boundary_velocity, widths, gradient=setup[-1])
+                local_velocity, setup[0], boundary_velocity, widths, gradient=setup[-1]
+            )
             return _solvax_implicit_momentum_duct(
-                local_velocity, local_force, local_density, local_viscosity,
-                rho_phi, boundary_velocity,
-                dt=dt, dx=dx, dy=local_dy, dz=local_dz,
-                iterations=momentum_iterations, tolerance=momentum_tolerance,
+                local_velocity,
+                local_force,
+                local_density,
+                local_viscosity,
+                rho_phi,
+                boundary_velocity,
+                dt=dt,
+                dx=dx,
+                dy=local_dy,
+                dz=local_dz,
+                iterations=momentum_iterations,
+                tolerance=momentum_tolerance,
                 frozen_setup=setup,
             )
 
-        def momentum_defect(velocity, lorentz_force, density, viscosity,
-                            rho_phi_plus, rho_phi_inlet, pressure):
+        def momentum_defect(
+            velocity, lorentz_force, density, viscosity, rho_phi_plus, rho_phi_inlet, pressure
+        ):
             return _duct_momentum_defect(
                 velocity[:, y0:y1, z0:z1],
                 lorentz_force[:, y0:y1, z0:z1],
                 density[:, y0:y1, z0:z1],
                 viscosity[:, y0:y1, z0:z1],
-                rho_phi_plus, rho_phi_inlet, pressure[:, y0:y1, z0:z1],
-                forcing=forcing, force_scale=electromagnetic_force_scale,
-                dt=dt, dx=dx, dy=local_dy, dz=local_dz,
-                field_sharding=field_sharding)
+                rho_phi_plus,
+                rho_phi_inlet,
+                pressure[:, y0:y1, z0:z1],
+                forcing=forcing,
+                force_scale=electromagnetic_force_scale,
+                dt=dt,
+                dx=dx,
+                dy=local_dy,
+                dz=local_dz,
+                field_sharding=field_sharding,
+            )
 
         def embed_velocity(local_velocity, mask):
-            embedded = jnp.pad(local_velocity,
-                ((0, 0), (y0, ny - y1), (z0, nz - z1), (0, 0)))
+            embedded = jnp.pad(local_velocity, ((0, 0), (y0, ny - y1), (z0, nz - z1), (0, 0)))
             return tuple(jnp.where(mask, embedded[..., i], 0.0) for i in range(3))
 
         def courant_numbers(east, north, top, inlet, density):
             return _compact_duct_courant_numbers(
-                (east, north, top), inlet, density[:, y0:y1, z0:z1], dt=dt, dx=dx,
-                dy=local_dy, dz=local_dz,
-                sharding=field_sharding)
+                (east, north, top),
+                inlet,
+                density[:, y0:y1, z0:z1],
+                dt=dt,
+                dx=dx,
+                dy=local_dy,
+                dz=local_dz,
+                sharding=field_sharding,
+            )
 
         def pack_flux(x, y, z):
             return jnp.stack((x, y, z))
@@ -6839,97 +6168,109 @@ def _solve_extruded_projection(
         def pack_vector(x, y, z):
             return jnp.stack((x, y, z), axis=-1)
 
-        def relax_flux(current_x, current_y, current_z, current_inlet,
-                       mapped_x, mapped_y, mapped_z, mapped_inlet, relaxation):
-            components = tuple(current + relaxation * (mapped - current)
-                for current, mapped in zip((current_x, current_y, current_z),
-                    (mapped_x, mapped_y, mapped_z), strict=True))
-            return (*components,
-                current_inlet + relaxation * (mapped_inlet - current_inlet))
+        def relax_flux(
+            current_x,
+            current_y,
+            current_z,
+            current_inlet,
+            mapped_x,
+            mapped_y,
+            mapped_z,
+            mapped_inlet,
+            relaxation,
+        ):
+            components = tuple(
+                current + relaxation * (mapped - current)
+                for current, mapped in zip(
+                    (current_x, current_y, current_z), (mapped_x, mapped_y, mapped_z), strict=True
+                )
+            )
+            return (*components, current_inlet + relaxation * (mapped_inlet - current_inlet))
 
         momentum_solve = jax.named_call(momentum_solve, name="lmx.b2.momentum")
-        momentum_defect = jax.named_call(
-            momentum_defect, name="lmx.b2.momentum_defect"
-        )
+        momentum_defect = jax.named_call(momentum_defect, name="lmx.b2.momentum_defect")
 
         if field_sharding is not None:  # pragma: no cover - hardware gate
-            initialize_flux = jax.jit(initialize_flux,
+            initialize_flux = jax.jit(
+                initialize_flux,
                 in_shardings=(field_sharding,) * 4,
-                out_shardings=(field_sharding,) * 3 + (replicated_sharding,))
-            initialize_flux = _reuse_fringing_jit(
-                ("initialize_flux", *kernel_key), initialize_flux)
+                out_shardings=(field_sharding,) * 3 + (replicated_sharding,),
+            )
+            initialize_flux = _reuse_fringing_jit(("initialize_flux", *kernel_key), initialize_flux)
             momentum_solve = jax.jit(
                 momentum_solve,
-                in_shardings=(vector_sharding,) * 2 + (field_sharding,) * 2
+                in_shardings=(vector_sharding,) * 2
+                + (field_sharding,) * 2
                 + (flux_sharding, replicated_sharding),
                 out_shardings=(vector_sharding, replicated_sharding, replicated_sharding),
             )
-            momentum_solve = _reuse_fringing_jit(
-                ("momentum", *kernel_key), momentum_solve
-            )
-            momentum_defect = jax.jit(momentum_defect,
+            momentum_solve = _reuse_fringing_jit(("momentum", *kernel_key), momentum_solve)
+            momentum_defect = jax.jit(
+                momentum_defect,
                 in_shardings=(vector_sharding,) * 2
                 + (field_sharding,) * 2
                 + (flux_sharding, replicated_sharding, field_sharding),
-                out_shardings=replicated_sharding)
-            momentum_defect = _reuse_fringing_jit(
-                ("momentum_defect", *kernel_key), momentum_defect
+                out_shardings=replicated_sharding,
             )
-            embed_velocity = jax.jit(embed_velocity,
+            momentum_defect = _reuse_fringing_jit(("momentum_defect", *kernel_key), momentum_defect)
+            embed_velocity = jax.jit(
+                embed_velocity,
                 in_shardings=(vector_sharding, field_sharding),
-                out_shardings=(field_sharding,) * 3)
-            embed_velocity = _reuse_fringing_jit(
-                ("embed_velocity", *kernel_key), embed_velocity)
-            courant_numbers = jax.jit(courant_numbers,
-                in_shardings=(field_sharding,) * 3
-                + (replicated_sharding, field_sharding),
-                out_shardings=(replicated_sharding, replicated_sharding))
-            courant_numbers = _reuse_fringing_jit(
-                ("courant", *kernel_key), courant_numbers)
-            pack_flux = jax.jit(pack_flux,
-                in_shardings=(field_sharding,) * 3, out_shardings=flux_sharding)
+                out_shardings=(field_sharding,) * 3,
+            )
+            embed_velocity = _reuse_fringing_jit(("embed_velocity", *kernel_key), embed_velocity)
+            courant_numbers = jax.jit(
+                courant_numbers,
+                in_shardings=(field_sharding,) * 3 + (replicated_sharding, field_sharding),
+                out_shardings=(replicated_sharding, replicated_sharding),
+            )
+            courant_numbers = _reuse_fringing_jit(("courant", *kernel_key), courant_numbers)
+            pack_flux = jax.jit(pack_flux, in_shardings=(field_sharding,) * 3, out_shardings=flux_sharding)
             pack_flux = _reuse_fringing_jit(("pack_flux", *kernel_key), pack_flux)
-            unpack_flux = jax.jit(unpack_flux, in_shardings=flux_sharding,
-                out_shardings=(field_sharding,) * 3)
-            unpack_flux = _reuse_fringing_jit(
-                ("unpack_flux", *kernel_key), unpack_flux)
-            pack_vector = jax.jit(pack_vector,
-                in_shardings=(field_sharding,) * 3, out_shardings=vector_sharding)
+            unpack_flux = jax.jit(
+                unpack_flux, in_shardings=flux_sharding, out_shardings=(field_sharding,) * 3
+            )
+            unpack_flux = _reuse_fringing_jit(("unpack_flux", *kernel_key), unpack_flux)
+            pack_vector = jax.jit(
+                pack_vector, in_shardings=(field_sharding,) * 3, out_shardings=vector_sharding
+            )
             pack_vector = _reuse_fringing_jit(("pack_vector", *kernel_key), pack_vector)
-            relax_flux = jax.jit(relax_flux,
-                in_shardings=(field_sharding,) * 3 + (replicated_sharding,)
-                + (field_sharding,) * 3 + (replicated_sharding,) * 2,
-                out_shardings=(field_sharding,) * 3 + (replicated_sharding,))
+            relax_flux = jax.jit(
+                relax_flux,
+                in_shardings=(field_sharding,) * 3
+                + (replicated_sharding,)
+                + (field_sharding,) * 3
+                + (replicated_sharding,) * 2,
+                out_shardings=(field_sharding,) * 3 + (replicated_sharding,),
+            )
             relax_flux = _reuse_fringing_jit(("relax_flux", *kernel_key), relax_flux)
 
         if restart_flux is None:
-            (*current_flux_components, current_rho_phi_inlet) = initialize_flux(
-                u, v, w, rho)
+            (*current_flux_components, current_rho_phi_inlet) = initialize_flux(u, v, w, rho)
         else:
             restart_flux = np.asarray(restart_flux, dtype=np.dtype(u.dtype))
             current_flux_components = tuple(
-                jnp.asarray(value) if field_sharding is None
-                else jax.device_put(value, field_sharding)
-                for value in restart_flux)
+                jnp.asarray(value) if field_sharding is None else jax.device_put(value, field_sharding)
+                for value in restart_flux
+            )
             current_rho_phi_inlet = jnp.asarray(restart_inlet, dtype=u.dtype)
             if replicated_sharding is not None:
-                current_rho_phi_inlet = jax.device_put(
-                    np.asarray(current_rho_phi_inlet), replicated_sharding)
+                current_rho_phi_inlet = jax.device_put(np.asarray(current_rho_phi_inlet), replicated_sharding)
         current_rho_phi_plus = pack_flux(*current_flux_components)
         if previous_anderson_flux is not None:
-            if (previous_anderson_flux.shape != current_rho_phi_plus.shape
-                    or previous_anderson_inlet.shape != current_rho_phi_inlet.shape):
+            if (
+                previous_anderson_flux.shape != current_rho_phi_plus.shape
+                or previous_anderson_inlet.shape != current_rho_phi_inlet.shape
+            ):
                 raise ValueError("B2 restart Anderson flux state has inconsistent shape")
             if flux_sharding is not None:  # pragma: no cover - hardware gate
-                previous_anderson_flux = jax.device_put(
-                    np.asarray(previous_anderson_flux), flux_sharding)
+                previous_anderson_flux = jax.device_put(np.asarray(previous_anderson_flux), flux_sharding)
                 previous_anderson_inlet = jax.device_put(
-                    np.asarray(previous_anderson_inlet), replicated_sharding)
+                    np.asarray(previous_anderson_inlet), replicated_sharding
+                )
 
     else:
-        unit_pressure_response = _enforce_velocity_bc_3d(
-            jnp.where(fluid_mask, dt / rho, 0.0), fluid_mask
-        )
+        unit_pressure_response = _enforce_velocity_bc_3d(jnp.where(fluid_mask, dt / rho, 0.0), fluid_mask)
 
     if use_alex_b2_finite_volume:
         # The strict corner bound oversolves PCG; the local residual gates physics.
@@ -7058,8 +6399,7 @@ def _solve_extruded_projection(
             values = state * fixed_point_scale
             return values[0], values[1], values[2], values[3]
 
-        def mix_anderson(mapped0, residual0, flux0, inlet0,
-                         mapped1, residual1, flux1, inlet1):
+        def mix_anderson(mapped0, residual0, flux0, inlet0, mapped1, residual1, flux1, inlet1):
             """Apply one shared SOLVAX weight vector to the coupled B2 record."""
 
             weights = anderson_weights(
@@ -7069,9 +6409,7 @@ def _solve_extruded_projection(
             damping = case.solver.coupling_damping
 
             def mix(previous, current):
-                weighted = jnp.tensordot(
-                    weights, jnp.stack((previous, current)), axes=(0, 0)
-                )
+                weighted = jnp.tensordot(weights, jnp.stack((previous, current)), axes=(0, 0))
                 return current + damping * (weighted - current)
 
             return (
@@ -7080,29 +6418,26 @@ def _solve_extruded_projection(
                 mix(inlet0, inlet1),
             )
 
-        mixed_boundary_projection = jax.named_call(
-            mixed_boundary_projection, name="lmx.b2.projection"
-        )
+        mixed_boundary_projection = jax.named_call(mixed_boundary_projection, name="lmx.b2.projection")
         electric_solve = jax.named_call(electric_solve, name="lmx.b2.electric")
         emf_operator = jax.named_call(emf_operator, name="lmx.b2.emf")
-        reconstruct_electric = jax.named_call(
-            reconstruct_electric, name="lmx.b2.reconstruction"
-        )
+        reconstruct_electric = jax.named_call(reconstruct_electric, name="lmx.b2.reconstruction")
         mix_anderson = jax.named_call(mix_anderson, name="lmx.b2.anderson")
 
         if field_sharding is not None:  # pragma: no cover - hardware gate
             axial_sharding = NamedSharding(field_sharding.mesh, P("x"))
-            state_sharding = NamedSharding(
-                field_sharding.mesh, P(None, "x", None, None)
-            )
+            state_sharding = NamedSharding(field_sharding.mesh, P(None, "x", None, None))
             if previous_fixed_point_residual is not None:
                 previous_fixed_point_residual = jax.device_put(
-                    np.asarray(previous_fixed_point_residual), state_sharding)
+                    np.asarray(previous_fixed_point_residual), state_sharding
+                )
             if previous_anderson_mapped is not None:
                 previous_anderson_mapped = jax.device_put(
-                    np.asarray(previous_anderson_mapped), state_sharding)
+                    np.asarray(previous_anderson_mapped), state_sharding
+                )
                 previous_anderson_residual = jax.device_put(
-                    np.asarray(previous_anderson_residual), state_sharding)
+                    np.asarray(previous_anderson_residual), state_sharding
+                )
             mixed_boundary_projection = jax.jit(
                 mixed_boundary_projection,
                 in_shardings=(field_sharding,) * 6,
@@ -7162,8 +6497,7 @@ def _solve_extruded_projection(
             )
             mix_anderson = jax.jit(
                 mix_anderson,
-                in_shardings=(state_sharding, state_sharding, flux_sharding,
-                    replicated_sharding) * 2,
+                in_shardings=(state_sharding, state_sharding, flux_sharding, replicated_sharding) * 2,
                 out_shardings=(state_sharding, flux_sharding, replicated_sharding),
             )
             (
@@ -7190,39 +6524,29 @@ def _solve_extruded_projection(
                     ("anderson", mix_anderson),
                 )
             )
-        momentum_solve = _synchronized_phase(
-            momentum_solve, "momentum", phase_timing_callback
-        )
-        momentum_defect = _synchronized_phase(
-            momentum_defect, "momentum_defect", phase_timing_callback
-        )
+        momentum_solve = _synchronized_phase(momentum_solve, "momentum", phase_timing_callback)
+        momentum_defect = _synchronized_phase(momentum_defect, "momentum_defect", phase_timing_callback)
         mixed_boundary_projection = _synchronized_phase(
             mixed_boundary_projection, "projection", phase_timing_callback
         )
-        electric_solve = _synchronized_phase(
-            electric_solve, "electric", phase_timing_callback
-        )
-        emf_operator = _synchronized_phase(
-            emf_operator, "emf", phase_timing_callback
-        )
+        electric_solve = _synchronized_phase(electric_solve, "electric", phase_timing_callback)
+        emf_operator = _synchronized_phase(emf_operator, "emf", phase_timing_callback)
         reconstruct_electric = _synchronized_phase(
             reconstruct_electric, "reconstruction", phase_timing_callback
         )
-        mix_anderson = _synchronized_phase(
-            mix_anderson, "anderson", phase_timing_callback
-        )
+        mix_anderson = _synchronized_phase(mix_anderson, "anderson", phase_timing_callback)
 
     stop_step = completed_steps + outer_steps
     for step in range(completed_steps, stop_step):
         flux_relaxation = jnp.asarray(1.0, dtype=u.dtype)
-        step_courant = (courant_numbers(*current_flux_components,
-            current_rho_phi_inlet, rho)
-            if use_alex_b2_finite_volume else (-1.0, -1.0))
+        step_courant = (
+            courant_numbers(*current_flux_components, current_rho_phi_inlet, rho)
+            if use_alex_b2_finite_volume
+            else (-1.0, -1.0)
+        )
         phi_previous = phi
         pressure_observable_previous = (
-            _cross_duct_pressure_difference(
-                p, active_mask=fluid_mask, magnetic_axis=1, side_axis=2
-            )
+            _cross_duct_pressure_difference(p, active_mask=fluid_mask, magnetic_axis=1, side_axis=2)
             if use_alex_b2_finite_volume
             else jnp.zeros((nx,), dtype=p.dtype)
         )
@@ -7255,16 +6579,13 @@ def _solve_extruded_projection(
             laplacian_w = _laplacian_3d(w, dx=dx, dy=dy_momentum, dz=dz_momentum)
         if use_alex_b2_finite_volume:
             velocity = pack_vector(u, v, w)
-            momentum_force = pack_vector(
-                lorentz_x + forcing, lorentz_y, lorentz_z)
+            momentum_force = pack_vector(lorentz_x + forcing, lorentz_y, lorentz_z)
             velocity_fluid, _, momentum_linear_converged = momentum_solve(
-                velocity, momentum_force, rho, nu,
-                current_rho_phi_plus, current_rho_phi_inlet)
+                velocity, momentum_force, rho, nu, current_rho_phi_plus, current_rho_phi_inlet
+            )
             u_star, v_star, w_star = embed_velocity(velocity_fluid, fluid_mask)
         else:
-            u_star = u + dt * (
-                nu * laplacian_u + forcing / rho + lorentz_x / rho - dp_dx / rho
-            )
+            u_star = u + dt * (nu * laplacian_u + forcing / rho + lorentz_x / rho - dp_dx / rho)
             v_star = v + dt * (nu * laplacian_v + lorentz_y / rho - dp_dy / rho)
             w_star = w + dt * (nu * laplacian_w + lorentz_z / rho - dp_dz / rho)
         if not use_alex_b2_finite_volume:
@@ -7276,24 +6597,34 @@ def _solve_extruded_projection(
             w_star = _enforce_velocity_bc_3d(w_star, fluid_mask)
 
         if use_alex_b2_finite_volume:
-            (u_next, v_next, w_next, p_corr, axial_pressure_loss_gradient,
-                projected_divergence_norm, fixed_flow_error, mapped_rho_phi_x,
-                mapped_rho_phi_y, mapped_rho_phi_z,
-                mapped_rho_phi_inlet, pressure_linear_residual,
-                pressure_linear_relative_residual, pressure_linear_iterations,
+            (
+                u_next,
+                v_next,
+                w_next,
+                p_corr,
+                axial_pressure_loss_gradient,
+                projected_divergence_norm,
+                fixed_flow_error,
+                mapped_rho_phi_x,
+                mapped_rho_phi_y,
+                mapped_rho_phi_z,
+                mapped_rho_phi_inlet,
+                pressure_linear_residual,
+                pressure_linear_relative_residual,
+                pressure_linear_iterations,
                 pressure_linear_converged,
-                pressure_linear_status) = mixed_boundary_projection(
-                u_star, v_star, w_star, p, rho, fluid_mask)
-            mapped_flux_components = (
-                mapped_rho_phi_x, mapped_rho_phi_y, mapped_rho_phi_z)
-            valid = all(bool(jnp.all(jnp.isfinite(field)))
-                for field in (u_next, v_next, w_next, p_corr))
-            valid &= all(bool(jnp.all(jnp.abs(field) <= velocity_limit))
-                for field in (u_next, v_next, w_next))
+                pressure_linear_status,
+            ) = mixed_boundary_projection(u_star, v_star, w_star, p, rho, fluid_mask)
+            mapped_flux_components = (mapped_rho_phi_x, mapped_rho_phi_y, mapped_rho_phi_z)
+            valid = all(bool(jnp.all(jnp.isfinite(field))) for field in (u_next, v_next, w_next, p_corr))
+            valid &= all(
+                bool(jnp.all(jnp.abs(field) <= velocity_limit)) for field in (u_next, v_next, w_next)
+            )
             if not valid:
-                state = tuple((name, bool(jnp.all(jnp.isfinite(field))),
-                    float(jnp.nanmax(jnp.abs(field)))) for name, field in
-                    zip(("u", "v", "w", "p"), (u_next, v_next, w_next, p_corr)))
+                state = tuple(
+                    (name, bool(jnp.all(jnp.isfinite(field))), float(jnp.nanmax(jnp.abs(field))))
+                    for name, field in zip(("u", "v", "w", "p"), (u_next, v_next, w_next, p_corr))
+                )
                 raise FloatingPointError(f"ALEX B2 projection inactive guard: {state}")
         else:
             du_dx, _, _ = _gradient_3d(u_star, dx=dx, dy=dy_momentum, dz=dz_momentum)
@@ -7309,9 +6640,7 @@ def _solve_extruded_projection(
                 tolerance=poisson_tolerance,
             )
             p_corr = _clip_state(jnp.where(fluid_mask, p_corr, 0.0), scalar_limit)
-            dpc_dx, dpc_dy, dpc_dz = _gradient_3d(
-                p_corr, dx=dx, dy=dy_momentum, dz=dz_momentum
-            )
+            dpc_dx, dpc_dy, dpc_dz = _gradient_3d(p_corr, dx=dx, dy=dy_momentum, dz=dz_momentum)
             u_next = _enforce_velocity_bc_3d(u_star - (dt / rho) * dpc_dx, fluid_mask)
             v_next = _enforce_velocity_bc_3d(v_star - (dt / rho) * dpc_dy, fluid_mask)
             w_next = _enforce_velocity_bc_3d(w_star - (dt / rho) * dpc_dz, fluid_mask)
@@ -7327,15 +6656,13 @@ def _solve_extruded_projection(
                 )
                 axial_pressure_loss_gradient = jnp.full((nx,), forcing, dtype=float)
             else:
-                u_next, axial_pressure_loss_gradient = (
-                    _apply_fixed_flow_pressure_constraint(
-                        u_next,
-                        unit_pressure_response=unit_pressure_response,
-                        active_mask=fluid_mask,
-                        cell_area=cell_area,
-                        target_flow_rate=target_flow_rate,
-                        base_pressure_loss_gradient=forcing,
-                    )
+                u_next, axial_pressure_loss_gradient = _apply_fixed_flow_pressure_constraint(
+                    u_next,
+                    unit_pressure_response=unit_pressure_response,
+                    active_mask=fluid_mask,
+                    cell_area=cell_area,
+                    target_flow_rate=target_flow_rate,
+                    base_pressure_loss_gradient=forcing,
                 )
             u_next = _enforce_velocity_bc_3d(u_next, fluid_mask)
             projected_divergence_norm = float("nan")
@@ -7409,9 +6736,14 @@ def _solve_extruded_projection(
                 phi, sigma, uxb_x, uxb_y, uxb_z, bx, by, bz, fluid_mask
             )
             momentum_defect_components = momentum_defect(
-                pack_vector(u_next, v_next, w_next), pack_vector(
-                    lorentz_x, lorentz_y, lorentz_z), rho, nu,
-                pack_flux(*mapped_flux_components), mapped_rho_phi_inlet, p_corr)
+                pack_vector(u_next, v_next, w_next),
+                pack_vector(lorentz_x, lorentz_y, lorentz_z),
+                rho,
+                nu,
+                pack_flux(*mapped_flux_components),
+                mapped_rho_phi_inlet,
+                p_corr,
+            )
         else:
             dphi_dx, dphi_dy, dphi_dz = _gradient_3d(phi, dx=dx, dy=dy, dz=dz)
             jx = _clip_state(sigma * (-dphi_dx + uxb_x), scalar_limit)
@@ -7496,12 +6828,13 @@ def _solve_extruded_projection(
         pressure_linear_by_step.append(tuple(linear_diagnostics[:5]))
         electric_diagnostics = linear_diagnostics[5:]
         electric_linear_by_step.append(tuple(electric_diagnostics))
-        courant_by_step.append((dt if use_alex_b2_finite_volume else -1.0,
-                                *map(float, step_courant)))
+        courant_by_step.append((dt if use_alex_b2_finite_volume else -1.0, *map(float, step_courant)))
         update_residual = max(u_update, v_update, w_update, pressure_update, potential_update)
-        stopping_residual = (max(u_update, v_update, w_update)
-            / (inverse_electromagnetic_scale * dt)
-            if use_alex_b2_finite_volume else update_residual)
+        stopping_residual = (
+            max(u_update, v_update, w_update) / (inverse_electromagnetic_scale * dt)
+            if use_alex_b2_finite_volume
+            else update_residual
+        )
         residual_by_step.append(update_residual)
         pressure_residual_by_step.append(pressure_update)
         potential_residual_by_step.append(potential_update)
@@ -7522,12 +6855,13 @@ def _solve_extruded_projection(
             and projected_divergence_max <= ALEX_BALANCE_TOLERANCE
             and flow_error_value <= ALEX_BALANCE_TOLERANCE
             and charge_balance <= ALEX_BALANCE_TOLERANCE
-            and (not use_alex_b2_finite_volume or all(map(bool, (momentum_linear_converged,
-                pressure_linear_converged, electric_converged))))
+            and (
+                not use_alex_b2_finite_volume
+                or all(map(bool, (momentum_linear_converged, pressure_linear_converged, electric_converged)))
+            )
         )
         accepted_state_converged = (
-            max(u_update, v_update, w_update, potential_update)
-            <= case.time_stepper.steady_tolerance
+            max(u_update, v_update, w_update, potential_update) <= case.time_stepper.steady_tolerance
         )
         if use_alex_b2_finite_volume:
             # Require repeated passing updates before accepting an oscillatory map.
@@ -7543,16 +6877,14 @@ def _solve_extruded_projection(
                 if fixed_aitken_relaxation is not None:
                     relaxation_value = 1.0 if step == 0 else fixed_aitken_relaxation
                     fixed_point_relaxation = jnp.asarray(relaxation_value, dtype=u.dtype)
-                    accelerated = (mapped_state if step == 0 else
-                        current_state + relaxation_value * fixed_point_residual)
+                    accelerated = (
+                        mapped_state if step == 0 else current_state + relaxation_value * fixed_point_residual
+                    )
                     flux_relaxation = relaxation_value
                 elif accepted_state_converged:
                     # Avoid reduction noise after settling while retaining a
                     # conservative, empirically monotone coupled acceleration.
-                    accelerated = (
-                        current_state
-                        + ALEX_B2_SETTLED_RELAXATION * fixed_point_residual
-                    )
+                    accelerated = current_state + ALEX_B2_SETTLED_RELAXATION * fixed_point_residual
                     previous_fixed_point_residual = None
                     fixed_point_relaxation = jnp.asarray(1.0, dtype=u.dtype)
                     flux_relaxation = ALEX_B2_SETTLED_RELAXATION
@@ -7564,9 +6896,7 @@ def _solve_extruded_projection(
                         min_relaxation=case.solver.coupling_min_relaxation,
                         max_relaxation=case.solver.coupling_max_relaxation,
                     )
-                    accelerated = (
-                        current_state + fixed_point_relaxation * fixed_point_residual
-                    )
+                    accelerated = current_state + fixed_point_relaxation * fixed_point_residual
                     flux_relaxation = fixed_point_relaxation
                 else:
                     accelerated = mapped_state
@@ -7599,16 +6929,18 @@ def _solve_extruded_projection(
             u, v, w = u_next, v_next, w_next
         if use_alex_b2_finite_volume:
             if case.solver.coupling_acceleration == "anderson":
-                current_rho_phi_plus = (pack_flux(*mapped_flux_components)
-                    if converged else accelerated_flux)
+                current_rho_phi_plus = pack_flux(*mapped_flux_components) if converged else accelerated_flux
                 # Preserve component placement across older GPU JAX releases.
                 current_flux_components = unpack_flux(current_rho_phi_plus)
-                current_rho_phi_inlet = (mapped_rho_phi_inlet
-                    if converged else accelerated_inlet)
+                current_rho_phi_inlet = mapped_rho_phi_inlet if converged else accelerated_inlet
             else:
                 (*current_flux_components, current_rho_phi_inlet) = relax_flux(
-                    *current_flux_components, current_rho_phi_inlet,
-                    *mapped_flux_components, mapped_rho_phi_inlet, flux_relaxation)
+                    *current_flux_components,
+                    current_rho_phi_inlet,
+                    *mapped_flux_components,
+                    mapped_rho_phi_inlet,
+                    flux_relaxation,
+                )
                 current_rho_phi_plus = pack_flux(*current_flux_components)
         _emit_iteration_progress(
             progress_callback,
@@ -7641,20 +6973,28 @@ def _solve_extruded_projection(
                 pressure_linear_history=pressure_linear_by_step,
                 rho_phi_plus=(current_rho_phi_plus if use_alex_b2_finite_volume else None),
                 rho_phi_inlet=(current_rho_phi_inlet if use_alex_b2_finite_volume else None),
-                aitken_state=((previous_fixed_point_residual, fixed_point_relaxation,
-                    steady_streak) if use_alex_b2_finite_volume and
-                    case.solver.coupling_acceleration == "aitken" else None),
-                anderson_state=((previous_anderson_mapped, previous_anderson_residual,
-                    previous_anderson_flux, previous_anderson_inlet)
-                    if use_alex_b2_finite_volume and
-                    case.solver.coupling_acceleration == "anderson" else None),
-                stopping_state=(step + 1, steady_streak,
-                    "converged" if converged else
-                    "step_limit" if step + 1 == stop_step else "in_progress"),
-                courant_history=courant_by_step,
-                momentum_defect_history=(
-                    momentum_defect_by_step if use_alex_b2_finite_volume else None
+                aitken_state=(
+                    (previous_fixed_point_residual, fixed_point_relaxation, steady_streak)
+                    if use_alex_b2_finite_volume and case.solver.coupling_acceleration == "aitken"
+                    else None
                 ),
+                anderson_state=(
+                    (
+                        previous_anderson_mapped,
+                        previous_anderson_residual,
+                        previous_anderson_flux,
+                        previous_anderson_inlet,
+                    )
+                    if use_alex_b2_finite_volume and case.solver.coupling_acceleration == "anderson"
+                    else None
+                ),
+                stopping_state=(
+                    step + 1,
+                    steady_streak,
+                    "converged" if converged else "step_limit" if step + 1 == stop_step else "in_progress",
+                ),
+                courant_history=courant_by_step,
+                momentum_defect_history=(momentum_defect_by_step if use_alex_b2_finite_volume else None),
             ),
         )
         if converged:
@@ -7665,18 +7005,14 @@ def _solve_extruded_projection(
         uxb_x = v * bz - w * by
         uxb_y = w * bx - u * bz
         uxb_z = u * by - v * bx
-        jx, jy, jz, div_j, lorentz_x, lorentz_y, lorentz_z = (
-            reconstruct_electric(phi, sigma, uxb_x, uxb_y, uxb_z,
-                bx, by, bz, fluid_mask))
+        jx, jy, jz, div_j, lorentz_x, lorentz_y, lorentz_z = reconstruct_electric(
+            phi, sigma, uxb_x, uxb_y, uxb_z, bx, by, bz, fluid_mask
+        )
 
     final_step_residual = residual_by_step[-1] if residual_by_step else 0.0
     residual = jnp.full((nx,), final_step_residual, dtype=float)
-    fluid_area = jnp.maximum(
-        jnp.sum(jnp.where(fluid_mask, cell_area, 0.0), axis=(1, 2)), 1.0e-20
-    )
-    volumetric_flow_rate = jnp.sum(
-        jnp.where(fluid_mask, u * cell_area, 0.0), axis=(1, 2)
-    )
+    fluid_area = jnp.maximum(jnp.sum(jnp.where(fluid_mask, cell_area, 0.0), axis=(1, 2)), 1.0e-20)
+    volumetric_flow_rate = jnp.sum(jnp.where(fluid_mask, u * cell_area, 0.0), axis=(1, 2))
     mean_velocity = volumetric_flow_rate / fluid_area
     fx, _, _ = _conservative_current_fluxes_3d(
         sigma,
@@ -7692,21 +7028,17 @@ def _solve_extruded_projection(
     axial_current = _station_axial_current_from_fluxes(fx, cell_area[0])
     if use_alex_b2_finite_volume:
         wall_current_leakage = jnp.zeros((nx,), dtype=div_j.dtype)
-        boundary_current_residual = jnp.abs(
-            jnp.sum(div_j * cell_area, axis=(1, 2)) * dx
-        )
+        boundary_current_residual = jnp.abs(jnp.sum(div_j * cell_area, axis=(1, 2)) * dx)
     else:
-        div_j, wall_current_leakage, boundary_current_residual = (
-            _conservative_current_diagnostics_3d(
-                sigma,
-                phi,
-                uxb_x,
-                uxb_y,
-                uxb_z,
-                dx=dx,
-                dy=dy,
-                dz=dz,
-            )
+        div_j, wall_current_leakage, boundary_current_residual = _conservative_current_diagnostics_3d(
+            sigma,
+            phi,
+            uxb_x,
+            uxb_y,
+            uxb_z,
+            dx=dx,
+            dy=dy,
+            dz=dz,
         )
     current_scaled_pressure_proxy = jnp.max(jnp.abs(jy), axis=(1, 2)) * jnp.maximum(
         jnp.max(jnp.abs(bx) + jnp.abs(by) + jnp.abs(bz), axis=(1, 2)), 1.0e-12
@@ -7727,15 +7059,22 @@ def _solve_extruded_projection(
         phi=phi,
         rho_phi_plus=(current_rho_phi_plus if use_alex_b2_finite_volume else None),
         rho_phi_inlet=(current_rho_phi_inlet if use_alex_b2_finite_volume else None),
-        aitken_state=((previous_fixed_point_residual, fixed_point_relaxation,
-            steady_streak) if use_alex_b2_finite_volume and
-            case.solver.coupling_acceleration == "aitken" else None),
-        anderson_state=((previous_anderson_mapped, previous_anderson_residual,
-            previous_anderson_flux, previous_anderson_inlet)
-            if use_alex_b2_finite_volume and
-            case.solver.coupling_acceleration == "anderson" else None),
-        stopping_state=(len(residual_by_step), steady_streak,
-            "converged" if converged else "step_limit"),
+        aitken_state=(
+            (previous_fixed_point_residual, fixed_point_relaxation, steady_streak)
+            if use_alex_b2_finite_volume and case.solver.coupling_acceleration == "aitken"
+            else None
+        ),
+        anderson_state=(
+            (
+                previous_anderson_mapped,
+                previous_anderson_residual,
+                previous_anderson_flux,
+                previous_anderson_inlet,
+            )
+            if use_alex_b2_finite_volume and case.solver.coupling_acceleration == "anderson"
+            else None
+        ),
+        stopping_state=(len(residual_by_step), steady_streak, "converged" if converged else "step_limit"),
         jx=jx,
         jy=jy,
         jz=jz,
@@ -7747,84 +7086,83 @@ def _solve_extruded_projection(
         mean_velocity=jnp.asarray(mean_velocity, dtype=float),
         axial_current=jnp.asarray(axial_current, dtype=float),
         wall_current_leakage=jnp.asarray(wall_current_leakage, dtype=float),
-        current_scaled_pressure_proxy=jnp.asarray(
-            current_scaled_pressure_proxy, dtype=float
-        ),
+        current_scaled_pressure_proxy=jnp.asarray(current_scaled_pressure_proxy, dtype=float),
         charge_balance_residual=jnp.asarray(charge_balance_residual, dtype=float),
         boundary_current_residual=jnp.asarray(boundary_current_residual, dtype=float),
         geometry_kind=case.geometry.kind,
         solver_kind=case.solver.kind,
-        axial_pressure_loss_gradient=jnp.asarray(
-            axial_pressure_loss_gradient, dtype=float
-        ),
-        transverse_pressure_difference=jnp.asarray(
-            transverse_pressure_difference, dtype=float
-        ),
-        **_iteration_history_arrays(residual_by_step, component_residual_by_step,
-            pressure_residual_by_step, electric_linear_by_step,
-            potential_residual_by_step, courant_by_step,
+        axial_pressure_loss_gradient=jnp.asarray(axial_pressure_loss_gradient, dtype=float),
+        transverse_pressure_difference=jnp.asarray(transverse_pressure_difference, dtype=float),
+        **_iteration_history_arrays(
+            residual_by_step,
+            component_residual_by_step,
+            pressure_residual_by_step,
+            electric_linear_by_step,
+            potential_residual_by_step,
+            courant_by_step,
             pressure_linear=pressure_linear_by_step,
-            momentum_defect=(
-                momentum_defect_by_step if use_alex_b2_finite_volume else None
-            )),
+            momentum_defect=(momentum_defect_by_step if use_alex_b2_finite_volume else None),
+        ),
     )
 
 
 def validate_extruded_inductionless_solution(
     bundle: ExtrudedFieldBundle,
     *,
-    station_history: list[dict[str, float]]
-    | tuple[dict[str, float], ...]
-    | None = None,
+    station_history: list[dict[str, float]] | tuple[dict[str, float], ...] | None = None,
 ) -> ExtrudedInductionlessValidation:
     required = (
-        "field_scale", "u_max", "mean_velocity", "volumetric_flow_rate",
-        "axial_current", "wall_current_leakage", "residual",
-        "charge_balance_residual", "boundary_current_residual", "pressure_span",
+        "field_scale",
+        "u_max",
+        "mean_velocity",
+        "volumetric_flow_rate",
+        "axial_current",
+        "wall_current_leakage",
+        "residual",
+        "charge_balance_residual",
+        "boundary_current_residual",
+        "pressure_span",
     )
     history = tuple(station_history or ())
-    if (len(history) != bundle.x.shape[0]
-            or any(any(name not in row for name in required) for row in history)):
+    if len(history) != bundle.x.shape[0] or any(any(name not in row for name in required) for row in history):
         history = _bundle_station_history(bundle)
-    values = {name: np.asarray([row[name] for row in history], dtype=float)
-        for name in required}
+    values = {name: np.asarray([row[name] for row in history], dtype=float) for name in required}
     field_scale, mean_velocity = values["field_scale"], values["mean_velocity"]
     centered_field = field_scale - np.mean(field_scale)
     centered_velocity = mean_velocity - np.mean(mean_velocity)
-    correlation_scale = np.sqrt(
-        np.sum(centered_field**2) * np.sum(centered_velocity**2)
+    correlation_scale = np.sqrt(np.sum(centered_field**2) * np.sum(centered_velocity**2))
+    correlation = (
+        float(np.sum(centered_field * centered_velocity) / correlation_scale)
+        if correlation_scale > 0.0
+        else 0.0
     )
-    correlation = (float(np.sum(centered_field * centered_velocity) / correlation_scale)
-        if correlation_scale > 0.0 else 0.0)
     axial_current, pressure_span = values["axial_current"], values["pressure_span"]
-    component_history = np.asarray(
-        getattr(bundle, "iteration_component_residual_history", jnp.zeros((0, 6)))
-    )
+    component_history = np.asarray(getattr(bundle, "iteration_component_residual_history", jnp.zeros((0, 6))))
+
     def center(array):
-        return float(np.mean(array[(array.size - 1) // 2:array.size // 2 + 1]))
+        return float(np.mean(array[(array.size - 1) // 2 : array.size // 2 + 1]))
+
     return ExtrudedInductionlessValidation(
         station_count=int(bundle.x.shape[0]),
         max_residual=float(np.max(np.abs(values["residual"]))),
-        max_charge_balance_residual=float(np.max(np.abs(
-            values["charge_balance_residual"]))),
+        max_charge_balance_residual=float(np.max(np.abs(values["charge_balance_residual"]))),
         mean_velocity_span=float(np.ptp(mean_velocity)),
         volumetric_flow_rate_span=float(np.ptp(values["volumetric_flow_rate"])),
         axial_current_span=float(np.ptp(axial_current)),
-        axial_current_mirror_residual=float(np.max(np.abs(
-            axial_current + axial_current[::-1]))),
-        max_wall_current_leakage=float(np.max(np.abs(
-            values["wall_current_leakage"]))),
-        net_boundary_current_residual=float(np.max(np.abs(
-            values["boundary_current_residual"]))),
+        axial_current_mirror_residual=float(np.max(np.abs(axial_current + axial_current[::-1]))),
+        max_wall_current_leakage=float(np.max(np.abs(values["wall_current_leakage"]))),
+        net_boundary_current_residual=float(np.max(np.abs(values["boundary_current_residual"]))),
         field_mean_velocity_correlation=correlation,
         peak_velocity_span=float(np.ptp(values["u_max"])),
         pressure_span_range=float(np.ptp(pressure_span)),
-        pressure_span_mirror_residual=float(np.max(np.abs(
-            pressure_span - pressure_span[::-1]))),
+        pressure_span_mirror_residual=float(np.max(np.abs(pressure_span - pressure_span[::-1]))),
         center_axial_current=center(axial_current),
         center_pressure_span=center(pressure_span),
-        max_divergence_residual=(float(component_history[-1, 3])
-            if component_history.ndim == 2 and component_history.shape[0] else 0.0),
+        max_divergence_residual=(
+            float(component_history[-1, 3])
+            if component_history.ndim == 2 and component_history.shape[0]
+            else 0.0
+        ),
     )
 
 
@@ -7862,16 +7200,10 @@ def solve_extruded_inductionless(
     bundle = _solve_extruded_projection(problem, **projection_kwargs)
     require_finite(
         "3-D fringing solve",
-        **{
-            name: getattr(bundle, name)
-            for name in _EXTRUDED_NUMERICAL_RESULTS
-            if hasattr(bundle, name)
-        },
+        **{name: getattr(bundle, name) for name in _EXTRUDED_NUMERICAL_RESULTS if hasattr(bundle, name)},
     )
     station_history = _bundle_station_history(bundle)
-    validation = validate_extruded_inductionless_solution(
-        bundle, station_history=station_history
-    )
+    validation = validate_extruded_inductionless_solution(bundle, station_history=station_history)
     return ExtrudedInductionlessSolution(
         problem=problem,
         bundle=bundle,

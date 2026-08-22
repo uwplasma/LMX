@@ -1,13 +1,25 @@
-from dataclasses import replace
-
+import jax
 import jax.numpy as jnp
+import numpy as np
 import pytest
 
+from lmx import field_models
+from lmx.field_models import (
+    cross_section_divergence_metrics,
+    load_tabulated_field,
+    make_divergence_free_cross_section_field,
+    make_localized_divergence_free_obstacle_field,
+    make_maxwell_consistent_fringe_field,
+    sample_cross_section_field,
+    sample_tabulated_cross_section_field,
+    sample_tabulated_field_volume,
+    tabulated_cross_section_reconstruction_metrics,
+    tabulated_field_quality_metrics,
+    write_tabulated_field_npz,
+)
 from lmx.mesh import (
     _smooth_boundary_layer_segment,
-    centerline_pipe_mesh_quality_metrics,
     generate_bent_pipe_mesh,
-    generate_centerline_pipe_mesh,
     generate_layered_duct_mesh,
     generate_layered_duct_mesh_from_fluid_faces,
     generate_multilayer_duct_mesh,
@@ -30,7 +42,6 @@ from lmx.operators import (
 )
 from lmx.wall_models import WallLayer
 
-
 pytestmark = pytest.mark.unit
 
 
@@ -42,16 +53,11 @@ def test_rect_duct_mesh_shape():
 
 
 def test_smooth_boundary_layer_segment_allocates_layer_without_spacing_jumps():
-    faces = _smooth_boundary_layer_segment(
-        -1.0, 1.0, 99, layer_thickness=0.002, layer_cells=10
-    )
+    faces = _smooth_boundary_layer_segment(-1.0, 1.0, 99, layer_thickness=0.002, layer_cells=10)
     widths = jnp.diff(faces)
     assert faces.shape == (100,)
     assert float(jnp.sum(widths[:10])) == pytest.approx(0.002, abs=5.0e-8)
-    assert (
-        float(jnp.max(jnp.maximum(widths[1:] / widths[:-1], widths[:-1] / widths[1:])))
-        < 1.3
-    )
+    assert float(jnp.max(jnp.maximum(widths[1:] / widths[:-1], widths[:-1] / widths[1:]))) < 1.3
     assert widths.tolist() == pytest.approx(widths[::-1].tolist(), abs=2.0e-7)
 
 
@@ -142,9 +148,7 @@ def test_pipe_ogrid_rejects_nonpositive_domain_or_resolution(kwargs):
 
 
 def test_bent_pipe_points_follow_curved_centerline():
-    mesh = generate_bent_pipe_mesh(
-        tube_radius=0.2, bend_radius=1.0, bend_angle=1.0, nx=4, nr=4, ntheta=8
-    )
+    mesh = generate_bent_pipe_mesh(tube_radius=0.2, bend_radius=1.0, bend_angle=1.0, nx=4, nr=4, ntheta=8)
     assert mesh.point_coordinates is not None
     start = mesh.point_coordinates[0, 0, 0]
     end = mesh.point_coordinates[-1, 0, 0]
@@ -154,84 +158,8 @@ def test_bent_pipe_points_follow_curved_centerline():
     assert float(end[1]) > 0.0
 
 
-def test_centerline_pipe_mesh_follows_arbitrary_route():
-    centerline = {
-        "x": jnp.asarray([0.0, 0.6, 0.8, 0.8]),
-        "y": jnp.asarray([0.0, 0.0, 0.4, 0.9]),
-        "z": jnp.asarray([0.0, 0.0, 0.1, 0.1]),
-    }
-
-    mesh = generate_centerline_pipe_mesh(
-        centerline, tube_radius=0.08, nx=8, nr=5, ntheta=12
-    )
-    metrics = centerline_pipe_mesh_quality_metrics(mesh)
-
-    assert mesh.geometry == "centerline_pipe"
-    assert mesh.point_coordinates is not None
-    assert mesh.point_coordinates.shape == (9, 6, 13, 3)
-    assert metrics["validation_pass"] is True
-    assert metrics["cell_count"] == 8 * 5 * 12
-    assert metrics["max_radius_error"] < 1.0e-6
-    assert metrics["max_theta_closure_error"] < 1.0e-6
-
-
-def test_centerline_pipe_mesh_rejects_invalid_centerline():
-    with pytest.raises(ValueError, match="at least three"):
-        generate_centerline_pipe_mesh(
-            {
-                "x": jnp.asarray([0.0, 1.0]),
-                "y": jnp.asarray([0.0, 0.0]),
-                "z": jnp.asarray([0.0, 0.0]),
-            },
-            tube_radius=0.1,
-        )
-
-
-def test_centerline_pipe_mesh_rejects_malformed_inputs():
-    base = {"x": [0, 1, 2], "y": [0, 0, 0], "z": [0, 0, 0]}
-    invalid = [
-        (base, {"tube_radius": 0.0}),
-        (base, {"tube_radius": 0.1, "nx": 1}),
-        (base | {"y": [0, 0]}, {"tube_radius": 0.1}),
-        ({key: [value] for key, value in base.items()}, {"tube_radius": 0.1}),
-        (base | {"station": [0, 1]}, {"tube_radius": 0.1}),
-        (base | {"x": [0, 1, float("nan")]}, {"tube_radius": 0.1}),
-    ]
-    for centerline, kwargs in invalid:
-        with pytest.raises(ValueError):
-            generate_centerline_pipe_mesh(centerline, **kwargs)
-
-
-def test_vertical_centerline_and_quality_input_validation():
-    mesh = generate_centerline_pipe_mesh(
-        {"x": [0, 0, 0], "y": [0, 0, 0], "z": [0, 1, 2]},
-        tube_radius=0.1,
-        nr=2,
-        ntheta=4,
-    )
-    assert centerline_pipe_mesh_quality_metrics(mesh)["validation_pass"] is True
-    with pytest.raises(ValueError, match="requires point_coordinates"):
-        centerline_pipe_mesh_quality_metrics(generate_rect_duct_mesh(width=1, height=1))
-    with pytest.raises(ValueError, match="must have shape"):
-        centerline_pipe_mesh_quality_metrics(
-            replace(mesh, point_coordinates=jnp.zeros((2, 3)))
-        )
-    with pytest.raises(ValueError, match="strictly increasing"):
-        generate_centerline_pipe_mesh(
-            {
-                "x": jnp.asarray([0.0, 1.0, 2.0]),
-                "y": jnp.asarray([0.0, 0.0, 0.0]),
-                "z": jnp.asarray([0.0, 0.0, 0.0]),
-                "station": jnp.asarray([0.0, 0.0, 1.0]),
-            },
-            tube_radius=0.1,
-        )
-
-
 def test_moderate_ha_rect_mesh_clusters_boundary_layers():
-    mesh = generate_rect_duct_mesh(
-        width=0.2, height=0.2, ny=32, nz=32, target_ha=20.0, magnetic_axis="z"
-    )
+    mesh = generate_rect_duct_mesh(width=0.2, height=0.2, ny=32, nz=32, target_ha=20.0, magnetic_axis="z")
     dy = mesh.dy
     dz = mesh.dz
     uniform_spacing = 0.2 / 32.0
@@ -259,17 +187,11 @@ def test_generate_rect_duct_mesh_from_faces_preserves_explicit_faces():
 
 def test_generate_rect_duct_mesh_from_faces_rejects_invalid_faces():
     with pytest.raises(ValueError, match="strictly increasing"):
-        generate_rect_duct_mesh_from_faces(
-            y_faces=jnp.asarray([0.0, 0.0]), z_faces=jnp.asarray([0.0, 1.0])
-        )
+        generate_rect_duct_mesh_from_faces(y_faces=jnp.asarray([0.0, 0.0]), z_faces=jnp.asarray([0.0, 1.0]))
     with pytest.raises(ValueError, match="one-dimensional"):
-        generate_rect_duct_mesh_from_faces(
-            y_faces=jnp.ones((2, 2)), z_faces=jnp.asarray([0.0, 1.0])
-        )
+        generate_rect_duct_mesh_from_faces(y_faces=jnp.ones((2, 2)), z_faces=jnp.asarray([0.0, 1.0]))
     with pytest.raises(ValueError, match="at least two"):
-        generate_rect_duct_mesh_from_faces(
-            y_faces=jnp.asarray([0.0]), z_faces=jnp.asarray([0.0, 1.0])
-        )
+        generate_rect_duct_mesh_from_faces(y_faces=jnp.asarray([0.0]), z_faces=jnp.asarray([0.0, 1.0]))
 
 
 def test_generate_layered_duct_mesh_from_fluid_faces_adds_wall_regions():
@@ -299,9 +221,7 @@ def test_layered_meshes_support_fluid_only_and_hartmann_targeting():
         height=1.0,
     )
     clustered = generate_layered_duct_mesh(width=1.0, height=1.0, ny=4, nz=4)
-    targeted = generate_multilayer_duct_mesh(
-        width=1.0, height=1.0, ny=12, nz=12, target_ha=20.0
-    )
+    targeted = generate_multilayer_duct_mesh(width=1.0, height=1.0, ny=12, nz=12, target_ha=20.0)
     assert bool(jnp.all(explicit.fluid_mask))
     assert bool(jnp.all(clustered.fluid_mask))
     assert bool(jnp.all(targeted.fluid_mask))
@@ -328,9 +248,7 @@ def test_multilayer_duct_mesh_rejects_invalid_inputs(kwargs):
 @pytest.mark.parametrize("layer_cells", [0, 2])
 def test_pipe_ogrid_rejects_invalid_hartmann_layer_resolution(layer_cells):
     with pytest.raises(ValueError, match="fit twice"):
-        generate_pipe_ogrid_mesh(
-            radius=1.0, nr=4, ntheta=8, target_ha=20.0, hartmann_layer_cells=layer_cells
-        )
+        generate_pipe_ogrid_mesh(radius=1.0, nr=4, ntheta=8, target_ha=20.0, hartmann_layer_cells=layer_cells)
 
 
 def test_generate_multilayer_duct_mesh_aligns_interfaces_and_sigma():
@@ -357,12 +275,12 @@ def test_generate_multilayer_duct_mesh_aligns_interfaces_and_sigma():
     assert mesh.region_names[0] == "fluid"
     assert "left:aln" in mesh.region_names
     assert float(mesh.sigma[mesh.region_ids == 0][0]) == pytest.approx(2.0)
-    assert float(
-        mesh.sigma[mesh.region_ids == mesh.region_names.index("left:aln")][0]
-    ) == pytest.approx(1.0e-8)
-    assert float(
-        mesh.sigma[mesh.region_ids == mesh.region_names.index("left:metal")][0]
-    ) == pytest.approx(1.0e6)
+    assert float(mesh.sigma[mesh.region_ids == mesh.region_names.index("left:aln")][0]) == pytest.approx(
+        1.0e-8
+    )
+    assert float(mesh.sigma[mesh.region_ids == mesh.region_names.index("left:metal")][0]) == pytest.approx(
+        1.0e6
+    )
     y_faces = [float(value) for value in mesh.y_faces]
     z_faces = [float(value) for value in mesh.z_faces]
     assert any(abs(value + 0.5) < 1.0e-6 for value in y_faces)
@@ -418,9 +336,7 @@ def test_laplacian_of_quadratic_field():
 
 
 def test_laplacian_of_quadratic_field_on_clustered_mesh():
-    mesh = generate_rect_duct_mesh(
-        width=2.0, height=2.0, ny=48, nz=48, target_ha=100.0, magnetic_axis="z"
-    )
+    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=48, nz=48, target_ha=100.0, magnetic_axis="z")
     y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
     field = y**2 + z**2
     lap = laplacian_scalar(field, mesh)
@@ -451,9 +367,7 @@ def test_operator_helpers_cover_spacings_face_averages_and_divergence():
     assert face_y.shape == (mesh.ny - 1, mesh.nz)
     assert face_z.shape == (mesh.ny, mesh.nz - 1)
 
-    div_flux = divergence_flux(
-        jnp.ones(mesh.yz_shape), 2.0 * jnp.ones(mesh.yz_shape), mesh
-    )
+    div_flux = divergence_flux(jnp.ones(mesh.yz_shape), 2.0 * jnp.ones(mesh.yz_shape), mesh)
     assert div_flux.shape == mesh.yz_shape
 
     face_flux_y = jnp.zeros((mesh.ny + 1, mesh.nz))
@@ -513,3 +427,153 @@ def test_laplacian_manufactured_solution_and_masking_are_consistent():
 
     lap = laplacian_scalar(field, mesh, mask=mask)
     assert jnp.allclose(lap[~mask], 0.0)
+
+
+def test_divergence_free_cross_section_field_has_small_discrete_divergence():
+    field_fn = make_divergence_free_cross_section_field(width=2.0, height=1.5, base_bz=10.0, perturbation=0.1)
+    metrics = cross_section_divergence_metrics(field_fn, width=2.0, height=1.5, ny=61, nz=61)
+    assert metrics["max_abs_divergence"] < 0.2
+    assert metrics["rms_divergence"] < 0.05
+
+
+@pytest.mark.parametrize("axis", ["y", "z"])
+def test_maxwell_consistent_fringe_field_satisfies_symmetry_and_maxwell(axis):
+    field = make_maxwell_consistent_fringe_field(peak_field=2.0, center=0.25, transition_width=1.2, axis=axis)
+    transverse_index = 1 if axis == "y" else 2
+
+    def point_field(x, transverse):
+        coordinates = [x, 0.0, 0.0]
+        coordinates[transverse_index] = transverse
+        return field(*map(jnp.asarray, coordinates))
+
+    jacobian = jax.jacfwd(lambda coordinates: point_field(*coordinates))(jnp.asarray([0.1, 0.3]))
+    assert jacobian[0, 0] + jacobian[transverse_index, 1] == pytest.approx(0.0, abs=1.0e-12)
+    assert jacobian[transverse_index, 0] - jacobian[0, 1] == pytest.approx(0.0, abs=1.0e-12)
+    positive = point_field(0.1, 0.3)
+    negative = point_field(0.1, -0.3)
+    assert positive[0] == pytest.approx(-float(negative[0]))
+    assert positive[transverse_index] == pytest.approx(float(negative[transverse_index]))
+
+
+def test_maxwell_consistent_fringe_field_rejects_invalid_parameters():
+    with pytest.raises(ValueError, match="positive"):
+        make_maxwell_consistent_fringe_field(peak_field=1.0, center=0.0, transition_width=0.0)
+    with pytest.raises(ValueError, match="axis"):
+        make_maxwell_consistent_fringe_field(peak_field=1.0, center=0.0, transition_width=1.0, axis="x")
+
+
+def test_sample_cross_section_field_returns_expected_shape():
+    field_fn = make_divergence_free_cross_section_field(width=2.0, height=1.0, base_bz=8.0, perturbation=0.1)
+    y, z, field = sample_cross_section_field(field_fn, width=2.0, height=1.0, ny=21, nz=25)
+    assert y.shape == (21,)
+    assert z.shape == (25,)
+    assert field.shape == (21, 25, 3)
+
+
+def test_localized_divergence_free_obstacle_field_has_small_discrete_divergence():
+    field_fn = make_localized_divergence_free_obstacle_field(width=2.0, height=2.0, base_bz=10.0)
+    metrics = cross_section_divergence_metrics(field_fn, width=2.0, height=2.0, ny=61, nz=61)
+    assert metrics["max_abs_divergence"] < 0.2
+    assert metrics["rms_divergence"] < 0.05
+
+
+def test_tabulated_field_npz_round_trip_and_sampling(tmp_path):
+    field_fn = make_divergence_free_cross_section_field(width=2.0, height=1.0, base_bz=8.0, perturbation=0.1)
+    y, z, field = sample_cross_section_field(field_fn, width=2.0, height=1.0, ny=21, nz=25)
+    path = write_tabulated_field_npz(
+        tmp_path / "field.npz",
+        y=y,
+        z=z,
+        bx=field[..., 0],
+        by=field[..., 1],
+        bz=field[..., 2],
+    )
+    payload = load_tabulated_field(path)
+    assert set(payload) == {"y", "z", "bx", "by", "bz"}
+    sampled = sample_tabulated_cross_section_field(
+        path, y=field[..., 0] * 0.0 + y[:, None], z=field[..., 0] * 0.0 + z[None, :]
+    )
+    assert sampled.shape == field.shape
+    assert abs(float(sampled[..., 2].mean()) - float(field[..., 2].mean())) < 1.0e-8
+    quality = tabulated_field_quality_metrics(path)
+    assert quality["dimension"] == 2
+    assert quality["axis_monotonic"] is True
+    assert quality["validation_pass"] is True
+    assert quality["interpolation_node_linf_error"] < 1.0e-12
+
+
+def test_tabulated_cross_section_reconstruction_metrics_compare_solver_points(tmp_path):
+    field_fn = make_divergence_free_cross_section_field(width=2.0, height=1.0, base_bz=8.0, perturbation=0.1)
+    y, z, field = sample_cross_section_field(field_fn, width=2.0, height=1.0, ny=41, nz=41)
+    path = write_tabulated_field_npz(
+        tmp_path / "field.npz",
+        y=y,
+        z=z,
+        bx=field[..., 0],
+        by=field[..., 1],
+        bz=field[..., 2],
+    )
+    solver_y = np.linspace(-0.95, 0.95, 13)
+    solver_z = np.linspace(-0.45, 0.45, 11)
+    metrics = tabulated_cross_section_reconstruction_metrics(
+        path,
+        reference_field_fn=field_fn,
+        y=solver_y,
+        z=solver_z,
+    )
+    assert metrics["sample_count"] == 13 * 11
+    assert metrics["relative_l2_error"] < 1.0e-3
+    assert metrics["validation_pass"] is True
+
+
+def test_tabulated_field_volume_sampling_supports_3d_npz(tmp_path):
+    x = np.linspace(0.0, 1.0, 5)
+    y = np.linspace(-1.0, 1.0, 7)
+    z = np.linspace(-0.5, 0.5, 9)
+    xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
+    bx = np.sin(yy)
+    by = -0.25 * zz
+    bz = 1.0 + 0.25 * yy
+    path = write_tabulated_field_npz(tmp_path / "field3d.npz", x=x, y=y, z=z, bx=bx, by=by, bz=bz)
+    sampled = sample_tabulated_field_volume(path, x=xx, y=yy, z=zz)
+    assert sampled.shape == xx.shape + (3,)
+    assert sampled[..., 0] == pytest.approx(bx)
+    quality = tabulated_field_quality_metrics(path)
+    assert quality["dimension"] == 3
+    assert quality["axis_names"] == "x,y,z"
+    assert quality["validation_pass"] is True
+    assert quality["normalized_magnitude_max"] == pytest.approx(1.0)
+
+
+def test_tabulated_field_validation_and_dimension_mismatch_paths(tmp_path, monkeypatch):
+    text_path = tmp_path / "field.txt"
+    text_path.write_text("not npz")
+    with pytest.raises(ValueError, match="NPZ"):
+        load_tabulated_field(text_path)
+
+    incomplete = tmp_path / "incomplete.npz"
+    np.savez(incomplete, y=[0.0], z=[0.0], bx=[[0.0]])
+    with pytest.raises(ValueError, match="must contain"):
+        load_tabulated_field(incomplete)
+
+    x = np.asarray([0.0, 1.0])
+    y = np.asarray([0.0, 1.0])
+    z = np.asarray([0.0, 1.0])
+    zeros = np.zeros((2, 2, 2))
+    field3d = write_tabulated_field_npz(tmp_path / "field3d.npz", x=x, y=y, z=z, bx=zeros, by=zeros, bz=zeros)
+    with pytest.raises(ValueError, match="needs an x coordinate"):
+        sample_tabulated_cross_section_field(field3d, y=np.asarray([[0.0]]), z=np.asarray([[0.0]]))
+
+    field2d = write_tabulated_field_npz(
+        tmp_path / "field2d.npz", y=y, z=z, bx=zeros[0], by=zeros[0], bz=zeros[0]
+    )
+    sampled = sample_tabulated_field_volume(
+        field2d, x=np.asarray([[0.0]]), y=np.asarray([[0.5]]), z=np.asarray([[0.5]])
+    )
+    assert sampled.shape == (1, 1, 3)
+
+    monkeypatch.setattr(field_models, "RegularGridInterpolator", None)
+    with pytest.raises(RuntimeError, match="RegularGridInterpolator"):
+        sample_tabulated_field_volume(
+            field2d, x=np.asarray([[0.0]]), y=np.asarray([[0.5]]), z=np.asarray([[0.5]])
+        )

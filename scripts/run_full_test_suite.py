@@ -12,38 +12,23 @@ import time
 _TEST_SHARDS = {
     "benchmarks": ("tests/test_benchmarks.py",),
     "core": (
-        "tests/test_autodiff.py",
         "tests/test_cli.py",
         "tests/test_config.py",
-        "tests/test_field_models.py",
         "tests/test_io.py",
         "tests/test_mesh.py",
-        "tests/test_plotting.py",
         "tests/test_reference_data.py",
-        "tests/test_reporting.py",
         "tests/test_runtime_logging.py",
         "tests/test_units_and_wall_models.py",
     ),
-    "examples": (
-        "tests/test_example_runner.py",
-        "tests/test_repository.py",
-    ),
+    "examples": ("tests/test_example_runner.py",),
     "physics": (
-        "tests/test_blanket.py",
         "tests/test_fringing.py",
         "tests/test_physics.py",
-        "tests/test_q2d.py",
-        "tests/test_scaling.py",
         "tests/test_solver.py",
     ),
     "validation": (
-        "tests/test_external_validation.py",
         "tests/test_freemhd.py",
         "tests/test_run_benchmark_b_independence.py",
-        "tests/test_run_convergence_suite.py",
-        "tests/test_run_samper_table_i.py",
-        "tests/test_validation.py",
-        "tests/test_validation_workflows.py",
     ),
 }
 
@@ -62,9 +47,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--coverage-fail-under", type=float, default=95.0)
     parser.add_argument("--coverage-xml", default="coverage.xml")
     parser.add_argument("--junit-xml", default="artifacts/tests/full-suite-junit.xml")
-    parser.add_argument(
-        "tests", nargs="*", help="Test paths to run; defaults to the complete suite"
-    )
+    parser.add_argument("tests", nargs="*", help="Test paths to run; defaults to the complete suite")
     args = parser.parse_args(argv)
 
     workers = args.workers

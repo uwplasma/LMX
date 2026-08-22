@@ -11,19 +11,15 @@ from dataclasses import replace
 from pathlib import Path
 
 from lmx.cases import make_shercliff_case
-from lmx.field_models import (
-    make_divergence_free_cross_section_field,
-    sample_cross_section_field,
-)
+from lmx.field_models import make_divergence_free_cross_section_field
 from lmx.fringing import (
     ExtrudedInductionlessProblem,
     smooth_fringing_profile,
     solve_extruded_inductionless,
     validate_variable_field_extruded_solution,
 )
-from lmx.plotting import write_cross_section_field_plots, write_extruded_overview_plots
+from lmx.plotting import write_extruded_overview_plots
 from lmx.specs import CaseSpec, MagneticFieldSpec
-
 
 # Inputs: geometry, field variation, axial profile, solver effort, and outputs.
 OUTPUT_DIR = Path("artifacts/examples/variable_field_extruded")
@@ -38,7 +34,6 @@ MAX_STEPS = 80
 POTENTIAL_ITERATIONS = 80
 COUPLING_ITERATIONS = 8
 STEADY_TOLERANCE = 1.0e-6
-FIELD_PLOT_POINTS = 61
 
 
 # Define the imposed vector field explicitly; this callable is evaluated on the mesh.
@@ -85,30 +80,13 @@ profile = smooth_fringing_profile(
 problem = ExtrudedInductionlessProblem(case=case, profile=profile)
 solution = solve_extruded_inductionless(problem)
 
-# Sample the exact imposed field and save both field and flow diagnostics.
+# Save flow, field-scale, and conservation diagnostics from the solved state.
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-y, z, sampled_field = sample_cross_section_field(
-    field_function,
-    width=WIDTH,
-    height=HEIGHT,
-    ny=FIELD_PLOT_POINTS,
-    nz=FIELD_PLOT_POINTS,
-)
-field_plots = write_cross_section_field_plots(
-    y=y,
-    z=z,
-    field=sampled_field,
-    out_dir=OUTPUT_DIR,
-    title="Analytic cross-sectional field used by the solver",
-)
-flow_plots = write_extruded_overview_plots(
-    solution, OUTPUT_DIR, case_title="Variable-field extruded duct"
-)
+flow_plots = write_extruded_overview_plots(solution, OUTPUT_DIR, case_title="Variable-field extruded duct")
 validation = validate_variable_field_extruded_solution(solution)
 summary = {
     "case": case.name,
     "geometry_kind": solution.bundle.geometry_kind,
-    "field_plots": [path.name for path in field_plots],
     "flow_plots": [path.name for path in flow_plots],
     "validation": validation,
 }

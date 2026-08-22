@@ -1,16 +1,16 @@
-from copy import deepcopy
 import hashlib
 import json
-from pathlib import Path
 import re
 import subprocess
+from copy import deepcopy
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
 import examples
-import lmx.benchmarks as benchmarks
+from lmx import benchmarks
 from lmx._fringing_types import ExtrudedFieldBundle
 from lmx.benchmarks import (
     BENCHMARK_B_SPEC_FILES,
@@ -27,8 +27,8 @@ from lmx.freemhd import (
     infer_rectangular_geometry,
     infer_solid_conductivities,
     infer_uniform_b0,
-    load_matched_b2_lmx_input,
     load_benchmark_a_spec,
+    load_matched_b2_lmx_input,
     load_samper_table_i,
     observe_freemhd_b2_contract,
     observe_freemhd_b2_output,
@@ -38,7 +38,6 @@ from lmx.freemhd import (
 )
 from lmx.io import write_extruded_bundle_restart_npz
 from scripts import run_freemhd_parity_suite
-
 
 pytestmark = pytest.mark.unit
 
@@ -61,13 +60,16 @@ def _test_artifact_sha256(path: Path, kind: str) -> str:
 def test_matched_b2_direct_can_exclude_optional_checkpoint_callback(monkeypatch):
     calls = []
     bundle = SimpleNamespace(**{name: np.zeros(1) for name in ("u", "p", "phi")})
+
     def solve(problem, **options):
         calls.append(options)
         return SimpleNamespace(bundle=bundle)
+
     monkeypatch.setattr("lmx.fringing.solve_extruded_inductionless", solve)
     problem = SimpleNamespace(case=SimpleNamespace(time_stepper=SimpleNamespace(max_steps=4)))
     checkpoint, _ = run_freemhd_parity_suite._run_matched_b2_lmx_direct(
-        problem, num_devices=1, capture_checkpoint=False)
+        problem, num_devices=1, capture_checkpoint=False
+    )
     assert checkpoint is None and calls == [{"num_devices": 1}]
 
 
@@ -77,7 +79,15 @@ def _matched_b_record(root: Path, case_id: str, *, role: str | None = None) -> d
     reference = load_benchmark_b_reference(case_id)
     spec_path = Path("lmx/data/benchmarks/specs") / BENCHMARK_B_SPEC_FILES[case_id]
     artifacts = {}
-    for name in ("lmx_source", "freemhd_source", "lmx_input", "freemhd_input", "evaluator", "lmx_output", "freemhd_output"):
+    for name in (
+        "lmx_source",
+        "freemhd_source",
+        "lmx_input",
+        "freemhd_input",
+        "evaluator",
+        "lmx_output",
+        "freemhd_output",
+    ):
         kind = "tree" if name in {"lmx_source", "freemhd_source", "freemhd_input"} else "file"
         path = root / name
         if kind == "tree":
@@ -85,7 +95,11 @@ def _matched_b_record(root: Path, case_id: str, *, role: str | None = None) -> d
             (path / "evidence.txt").write_text(name)
         else:
             path.write_text(name)
-        artifacts[name] = {"path": name, "kind": kind, "sha256": _test_artifact_sha256(path, kind)}
+        artifacts[name] = {
+            "path": name,
+            "kind": kind,
+            "sha256": _test_artifact_sha256(path, kind),
+        }
     return {
         "schema_version": 2,
         "case_id": case_id,
@@ -143,10 +157,14 @@ def _write_demo_template(root: Path) -> None:
         (constant / "thermophysicalProperties").write_text("elcond 1e-6;\n")
         system = root / "system" / region
         system.mkdir(parents=True)
-        (system / "changeDictionaryDict").write_text("B0 { internalField uniform (0 10 0); value uniform (0 10 0); }\n")
+        (system / "changeDictionaryDict").write_text(
+            "B0 { internalField uniform (0 10 0); value uniform (0 10 0); }\n"
+        )
     liquid_constant = root / "constant" / "liquid"
     liquid_constant.mkdir(parents=True)
-    (liquid_constant / "thermophysicalProperties.liquidMetal").write_text("rho 1000;\nmu 1;\nelcond [-1 -3 3 0 0 2 0] 1e6;\n")
+    (liquid_constant / "thermophysicalProperties.liquidMetal").write_text(
+        "rho 1000;\nmu 1;\nelcond [-1 -3 3 0 0 2 0] 1e6;\n"
+    )
     liquid_system = root / "system" / "liquid"
     liquid_system.mkdir(parents=True)
     (liquid_system / "changeDictionaryDict").write_text(
@@ -204,20 +222,39 @@ def _write_lmx_b2_output(
         zeros = benchmarks.jnp.zeros(shape)
         compact_flux = benchmarks.jnp.zeros((3, 8, 5, 5))
         inlet_flux = benchmarks.jnp.zeros((5, 5))
-        anderson_state = ((benchmarks.jnp.zeros((4, *shape)),
-            benchmarks.jnp.zeros((4, *shape)), compact_flux, inlet_flux)
-            if case.solver.coupling_acceleration == "anderson" else None)
+        anderson_state = (
+            (
+                benchmarks.jnp.zeros((4, *shape)),
+                benchmarks.jnp.zeros((4, *shape)),
+                compact_flux,
+                inlet_flux,
+            )
+            if case.solver.coupling_acceleration == "anderson"
+            else None
+        )
         return ExtrudedFieldBundle(
-            x=x, y=y, z=z, field_scale=benchmarks.jnp.asarray(payload["field_profile"]["sample_b_over_B0"]),
-            u=benchmarks.jnp.full(shape, u_value), v=zeros, w=zeros, p=zeros, phi=zeros,
-            geometry_kind="layered_duct", solver_kind="extruded_inductionless",
-            rho_phi_plus=compact_flux, rho_phi_inlet=inlet_flux,
-            aitken_state=((None, 1.0, 0)
-                if case.solver.coupling_acceleration == "aitken" else None),
+            x=x,
+            y=y,
+            z=z,
+            field_scale=benchmarks.jnp.asarray(payload["field_profile"]["sample_b_over_B0"]),
+            u=benchmarks.jnp.full(shape, u_value),
+            v=zeros,
+            w=zeros,
+            p=zeros,
+            phi=zeros,
+            geometry_kind="layered_duct",
+            solver_kind="extruded_inductionless",
+            rho_phi_plus=compact_flux,
+            rho_phi_inlet=inlet_flux,
+            aitken_state=((None, 1.0, 0) if case.solver.coupling_acceleration == "aitken" else None),
             anderson_state=anderson_state,
-            stopping_state=(steps, 0,
-                "step_limit" if steps == executed_steps else "in_progress"),
-            jx=benchmarks.jnp.ones(shape), jz=benchmarks.jnp.ones(shape),
+            stopping_state=(
+                steps,
+                0,
+                "step_limit" if steps == executed_steps else "in_progress",
+            ),
+            jx=benchmarks.jnp.ones(shape),
+            jz=benchmarks.jnp.ones(shape),
             volumetric_flow_rate=benchmarks.jnp.full(8, 4.0),
             charge_balance_residual=benchmarks.jnp.full(8, 1.0e-5),
             boundary_current_residual=benchmarks.jnp.full(8, 1.0e-5),
@@ -232,24 +269,32 @@ def _write_lmx_b2_output(
             ),
             iteration_electric_linear_history=benchmarks.jnp.zeros((steps, 6)),
             iteration_potential_residual_history=benchmarks.jnp.zeros(steps),
-            iteration_courant_history=benchmarks.jnp.tile(benchmarks.jnp.asarray([dt, 1e-6, 2e-6]), (steps, 1)),
+            iteration_courant_history=benchmarks.jnp.tile(
+                benchmarks.jnp.asarray([dt, 1e-6, 2e-6]), (steps, 1)
+            ),
         )
 
     root.mkdir()
     for name, value in (
         ("checkpoint.npz", bundle(checkpoint_step)),
         ("direct.npz", bundle(executed_steps, u_value=direct_u)),
-        ("resumed.npz", bundle(
-            executed_steps, u_value=direct_u + resumed_u_delta
-        )),
+        ("resumed.npz", bundle(executed_steps, u_value=direct_u + resumed_u_delta)),
     ):
         write_extruded_bundle_restart_npz(value, case, root / name)
-    (root / "run.json").write_text(json.dumps({
-        "schema_version": 1, "code": "LMX", "case_id": "B2-fringing-square",
-        "input_sha256": artifact_sha256(input_path, "file"),
-        "evaluator_sha256": artifact_sha256(evaluator, "file"),
-        "wall_seconds": 1.0, "num_devices": 1, "float_precision": "float64",
-    }))
+    (root / "run.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "code": "LMX",
+                "case_id": "B2-fringing-square",
+                "input_sha256": artifact_sha256(input_path, "file"),
+                "evaluator_sha256": artifact_sha256(evaluator, "file"),
+                "wall_seconds": 1.0,
+                "num_devices": 1,
+                "float_precision": "float64",
+            }
+        )
+    )
 
 
 def _write_freemhd_b2_output(root: Path, input_dir: Path, evaluator: Path) -> None:
@@ -277,8 +322,10 @@ def _write_freemhd_b2_output(root: Path, input_dir: Path, evaluator: Path) -> No
     rows = [" ".join([f"{time:.17g}", *map(str, np.zeros(8)), *map(str, delta)]) for time in times]
     probes.write_text("\n".join([*headers, "# Time", *rows]) + "\n")
     values = {
-        "massIn": (-4.0, "sum(rhoPhi)"), "massOut": (4.0, "sum(rhoPhi)"),
-        "currentIn": (-0.1, "sum(jn)"), "currentOut": (0.1, "sum(jn)"),
+        "massIn": (-4.0, "sum(rhoPhi)"),
+        "massOut": (4.0, "sum(rhoPhi)"),
+        "currentIn": (-0.1, "sum(jn)"),
+        "currentOut": (0.1, "sum(jn)"),
         "currentIntoSolid": (1.0e-5, "sum(jn)"),
         "currentIntoSolidMagnitude": (1.0, "sumMag(jn)"),
     }
@@ -286,12 +333,21 @@ def _write_freemhd_b2_output(root: Path, input_dir: Path, evaluator: Path) -> No
         path = post / name / "0/surfaceFieldValue.dat"
         path.parent.mkdir(parents=True)
         path.write_text(f"# Time {header}\n" + "".join(f"{time:.17g} {value}\n" for time in times))
-    (root / "run.json").write_text(json.dumps({
-        "schema_version": 1, "code": "FreeMHD", "case_id": "B2-fringing-square",
-        "input_sha256": artifact_sha256(input_dir, "tree"),
-        "evaluator_sha256": artifact_sha256(evaluator, "file"),
-        "wall_seconds": 1.0, "nproc": 2, "image": "freemhd:test", "float_precision": "float64",
-    }))
+    (root / "run.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "code": "FreeMHD",
+                "case_id": "B2-fringing-square",
+                "input_sha256": artifact_sha256(input_dir, "tree"),
+                "evaluator_sha256": artifact_sha256(evaluator, "file"),
+                "wall_seconds": 1.0,
+                "nproc": 2,
+                "image": "freemhd:test",
+                "float_precision": "float64",
+            }
+        )
+    )
 
 
 def _matched_b2_smoke_record(
@@ -317,19 +373,46 @@ def _matched_b2_smoke_record(
     for name in run_freemhd_parity_suite._FREEMHD_SOURCE_NAMES:
         key = f"{name}_source"
         relative = f"src/{Path(reference[key]).name}"
-        reference[key], reference[f"{key}_sha256"] = relative, manifest["files"][relative]
+        reference[key], reference[f"{key}_sha256"] = (
+            relative,
+            manifest["files"][relative],
+        )
     monkeypatch.setattr(benchmarks, "load_benchmark_b_spec", lambda *_: spec)
     artifacts = {}
-    for name in ("lmx_source", "freemhd_source", "lmx_input", "freemhd_input", "evaluator", "lmx_output", "freemhd_output"):
-        kind = "tree" if name in {"lmx_source", "freemhd_source", "freemhd_input"} or executed and name.endswith("_output") else "file"
-        artifacts[name] = {"path": name, "kind": kind, "sha256": artifact_sha256(root / name, kind)}
+    for name in (
+        "lmx_source",
+        "freemhd_source",
+        "lmx_input",
+        "freemhd_input",
+        "evaluator",
+        "lmx_output",
+        "freemhd_output",
+    ):
+        kind = (
+            "tree"
+            if name in {"lmx_source", "freemhd_source", "freemhd_input"}
+            or executed
+            and name.endswith("_output")
+            else "file"
+        )
+        artifacts[name] = {
+            "path": name,
+            "kind": kind,
+            "sha256": artifact_sha256(root / name, kind),
+        }
     contract = canonical_matched_b_contract(spec, "harness-smoke")
     return {
-        "schema_version": 3 if executed else 2, "case_id": "B2-fringing-square", "acceptance_role": "harness-smoke",
+        "schema_version": 3 if executed else 2,
+        "case_id": "B2-fringing-square",
+        "acceptance_role": "harness-smoke",
         "contract": {"lmx": deepcopy(contract), "freemhd": deepcopy(contract)},
-        "comparison": {"source": "independent-output-observers"} if executed else {"x_over_L": [], "lmx_observable": [], "freemhd_observable": []},
+        "comparison": {"source": "independent-output-observers"}
+        if executed
+        else {"x_over_L": [], "lmx_observable": [], "freemhd_observable": []},
         "provenance": {
-            "benchmark_spec_sha256": hashlib.sha256(Path("lmx/data/benchmarks/specs/alex-b2-square.toml").read_bytes()).hexdigest(),
+            "benchmark_spec_sha256": hashlib.sha256(
+                Path("lmx/data/benchmarks/specs/alex-b2-square.toml").read_bytes()
+            ).hexdigest(),
             "artifacts": artifacts,
         },
     }
@@ -373,7 +456,12 @@ def test_matched_b_schema2_verifies_contract_comparison_and_real_artifacts(tmp_p
     record = _matched_b_record(tmp_path, case_id)
     report = validate_matched_b_record(record, expected_case_id=case_id, artifact_root=tmp_path)
 
-    assert report["schema_complete"] and report["artifact_pass"] and report["contract_pass"] and report["comparison_pass"]
+    assert (
+        report["schema_complete"]
+        and report["artifact_pass"]
+        and report["contract_pass"]
+        and report["comparison_pass"]
+    )
     assert report["observation_pass"] is report["acceptance_pass"] is False
     assert set(report["calculated_artifact_sha256"]) == set(record["provenance"]["artifacts"])
     assert "contract.observers.unavailable" in report["failed_checks"]
@@ -390,9 +478,11 @@ def test_matched_b_schema2_rejects_contract_and_record_forgery(tmp_path: Path):
     mismatch = deepcopy(record)
     mismatch["contract"]["freemhd"]["equations"] = {"semantic_contract": "different"}
     mismatch["exact_case_match"] = mismatch["pass"] = True
-    rejected = validate_matched_b_record(mismatch, expected_case_id="B2-fringing-square", artifact_root=tmp_path)
+    rejected = validate_matched_b_record(
+        mismatch, expected_case_id="B2-fringing-square", artifact_root=tmp_path
+    )
     assert "contract.equations.mismatch" in rejected["failed_checks"]
-    assert "legacy.exact_case_match" in rejected["failed_checks"]
+    assert "schema.exact_case_match" in rejected["failed_checks"]
 
     mutations = (
         (("schema_version",), 1, "schema"),
@@ -413,7 +503,9 @@ def test_matched_b_schema2_rejects_contract_and_record_forgery(tmp_path: Path):
         for key in path[:-1]:
             target = target[key]
         target[path[-1]] = value
-        report = validate_matched_b_record(malformed, expected_case_id="B2-fringing-square", artifact_root=tmp_path)
+        report = validate_matched_b_record(
+            malformed, expected_case_id="B2-fringing-square", artifact_root=tmp_path
+        )
         assert expected_check in report["failed_checks"]
 
     for section, key, wrong in (
@@ -423,7 +515,11 @@ def test_matched_b_schema2_rejects_contract_and_record_forgery(tmp_path: Path):
         self_consistent = deepcopy(record)
         self_consistent["contract"]["lmx"][section][key] = wrong
         self_consistent["contract"]["freemhd"][section][key] = wrong
-        rejected = validate_matched_b_record(self_consistent, expected_case_id="B2-fringing-square", artifact_root=tmp_path)
+        rejected = validate_matched_b_record(
+            self_consistent,
+            expected_case_id="B2-fringing-square",
+            artifact_root=tmp_path,
+        )
         assert f"contract.{section}.canonical" in rejected["failed_checks"]
 
     smoke = deepcopy(record)
@@ -433,7 +529,9 @@ def test_matched_b_schema2_rejects_contract_and_record_forgery(tmp_path: Path):
     assert "contract.mesh_coordinates.canonical" in report["failed_checks"]
 
     poor = deepcopy(record)
-    poor["comparison"]["freemhd_observable"] = [value + 1.0 for value in poor["comparison"]["freemhd_observable"]]
+    poor["comparison"]["freemhd_observable"] = [
+        value + 1.0 for value in poor["comparison"]["freemhd_observable"]
+    ]
     report = validate_matched_b_record(poor, expected_case_id="B2-fringing-square", artifact_root=tmp_path)
     assert report["comparison_pass"] is report["acceptance_pass"] is False
 
@@ -505,7 +603,9 @@ def test_materialize_matched_freemhd_case_is_audited_and_refuses_overwrite(tmp_p
     second_output = tmp_path / "second-output"
     _write_demo_template(template)
 
-    manifest = run_freemhd_parity_suite.materialize_matched_freemhd_case(template, output, case_kind=case_kind)
+    manifest = run_freemhd_parity_suite.materialize_matched_freemhd_case(
+        template, output, case_kind=case_kind
+    )
 
     assert manifest["run_profile"] == "docker_smoke_only"
     assert manifest["audit"]["matched"] is True
@@ -514,9 +614,18 @@ def test_materialize_matched_freemhd_case_is_audited_and_refuses_overwrite(tmp_p
     assert (output / "lmx-benchmark-manifest.json").is_file()
     assert infer_uniform_b0(output) == pytest.approx((0.0, 0.2, 0.0))
     assert infer_inlet_drive_mode(output) == "inlet_flow_rate"
-    assert infer_inlet_flow_rate(output) == pytest.approx(load_benchmark_a_spec(case_kind)["drive"]["target_flow_rate"])
-    assert run_freemhd_parity_suite.materialize_matched_freemhd_case(template, second_output, case_kind=case_kind) == manifest
-    assert (second_output / "lmx-benchmark-manifest.json").read_bytes() == (output / "lmx-benchmark-manifest.json").read_bytes()
+    assert infer_inlet_flow_rate(output) == pytest.approx(
+        load_benchmark_a_spec(case_kind)["drive"]["target_flow_rate"]
+    )
+    assert (
+        run_freemhd_parity_suite.materialize_matched_freemhd_case(
+            template, second_output, case_kind=case_kind
+        )
+        == manifest
+    )
+    assert (second_output / "lmx-benchmark-manifest.json").read_bytes() == (
+        output / "lmx-benchmark-manifest.json"
+    ).read_bytes()
     with pytest.raises(FileExistsError, match="Refusing to overwrite"):
         run_freemhd_parity_suite.materialize_matched_freemhd_case(template, output, case_kind=case_kind)
 
@@ -533,13 +642,23 @@ def _frozen_source_repo(root: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Pa
         reference[source_key] = relative
         reference[f"{source_key}_sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
     (repo / "unrelated.txt").write_text("clean\n")
-    for args in (("init", "-q"), ("config", "user.email", "test@example.com"), ("config", "user.name", "Test"), ("add", "."), ("commit", "-qm", "fixture")):
+    for args in (
+        ("init", "-q"),
+        ("config", "user.email", "test@example.com"),
+        ("config", "user.name", "Test"),
+        ("add", "."),
+        ("commit", "-qm", "fixture"),
+    ):
         subprocess.run(("git", "-C", str(repo), *args), check=True)
     reference["repository_commit"] = subprocess.check_output(
         ("git", "-C", str(repo), "rev-parse", "HEAD"), text=True
     ).strip()
     spec = {"free_mhd_discretization_reference": reference}
-    monkeypatch.setattr(run_freemhd_parity_suite, "load_benchmark_b_spec", lambda case_id, spec_root=None: spec)
+    monkeypatch.setattr(
+        run_freemhd_parity_suite,
+        "load_benchmark_b_spec",
+        lambda case_id, spec_root=None: spec,
+    )
     return repo, reference, repo / reference["momentum_source"]
 
 
@@ -555,13 +674,22 @@ def test_freemhd_source_snapshot_is_deterministic_and_allows_unrelated_dirt(
     assert manifest == run_freemhd_parity_suite.materialize_freemhd_source_snapshot(repo, second)
     assert artifact_sha256(first, "tree") == artifact_sha256(second, "tree")
     assert len([path for path in first.rglob("*") if path.is_file()]) == 8
-    assert set(manifest) == {"schema_version", "project", "commit", "openfoam_release", "files"}
+    assert set(manifest) == {
+        "schema_version",
+        "project",
+        "commit",
+        "openfoam_release",
+        "files",
+    }
     assert manifest["commit"] == reference["repository_commit"]
     with pytest.raises(FileExistsError, match="Refusing to overwrite"):
         run_freemhd_parity_suite.materialize_freemhd_source_snapshot(repo, first)
 
 
-@pytest.mark.parametrize("hazard", ["head", "unstaged", "staged", "hash", "missing", "symlink", "noncanonical"])
+@pytest.mark.parametrize(
+    "hazard",
+    ["head", "unstaged", "staged", "hash", "missing", "symlink", "noncanonical"],
+)
 def test_freemhd_source_snapshot_rejects_unfrozen_evidence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, hazard: str
 ):
@@ -590,8 +718,12 @@ def test_freemhd_source_snapshot_rejects_unfrozen_evidence(
 
 def test_matched_b2_lmx_input_is_deterministic_real_and_observed(tmp_path: Path):
     first, second, scaled, sustained, sustained_copy = (
-        tmp_path / name for name in (
-            "first.json", "second.json", "scaled.json", "sustained.json",
+        tmp_path / name
+        for name in (
+            "first.json",
+            "second.json",
+            "scaled.json",
+            "sustained.json",
             "sustained-copy.json",
         )
     )
@@ -600,29 +732,52 @@ def test_matched_b2_lmx_input_is_deterministic_real_and_observed(tmp_path: Path)
     problem, contract = load_matched_b2_lmx_input(first), observe_lmx_b2_contract(first)
 
     assert first.read_bytes() == second.read_bytes()
-    assert payload["mesh"]["x_faces"] == [-15.0, -11.875, -8.75, -5.625, -2.5, 0.625, 3.75, 6.875, 10.0]
-    assert payload["field_profile"]["sample_b_over_B0"] == [1.0, 1.0, 0.991875, 0.9371875, 0.69, 0.16125, 0.00875, 0.0]
+    assert payload["mesh"]["x_faces"] == [
+        -15.0,
+        -11.875,
+        -8.75,
+        -5.625,
+        -2.5,
+        0.625,
+        3.75,
+        6.875,
+        10.0,
+    ]
+    assert payload["field_profile"]["sample_b_over_B0"] == [
+        1.0,
+        1.0,
+        0.991875,
+        0.9371875,
+        0.69,
+        0.16125,
+        0.00875,
+        0.0,
+    ]
     assert problem.case.name == "alex_b2-fringing-square_harness-smoke"
     payload["mesh"]["y_faces"][2] += np.finfo(float).eps
     first.write_text(json.dumps(payload))
     assert load_matched_b2_lmx_input(first).case == problem.case
     groups = contract["nondimensional_groups"]
-    assert {name: groups[name] for name in ("hartmann_number", "interaction_parameter", "reynolds_number")} == pytest.approx(
-        {"hartmann_number": 2900.0, "interaction_parameter": 540.0, "reynolds_number": 2900.0**2 / 540.0}
+    assert {
+        name: groups[name] for name in ("hartmann_number", "interaction_parameter", "reynolds_number")
+    } == pytest.approx(
+        {
+            "hartmann_number": 2900.0,
+            "interaction_parameter": 540.0,
+            "reynolds_number": 2900.0**2 / 540.0,
+        }
     )
     assert groups["magnetic_reynolds_number_assumption"] == "Rm << 1"
     assert contract["stopping_rules"]["expected_stop_reason"] == "step_limit"
-    scaled_payload = run_freemhd_parity_suite.materialize_matched_b2_lmx_input(scaled, solver_shape=(16, 7, 7))
+    scaled_payload = run_freemhd_parity_suite.materialize_matched_b2_lmx_input(
+        scaled, solver_shape=(16, 7, 7)
+    )
     scaled_problem = load_matched_b2_lmx_input(scaled)
     geometry = scaled_problem.case.geometry
     assert (geometry.nx, geometry.ny, geometry.nz) == (16, 5, 5)
     assert len(scaled_payload["field_profile"]["sample_x_over_L"]) == 16
-    sustained_payload = run_freemhd_parity_suite.materialize_matched_b2_lmx_input(
-        sustained, executed_steps=6
-    )
-    run_freemhd_parity_suite.materialize_matched_b2_lmx_input(
-        sustained_copy, executed_steps=6
-    )
+    sustained_payload = run_freemhd_parity_suite.materialize_matched_b2_lmx_input(sustained, executed_steps=6)
+    run_freemhd_parity_suite.materialize_matched_b2_lmx_input(sustained_copy, executed_steps=6)
     sustained_problem = load_matched_b2_lmx_input(sustained)
     assert sustained.read_bytes() == sustained_copy.read_bytes()
     assert sustained_payload["effective_controls"]["executed_steps"] == 6
@@ -631,23 +786,24 @@ def test_matched_b2_lmx_input_is_deterministic_real_and_observed(tmp_path: Path)
     assert sustained_problem.case.time_stepper.t_final == pytest.approx(
         6 * sustained_problem.case.time_stepper.dt
     )
-    assert observe_lmx_b2_contract(sustained)["stopping_rules"] == (
-        sustained_payload["effective_controls"]
-    )
+    assert observe_lmx_b2_contract(sustained)["stopping_rules"] == (sustained_payload["effective_controls"])
     for invalid in (True, 1, 2.5):
         with pytest.raises((TypeError, ValueError), match="executed_steps"):
             run_freemhd_parity_suite.materialize_matched_b2_lmx_input(
                 tmp_path / f"invalid-{invalid}.json", executed_steps=invalid
             )
     with pytest.raises(ValueError, match="requires nx"):
-        run_freemhd_parity_suite.materialize_matched_b2_lmx_input(
-            tmp_path / "bad", solver_shape=(8, 2, 7))
+        run_freemhd_parity_suite.materialize_matched_b2_lmx_input(tmp_path / "bad", solver_shape=(8, 2, 7))
     with pytest.raises(FileExistsError, match="Refusing to overwrite"):
         run_freemhd_parity_suite.materialize_matched_b2_lmx_input(first)
 
 
 def test_matched_b2_freemhd_input_is_deterministic_slim_and_solver_free(tmp_path: Path):
-    template, first, second = tmp_path / "hunt_demo", tmp_path / "first", tmp_path / "second"
+    template, first, second = (
+        tmp_path / "hunt_demo",
+        tmp_path / "first",
+        tmp_path / "second",
+    )
     _write_b2_skeleton(template)
     (template / "0/cellToRegion").write_text("generated junk must not be copied\n")
     (template / "0/insulator").mkdir()
@@ -688,10 +844,15 @@ def test_independent_matched_b2_input_observers_agree(tmp_path: Path, monkeypatc
     )
     summary = run_freemhd_parity_suite.materialize_matched_b2_preflight(template, source, tmp_path / "bundle")
     case, source = tmp_path / "bundle/freemhd_input", tmp_path / "bundle/freemhd_source"
-    lmx_input, evaluator = tmp_path / "bundle/lmx_input.json", tmp_path / "bundle/evaluator.json"
+    lmx_input, evaluator = (
+        tmp_path / "bundle/lmx_input.json",
+        tmp_path / "bundle/evaluator.json",
+    )
 
     assert summary["status"] == "preflight-pass"
-    assert observe_freemhd_b2_contract(case, source, evaluator) == observe_lmx_b2_contract(lmx_input, evaluator)
+    assert observe_freemhd_b2_contract(case, source, evaluator) == observe_lmx_b2_contract(
+        lmx_input, evaluator
+    )
 
 
 @pytest.mark.parametrize("acceleration", ("anderson", "aitken"))
@@ -700,9 +861,7 @@ def test_lmx_b2_output_observer_replays_restart_evidence(
     tmp_path: Path, acceleration: str, executed_steps: int
 ):
     input_path, evaluator = tmp_path / "lmx.json", tmp_path / "evaluator.json"
-    run_freemhd_parity_suite.materialize_matched_b2_lmx_input(
-        input_path, executed_steps=executed_steps
-    )
+    run_freemhd_parity_suite.materialize_matched_b2_lmx_input(input_path, executed_steps=executed_steps)
     if acceleration == "aitken":
         payload = json.loads(input_path.read_text())
         payload["case"]["solver"]["coupling_acceleration"] = acceleration
@@ -715,11 +874,20 @@ def test_lmx_b2_output_observer_replays_restart_evidence(
     assert observed["steps"] == executed_steps
     assert observed["stop_reason"] == "step_limit"
     assert len(observed["dt"]) == len(observed["courant_mean"]) == executed_steps
-    assert all(observed[name] == 0.0 for name in (
-        "restart_max_abs", "restart_state_max_abs", "restart_flux_max_abs",
-        "restart_state_relative_l2", "restart_state_tolerance_ratio",
-        "restart_flux_relative_l2", "restart_derived_max_abs",
-        "restart_history_max_abs", "mass_balance"))
+    assert all(
+        observed[name] == 0.0
+        for name in (
+            "restart_max_abs",
+            "restart_state_max_abs",
+            "restart_flux_max_abs",
+            "restart_state_relative_l2",
+            "restart_state_tolerance_ratio",
+            "restart_flux_relative_l2",
+            "restart_derived_max_abs",
+            "restart_history_max_abs",
+            "mass_balance",
+        )
+    )
     assert observed["current_balance"] == observed["interface_current_balance"] == pytest.approx(1.0e-5)
     assert observed["pressure_observable"][4] == pytest.approx(3.0 / 540.0)
 
@@ -748,14 +916,22 @@ def test_lmx_b2_output_observer_measures_relative_restart_state_corruption(
 
 @pytest.mark.parametrize("mutation", ("root", "metadata", "provenance"))
 def test_lmx_b2_output_observer_rejects_corrupt_evidence(tmp_path: Path, mutation: str):
-    input_path, evaluator, output = tmp_path / "lmx.json", tmp_path / "evaluator.json", tmp_path / "output"
+    input_path, evaluator, output = (
+        tmp_path / "lmx.json",
+        tmp_path / "evaluator.json",
+        tmp_path / "output",
+    )
     run_freemhd_parity_suite.materialize_matched_b2_lmx_input(input_path)
     run_freemhd_parity_suite.materialize_matched_b2_evaluator(evaluator)
     _write_lmx_b2_output(output, input_path, evaluator)
     path, old, new = {
         "root": (output / "unexpected", None, "unexpected\n"),
         "metadata": (output / "run.json", '"code": "LMX"', '"code": "bad"'),
-        "provenance": (output / "run.json", '"float_precision": "float64"', '"float_precision": "bad"'),
+        "provenance": (
+            output / "run.json",
+            '"float_precision": "float64"',
+            '"float_precision": "bad"',
+        ),
     }[mutation]
     path.write_text(new if old is None else path.read_text().replace(old, new, 1))
     with pytest.raises(ValueError, match="LMX B2"):
@@ -763,7 +939,11 @@ def test_lmx_b2_output_observer_rejects_corrupt_evidence(tmp_path: Path, mutatio
 
 
 def test_freemhd_b2_output_observer_reads_only_native_tables(tmp_path: Path):
-    template, case, evaluator = tmp_path / "template", tmp_path / "case", tmp_path / "evaluator"
+    template, case, evaluator = (
+        tmp_path / "template",
+        tmp_path / "case",
+        tmp_path / "evaluator",
+    )
     _write_b2_skeleton(template)
     run_freemhd_parity_suite.materialize_matched_b2_freemhd_input(template, case)
     run_freemhd_parity_suite.materialize_matched_b2_evaluator(evaluator)
@@ -781,15 +961,32 @@ def test_freemhd_b2_output_observer_reads_only_native_tables(tmp_path: Path):
 @pytest.mark.parametrize(
     "mutation",
     (
-        "root", "metadata", "provenance", "controls", "fatal", "execution", "post",
-        "width", "rows", "table_missing", "header", "time", "probe_missing",
-        "probe_headers", "columns", "probe", "magnitude", "stations",
+        "root",
+        "metadata",
+        "provenance",
+        "controls",
+        "fatal",
+        "execution",
+        "post",
+        "width",
+        "rows",
+        "table_missing",
+        "header",
+        "time",
+        "probe_missing",
+        "probe_headers",
+        "columns",
+        "probe",
+        "magnitude",
+        "stations",
     ),
 )
-def test_freemhd_b2_output_observer_rejects_corrupt_evidence(
-    tmp_path: Path, mutation: str
-):
-    template, case, evaluator = tmp_path / "template", tmp_path / "case", tmp_path / "evaluator"
+def test_freemhd_b2_output_observer_rejects_corrupt_evidence(tmp_path: Path, mutation: str):
+    template, case, evaluator = (
+        tmp_path / "template",
+        tmp_path / "case",
+        tmp_path / "evaluator",
+    )
     _write_b2_skeleton(template)
     run_freemhd_parity_suite.materialize_matched_b2_freemhd_input(template, case)
     run_freemhd_parity_suite.materialize_matched_b2_evaluator(evaluator)
@@ -798,21 +995,61 @@ def test_freemhd_b2_output_observer_rejects_corrupt_evidence(
     path, old, new = {
         "root": (output / "unexpected", None, "unexpected\n"),
         "metadata": (output / "run.json", '"code": "FreeMHD"', '"code": "bad"'),
-        "provenance": (output / "run.json", '"float_precision": "float64"', '"float_precision": "bad"'),
-        "controls": (output / "controlDict.used", "adjustTimeStep off", "adjustTimeStep on"),
+        "provenance": (
+            output / "run.json",
+            '"float_precision": "float64"',
+            '"float_precision": "bad"',
+        ),
+        "controls": (
+            output / "controlDict.used",
+            "adjustTimeStep off",
+            "adjustTimeStep on",
+        ),
         "fatal": (output / "run.log", "End", "FOAM FATAL ERROR\nEnd"),
         "execution": (output / "run.log", "End", "Stopped"),
         "post": (output / "postProcessing/unexpected", None, "unexpected\n"),
-        "width": (output / "postProcessing/massIn/0/surfaceFieldValue.dat", " -4.0\n", " -4.0 0\n"),
-        "rows": (output / "postProcessing/massIn/0/surfaceFieldValue.dat", "3.7037037037037037e-06", "1.8518518518518519e-06"),
-        "table_missing": (output / "postProcessing/massIn/0/surfaceFieldValue.dat", None, None),
-        "header": (output / "postProcessing/massIn/0/surfaceFieldValue.dat", "sum(rhoPhi)", "sum(phi)"),
-        "time": (output / "postProcessing/massIn/0/surfaceFieldValue.dat", "1.8518518518518519e-06", "1e-6"),
+        "width": (
+            output / "postProcessing/massIn/0/surfaceFieldValue.dat",
+            " -4.0\n",
+            " -4.0 0\n",
+        ),
+        "rows": (
+            output / "postProcessing/massIn/0/surfaceFieldValue.dat",
+            "3.7037037037037037e-06",
+            "1.8518518518518519e-06",
+        ),
+        "table_missing": (
+            output / "postProcessing/massIn/0/surfaceFieldValue.dat",
+            None,
+            None,
+        ),
+        "header": (
+            output / "postProcessing/massIn/0/surfaceFieldValue.dat",
+            "sum(rhoPhi)",
+            "sum(phi)",
+        ),
+        "time": (
+            output / "postProcessing/massIn/0/surfaceFieldValue.dat",
+            "1.8518518518518519e-06",
+            "1e-6",
+        ),
         "probe_missing": (output / "postProcessing/b2PressureTaps/0/p", None, None),
-        "probe_headers": (output / "postProcessing/b2PressureTaps/0/p", "# Probe 0", "# Probe 1"),
-        "columns": (output / "postProcessing/b2PressureTaps/0/p", "# Time\n", "# Bad\n"),
+        "probe_headers": (
+            output / "postProcessing/b2PressureTaps/0/p",
+            "# Probe 0",
+            "# Probe 1",
+        ),
+        "columns": (
+            output / "postProcessing/b2PressureTaps/0/p",
+            "# Time\n",
+            "# Bad\n",
+        ),
         "probe": (output / "postProcessing/b2PressureTaps/0/p", "0.8 0)", "0.7 0)"),
-        "magnitude": (output / "postProcessing/currentIntoSolidMagnitude/0/surfaceFieldValue.dat", " 1.0", " -1.0"),
+        "magnitude": (
+            output / "postProcessing/currentIntoSolidMagnitude/0/surfaceFieldValue.dat",
+            " 1.0",
+            " -1.0",
+        ),
         "stations": (case / "system/blockMeshDict", "Nx 8;", "Nx 7;"),
     }[mutation]
     if old is None:
@@ -839,7 +1076,12 @@ def test_freemhd_b2_output_observer_rejects_corrupt_evidence(
         ("lmx", "dt", [0.0], "execution.lmx.dt"),
         ("lmx", "courant_max", [1.0], "execution.lmx.courant"),
         ("lmx", "mass_balance", 1.0, "execution.lmx.mass_balance"),
-        ("lmx", "interface_current_activity", 0.0, "execution.lmx.interface_current_activity"),
+        (
+            "lmx",
+            "interface_current_activity",
+            0.0,
+            "execution.lmx.interface_current_activity",
+        ),
         ("lmx", "restart_max_abs", 1.0, "execution.lmx.restart"),
         ("lmx", "dt", None, "execution.lmx.schema"),
         ("freemhd", "x_over_L", [0.0, 2.0], "x"),
@@ -851,18 +1093,26 @@ def test_freemhd_b2_output_observer_rejects_corrupt_evidence(
 def test_b2_smoke_execution_attributes_each_gate(target, key, value, failed):
     dt = 1.0 / 540000.0
     observed = {
-        "steps": 2, "stop_reason": "step_limit", "dt": [dt, dt],
-        "courant_mean": [0.0, 0.0], "courant_max": [0.0, 0.0],
-        "mass_balance": 0.0, "current_balance": 0.0,
-        "interface_current_balance": 0.0, "interface_current_activity": 1.0,
-        "restart_max_abs": 0.0, "x_over_L": [0.0, 1.0],
+        "steps": 2,
+        "stop_reason": "step_limit",
+        "dt": [dt, dt],
+        "courant_mean": [0.0, 0.0],
+        "courant_max": [0.0, 0.0],
+        "mass_balance": 0.0,
+        "current_balance": 0.0,
+        "interface_current_balance": 0.0,
+        "interface_current_activity": 1.0,
+        "restart_max_abs": 0.0,
+        "x_over_L": [0.0, 1.0],
         "pressure_observable": [0.0, 0.0],
     }
     lmx, freemhd = deepcopy(observed), deepcopy(observed)
     selected = {"lmx": lmx, "freemhd": freemhd}[target]
     selected.pop(key) if value is None else selected.__setitem__(key, value)
     execution, comparison, _ = _validate_b2_smoke_execution(
-        lmx, freemhd, load_benchmark_b_spec("B2-fringing-square")["harness_smoke_execution"]
+        lmx,
+        freemhd,
+        load_benchmark_b_spec("B2-fringing-square")["harness_smoke_execution"],
     )
     assert failed in execution + comparison
 
@@ -951,9 +1201,14 @@ def test_matched_b2_smoke_attributes_one_sided_mutations(
         text = path.read_text().replace('"bc=1"', '"bc=0.99"')
         values = dict(re.findall(r'"([xb][a-z])=([^\"]+)"', text))
         labels = sorted(name[1:] for name in values if name.startswith("x"))
-        anchors = {"x_over_L": [float(values[f"x{label}"]) for label in labels], "b_over_B0": [float(values[f"b{label}"]) for label in labels]}
-        digest = hashlib.sha256(json.dumps(anchors, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        text = re.sub(r'(lmxFieldAnchorsSHA256 ")[0-9a-f]{64}', rf'\g<1>{digest}', text)
+        anchors = {
+            "x_over_L": [float(values[f"x{label}"]) for label in labels],
+            "b_over_B0": [float(values[f"b{label}"]) for label in labels],
+        }
+        digest = hashlib.sha256(
+            json.dumps(anchors, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        text = re.sub(r'(lmxFieldAnchorsSHA256 ")[0-9a-f]{64}', rf"\g<1>{digest}", text)
         for region in ("liquid", "solidWalls"):
             (case / f"system/{region}/setExprFieldsDict").write_text(text)
     elif mutation == "fluid":
@@ -962,13 +1217,29 @@ def test_matched_b2_smoke_attributes_one_sided_mutations(
     elif mutation == "wall":
         replace("constant/solidWalls/thermophysicalProperties", "elcond 3.5", "elcond 3.6")
     elif mutation == "velocity":
-        replace("system/liquid/changeDictionaryDict", "sink { type zeroGradient", "sink { type fixedValue")
+        replace(
+            "system/liquid/changeDictionaryDict",
+            "sink { type zeroGradient",
+            "sink { type fixedValue",
+        )
     elif mutation == "pressure":
-        replace("system/liquid/changeDictionaryDict", "sink { type fixedValue; value uniform 0; }", "sink { type fixedValue; value uniform 1; }")
+        replace(
+            "system/liquid/changeDictionaryDict",
+            "sink { type fixedValue; value uniform 0; }",
+            "sink { type fixedValue; value uniform 1; }",
+        )
     elif mutation == "electric":
-        replace("system/liquid/changeDictionaryDict", "inlet { type zeroGradient; } sink", "inlet { type fixedValue; value uniform 0; } sink")
+        replace(
+            "system/liquid/changeDictionaryDict",
+            "inlet { type zeroGradient; } sink",
+            "inlet { type fixedValue; value uniform 0; } sink",
+        )
     elif mutation == "scheme":
-        replace("system/liquid/fvSchemes", "div(rhoPhi,U) Gauss limitedLinear 1.0", "div(rhoPhi,U) Gauss limitedLinear 0.5")
+        replace(
+            "system/liquid/fvSchemes",
+            "div(rhoPhi,U) Gauss limitedLinear 1.0",
+            "div(rhoPhi,U) Gauss limitedLinear 0.5",
+        )
     elif mutation == "iterations":
         for region in ("liquid", "solidWalls"):
             replace(f"system/{region}/fvSolution", "maxIter 600", "maxIter 601")
@@ -1028,10 +1299,24 @@ def test_parity_command_materializes_without_running_suite(tmp_path: Path, monke
         return {"case_kind": case_kind, "audit": {"matched": True}}
 
     monkeypatch.setattr(run_freemhd_parity_suite, "materialize_matched_freemhd_case", materialize)
-    monkeypatch.setattr(run_freemhd_parity_suite, "run_suite", lambda **_: pytest.fail("parity must not run"))
-    assert run_freemhd_parity_suite.main(
-        ["--output", str(output), "--freemhd-install-dir", str(install), "--materialize", "hunt"]
-    ) == 0
+    monkeypatch.setattr(
+        run_freemhd_parity_suite,
+        "run_suite",
+        lambda **_: pytest.fail("parity must not run"),
+    )
+    assert (
+        run_freemhd_parity_suite.main(
+            [
+                "--output",
+                str(output),
+                "--freemhd-install-dir",
+                str(install),
+                "--materialize",
+                "hunt",
+            ]
+        )
+        == 0
+    )
     assert called == {
         "template": install / "cases/hunt_demo",
         "destination": output,
@@ -1041,12 +1326,23 @@ def test_parity_command_materializes_without_running_suite(tmp_path: Path, monke
         run_freemhd_parity_suite,
         "materialize_matched_b2_preflight",
         lambda template, source, destination: {
-            "template": str(template), "source": str(source), "output": str(destination)
+            "template": str(template),
+            "source": str(source),
+            "output": str(destination),
         },
     )
-    assert run_freemhd_parity_suite.main(
-        ["--output", str(output), "--freemhd-install-dir", str(install), "--matched-b2-preflight"]
-    ) == 0
+    assert (
+        run_freemhd_parity_suite.main(
+            [
+                "--output",
+                str(output),
+                "--freemhd-install-dir",
+                str(install),
+                "--matched-b2-preflight",
+            ]
+        )
+        == 0
+    )
     monkeypatch.setattr(
         run_freemhd_parity_suite,
         "run_matched_b2_smoke_bundle",
@@ -1055,142 +1351,38 @@ def test_parity_command_materializes_without_running_suite(tmp_path: Path, monke
             "comparison_pass": destination == output and options["nproc"] == 3,
         },
     )
-    assert run_freemhd_parity_suite.main([
-        "--output", str(output), "--freemhd-install-dir", str(install),
-        "--freemhd-source-repo", str(tmp_path / "source"),
-        "--matched-b2-smoke", "--nproc", "3", "--smoke-timeout", "9",
-    ]) == 0
-
-
-def test_s3_pipe_archive_preflight_is_identity_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    archive, member, content = tmp_path / "S3_Buhler_Ha616.zip", "system/controlDict", b"control"
-    with run_freemhd_parity_suite.zipfile.ZipFile(archive, "w") as zipped:
-        zipped.writestr(member, content)
-    expected = {
-        "name": archive.name, "drive_id": "fixture", "size": archive.stat().st_size,
-        "sha256": artifact_sha256(archive, "file"), "member_count": 1,
-        "expanded_bytes": len(content), "members": {member: (len(content), hashlib.sha256(content).hexdigest())},
-    }
-    monkeypatch.setattr(run_freemhd_parity_suite, "_S3_PIPE_ARCHIVE", expected)
-    assert run_freemhd_parity_suite.main(
-        ["--output", str(tmp_path / "preflight"), "--freemhd-s3-preflight", str(archive)]) == 0
-    report = json.loads((tmp_path / "preflight/freemhd-s3-preflight.json").read_text())
-    assert report["preflight_pass"] and not report["alex_b1_parity"]
-    expected["members"][member] = (len(content), "0" * 64)
-    rejected = run_freemhd_parity_suite.preflight_freemhd_s3_pipe_archive(archive)
-    assert not rejected["preflight_pass"] and rejected["classification"] == "unverified-user-archive"
-    monkeypatch.setattr(run_freemhd_parity_suite, "run_freemhd_s3_pipe_smoke_bundle",
-                        lambda *_, **__: {"execution_pass": True})
-    assert run_freemhd_parity_suite.main([
-        "--output", str(tmp_path / "smoke"), "--freemhd-s3-smoke", str(archive)]) == 0
-
-
-def test_s3_pipe_materializer_safely_reduces_private_inputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    archive = tmp_path / "S3_Buhler_Ha616.zip"
-    fields = "boundaryField { inlet { type cyclic; } sink { type cyclic; } }\n"
-    mesh = "\n".join(
-        ["(52 52 194)\nsimpleGrading (9 9 9)"] * 5
-        + ["(194 52 194)\nsimpleGrading (9 9 9)"] * 4
+    assert (
+        run_freemhd_parity_suite.main(
+            [
+                "--output",
+                str(output),
+                "--freemhd-install-dir",
+                str(install),
+                "--freemhd-source-repo",
+                str(tmp_path / "source"),
+                "--matched-b2-smoke",
+                "--nproc",
+                "3",
+                "--smoke-timeout",
+                "9",
+            ]
+        )
+        == 0
     )
-    members = {"system/0/T": fields, "system/0/JxB": fields, "system/blockMeshDict": mesh}
-    with run_freemhd_parity_suite.zipfile.ZipFile(archive, "w") as zipped:
-        for name, content in members.items():
-            zipped.writestr(name, content)
-    monkeypatch.setattr(run_freemhd_parity_suite, "_S3_PIPE_INPUT_MEMBERS", tuple(members))
-    monkeypatch.setattr(run_freemhd_parity_suite, "preflight_freemhd_s3_pipe_archive", lambda _: {
-        "preflight_pass": True, "observed_sha256": "a" * 64,
-        "runtime_property_hartmann_number": 573.33628803877, "extraction_authorized": False,
-    })
-    manifest = run_freemhd_parity_suite.materialize_freemhd_s3_pipe_smoke(archive, tmp_path / "input")
-    root = tmp_path / "input"
-    assert not (root / "system/0").exists()
-    assert (root / "0/T").read_text().count("type calculated;") == 2
-    assert (root / "0/JxB").read_text().count("type calculated;") == 2
-    reduced = (root / "system/blockMeshDict").read_text()
-    assert reduced.count("(8 8 8)") == 5 and reduced.count("(2 8 8)") == 4
-    assert reduced.count("simpleGrading (1 1 1)") == 9
-    assert manifest["private_extraction_authority"] == "explicit local user invocation"
 
 
-@pytest.mark.parametrize(("name", "symlink"), [("../escape", False), ("link", True)])
-def test_s3_pipe_extraction_rejects_unsafe_members(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, symlink: bool
-):
-    archive = tmp_path / "unsafe.zip"
-    monkeypatch.setattr(run_freemhd_parity_suite, "_S3_PIPE_INPUT_MEMBERS", ("safe",))
-    with run_freemhd_parity_suite.zipfile.ZipFile(archive, "w") as zipped:
-        zipped.writestr("safe", "input")
-        entry = run_freemhd_parity_suite.zipfile.ZipInfo(name)
-        if symlink:
-            entry.create_system, entry.external_attr = 3, 0o120777 << 16
-        zipped.writestr(entry, "target")
-    with pytest.raises(ValueError, match="Unsafe"):
-        run_freemhd_parity_suite._extract_s3_pipe_inputs(archive, tmp_path / "output")
-
-
-def _write_s3_smoke_fixture(root: Path) -> tuple[Path, Path, Path]:
-    case, source, output = root / "input", root / "source", root / "output"
-    (case / "system").mkdir(parents=True)
-    control = (
-        "startTime 0; endTime 2e-6; deltaT 1e-6; maxDeltaT 1e-6; writeInterval 1; "
-        "adjustTimeStep off;\n"
-    )
-    (case / "system/controlDict").write_text(control)
-    (case / "system/decomposeParDict").write_text("numberOfSubdomains 2;\n")
-    (case / "s3-smoke-input.json").write_text(json.dumps({
-        "classification": run_freemhd_parity_suite._S3_SMOKE_CLASS, "archive_sha256": run_freemhd_parity_suite._S3_PIPE_ARCHIVE["sha256"], "runtime_hartmann_number": run_freemhd_parity_suite._S3_RUNTIME_HA,
-        "mesh_cells": {"liquid": 2560, "solidWalls": 512, "total": 3072},
-        **run_freemhd_parity_suite._S3_DENIALS, **run_freemhd_parity_suite._S3_LOCAL_AUTHORITY,
-    }))
-    source.mkdir()
-    (source / "source-pin.json").write_text(json.dumps({"commit": run_freemhd_parity_suite._S3_SOURCE_COMMIT}))
-    output.mkdir()
-    (output / "controlDict.used").write_text(control)
-    setup = "Number of regions:2\n0  2560\n1  512\n" + "\n".join(
-        f"Number of cells = {value}" for value in (1280, 1280, 256, 256))
-    (output / "setup.log").write_text(setup)
-    solves = ["potE", "potE", "p_rgh", "p_rgh", "p_rgh"] * 2
-    run = "Region: liquid Courant Number mean: 1e-10 max: 2e-10\n"
-    for step in (1, 2):
-        run += f"Time = {step}e-06\nRegion: liquid Courant Number mean: 1e-10 max: 2e-10\n"
-        for field in solves[(step - 1) * 5:step * 5]:
-            run += f"Solving for {field}, Initial residual = 1, Final residual = 1e-8, No Iterations 2\n"
-    (output / "run.log").write_text(run + "End\n")
-    (output / "run.json").write_text(json.dumps({
-        "schema_version": 1, "classification": "native-s3-reduced-pipe-harness-smoke",
-        "input_sha256": artifact_sha256(case, "tree"),
-        "source_sha256": artifact_sha256(source, "tree"),
-        "source_commit": run_freemhd_parity_suite._S3_SOURCE_COMMIT,
-        "wall_seconds": 1.0, "nproc": 2, "image_id": f"sha256:{'a' * 64}",
-        "float_precision": "float64",
-    }))
-    return case, source, output
-
-
-def test_s3_pipe_observer_passes_execution_only_and_fails_closed(tmp_path: Path):
-    case, source, output = _write_s3_smoke_fixture(tmp_path)
-    report = run_freemhd_parity_suite.observe_freemhd_s3_pipe_smoke(output, case, source)
-    assert report["execution_pass"] and report["cells"]["total"] == 3072 and report["image_id"].startswith("sha256:")
-    assert not any(report[name] for name in run_freemhd_parity_suite._S3_DENIALS)
-    (output / "run.log").write_text((output / "run.log").read_text().replace("1e-8", "nan", 1))
-    with pytest.raises(ValueError, match="fatal or nonfinite"):
-        run_freemhd_parity_suite.observe_freemhd_s3_pipe_smoke(output, case, source)
-
-
-@pytest.mark.parametrize("kind", ["b2", "s3"])
 @pytest.mark.parametrize("result", ["success", "timeout", "failure"])
 def test_freemhd_docker_runners_enforce_pins_deadline_and_cleanup(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str, result: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, result: str
 ):
-    source, evaluator, output = tmp_path / "input", tmp_path / "evaluator", tmp_path / "output"
+    source, evaluator, output = (
+        tmp_path / "input",
+        tmp_path / "evaluator",
+        tmp_path / "output",
+    )
     source.mkdir()
     (source / "input.txt").write_text("immutable\n")
     evaluator.write_text("evaluator\n")
-    snapshot = tmp_path / "source"
-    snapshot.mkdir()
-    (snapshot / "source-pin.json").write_text(json.dumps({
-        "commit": run_freemhd_parity_suite._S3_SOURCE_COMMIT
-    }))
     calls = []
 
     def run(command, **kwargs):
@@ -1207,19 +1399,20 @@ def test_freemhd_docker_runners_enforce_pins_deadline_and_cleanup(
 
     monkeypatch.setattr(run_freemhd_parity_suite.subprocess, "run", run)
     monkeypatch.setattr(
-        run_freemhd_parity_suite, "observe_freemhd_b2_output", lambda *args: {"observed": args}
-    )
-    monkeypatch.setattr(
-        run_freemhd_parity_suite, "observe_freemhd_s3_pipe_smoke", lambda *_: {"execution_pass": True}
+        run_freemhd_parity_suite,
+        "observe_freemhd_b2_output",
+        lambda *args: {"observed": args},
     )
 
     def invoke():
-        if kind == "s3":
-            return run_freemhd_parity_suite.run_freemhd_s3_pipe_smoke(
-                source, snapshot, output, image="freemhd:test", timeout_seconds=7.0
-            )
         return run_freemhd_parity_suite.run_matched_b2_freemhd_smoke(
-            source, evaluator, output, image="freemhd:test", nproc=2, timeout_seconds=7.0)
+            source,
+            evaluator,
+            output,
+            image="freemhd:test",
+            nproc=2,
+            timeout_seconds=7.0,
+        )
 
     if result == "timeout":
         with pytest.raises(TimeoutError, match="exceeded 7 seconds"):
@@ -1229,16 +1422,13 @@ def test_freemhd_docker_runners_enforce_pins_deadline_and_cleanup(
             invoke()
     else:
         observed = invoke()
-        assert ("observed" in observed) if kind == "b2" else observed["execution_pass"]
+        assert "observed" in observed
         metadata = json.loads((output / "run.json").read_text())
-        assert metadata["image"] == "freemhd:test" if kind == "b2" else metadata["image_id"].startswith("sha256:")
+        assert metadata["image"] == "freemhd:test"
     docker = next(call for call in calls if call[0][1] == "run")
     assert docker[1]["timeout"] == 7.0
     rendered = " ".join(docker[0])
     assert {"--rm", "--name", "--cidfile"} <= set(rendered.split()) and "readonly" in rendered
-    if kind == "s3":
-        assert f"{run_freemhd_parity_suite.os.getuid()}:{run_freemhd_parity_suite.os.getgid()}" in rendered
-        assert "HOME=/tmp" in rendered and f"sha256:{'b' * 64}" in rendered and "mpirun -np 2" in rendered and "--network none" in rendered and "--cap-drop ALL" in rendered
     assert calls[-1][0][1:3] == ["rm", "-f"]
     assert (source / "input.txt").read_text() == "immutable\n"
 
@@ -1265,9 +1455,14 @@ def test_matched_b2_bundle_runs_lmx_before_freemhd_and_builds_schema3(
         root.mkdir()
         (root / "evidence").write_text("lmx")
         return {
-            "steps": 2, "stop_reason": "step_limit", "dt": [1 / 540000] * 2,
-            "courant_max": [0.0, 0.0], "mass_balance": 0.0, "current_balance": 0.0,
-            "interface_current_balance": 0.0, "interface_current_activity": 1.0,
+            "steps": 2,
+            "stop_reason": "step_limit",
+            "dt": [1 / 540000] * 2,
+            "courant_max": [0.0, 0.0],
+            "mass_balance": 0.0,
+            "current_balance": 0.0,
+            "interface_current_balance": 0.0,
+            "interface_current_activity": 1.0,
             "restart_max_abs": 0.0,
         }
 
@@ -1282,7 +1477,11 @@ def test_matched_b2_bundle_runs_lmx_before_freemhd_and_builds_schema3(
     monkeypatch.setattr(run_freemhd_parity_suite, "run_matched_b2_lmx_smoke", lmx)
     monkeypatch.setattr(run_freemhd_parity_suite, "run_matched_b2_freemhd_smoke", freemhd)
     monkeypatch.setattr(run_freemhd_parity_suite, "observe_lmx_b2_contract", lambda *_: {"code": "lmx"})
-    monkeypatch.setattr(run_freemhd_parity_suite, "observe_freemhd_b2_contract", lambda *_: {"code": "freemhd"})
+    monkeypatch.setattr(
+        run_freemhd_parity_suite,
+        "observe_freemhd_b2_contract",
+        lambda *_: {"code": "freemhd"},
+    )
 
     def validate(record, **_):
         captured["record"] = record
@@ -1290,26 +1489,36 @@ def test_matched_b2_bundle_runs_lmx_before_freemhd_and_builds_schema3(
 
     monkeypatch.setattr(run_freemhd_parity_suite, "validate_matched_b_record", validate)
     report = run_freemhd_parity_suite.run_matched_b2_smoke_bundle(
-        tmp_path / "template", tmp_path / "source", tmp_path / "bundle", total_timeout_seconds=10.0
+        tmp_path / "template",
+        tmp_path / "source",
+        tmp_path / "bundle",
+        total_timeout_seconds=10.0,
     )
 
     assert order == ["lmx", "freemhd"] and report["execution_pass"]
     assert captured["record"]["comparison"] == {"source": "independent-output-observers"}
-    assert all(item["kind"] == "tree" for name, item in captured["record"]["provenance"]["artifacts"].items() if name.endswith("output"))
+    assert all(
+        item["kind"] == "tree"
+        for name, item in captured["record"]["provenance"]["artifacts"].items()
+        if name.endswith("output")
+    )
 
 
 def test_parity_command_portably_skips_missing_references(tmp_path: Path):
     output = tmp_path / "parity"
-    assert run_freemhd_parity_suite.main(
-        [
-            "--output",
-            str(output),
-            "--freemhd-install-dir",
-            str(tmp_path / "missing-freemhd"),
-            "--processed-root",
-            str(tmp_path / "missing-processed"),
-        ]
-    ) == 0
+    assert (
+        run_freemhd_parity_suite.main(
+            [
+                "--output",
+                str(output),
+                "--freemhd-install-dir",
+                str(tmp_path / "missing-freemhd"),
+                "--processed-root",
+                str(tmp_path / "missing-processed"),
+            ]
+        )
+        == 0
+    )
     assert json.loads((output / "summary.json").read_text())["status"] == "skipped"
     assert (output / "summary.md").is_file()
 
@@ -1432,7 +1641,9 @@ def test_benchmark_a_spec_loader_rejects_unsupported_case():
         ),
     ],
 )
-def test_benchmark_a_spec_loader_rejects_inconsistent_inputs(tmp_path: Path, case_kind: str, old: str, new: str, message: str):
+def test_benchmark_a_spec_loader_rejects_inconsistent_inputs(
+    tmp_path: Path, case_kind: str, old: str, new: str, message: str
+):
     source = Path("lmx/data/benchmarks/specs") / f"{case_kind}-ha20.toml"
     (tmp_path / source.name).write_text(source.read_text().replace(old, new, 1))
     with pytest.raises(ValueError, match=message):
@@ -1457,10 +1668,14 @@ def test_samper_table_i_reference_is_complete_and_exact(tmp_path: Path):
     invalid.write_text(source.read_text().replace("schema_version = 1", "schema_version = 0"))
     with pytest.raises(ValueError, match="Invalid Samper Table I"):
         load_samper_table_i(invalid)
-    invalid.write_text(source.read_text().replace("hartmann_wall_conductance = 0.01", "hartmann_wall_conductance = 0.02", 1))
+    invalid.write_text(
+        source.read_text().replace("hartmann_wall_conductance = 0.01", "hartmann_wall_conductance = 0.02", 1)
+    )
     with pytest.raises(ValueError, match="Incorrect hunt wall conductance"):
         load_samper_table_i(invalid)
-    invalid.write_text(source.read_text().replace("analytical_flow_rate = 7.680e-3", "analytical_flow_rate = -1.0", 1))
+    invalid.write_text(
+        source.read_text().replace("analytical_flow_rate = 7.680e-3", "analytical_flow_rate = -1.0", 1)
+    )
     with pytest.raises(ValueError, match="Non-positive shercliff flow-rate"):
         load_samper_table_i(invalid)
 

@@ -1,14 +1,15 @@
-from dataclasses import fields, replace
 import json
+from dataclasses import fields, replace
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
-import numpy as np
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
+import numpy as np
+import pytest
 
-from lmx.core import Diagnostics, MHDState, Solution, zeros_state
 from lmx.cases import make_hartmann_case
+from lmx.core import Diagnostics, MHDState, Solution, zeros_state
 from lmx.io import (
     load_extruded_restart_bundle,
     load_restart_bundle,
@@ -24,8 +25,14 @@ from lmx.io import (
     write_vtu,
 )
 from lmx.mesh import generate_pipe_ogrid_mesh
+from lmx.plotting import (
+    _prepare_plot_output,
+    _save_figure_pair,
+    write_case_overview_plots,
+    write_extruded_overview_plots,
+    write_freemhd_observable_parity_plots,
+)
 from lmx.solvers import _build_mesh
-
 
 pytestmark = pytest.mark.unit
 
@@ -73,9 +80,7 @@ def _sample_solution(case) -> Solution:
         gauge_residual_history=jnp.asarray([1.0e-8, 5.0e-9, 2.5e-9]),
         interface_current_residual_history=jnp.asarray([1.0e-6, 8.0e-7, 6.0e-7]),
     )
-    return Solution(
-        mesh=mesh, state=state, diagnostics=diagnostics, case_name=case.name
-    )
+    return Solution(mesh=mesh, state=state, diagnostics=diagnostics, case_name=case.name)
 
 
 def _extruded_rect_case(*, nx=3, write_plots=False, write_stride=1):
@@ -83,13 +88,9 @@ def _extruded_rect_case(*, nx=3, write_plots=False, write_stride=1):
     return replace(
         case,
         name="fringing_rect_demo",
-        geometry=replace(
-            case.geometry, kind="rect_duct", length=6.0, nx=nx, ny=2, nz=2
-        ),
+        geometry=replace(case.geometry, kind="rect_duct", length=6.0, nx=nx, ny=2, nz=2),
         solver=replace(case.solver, kind="extruded_inductionless"),
-        output=replace(
-            case.output, write_plots=write_plots, write_stride=write_stride
-        ),
+        output=replace(case.output, write_plots=write_plots, write_stride=write_stride),
     )
 
 
@@ -122,9 +123,7 @@ def _extruded_bundle(**updates) -> SimpleNamespace:
         "transverse_pressure_difference": jnp.asarray([0.0, 0.25, 0.0]),
         "charge_balance_residual": jnp.asarray([1.0e-7, 2.0e-7, 1.0e-7]),
         "boundary_current_residual": jnp.asarray([3.0e-8, 3.0e-8, 3.0e-8]),
-        "iteration_electric_linear_history": jnp.asarray(
-            [[1.0e-8, 1.0e-9, 2.0e-8, 12.0, 1.0, 1.0]]
-        ),
+        "iteration_electric_linear_history": jnp.asarray([[1.0e-8, 1.0e-9, 2.0e-8, 12.0, 1.0, 1.0]]),
         "iteration_potential_residual_history": jnp.asarray([3.0e-5]),
         "geometry_kind": "rect_duct",
         "solver_kind": "extruded_inductionless",
@@ -238,16 +237,12 @@ def test_validate_restart_bundle_rejects_geometry_shape_faces_and_case_mismatch(
     mesh = _build_mesh(case)
 
     with pytest.raises(ValueError, match="geometry_kind"):
-        validate_restart_bundle(
-            bundle, mesh=mesh, geometry_kind="pipe", case_name=case.name
-        )
+        validate_restart_bundle(bundle, mesh=mesh, geometry_kind="pipe", case_name=case.name)
 
     wrong_shape_bundle = bundle.__class__(
         **{
             **bundle.__dict__,
-            "state": bundle.state.__class__(
-                **{**bundle.state.__dict__, "u": jnp.zeros((1, 1))}
-            ),
+            "state": bundle.state.__class__(**{**bundle.state.__dict__, "u": jnp.zeros((1, 1))}),
         }
     )
     with pytest.raises(ValueError, match="field shape"):
@@ -258,9 +253,7 @@ def test_validate_restart_bundle_rejects_geometry_shape_faces_and_case_mismatch(
             case_name=case.name,
         )
 
-    wrong_y_faces = bundle.__class__(
-        **{**bundle.__dict__, "y_faces": np.array([0.0, 1.0])}
-    )
+    wrong_y_faces = bundle.__class__(**{**bundle.__dict__, "y_faces": np.array([0.0, 1.0])})
     with pytest.raises(ValueError, match="y_faces"):
         validate_restart_bundle(
             wrong_y_faces,
@@ -269,9 +262,7 @@ def test_validate_restart_bundle_rejects_geometry_shape_faces_and_case_mismatch(
             case_name=case.name,
         )
 
-    wrong_z_faces = bundle.__class__(
-        **{**bundle.__dict__, "z_faces": np.array([0.0, 1.0])}
-    )
+    wrong_z_faces = bundle.__class__(**{**bundle.__dict__, "z_faces": np.array([0.0, 1.0])})
     with pytest.raises(ValueError, match="z_faces"):
         validate_restart_bundle(
             wrong_z_faces,
@@ -284,14 +275,10 @@ def test_validate_restart_bundle_rejects_geometry_shape_faces_and_case_mismatch(
         **{**bundle.__dict__, "metadata": {**bundle.metadata, "case": "other_case"}}
     )
     with pytest.raises(ValueError, match="Restart case"):
-        validate_restart_bundle(
-            wrong_case, mesh=mesh, geometry_kind=case.geometry.kind, case_name=case.name
-        )
+        validate_restart_bundle(wrong_case, mesh=mesh, geometry_kind=case.geometry.kind, case_name=case.name)
 
 
-def test_write_solution_outputs_respects_output_flags(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
+def test_write_solution_outputs_respects_output_flags(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     case = case.__class__(
         **{
@@ -311,18 +298,14 @@ def test_write_solution_outputs_respects_output_flags(
 
     monkeypatch.setattr(
         "lmx.io.write_paraview",
-        lambda *args, **kwargs: (_ for _ in ()).throw(
-            AssertionError("unexpected paraview")
-        ),
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("unexpected paraview")),
     )
     monkeypatch.setattr(
         "lmx.io.write_solution_npz",
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("unexpected npz")),
     )
 
-    outputs = write_solution_outputs(
-        solution, case, tmp_path, write_npz=True, write_plots=True
-    )
+    outputs = write_solution_outputs(solution, case, tmp_path, write_npz=True, write_plots=True)
 
     assert outputs == {"paraview": [], "csv": [], "npz": [], "plots": []}
 
@@ -372,12 +355,8 @@ def test_write_extruded_solution_npz_and_outputs(tmp_path: Path):
         ),
     )
 
-    npz_path = write_extruded_solution_npz(
-        solution, case, tmp_path / "fringing_results.npz"
-    )
-    outputs = write_extruded_solution_outputs(
-        solution, case, tmp_path, write_plots=True
-    )
+    npz_path = write_extruded_solution_npz(solution, case, tmp_path / "fringing_results.npz")
+    outputs = write_extruded_solution_outputs(solution, case, tmp_path, write_plots=True)
 
     assert npz_path.exists()
     assert outputs["csv"][0].exists()
@@ -404,30 +383,32 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
         stopping_state=(1, 1, "in_progress"),
         iteration_residual_history=jnp.asarray([1.0e-3]),
         iteration_momentum_defect_history=jnp.asarray([4.0e-5]),
-        iteration_component_residual_history=jnp.asarray(
-            [[1.0e-3, 2.0e-4, 3.0e-5, 1.0e-6, 2.0e-6, 3.0e-6]]),
+        iteration_component_residual_history=jnp.asarray([[1.0e-3, 2.0e-4, 3.0e-5, 1.0e-6, 2.0e-6, 3.0e-6]]),
         iteration_pressure_residual_history=jnp.asarray([2.0e-4]),
-        iteration_pressure_linear_history=jnp.asarray(
-            [[1.0e-9, 2.0e-10, 18.0, 1.0, 1.0]]
-        ),
+        iteration_pressure_linear_history=jnp.asarray([[1.0e-9, 2.0e-10, 18.0, 1.0, 1.0]]),
         iteration_courant_history=jnp.asarray([[1.0e-3, 0.02, 0.04]]),
     )
     solution = SimpleNamespace(bundle=bundle, station_history=({"x": 0.0},))
 
-    restart_path = write_extruded_restart_npz(
-        solution, case, tmp_path / "restart" / "fringing_restart.npz"
-    )
+    restart_path = write_extruded_restart_npz(solution, case, tmp_path / "restart" / "fringing_restart.npz")
     restart_bundle = load_extruded_restart_bundle(restart_path)
     validate_extruded_restart_bundle(restart_bundle, case=case)
 
     layout = prepare_extruded_output_layout(tmp_path / "run")
     assert restart_path.exists()
     assert restart_bundle.bundle.u.shape == (3, 2, 2)
-    assert restart_bundle.metadata["restart_schema"] == "b2_diagnostics_v5"
-    for name in ("rho_phi_plus", "rho_phi_inlet", "axial_pressure_loss_gradient",
-                 "transverse_pressure_difference", "iteration_pressure_linear_history",
-                 "iteration_electric_linear_history", "iteration_potential_residual_history",
-                 "iteration_courant_history", "iteration_momentum_defect_history"):
+    assert restart_bundle.metadata["restart_schema"] == "extruded_aitken_v1"
+    for name in (
+        "rho_phi_plus",
+        "rho_phi_inlet",
+        "axial_pressure_loss_gradient",
+        "transverse_pressure_difference",
+        "iteration_pressure_linear_history",
+        "iteration_electric_linear_history",
+        "iteration_potential_residual_history",
+        "iteration_courant_history",
+        "iteration_momentum_defect_history",
+    ):
         assert getattr(restart_bundle.bundle, name) == pytest.approx(getattr(bundle, name))
     assert restart_bundle.bundle.stopping_state == (1, 1, "in_progress")
     assert all(path.exists() for path in vars(layout).values())
@@ -438,35 +419,38 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
         jnp.full((3, 3, 1, 2), 4.0),
         jnp.full((1, 2), 5.0),
     )
-    anderson_bundle = SimpleNamespace(**(
-        bundle.__dict__ | {"aitken_state": None, "anderson_state": anderson_values}
-    ))
+    anderson_bundle = SimpleNamespace(
+        **(bundle.__dict__ | {"aitken_state": None, "anderson_state": anderson_values})
+    )
     anderson_path = write_extruded_restart_npz(
         SimpleNamespace(bundle=anderson_bundle, station_history=()),
         case,
         tmp_path / "restart" / "anderson.npz",
     )
     anderson = load_extruded_restart_bundle(anderson_path)
-    assert anderson.metadata["restart_schema"] == "b2_diagnostics_v6"
-    assert all(actual == pytest.approx(expected) for actual, expected in
-               zip(anderson.bundle.anderson_state, anderson_values, strict=True))
+    assert anderson.metadata["restart_schema"] == "extruded_anderson_v1"
+    assert all(
+        actual == pytest.approx(expected)
+        for actual, expected in zip(anderson.bundle.anderson_state, anderson_values, strict=True)
+    )
     with np.load(anderson_path, allow_pickle=False) as data:
         anderson_payload = {key: data[key] for key in data.files}
     for missing in (
-        "anderson_mapped_state", "anderson_residual",
-        "anderson_mapped_flux", "anderson_mapped_inlet",
+        "anderson_mapped_state",
+        "anderson_residual",
+        "anderson_mapped_flux",
+        "anderson_mapped_inlet",
     ):
         partial_path = tmp_path / "restart" / f"missing_{missing}.npz"
-        np.savez_compressed(partial_path, **{
-            key: value for key, value in anderson_payload.items() if key != missing
-        })
+        np.savez_compressed(
+            partial_path,
+            **{key: value for key, value in anderson_payload.items() if key != missing},
+        )
         with pytest.raises(ValueError, match="all-or-none"):
             load_extruded_restart_bundle(partial_path)
-    malformed_anderson = SimpleNamespace(**(
-        anderson_bundle.__dict__ | {"anderson_state": (
-            anderson_values[0][:, :-1], *anderson_values[1:]
-        )}
-    ))
+    malformed_anderson = SimpleNamespace(
+        **(anderson_bundle.__dict__ | {"anderson_state": (anderson_values[0][:, :-1], *anderson_values[1:])})
+    )
     with pytest.raises(ValueError, match="inconsistent shape"):
         write_extruded_restart_npz(
             SimpleNamespace(bundle=malformed_anderson, station_history=()),
@@ -484,98 +468,63 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
     bundle.iteration_momentum_defect_history = jnp.asarray([4.0e-5])
 
     with np.load(restart_path, allow_pickle=False) as data:
-        v5_payload = {key: data[key] for key in data.files}
-        v5_metadata = json.loads(str(data["metadata_json"]))
-        bad_stopping_payload = dict(v5_payload)
+        current_payload = {key: data[key] for key in data.files}
+        current_metadata = json.loads(str(data["metadata_json"]))
+        bad_stopping_payload = dict(current_payload)
         bad_stopping_payload["metadata_json"] = json.dumps(
-            {**v5_metadata, "stopping_state": [0, 1, "corrupt"]}
+            {**current_metadata, "stopping_state": [0, 1, "corrupt"]}
         )
-        bad_momentum_rank_payload = dict(v5_payload)
-        bad_momentum_rank_payload["iteration_momentum_defect_history"] = np.asarray(
-            [[4.0e-5]]
+        bad_momentum_rank_payload = dict(current_payload)
+        bad_momentum_rank_payload["iteration_momentum_defect_history"] = np.asarray([[4.0e-5]])
+        missing_diagnostics = [
+            (message, {key: data[key] for key in data.files if key != field})
+            for field, message in (
+                ("steady_streak", "missing accelerator state"),
+                ("iteration_courant_history", "missing CFL history"),
+                (
+                    "iteration_pressure_linear_history",
+                    "missing pressure linear history",
+                ),
+                (
+                    "iteration_momentum_defect_history",
+                    "missing momentum defect history",
+                ),
+            )
+        ]
+        short_payload = dict(current_payload)
+        short_payload["iteration_momentum_defect_history"] = np.zeros(0)
+        unsupported_payload = dict(current_payload)
+        unsupported_payload["metadata_json"] = json.dumps(
+            {**current_metadata, "restart_schema": "unsupported"}
         )
-        missing_v4 = [(message, {key: data[key] for key in data.files if key != field})
-                      for field, message in (
-                          ("steady_streak", "missing accelerator state"),
-                          ("iteration_courant_history", "missing CFL history"),
-                          ("iteration_pressure_linear_history", "missing pressure linear history"),
-                          ("iteration_momentum_defect_history", "missing momentum defect history"),
-                      )]
-        v4_short = {key: data[key] for key in data.files}
-        v4_short["iteration_momentum_defect_history"] = np.zeros(0)
-        v4_metadata = json.loads(str(data["metadata_json"]))
-        v4_metadata["restart_schema"] = "b2_diagnostics_v4"
-        v4_payload = {key: data[key] for key in data.files}
-        v4_payload["metadata_json"] = json.dumps(v4_metadata)
-        v3_metadata = {**v4_metadata, "restart_schema": "b2_diagnostics_v3"}
-        v3_payload = {key: data[key] for key in data.files
-                      if key != "iteration_momentum_defect_history"}
-        v3_payload["metadata_json"] = json.dumps(v3_metadata)
-        v2_metadata = {**v3_metadata, "restart_schema": "b2_diagnostics_v2"}
-        v2_payload = {key: value for key, value in v3_payload.items()
-                      if key != "iteration_pressure_linear_history"}
-        v2_payload["metadata_json"] = json.dumps(v2_metadata)
-        v1_metadata = {**v2_metadata, "restart_schema": "b2_aitken_v1"}
-        v1_payload = {key: value for key, value in v2_payload.items()
-                      if key != "iteration_courant_history"}
-        v1_payload["metadata_json"] = json.dumps(v1_metadata)
-        legacy_payload = {key: data[key] for key in data.files if key not in {
-            "metadata_json", "rho_phi_plus", "rho_phi_inlet", "iteration_courant_history"}}
     bad_stopping_path = tmp_path / "restart" / "bad_stopping.npz"
     np.savez_compressed(bad_stopping_path, **bad_stopping_payload)
     with pytest.raises(ValueError, match="stopping state has inconsistent step count"):
         load_extruded_restart_bundle(bad_stopping_path)
     bad_rank_path = tmp_path / "restart" / "bad_momentum_rank.npz"
     np.savez_compressed(bad_rank_path, **bad_momentum_rank_payload)
-    with pytest.raises(
-        ValueError, match="diagnostic restart histories have inconsistent lengths"
-    ):
+    with pytest.raises(ValueError, match="diagnostic restart histories have inconsistent lengths"):
         load_extruded_restart_bundle(bad_rank_path)
-    for index, (message, payload) in enumerate(missing_v4):
-        missing_path = tmp_path / "restart" / f"diagnostics_v4_missing_{index}.npz"
+    for index, (message, payload) in enumerate(missing_diagnostics):
+        missing_path = tmp_path / "restart" / f"diagnostics_missing_{index}.npz"
         np.savez_compressed(missing_path, **payload)
         with pytest.raises(ValueError, match=message):
             load_extruded_restart_bundle(missing_path)
-    short_path = tmp_path / "restart" / "diagnostics_v4_short.npz"
-    np.savez_compressed(short_path, **v4_short)
+    short_path = tmp_path / "restart" / "diagnostics_short.npz"
+    np.savez_compressed(short_path, **short_payload)
     with pytest.raises(ValueError, match="inconsistent lengths"):
         load_extruded_restart_bundle(short_path)
-
-    v4_path = tmp_path / "restart" / "diagnostics_v4.npz"
-    np.savez_compressed(v4_path, **v4_payload)
-    v4 = load_extruded_restart_bundle(v4_path)
-    assert v4.metadata["restart_schema"] == "b2_diagnostics_v4"
-    assert not v4.bundle.iteration_momentum_defect_history.size
-
-    v3_path = tmp_path / "restart" / "diagnostics_v3.npz"
-    np.savez_compressed(v3_path, **v3_payload)
-    v3 = load_extruded_restart_bundle(v3_path)
-    assert v3.metadata["restart_schema"] == "b2_diagnostics_v3"
-    assert not v3.bundle.iteration_momentum_defect_history.size
-
-    v2_path = tmp_path / "restart" / "diagnostics_v2.npz"
-    np.savez_compressed(v2_path, **v2_payload)
-    v2 = load_extruded_restart_bundle(v2_path)
-    assert v2.metadata["restart_schema"] == "b2_diagnostics_v2"
-    assert not v2.bundle.iteration_pressure_linear_history.size
-
-    v1_path = tmp_path / "restart" / "aitken_v1.npz"
-    np.savez_compressed(v1_path, **v1_payload)
-    v1 = load_extruded_restart_bundle(v1_path)
-    assert v1.metadata["restart_schema"] == "b2_aitken_v1"
-    assert not v1.bundle.iteration_pressure_linear_history.size
-
-    legacy_path = tmp_path / "restart" / "legacy.npz"
-    np.savez_compressed(legacy_path, **legacy_payload)
-    legacy = load_extruded_restart_bundle(legacy_path)
-    assert legacy.bundle.rho_phi_plus is legacy.bundle.rho_phi_inlet is None
-    assert legacy.metadata["restart_schema"] == "legacy_nonexact"
-    assert not legacy.bundle.iteration_courant_history.size
+    unsupported_path = tmp_path / "restart" / "unsupported.npz"
+    np.savez_compressed(unsupported_path, **unsupported_payload)
+    with pytest.raises(ValueError, match="Unsupported extruded restart schema"):
+        load_extruded_restart_bundle(unsupported_path)
 
     partial = SimpleNamespace(**{**bundle.__dict__, "rho_phi_inlet": None})
     with pytest.raises(ValueError, match="requires both"):
         write_extruded_restart_npz(
-            SimpleNamespace(bundle=partial, station_history=()), case, tmp_path / "bad.npz"
+            SimpleNamespace(bundle=partial, station_history=()),
+            case,
+            tmp_path / "bad.npz",
         )
 
 
@@ -596,9 +545,7 @@ def test_validate_extruded_restart_bundle_rejects_mismatch():
                     "ntheta": 8,
                 }
             ),
-            "solver": case.solver.__class__(
-                **{**case.solver.__dict__, "kind": "extruded_inductionless"}
-            ),
+            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
         }
     )
     bad_bundle = SimpleNamespace(
@@ -624,24 +571,18 @@ def test_validate_extruded_restart_bundle_rejects_solver_case_and_resolution_mis
     with pytest.raises(ValueError, match="solver_kind"):
         validate_extruded_restart_bundle(bundle, case=case)
 
-    good_solver = SimpleNamespace(
-        **{**bundle.__dict__, "solver_kind": "extruded_inductionless"}
-    )
+    good_solver = SimpleNamespace(**{**bundle.__dict__, "solver_kind": "extruded_inductionless"})
     with pytest.raises(ValueError, match="Extruded restart case"):
         validate_extruded_restart_bundle(good_solver, case=case)
 
-    good_case = SimpleNamespace(
-        **{**good_solver.__dict__, "metadata": {"case": case.name}}
-    )
+    good_case = SimpleNamespace(**{**good_solver.__dict__, "metadata": {"case": case.name}})
     with pytest.raises(ValueError, match="station count"):
         validate_extruded_restart_bundle(good_case, case=case)
 
     good_x = SimpleNamespace(
         **{
             **good_case.__dict__,
-            "bundle": SimpleNamespace(
-                x=jnp.zeros((3,)), y=jnp.zeros((3,)), z=jnp.zeros((2,))
-            ),
+            "bundle": SimpleNamespace(x=jnp.zeros((3,)), y=jnp.zeros((3,)), z=jnp.zeros((2,))),
         }
     )
     with pytest.raises(ValueError, match="y resolution"):
@@ -650,9 +591,7 @@ def test_validate_extruded_restart_bundle_rejects_solver_case_and_resolution_mis
     good_y = SimpleNamespace(
         **{
             **good_x.__dict__,
-            "bundle": SimpleNamespace(
-                x=jnp.zeros((3,)), y=jnp.zeros((2,)), z=jnp.zeros((3,))
-            ),
+            "bundle": SimpleNamespace(x=jnp.zeros((3,)), y=jnp.zeros((2,)), z=jnp.zeros((3,))),
         }
     )
     with pytest.raises(ValueError, match="z/theta resolution"):
@@ -674,9 +613,7 @@ def test_validate_extruded_restart_bundle_rejects_solver_case_and_resolution_mis
         (jnp.zeros((3, 3, 1, 2)), None, "requires both"),
     )
     for plus, inlet, message in malformed:
-        candidate = SimpleNamespace(
-            **{**compact.__dict__, "rho_phi_plus": plus, "rho_phi_inlet": inlet}
-        )
+        candidate = SimpleNamespace(**{**compact.__dict__, "rho_phi_plus": plus, "rho_phi_inlet": inlet})
         with pytest.raises(ValueError, match=message):
             validate_extruded_restart_bundle(
                 SimpleNamespace(**{**valid.__dict__, "bundle": candidate}), case=case
@@ -734,22 +671,220 @@ def test_write_extruded_solution_outputs_archives_last_station_with_stride(
             "volumetric_flow_rate": float(bundle.volumetric_flow_rate[i]),
             "axial_current": float(bundle.axial_current[i]),
             "wall_current_leakage": float(bundle.wall_current_leakage[i]),
-            "current_scaled_pressure_proxy": float(
-                bundle.current_scaled_pressure_proxy[i]
-            ),
+            "current_scaled_pressure_proxy": float(bundle.current_scaled_pressure_proxy[i]),
             "residual": float(bundle.residual[i]),
             "charge_balance_residual": float(bundle.charge_balance_residual[i]),
             "boundary_current_residual": float(bundle.boundary_current_residual[i]),
         }
         for i in range(4)
     )
-    solution = SimpleNamespace(
-        bundle=bundle, validation=validation, station_history=station_history
-    )
+    solution = SimpleNamespace(bundle=bundle, validation=validation, station_history=station_history)
 
-    outputs = write_extruded_solution_outputs(
-        solution, case, tmp_path, write_plots=False
-    )
+    outputs = write_extruded_solution_outputs(solution, case, tmp_path, write_plots=False)
 
     archived = [path.name for path in outputs["archive"] if path.suffix == ".npz"]
     assert archived == ["station_0000.npz", "station_0002.npz", "station_0003.npz"]
+
+
+def _plot_solution(case) -> Solution:
+    mesh = _build_mesh(case)
+    y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
+    u = 1.0 - 0.2 * y**2 - 0.3 * z**2
+    phi = y - z
+    zeros = jnp.zeros_like(u)
+    diagnostics = Diagnostics(
+        residual_history=jnp.asarray([1.0e-2, 1.0e-4]),
+        courant_like=jnp.asarray([0.1, 0.05]),
+        ohmic_power=jnp.asarray([0.2, 0.1]),
+        time_history=jnp.asarray([0.0, 0.1]),
+        u_max_history=jnp.asarray([0.8, 0.9]),
+        mean_velocity_history=jnp.asarray([0.5, 0.55]),
+        applied_forcing_history=jnp.asarray([1.0, 1.0]),
+        pressure_proxy_history=jnp.asarray([0.2, 0.18]),
+        current_scaled_pressure_proxy_history=jnp.asarray([0.15, 0.13]),
+        raw_update_max_history=jnp.asarray([0.05, 0.02]),
+        limiter_scale_history=jnp.asarray([1.0, 1.0]),
+        limited_fraction_history=jnp.asarray([0.0, 0.0]),
+        current_max_history=jnp.asarray([0.4, 0.35]),
+        face_current_max_history=jnp.asarray([0.38, 0.33]),
+        emf_max_history=jnp.asarray([0.25, 0.2]),
+        lorentz_max_history=jnp.asarray([0.18, 0.16]),
+        face_lorentz_max_history=jnp.asarray([0.16, 0.14]),
+        potential_residual_history=jnp.asarray([1.0e-3, 1.0e-4]),
+        potential_iterations_history=jnp.asarray([8.0, 6.0]),
+        linear_residual_history=jnp.asarray([1.0e-2, 1.0e-5]),
+        linear_iterations_history=jnp.asarray([12.0, 8.0]),
+        volumetric_flow_rate_history=jnp.asarray([0.9, 1.0]),
+        mean_current_magnitude_history=jnp.asarray([0.2, 0.18]),
+        lorentz_power_history=jnp.asarray([0.1, 0.09]),
+        div_current_max_history=jnp.asarray([1.0e-6, 5.0e-7]),
+        charge_balance_residual_history=jnp.asarray([1.0e-7, 8.0e-8]),
+        gauge_residual_history=jnp.asarray([1.0e-8, 5.0e-9]),
+        interface_current_residual_history=jnp.asarray([1.0e-6, 8.0e-7]),
+    )
+    return Solution(
+        mesh=mesh,
+        state=MHDState(
+            u=u,
+            phi=phi,
+            jy=zeros,
+            jz=zeros,
+            lorentz_x=zeros,
+            time=0.1,
+            residual=1.0e-5,
+        ),
+        diagnostics=diagnostics,
+        case_name=case.name,
+    )
+
+
+def _assert_figure_pair(outputs: list[Path], out_dir: Path, stem: str) -> None:
+    expected = [out_dir / f"{stem}.png", out_dir / f"{stem}.pdf"]
+    assert outputs == expected
+    assert all(path.exists() for path in expected)
+
+
+@pytest.fixture(autouse=True)
+def _stub_repeated_figure_pair_encoding(monkeypatch: pytest.MonkeyPatch) -> None:
+    def save(
+        fig,
+        out_dir: Path,
+        stem: str,
+        *,
+        dpi: int | None = None,
+        tight: bool = True,
+    ) -> list[Path]:
+        paths = [out_dir / f"{stem}.png", out_dir / f"{stem}.pdf"]
+        for path in paths:
+            path.write_bytes(b"plot")
+        plt.close(fig)
+        return paths
+
+    monkeypatch.setattr("lmx.plotting._save_figure_pair", save)
+
+
+def test_figure_pair_owner_writes_real_png_and_pdf(tmp_path: Path):
+    out_dir = _prepare_plot_output(tmp_path)
+    fig, ax = plt.subplots()
+    ax.plot([0.0, 1.0], [0.0, 1.0])
+    png, pdf = _save_figure_pair(fig, out_dir, "formats")
+    assert png.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    assert pdf.read_bytes().startswith(b"%PDF")
+
+
+@pytest.mark.parametrize(
+    ("options", "expected"),
+    [
+        ({}, {"bbox_inches": "tight"}),
+        ({"dpi": 185}, {"bbox_inches": "tight", "dpi": 185}),
+        ({"tight": False}, {}),
+    ],
+)
+def test_figure_pair_owner_preserves_save_options(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    options: dict[str, object],
+    expected: dict[str, object],
+):
+    calls = []
+    fig = SimpleNamespace(savefig=lambda path, **kwargs: calls.append((path, kwargs)))
+    monkeypatch.setattr(plt, "close", lambda figure: None)
+
+    paths = _save_figure_pair(fig, tmp_path, "options", **options)
+
+    assert paths == [tmp_path / "options.png", tmp_path / "options.pdf"]
+    assert calls == [(path, expected) for path in paths]
+
+
+def test_write_case_overview_plots_writes_overview_and_diagnostics(tmp_path: Path):
+    solution = _plot_solution(make_hartmann_case(ha=5.0, ny=8, nz=8))
+    outputs = write_case_overview_plots(
+        solution,
+        tmp_path,
+        case_title="Hartmann demo",
+        y_reference_coordinate=jnp.asarray([-1.0, 0.0, 1.0]),
+        y_reference_values=jnp.asarray([0.0, 1.0, 0.0]),
+        z_reference_coordinate=jnp.asarray([-1.0, 0.0, 1.0]),
+        z_reference_values=jnp.asarray([0.0, 1.0, 0.0]),
+    )
+    _assert_figure_pair(outputs[:2], tmp_path, "overview")
+    _assert_figure_pair(outputs[2:], tmp_path, "diagnostics")
+
+
+def test_write_case_overview_plots_skips_diagnostics_when_no_time_history(
+    tmp_path: Path,
+):
+    solution = _plot_solution(make_hartmann_case(ha=5.0, ny=8, nz=8))
+    solution = Solution(
+        mesh=solution.mesh,
+        state=solution.state,
+        diagnostics=Diagnostics(
+            residual_history=jnp.asarray([]),
+            courant_like=jnp.asarray([]),
+            ohmic_power=jnp.asarray([]),
+            time_history=jnp.asarray([]),
+        ),
+        case_name=solution.case_name,
+    )
+    outputs = write_case_overview_plots(solution, tmp_path, case_title="No diagnostics")
+    _assert_figure_pair(outputs, tmp_path, "overview")
+    assert not (tmp_path / "diagnostics.png").exists()
+
+
+def test_write_extruded_overview_plots_writes_outputs(tmp_path: Path):
+    values = np.arange(12, dtype=float).reshape(3, 2, 2)
+    bundle = SimpleNamespace(
+        x=np.asarray([0.0, 0.5, 1.0]),
+        y=np.asarray([-0.5, 0.5]),
+        z=np.asarray([-0.5, 0.5]),
+        geometry_kind="rect_duct",
+        field_scale=np.asarray([0.2, 1.0, 0.3]),
+        mean_velocity=np.asarray([1.0, 0.8, 0.9]),
+        current_scaled_pressure_proxy=np.asarray([0.1, 0.4, 0.2]),
+        charge_balance_residual=np.asarray([1.0e-8, 2.0e-8, 1.0e-8]),
+        boundary_current_residual=np.asarray([1.0e-9, 1.0e-9, 1.0e-9]),
+        wall_current_leakage=np.asarray([1.0e-10, 1.0e-10, 1.0e-10]),
+        axial_current=np.asarray([0.0, 1.0e-9, 0.0]),
+        u=values,
+        phi=0.1 * values,
+    )
+    validation = SimpleNamespace(
+        max_charge_balance_residual=2.0e-8,
+        net_boundary_current_residual=1.0e-9,
+    )
+
+    outputs = write_extruded_overview_plots(
+        SimpleNamespace(bundle=bundle, validation=validation),
+        tmp_path,
+        case_title="Fringing duct",
+    )
+
+    _assert_figure_pair(outputs, tmp_path, "extruded_overview")
+
+
+def test_write_freemhd_observable_parity_plots_writes_outputs(tmp_path: Path):
+    cut = {
+        "coordinate": np.linspace(-1.0, 1.0, 5).tolist(),
+        "simulated": np.array([0.0, 0.9, 1.0, 0.9, 0.0]).tolist(),
+        "reference": np.array([0.0, 0.92, 1.0, 0.92, 0.0]).tolist(),
+        "l2_error": 5.0e-3,
+        "linf_error": 2.0e-2,
+    }
+    records = [
+        {
+            "case_kind": "shercliff",
+            "observables": {
+                name: {"y": {**cut}, "z": {**cut}, "peak_ratio": 0.98}
+                for name in ("velocity", "potential", "current", "lorentz")
+            },
+        },
+        {
+            "case_kind": "hunt",
+            "observables": {
+                name: {"y": {**cut}, "z": {**cut}, "peak_ratio": 1.02}
+                for name in ("velocity", "potential", "current", "lorentz")
+            },
+        },
+    ]
+    outputs = write_freemhd_observable_parity_plots(records, tmp_path, case_title="Observable parity")
+    _assert_figure_pair(outputs, tmp_path, "freemhd_closed_channel_observable_parity")

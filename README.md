@@ -1,159 +1,128 @@
 # LMX
 
-[![Python](https://img.shields.io/badge/python-3.10--3.13-blue.svg)](https://github.com/uwplasma/LMX/blob/main/pyproject.toml)
-[![JAX](https://img.shields.io/badge/JAX-CPU%20%7C%20GPU-orange.svg)](https://docs.jax.dev/)
-[![Docs](https://img.shields.io/badge/docs-read%20online-blue.svg)](https://lmx.readthedocs.io/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/uwplasma/LMX/blob/main/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/lmx.svg)](https://pypi.org/project/lmx/)
+[![Python](https://img.shields.io/pypi/pyversions/lmx.svg)](https://pypi.org/project/lmx/)
+[![CI](https://img.shields.io/github/actions/workflow/status/uwplasma/LMX/ci.yml?branch=main&label=ci)](https://github.com/uwplasma/LMX/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/readthedocs/lmx/latest?label=docs)](https://lmx.readthedocs.io/)
+[![License](https://img.shields.io/github/license/uwplasma/LMX)](LICENSE)
 
-**LMX is JAX-native inductionless liquid-metal MHD for CPUs and GPUs.**
-Verified: Hartmann, Shercliff, and Hunt ducts, conducting walls, and selected
-differentiable workflows. Research-stage: imposed 3D/fringe fields, magnetic
-obstacles, Q2D turbulence, blanket models, and extruded flows.
+LMX solves inductionless liquid-metal magnetohydrodynamics in ducts with JAX.
+It covers fully developed Hartmann, Shercliff, and Hunt flows and three-dimensional
+extruded ducts and pipes in spatially varying magnetic fields. LMX owns the MHD
+models, boundary conditions, coupling, diagnostics, and validation;
+[SOLVAX](https://github.com/uwplasma/SOLVAX) supplies reusable linear and
+fixed-point algorithms.
 
-[Documentation](https://lmx.readthedocs.io/) ·
-[Quickstart](https://lmx.readthedocs.io/en/latest/getting_started.html) ·
-[Examples](https://lmx.readthedocs.io/en/latest/case_cookbook.html) ·
-[Validation](https://lmx.readthedocs.io/en/latest/benchmark_matrix.html) ·
-[Roadmap](https://github.com/uwplasma/LMX/blob/main/plan.md)
+![Analytical duct profiles](docs/_static/analytic_velocity_profiles.webp)
 
-![Duct-flow profiles](docs/_static/analytic_velocity_profiles.webp)
+## Install
 
-## Install and run
-
-```bash
-git clone https://github.com/uwplasma/LMX.git
-cd LMX && python -m pip install -e '.[visualization]'
-lmx examples/hartmann_case.toml
+```console
+python -m pip install lmx
+lmx --help
 ```
+
+LMX supports Python 3.10–3.13. JAX selects the CPU by default; install the
+appropriate accelerator wheel using the
+[JAX installation guide](https://docs.jax.dev/en/latest/installation.html).
+Plots are optional: `python -m pip install "lmx[visualization]"`.
+
+## Solve a duct
 
 ```python
-from lmx import make_hartmann_case, solve_steady
+import lmx
 
-solution = solve_steady(make_hartmann_case(ha=20, ny=48, nz=48))
-print(solution.diagnostics.volumetric_flow_rate_history[-1])
+case = lmx.make_hartmann_case(ha=20.0, ny=48, nz=48)
+result = lmx.solve_steady(case)
+
+print(result.converged, result.status)
+print(result.state.residual)
 ```
 
-TOML/Python cases support restarts, diagnostics, plots, and checksummed artifacts.
-For the lean core, use `pip install -e .`; see the
-[case cookbook](https://lmx.readthedocs.io/en/latest/case_cookbook.html).
+The case object contains the geometry, materials, imposed field, boundary
+conditions, time stepping, solver controls, and output policy. The result
+contains the final fields, convergence status, iteration counts, and physical
+diagnostics. The same workflow is available from TOML:
 
-## Capabilities
+```console
+lmx examples/hartmann_case.toml --plots
+```
 
-✅ native/documented · ◐ partial/research · — no named native workflow
+## Solve a three-dimensional fringe
 
-| Capability | LMX | [FreeMHD](https://github.com/PlasmaControl/FreeMHD) | [NekRS](https://nekrs.readthedocs.io/en/latest/) |
-|---|:---:|:---:|:---:|
-| Inductionless electric-potential LM MHD | ✅ | ✅ | — |
-| Full-induction / finite-Rm MHD | — | —¹ | ◐ research |
-| Verified high-Hartmann duct benchmarks | ✅ | ✅ | — |
-| 3D imposed/fringing-field LM workflow | ◐ | ✅ | — |
-| Conducting/insulating wall-current closure | ✅ | ✅ | — |
-| Fully 3D transient MHD | ◐ extruded | ✅ | ◐ research |
-| Free-surface / two-phase MHD | — | ✅ | — |
-| Fluid–solid conjugate heat transfer | — | ✅ | ✅ |
-| Turbulence models | ◐ Q2D | ◐ OpenFOAM | ✅ LES/RANS |
-| Curved / complex 3D meshes | ◐ mapped | ✅ | ✅ |
-| Parallel CPU solver | ◐ | ✅ | ✅ |
-| Single-GPU execution | ✅ | — | ✅ |
-| Multi-GPU execution | ◐ B2 | — | ✅ |
-| Selected reverse-mode AD workflows | ✅ | — | — |
-| Published liquid-metal experiment comparison | ◐ | ✅ | — |
+```python
+from lmx.fringing import (
+    build_square_duct_extruded_problem,
+    solve_extruded_inductionless,
+)
 
-¹ [FreeMHD2](https://arxiv.org/abs/2606.18745) is a separate finite-Rm extension.
-Sources: [FreeMHD paper](https://doi.org/10.1063/5.0230242),
-[solver](https://github.com/PlasmaControl/FreeMHD/blob/main/MHD_Solvers/solvers/epotMultiRegionInterFoam/epotMultiRegionInterFoam.C),
-[NekRS](https://nekrs.readthedocs.io/en/latest/), [MHD extension](https://doi.org/10.2172/2453867),
-[GPU scaling](https://doi.org/10.1016/j.parco.2022.102982).
+problem = build_square_duct_extruded_problem(
+    ha_peak=20.0,
+    width=2.0,
+    height=2.0,
+    length=6.0,
+    nx_stations=21,
+    ny=24,
+    nz=24,
+)
+result = solve_extruded_inductionless(problem)
 
-## Verified duct MHD
+print(result.converged, result.validation.max_charge_balance_residual)
+```
 
-Eight frozen high-Hartmann rows pass; audited closed-channel FreeMHD
-observables pass the 1% finite-grid gate.
+The 3-D formulation solves electric-potential/current closure, Lorentz force,
+momentum transport, and face-flux pressure projection on rectangular,
+layered-duct, straight-pipe, and mapped bent-pipe meshes. Analytic and tabulated
+vector fields use the same problem interface.
 
-![Samper Benchmark A validation](docs/_static/samper_benchmark_a.webp)
+![Three-dimensional fringing-field result](docs/_static/fringing_solver_family.webp)
 
-![Analytical duct and FreeMHD parity](docs/_static/freemhd_closed_channel_observable_parity.webp)
+## Capabilities and evidence
 
-<p align="center">
-  <img src="docs/_static/readme-hunt-startup.webp" alt="Hunt/Shercliff startup movie" width="82%">
-  <br><em>Legacy bounded transient; a steady-gated replacement is pending an idle-host run.</em>
-</p>
+| Capability | Interface | Evidence |
+|---|---|---|
+| Hartmann, Shercliff, and Hunt flow | `lmx.make_*_case`, `solve_steady` | analytical profiles, conservation, power balance, mesh convergence |
+| Conducting and insulating wall layers | `WallLayer`, layered mesh builders | interface-current and layer-resolution gates |
+| 3-D rectangular fringing fields | `lmx.fringing` | manufactured operators, projection, restart, Benchmark B2 |
+| 3-D pipe fringing fields | `lmx.fringing` | mapped operators, current closure, fixed-flow and Benchmark B1 gates |
+| FreeMHD comparison | `lmx.freemhd`, validation scripts | pinned case contracts, native-output observers, executable Docker workflow |
+| Differentiable Hartmann objectives | `lmx.autodiff` | finite-difference, JVP, and VJP checks |
+| Constant, analytic, and tabulated fields | `lmx.field_models` | divergence and interpolation tests |
 
-[Validation evidence →](https://lmx.readthedocs.io/en/latest/validation_report.html)
+Validation status and tolerances are stated in the
+[validation guide](https://lmx.readthedocs.io/en/latest/validation/index.html).
+Internal diagnostics are not presented as external validation.
 
-## Real geometries and nonuniform fields
+![LMX and FreeMHD observable comparison](docs/_static/freemhd_closed_channel_observable_parity.webp)
 
-<p align="center">
-  <img src="docs/_static/readme-geometries.webp" alt="LMX geometries" width="48%">
-  <img src="docs/_static/readme-variable-field.webp" alt="Field response and conservation" width="48%">
-</p>
+## Documentation
 
-![B2 fringe-field diagnostics](docs/_static/readme-alex-b2-field-pressure.webp)
+- [Install and run](https://lmx.readthedocs.io/en/latest/getting_started/install.html)
+- [First 2-D solve](https://lmx.readthedocs.io/en/latest/getting_started/first_run.html)
+- [3-D fringing tutorial](https://lmx.readthedocs.io/en/latest/tutorials/fringing.html)
+- [Equations and assumptions](https://lmx.readthedocs.io/en/latest/physics/equations.html)
+- [Numerical methods and SOLVAX boundary](https://lmx.readthedocs.io/en/latest/physics/numerics.html)
+- [Python API](https://lmx.readthedocs.io/en/latest/reference/api.html)
+- [CLI and TOML schema](https://lmx.readthedocs.io/en/latest/reference/cli.html)
 
-B2 passes exact restart and schema-6 topology gates (1/2/4 CPU; 1/2 GPU).
-Shared-norm acceleration and production parity remain open; multi-minute
-Docker CPU-allocation scaling is accepted, while exact-core and idle-host GPU
-timing remain open.
-[Fringing status →](https://lmx.readthedocs.io/en/latest/fringing.html)
+Runnable scripts in [`examples/`](examples/) are deliberately small and write
+their artifacts under an ignored `artifacts/` directory.
 
-## Follow curved pipes
+## Development
 
-![Bent-pipe and Dean-vortex gates](docs/_static/readme-curved-pipes.webp)
+```console
+git clone https://github.com/uwplasma/LMX.git
+cd LMX
+python -m pip install -e ".[dev,docs]"
+python scripts/run_full_test_suite.py
+python -m sphinx -W -b html docs docs/_build/html
+```
 
-Mapped pipes have a low-De inductionless baseline; Dean vortices await their
-literature gate. [Geometry status →](https://lmx.readthedocs.io/en/latest/geometry.html)
+Tests require at least 95% combined line/branch coverage. A release also gates
+package size, lazy import behavior, distribution contents, analytical physics,
+3-D conservation, and the pinned external-validation contract.
 
-## Model conducting multilayer walls
+## Cite
 
-![Li/AlN wall convergence](https://github.com/uwplasma/LMX/releases/download/lmx-research-assets-v1/readme-li-aln-multilayer-convergence.webp)
-
-At `Ha = 220`, research-stage Li/AlN pressure/current change below 10% per mesh
-step; experiment/blanket validation remain open. [Wall models →](https://lmx.readthedocs.io/en/latest/wall_models.html)
-
-## Differentiate selected workflows
-
-![Sensitivity and inverse design](docs/_static/readme-autodiff.webp)
-
-Promoted objectives pass finite-difference/independent-transpose checks.
-[Differentiable workflows →](https://lmx.readthedocs.io/en/latest/autodiff.html)
-
-## Explore research flows
-
-<p align="center">
-  <img src="docs/_static/readme-magnetic-obstacle.webp" alt="Magnetic-obstacle response" width="48%">
-  <img src="docs/_static/readme-blanket-flow.webp" alt="Blanket-flow movie" width="48%">
-</p>
-
-<p align="center">
-  <img src="docs/_static/readme-q2d-turbulence.webp" alt="Q2D turbulence movie" width="58%">
-</p>
-
-The blanket loop stops at its accepted 18-update steady window. The Q2D loop
-is a weakly forced legacy transient (7.000 s), not a statistically steady
-result. Quantitative turbulent Q2D-MHDfoam parity and blanket validation remain
-open.
-[Geometry and fields →](https://lmx.readthedocs.io/en/latest/geometry.html) ·
-[External benchmarks →](https://lmx.readthedocs.io/en/latest/external_benchmarks.html)
-
-## Scale on CPUs and GPUs
-
-![Multi-minute CPU scaling and GPU calibration](docs/_static/strong_scaling.webp)
-
-The callback-free `256 × 67 × 67` CPU ladder (32 updates, three warm/rung) takes
-244.763/173.033/158.354 s, reaching **1.415×/1.546×** on 2/4 JAX devices with
-2.318% maximum CV. Observer exclusion, exact restart, and continuous monitoring
-pass. A multi-minute 1/2-GPU ladder reaches 1.626× on two A4000s, but foreign
-contexts keep that result a shared-host calibration.
-[Protocol and results →](https://lmx.readthedocs.io/en/latest/performance.html)
-
-## Quality and citation
-
-Portable gate: **854 tests**, **95.37% line/branch coverage**, **142.6 s** on six
-Apple-Silicon workers.
-[Testing](https://lmx.readthedocs.io/en/latest/testing.html) ·
-[Theory](https://lmx.readthedocs.io/en/latest/theory.html) ·
-[Numerics](https://lmx.readthedocs.io/en/latest/numerics.html) ·
-[Contributing](https://github.com/uwplasma/LMX/blob/main/CONTRIBUTING.md) ·
-[Research assets](https://github.com/uwplasma/LMX/releases/tag/lmx-research-assets-v1)
-
-MIT licensed; cite [CITATION.cff](https://github.com/uwplasma/LMX/blob/main/CITATION.cff).
+Use the version or commit that produced the result. Citation metadata is in
+[`CITATION.cff`](CITATION.cff).

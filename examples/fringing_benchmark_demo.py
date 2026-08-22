@@ -22,7 +22,6 @@ from lmx.fringing import (
 )
 from lmx.plotting import write_extruded_overview_plots
 
-
 # Inputs: geometry, materials, field envelope, numerics, and output location.
 OUTPUT_DIR = Path("artifacts/examples/fringing_benchmark")
 HARTMANN_NUMBER = 20.0

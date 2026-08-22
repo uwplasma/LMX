@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 project = "LMX"
 author = "LMX contributors"
-copyright = f"{datetime.now().year}, LMX contributors"
+copyright = f"{datetime.now(timezone.utc).year}, LMX contributors"
 release = "1.1.3"
 
 extensions = [
     "myst_parser",
     "sphinx_copybutton",
     "sphinx.ext.mathjax",
+    "sphinx.ext.autodoc",
+    "sphinx_design",
 ]
 
 source_suffix = {
