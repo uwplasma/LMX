@@ -1004,15 +1004,17 @@ surface, measurements, validation, decision, and next action.
   gates, then reached 69% without a test failure before runner termination. A
   1,200-second rehearsal proved that enlarging the script and job budgets did
   not prevent GitHub from sending a shutdown signal at 11 minutes. Replaced
-  the accumulating monolithic process with exact core (299), examples (22),
-  physics (232), and validation (274) shards. The minimum-dependency lane uses
-  isolated runners; the coverage lane uses fresh bounded pytest subprocesses
-  and combines their data in place. Examples run on one worker so their
-  existing subprocess timeouts measure the example, rather than contention
-  with a simultaneous JAX compile. The partition contains all 827 tests exactly
-  once per dependency lane before enforcing the unchanged 95% threshold.
-- Rehearsed the final partition locally in the repository environment: core
-  passed 296 with 3 optional-data skips in 53 seconds, examples passed all 22
+  the accumulating monolithic process with exact benchmark (58), core (241),
+  examples (22), physics (232), and validation (274) shards. The
+  minimum-dependency lane uses isolated runners; the coverage lane uses fresh
+  bounded pytest subprocesses and combines their data in place. Benchmarks and
+  examples run on one worker so their existing timeouts measure the operation,
+  rather than contention with a simultaneous JAX compile. The partition
+  contains all 827 tests exactly once per dependency lane before enforcing the
+  unchanged 95% threshold.
+- Rehearsed the pre-isolation partition locally in the repository environment:
+  core plus benchmarks passed 296 with 3 optional-data skips in 53 seconds,
+  examples passed all 22
   on one worker in 55 seconds, physics passed 230 with 2 optional-data skips in
   63 seconds, and validation passed all 274 in 6 seconds. Coverage-enabled
   physics and validation took 74 and 11 seconds; the pre-isolation
@@ -1022,6 +1024,23 @@ surface, measurements, validation, decision, and next action.
 - Kept the CI success path independent of Actions artifact storage after the
   hosted account reported its artifact quota full. Coverage is combined and
   enforced on the runner; normal logs retain the test and coverage evidence.
+- The first bounded hosted run passed Python 3.10 validation in 51 seconds and
+  exposed two example-specific minimum-endpoint assumptions. JAX 0.6.2 gives
+  direct-versus-restarted mean-velocity and charge-balance differences of
+  `6.7e-16` and `1.1e-12`, while its iterative `p` and `phi` fields differ by
+  `0.0090` and `0.0034` on direct scales of `104` and `8.6`. Replaced the
+  nonportable bitwise claim with explicit per-field tolerances while retaining
+  the near-machine conserved-observable requirements.
+- Reduced only the Li/AlN demonstration discretization from 2,048 to 512
+  cross-section cells across its two wall models and bounded it to six updates
+  with 40 potential iterations. On the clean minimum numerical endpoint its
+  runtime fell from 21.7 to 11.4 seconds. The full 22-test examples shard now
+  passes in 45.7 seconds there and 47.5 seconds on the current endpoint.
+- The same hosted run passed the minimum-endpoint physics and validation shards
+  in 7m01s and 51 seconds. Its only core failure was a B1 production-path
+  compile exceeding the 120-second per-test limit while sharing a two-core
+  runner; every other core item completed. Isolated all 58 benchmark tests on
+  one worker, where the clean minimum endpoint passes them in 61.8 seconds.
 - SOLVAX hosted lint, types, docs, and build passed. Current JAX reports its
   unsupported bfloat16 LU dtype as `TypeError`; the pre-existing portability
   test now accepts that documented backend error alongside the older runtime

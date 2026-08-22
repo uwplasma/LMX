@@ -78,14 +78,15 @@ python examples/extruded_restart_demo.py
 ```
 
 <p align="center">
-  <img src="_static/extruded_restart_equivalence.webp" alt="Direct and restarted extruded solutions agree exactly in mean velocity, charge balance, and saved state" width="92%">
+  <img src="_static/extruded_restart_equivalence.webp" alt="Direct and restarted extruded solutions agree within declared numerical tolerances" width="92%">
 </p>
 
 Edit the layered geometry, field envelope, and split lengths at the top of the
-file. The portable 3+3-step demo reproduces the direct six-step solution bit-for-bit
-across `u`, `v`, `w`, `p`, and `phi` (5.15 s on the reference Mac run).
-Restart metadata protects against incompatible source, mesh, or input state.
-Use atomic partial checkpoints for long extruded runs.
+file. The portable 3+3-step demo checks the direct six-step solution against
+explicit tolerances for `u`, `v`, `w`, `p`, and `phi`; mean velocity and charge
+balance agree near machine precision. Restart metadata protects against
+incompatible source, mesh, or input state. Use atomic partial checkpoints for
+long extruded runs.
 
 ## Custom imposed field
 

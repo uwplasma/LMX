@@ -10,9 +10,9 @@ import sys
 import time
 
 _TEST_SHARDS = {
+    "benchmarks": ("tests/test_benchmarks.py",),
     "core": (
         "tests/test_autodiff.py",
-        "tests/test_benchmarks.py",
         "tests/test_cli.py",
         "tests/test_config.py",
         "tests/test_field_models.py",
@@ -70,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
 
     workers = args.workers
     if workers is None:
-        workers = 1 if args.shard == "examples" else _default_workers()
+        workers = 1 if args.shard in {"benchmarks", "examples"} else _default_workers()
     if workers < 1:
         parser.error("--workers must be positive")
     if args.budget_seconds <= 0.0:
