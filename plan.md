@@ -1160,6 +1160,12 @@ surface, measurements, validation, decision, and next action.
   architecture/import, Sphinx, package build, Twine, and distribution-content
   gates pass on the live sources. The wheel is 175,592 bytes with 37 members;
   the source distribution is 163,607 bytes with 43 members.
-- Next action: commit the structural tranche, repeat the pinned B2 Docker smoke
-  on that exact commit, then decompose and consolidate the retained 3-D and
-  FreeMHD paths toward the final source/module ceilings.
+- Repeated the pinned B2 Docker smoke on committed source `5ed4c4b` with
+  FreeMHD `14b54a3` and image
+  `sha256:44e9c9c1cc9d69aa4e50ca773aef7971010905a529462273bf913e6bc5b2c238`.
+  Execution, artifacts, contract, observation, and comparison passed with no
+  failed checks; pressure Linf is `0.0109172453` and RMS is `0.0045179771`.
+  The external record is
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-capability-trim-5ed4c4b/b2`.
+- Next action: decompose and consolidate the retained 3-D and FreeMHD paths
+  toward the final source/module ceilings.
