@@ -1212,5 +1212,10 @@ surface, measurements, validation, decision, and next action.
   members and the source distribution is 161,499 bytes with 33 members.
   Architecture regression ceilings are ratcheted to 14 modules and 18,100
   package lines.
+- Repeated the pinned B2 Docker smoke on committed source `0a7ea11`.
+  Execution, artifacts, contract, observation, and comparison passed with no
+  failed checks and unchanged pressure errors. The report is non-accepting only
+  because the branch has the candidate role. Its external record is
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-ownership-consolidation-0a7ea11/b2`.
 - Next action: decompose and consolidate the retained 3-D and FreeMHD paths
   toward the final source/module ceilings.
