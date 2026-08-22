@@ -2042,3 +2042,20 @@ surface, measurements, validation, decision, and next action.
   redundant push run.
 - Next action: require the quota-independent release PR to pass, publish 1.3.0,
   then revalidate and merge the pending differentiated production 3-D tranche.
+- The integrated 3-D cold-cache run kept metadata (16s), physics (4m30s),
+  support (5m26s), documentation (25s), links (23s), and pinned FreeMHD
+  (7m06s) within budget. Its 56-test fringing lane passed in 7m57s, but
+  two-worker `loadgroup` scheduling left a long-tail imbalance after a 151s
+  derivative test. The runner now uses xdist work stealing; the exact covered
+  two-worker lane passes locally in 2m35s. The small derivative acceptance
+  problem also uses ten converged electric-closure updates instead of twenty,
+  while retaining production parity, two-parameter finite differences,
+  JVP/VJP duality, and the compiled reverse-memory bound.
+- The integrated run's report-only coverage job never started: GitHub marked
+  it failed because the organization currently reports failed payment or an
+  exhausted Actions spending limit. PyPI likewise rejected the release OIDC
+  exchange because this first publication has no pending trusted publisher.
+  These are external account settings; no evidence gate was bypassed.
+- Next action: restore GitHub Actions billing, register the exact pending PyPI
+  publisher, rerun the warm-cache gate, publish 1.3.0, and merge the 3-D
+  tranche only after every required check is green.
