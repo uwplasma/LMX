@@ -1921,7 +1921,13 @@ surface, measurements, validation, decision, and next action.
   release treats artifact upload as non-verdict infrastructure and ignores
   only those exact persistent DOI URLs while continuing to check their
   associated software/preprint links.
-- Next action: open the implicit-field PR and require every hosted gate. Then
-  implement and validate the layered block/transpose preconditioner before
-  making any Hunt differentiability claim; GPU derivative parity waits for an
-  unoccupied office device.
+- Merged the production implicit-field implementation as PR #3 at `042f9ef`
+  only after every hosted CI, documentation, external-link, and pinned FreeMHD
+  Docker gate passed. The release candidate is 1.3.0; its fresh-wheel smoke
+  compiles both the primal solver and a magnetic-field value-and-gradient.
+- Removed 580 redundant non-release GitHub Actions artifacts while retaining
+  26 distribution and release-validation records. This restores deliberate
+  evidence retention without using transient CI products as permanent storage.
+- Next action: release 1.3.0, then implement and validate the layered
+  block/transpose preconditioner before making any Hunt differentiability
+  claim; GPU derivative parity waits for an unoccupied office device.
