@@ -138,6 +138,7 @@ write_json_summary = true
 write_plots = false
 copy_input_file = true
 write_stride = 1
+history_stride = 3
 
 [logging]
 enabled = true
@@ -191,6 +192,7 @@ side = "max"
     assert config.case.name == "hartmann_toml_demo"
     assert config.case.geometry.kind == "rect_duct"
     assert config.case.output.directory == str((tmp_path / "out").resolve())
+    assert config.case.output.history_stride == 3
     assert config.case.solver.kind == "fully_developed_inductionless"
     assert config.case.solver.mode == "steady"
     assert config.case.solver.preconditioner == "jacobi"

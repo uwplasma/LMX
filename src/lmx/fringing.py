@@ -726,6 +726,8 @@ def solve_extruded_inductionless(
     Leave it unset for ordinary asynchronous execution and scaling timings.
     """
 
+    if problem.case.output.history_stride < 0:
+        raise ValueError("history_stride must be non-negative")
     if checkpoint_interval is not None and checkpoint_interval <= 0:
         raise ValueError("checkpoint_interval must be positive")
 

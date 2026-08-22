@@ -372,7 +372,7 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
         rho_phi_plus=jnp.arange(18.0).reshape((3, 3, 1, 2)),
         rho_phi_inlet=jnp.asarray([[0.4, 0.6]]),
         aitken_state=(jnp.ones((4, 3, 2, 2)), 0.75, 1),
-        stopping_state=(1, 1, "in_progress"),
+        stopping_state=(4, 1, "in_progress"),
         iteration_residual_history=jnp.asarray([1.0e-3]),
         iteration_momentum_defect_history=jnp.asarray([4.0e-5]),
         iteration_component_residual_history=jnp.asarray([[1.0e-3, 2.0e-4, 3.0e-5, 1.0e-6, 2.0e-6, 3.0e-6]]),
@@ -402,7 +402,7 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
         "iteration_momentum_defect_history",
     ):
         assert getattr(restart_bundle.bundle, name) == pytest.approx(getattr(bundle, name))
-    assert restart_bundle.bundle.stopping_state == (1, 1, "in_progress")
+    assert restart_bundle.bundle.stopping_state == (4, 1, "in_progress")
     assert all(path.exists() for path in vars(layout).values())
 
     anderson_values = (

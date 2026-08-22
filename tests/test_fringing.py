@@ -16,10 +16,12 @@ from lmx._fringing_common import (
     _enforce_stationwise_flow_rate_3d,
     _gauge_invariant_scalar_update,
     _gradient_3d,
+    _iteration_history_arrays,
     _laplacian_3d,
     _normalized_pressure_observable_update,
     _projection_pressure_correction_3d,
     _rectangular_fluid_bounds,
+    _restore_duct_iteration_state,
     _shard_extruded_fields,
     _spacing_vector,
     _thin_wall_interface_mean,
@@ -116,8 +118,63 @@ def test_extruded_solver_rejects_nonfinite_result(monkeypatch: pytest.MonkeyPatc
     )
     monkeypatch.setattr(fringing_impl, "_solve_extruded_projection", lambda *args, **kwargs: bundle)
 
+    problem = build_square_duct_extruded_problem(nx_stations=1, ny=1, nz=1)
     with pytest.raises(NumericalFailure, match="3-D fringing solve.*u"):
-        solve_extruded_inductionless(SimpleNamespace())
+        solve_extruded_inductionless(problem)
+    with pytest.raises(ValueError, match="history_stride"):
+        solve_extruded_inductionless(
+            replace(
+                problem, case=replace(problem.case, output=replace(problem.case.output, history_stride=-1))
+            )
+        )
+
+
+def test_extruded_histories_are_terminal_strided_and_restartable():
+    values = list(range(5))
+    components = [tuple(float(value) for _ in range(6)) for value in values]
+    compact = _iteration_history_arrays(values, components, values, components, values, stride=0)
+    strided = _iteration_history_arrays(values, components, values, components, values, stride=2)
+    resumed = _iteration_history_arrays(
+        [0, 2, 3, 4, 5, 6, 7],
+        [tuple(float(value) for _ in range(6)) for value in (0, 2, 3, 4, 5, 6, 7)],
+        [0, 2, 3, 4, 5, 6, 7],
+        [tuple(float(value) for _ in range(6)) for value in (0, 2, 3, 4, 5, 6, 7)],
+        [0, 2, 3, 4, 5, 6, 7],
+        stride=2,
+        retained_prefix=3,
+    )
+    assert compact["iteration_residual_history"].tolist() == [4.0]
+    assert strided["iteration_residual_history"].tolist() == [0.0, 2.0, 4.0]
+    assert strided["iteration_component_residual_history"].shape == (3, 6)
+    assert resumed["iteration_residual_history"].tolist() == [0.0, 2.0, 3.0, 4.0, 6.0, 7.0]
+
+    problem = build_square_duct_extruded_problem(nx_stations=2, ny=2, nz=2)
+    zeros = jnp.zeros((2, 2, 2))
+    bundle = ExtrudedFieldBundle(
+        x=jnp.arange(2.0),
+        y=jnp.arange(2.0),
+        z=jnp.arange(2.0),
+        field_scale=jnp.ones(2),
+        u=zeros,
+        v=zeros,
+        w=zeros,
+        p=zeros,
+        phi=zeros,
+        geometry_kind="rect_duct",
+        solver_kind="extruded_inductionless",
+        stopping_state=(4, 0, "step_limit"),
+        **compact,
+    )
+    restored = _restore_duct_iteration_state(
+        bundle,
+        case=problem.case,
+        use_b2=False,
+        velocity=zeros,
+        velocity_limit=1.0,
+        potential_scale=1.0,
+        forcing=1.0,
+    )
+    assert restored[5] == 4
 
 
 def _with_analytic_field(problem, *, name, field_fn):
@@ -2219,6 +2276,7 @@ def test_solve_extruded_inductionless_supports_layered_analytic_variable_field()
     assert solution.bundle.geometry_kind == "layered_duct"
     assert jnp.all(jnp.isfinite(solution.bundle.u))
     assert jnp.all(jnp.isfinite(solution.bundle.phi))
+    assert solution.bundle.iteration_residual_history.shape == (1,)
     assert solution.validation.volumetric_flow_rate_span < 5.0e-3
     assert solution.validation.max_residual < 1.0e-3
     assert solution.validation.max_charge_balance_residual < 1.0e-4

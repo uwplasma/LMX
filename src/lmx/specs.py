@@ -115,6 +115,7 @@ class OutputSpec:
     write_plots: bool = False
     copy_input_file: bool = True
     write_stride: int = 1
+    history_stride: int = 0
 
 
 @dataclass(frozen=True)
@@ -613,6 +614,7 @@ def load_run_config(path: str | Path) -> RunConfig:
         write_plots=bool(output_table.get("write_plots", False)),
         copy_input_file=bool(output_table.get("copy_input_file", True)),
         write_stride=int(output_table.get("write_stride", 1)),
+        history_stride=int(output_table.get("history_stride", 0)),
     )
 
     case = CaseSpec(

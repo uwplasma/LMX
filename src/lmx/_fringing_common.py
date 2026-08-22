@@ -138,6 +138,9 @@ def _iteration_history_arrays(
     courant=None,
     pressure_linear=None,
     momentum_defect=None,
+    *,
+    stride=1,
+    retained_prefix=0,
 ):
     """Build consistently shaped outer-iteration histories."""
 
@@ -151,12 +154,29 @@ def _iteration_history_arrays(
         potential,
         courant or (),
     )
-    return {
+    arrays = {
         name: jnp.asarray(value, dtype=float).reshape((-1, width))
         if width
         else jnp.asarray(value, dtype=float)
         for (name, width), value in zip(EXTRUDED_HISTORY_WIDTHS, values, strict=True)
     }
+    if stride == 1:
+        return arrays
+    for name, array in arrays.items():
+        if not len(array):
+            continue
+        if stride == 0:
+            arrays[name] = array[-1:]
+            continue
+        prefix, segment = array[:retained_prefix], array[retained_prefix:]
+        if not len(segment):
+            arrays[name] = prefix
+            continue
+        sampled = segment[::stride]
+        if (len(segment) - 1) % stride:
+            sampled = jnp.concatenate((sampled, segment[-1:]))
+        arrays[name] = jnp.concatenate((prefix, sampled)) if len(prefix) else sampled
+    return arrays
 
 
 def _iteration_checkpoint_bundle(
@@ -300,29 +320,37 @@ def _restore_duct_iteration_state(
     )
     if len({len(history) for history in histories}) != 1:
         raise ValueError("B2 restart iteration histories have inconsistent lengths")
-    completed_steps = len(histories[0])
+    stored_steps = len(histories[0])
+    restart_stopping = (
+        (0, 0, "not_recorded")
+        if initial is None
+        else getattr(initial, "stopping_state", (0, 0, "not_recorded"))
+    )
+    completed_steps = int(restart_stopping[0])
+    if stored_steps > completed_steps or bool(stored_steps) != bool(completed_steps):
+        raise ValueError("B2 restart stopping state has inconsistent step count")
     momentum_defect = (
         [] if initial is None else np.asarray(initial.iteration_momentum_defect_history).tolist()
     )
-    if use_b2 and len(momentum_defect) != completed_steps:
+    if use_b2 and len(momentum_defect) != stored_steps:
         raise ValueError("B2 restart predates the electromagnetic momentum-defect contract")
     pressure_linear = (
         []
         if initial is None
         else np.asarray(getattr(initial, "iteration_pressure_linear_history", jnp.zeros((0, 5)))).tolist()
     )
-    if completed_steps and not pressure_linear:
-        pressure_linear = [[math.nan, math.nan, 0.0, 0.0, -1.0]] * completed_steps
-    if len(pressure_linear) != completed_steps:
+    if stored_steps and not pressure_linear:
+        pressure_linear = [[math.nan, math.nan, 0.0, 0.0, -1.0]] * stored_steps
+    if len(pressure_linear) != stored_steps:
         raise ValueError("B2 restart pressure-linear history has inconsistent length")
     courant = (
         []
         if initial is None
         else np.asarray(getattr(initial, "iteration_courant_history", jnp.zeros((0, 3)))).tolist()
     )
-    if completed_steps and not courant:
-        courant = [[-1.0, -1.0, -1.0]] * completed_steps
-    if len(courant) != completed_steps:
+    if stored_steps and not courant:
+        courant = [[-1.0, -1.0, -1.0]] * stored_steps
+    if len(courant) != stored_steps:
         raise ValueError("B2 restart CFL histories have inconsistent lengths")
 
     fixed_aitken = (
@@ -332,13 +360,6 @@ def _restore_duct_iteration_state(
         and case.solver.coupling_min_relaxation == case.solver.coupling_max_relaxation
         else None
     )
-    restart_stopping = (
-        (0, 0, "not_recorded")
-        if initial is None
-        else getattr(initial, "stopping_state", (0, 0, "not_recorded"))
-    )
-    if restart_stopping[0] not in (0, completed_steps):
-        raise ValueError("B2 restart stopping state has inconsistent step count")
     steady_streak = int(restart_stopping[1])
     fixed_relaxation = jnp.asarray(1.0, dtype=velocity.dtype)
     previous_fixed_residual = None

@@ -52,6 +52,7 @@ write_json_summary = true
 write_plots = true
 copy_input_file = true
 write_stride = 1
+history_stride = 0
 
 [logging]
 enabled = true

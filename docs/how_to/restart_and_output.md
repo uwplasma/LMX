@@ -21,6 +21,12 @@ case's `OutputSpec`. Prefer NPZ plus JSON for repeatable studies. Enable VTK
 only when a downstream visualization tool needs it, and keep generated output
 outside the repository.
 
-Full iteration and station histories cost memory. LMX stores compact diagnostic
-histories by default; use output strides and checkpoint intervals deliberately
-for long 3-D runs.
+Full iteration histories cost memory. `OutputSpec(history_stride=0)` keeps the
+terminal sample, which is the default. Set a positive stride to retain the
+first sample, every requested interval, and the terminal sample; use `1` only
+when every iteration is needed. Positive-stride restart segments preserve
+retained samples and add samples from the resumed segment; stride `0` keeps
+only the latest terminal. Restart state and compact diagnostics are independent,
+while benchmark builders retain every iteration required by their published
+evidence contracts. `write_stride` controls station-field output and
+`checkpoint_interval` controls in-progress 3-D restart callbacks.

@@ -36,7 +36,7 @@ The schema maps directly to the Python dataclasses:
 | `[[boundary_conditions]]` | `BoundaryCondition` | velocity, pressure, current, and wall conditions |
 | `[solver]` | `SolverConfig` | model, mode, coupling, SOLVAX selection |
 | `[time_stepper]` | `TimeStepperConfig` | step sizes, iteration limits, physical tolerances |
-| `[output]` | `OutputSpec` | NPZ, JSON, VTK, CSV, and plot policy |
+| `[output]` | `OutputSpec` | NPZ, JSON, VTK, CSV, plots, and diagnostic-history stride |
 | `[fringing]` | `FringingSpec` | axial entry/exit envelope |
 
 Start from `examples/hartmann_case.toml`. Unknown keys, inconsistent geometry,

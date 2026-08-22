@@ -57,7 +57,11 @@ def _fake_step_result(u, **overrides):
 
 def _steady_stopping_case(**time_stepper):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    return replace(case, time_stepper=replace(case.time_stepper, **time_stepper))
+    return replace(
+        case,
+        time_stepper=replace(case.time_stepper, **time_stepper),
+        output=replace(case.output, history_stride=1),
+    )
 
 
 def _fake_potential_solver(shape, residual, iterations, initial_residual):
@@ -390,10 +394,12 @@ def transient_restart_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     direct_case = replace(
         case,
         time_stepper=replace(case.time_stepper, dt=0.01, t_final=0.04, max_steps=4),
+        output=replace(case.output, history_stride=1),
     )
     partial_case = replace(
         case,
         time_stepper=replace(case.time_stepper, dt=0.01, t_final=0.02, max_steps=2),
+        output=replace(case.output, history_stride=1),
     )
 
     def fake_fully_developed_case_step(**kwargs):
@@ -463,6 +469,36 @@ def test_common_solve_dispatches_configured_mode_and_fringing(monkeypatch: pytes
     assert cases_impl.solve(problem) is extruded_result
     with pytest.raises(TypeError, match="CaseSpec or ExtrudedInductionlessProblem"):
         cases_impl.solve(SimpleNamespace())
+
+
+def test_diagnostic_history_is_terminal_by_default_and_strided_when_requested(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    case = _steady_stopping_case(dt=0.002, t_final=0.01, max_steps=5, steady_tolerance=0.0)
+    monkeypatch.setattr(
+        cases_impl,
+        "_fully_developed_case_step",
+        lambda **kwargs: _fake_step_result(kwargs["u_previous"], velocity_residual=1.0e-2),
+    )
+
+    terminal = solve_steady(replace(case, output=replace(case.output, history_stride=0)))
+    strided = solve_steady(replace(case, output=replace(case.output, history_stride=2)))
+    assert terminal.diagnostics.time_history.tolist() == pytest.approx([0.01])
+    assert terminal.diagnostics.residual_history.shape == (1,)
+    assert strided.diagnostics.time_history.tolist() == pytest.approx([0.002, 0.006, 0.01])
+    resumed = solve_steady(
+        replace(
+            case,
+            time_stepper=replace(case.time_stepper, t_final=0.02),
+            output=replace(case.output, history_stride=0),
+        ),
+        initial_state=terminal.state,
+        initial_diagnostics=terminal.diagnostics,
+        append_diagnostics=True,
+    )
+    assert resumed.diagnostics.time_history.tolist() == pytest.approx([0.02])
+    with pytest.raises(ValueError, match="history_stride"):
+        solve_steady(replace(case, output=replace(case.output, history_stride=-1)))
 
 
 def test_transient_restart_can_append_diagnostics(

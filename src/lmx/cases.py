@@ -652,6 +652,8 @@ def _solve_fully_developed(
     append_diagnostics: bool = False,
     restart_info: RestartLogInfo | None = None,
 ) -> Solution:
+    if case.output.history_stride < 0:
+        raise ValueError("history_stride must be non-negative")
     mesh = _build_mesh(case) if mesh is None else mesh
     materials = build_material_fields(case, mesh)
     target_mean_velocity = _target_mean_velocity(case)
@@ -877,124 +879,47 @@ def _solve_fully_developed(
         time=float(start_time + step_count * dt),
         residual=residual_value,
     )
+    history_values = {
+        "time_history": time_history,
+        "u_max_history": u_max_history,
+        "mean_velocity_history": mean_velocity_history,
+        "applied_forcing_history": applied_forcing_history,
+        "residual_history": residual_history,
+        "courant_like": courant_history,
+        "ohmic_power": ohmic_history,
+        "current_max_history": current_max_history,
+        "face_current_max_history": face_current_max_history,
+        "emf_max_history": emf_max_history,
+        "lorentz_max_history": lorentz_max_history,
+        "face_lorentz_max_history": face_lorentz_max_history,
+        "potential_residual_history": potential_history,
+        "potential_iterations_history": potential_iteration_history,
+        "linear_residual_history": linear_residual_history,
+        "linear_iterations_history": linear_iteration_history,
+        "volumetric_flow_rate_history": volumetric_flow_rate_history,
+        "mean_current_magnitude_history": mean_current_magnitude_history,
+        "lorentz_power_history": lorentz_power_history,
+        "div_current_max_history": div_current_max_history,
+        "charge_balance_residual_history": charge_balance_residual_history,
+        "gauge_residual_history": gauge_residual_history,
+        "interface_current_residual_history": interface_current_residual_history,
+    }
+
+    def retained_history(name, values):
+        array = jnp.asarray(values, dtype=float)
+        stride = case.output.history_stride
+        if stride == 0:
+            array = array[-1:]
+        elif stride > 1 and array.size:
+            sampled = array[::stride]
+            array = sampled if (len(array) - 1) % stride == 0 else jnp.concatenate((sampled, array[-1:]))
+        initial = (
+            getattr(initial_diagnostics, name) if initial_diagnostics is not None and stride != 0 else None
+        )
+        return _concat_history(initial, array, append=append_diagnostics)
+
     diagnostics = Diagnostics(
-        time_history=_concat_history(
-            initial_diagnostics.time_history if initial_diagnostics is not None else None,
-            jnp.asarray(time_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        u_max_history=_concat_history(
-            initial_diagnostics.u_max_history if initial_diagnostics is not None else None,
-            jnp.asarray(u_max_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        mean_velocity_history=_concat_history(
-            initial_diagnostics.mean_velocity_history if initial_diagnostics is not None else None,
-            jnp.asarray(mean_velocity_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        applied_forcing_history=_concat_history(
-            initial_diagnostics.applied_forcing_history if initial_diagnostics is not None else None,
-            jnp.asarray(applied_forcing_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        residual_history=_concat_history(
-            initial_diagnostics.residual_history if initial_diagnostics is not None else None,
-            jnp.asarray(residual_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        courant_like=_concat_history(
-            initial_diagnostics.courant_like if initial_diagnostics is not None else None,
-            jnp.asarray(courant_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        ohmic_power=_concat_history(
-            initial_diagnostics.ohmic_power if initial_diagnostics is not None else None,
-            jnp.asarray(ohmic_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        current_max_history=_concat_history(
-            initial_diagnostics.current_max_history if initial_diagnostics is not None else None,
-            jnp.asarray(current_max_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        face_current_max_history=_concat_history(
-            initial_diagnostics.face_current_max_history if initial_diagnostics is not None else None,
-            jnp.asarray(face_current_max_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        emf_max_history=_concat_history(
-            initial_diagnostics.emf_max_history if initial_diagnostics is not None else None,
-            jnp.asarray(emf_max_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        lorentz_max_history=_concat_history(
-            initial_diagnostics.lorentz_max_history if initial_diagnostics is not None else None,
-            jnp.asarray(lorentz_max_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        face_lorentz_max_history=_concat_history(
-            initial_diagnostics.face_lorentz_max_history if initial_diagnostics is not None else None,
-            jnp.asarray(face_lorentz_max_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        potential_residual_history=_concat_history(
-            initial_diagnostics.potential_residual_history if initial_diagnostics is not None else None,
-            jnp.asarray(potential_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        potential_iterations_history=_concat_history(
-            initial_diagnostics.potential_iterations_history if initial_diagnostics is not None else None,
-            jnp.asarray(potential_iteration_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        linear_residual_history=_concat_history(
-            initial_diagnostics.linear_residual_history if initial_diagnostics is not None else None,
-            jnp.asarray(linear_residual_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        linear_iterations_history=_concat_history(
-            initial_diagnostics.linear_iterations_history if initial_diagnostics is not None else None,
-            jnp.asarray(linear_iteration_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        volumetric_flow_rate_history=_concat_history(
-            initial_diagnostics.volumetric_flow_rate_history if initial_diagnostics is not None else None,
-            jnp.asarray(volumetric_flow_rate_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        mean_current_magnitude_history=_concat_history(
-            initial_diagnostics.mean_current_magnitude_history if initial_diagnostics is not None else None,
-            jnp.asarray(mean_current_magnitude_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        lorentz_power_history=_concat_history(
-            initial_diagnostics.lorentz_power_history if initial_diagnostics is not None else None,
-            jnp.asarray(lorentz_power_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        div_current_max_history=_concat_history(
-            initial_diagnostics.div_current_max_history if initial_diagnostics is not None else None,
-            jnp.asarray(div_current_max_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        charge_balance_residual_history=_concat_history(
-            initial_diagnostics.charge_balance_residual_history if initial_diagnostics is not None else None,
-            jnp.asarray(charge_balance_residual_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        gauge_residual_history=_concat_history(
-            initial_diagnostics.gauge_residual_history if initial_diagnostics is not None else None,
-            jnp.asarray(gauge_residual_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        interface_current_residual_history=_concat_history(
-            initial_diagnostics.interface_current_residual_history
-            if initial_diagnostics is not None
-            else None,
-            jnp.asarray(interface_current_residual_history, dtype=float),
-            append=append_diagnostics,
-        ),
+        **{name: retained_history(name, values) for name, values in history_values.items()}
     )
     solution = Solution(
         mesh=mesh,

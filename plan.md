@@ -740,7 +740,7 @@ purpose.
 
 - [ ] Review every supported source function for ownership and necessity.
 - [ ] Reuse coefficients, factors, preconditioners, and initial guesses.
-- [ ] Make full histories opt-in and remove plot-only work from solves.
+- [x] Make full histories opt-in and remove plot-only work from solves.
 - [ ] Consolidate JIT boundaries and eliminate hot-path host transfers.
 - [ ] Remove dense/intermediate allocations where matrix-free structure exists.
 - [ ] Benchmark 2-D and 3-D cold, warm, memory, iterations, and physical errors
@@ -1399,3 +1399,32 @@ surface, measurements, validation, decision, and next action.
 - Next action: make full diagnostic histories opt-in while preserving terminal
   diagnostics, exact benchmark/restart evidence, and the common result
   contract.
+
+### 2026-08-22 — bounded diagnostic retention
+
+- Added one `OutputSpec.history_stride` policy for 2-D and 3-D solves. The
+  default retains only the terminal sample, positive values retain the first,
+  periodic, and terminal samples, and `1` requests every iteration. Positive
+  restart segments preserve already retained samples; terminal-only resumes
+  keep only the new terminal. Benchmark builders explicitly request complete
+  histories for their evidence contracts.
+- Kept checkpoint state independent from returned diagnostic retention.
+  Compact 3-D restart bundles retain the actual completed-step count and
+  validate all stored history widths without reconstructing discarded data.
+  `write_stride`, `history_stride`, and `checkpoint_interval` now have separate
+  documented purposes.
+- Collapsed repeated 2-D diagnostic assembly while adding the shared policy.
+  Package source is 14,934 lines across 15 modules, below the 15,000-line gate;
+  tests are 11,590 lines across 13 files and the root API remains 24 names.
+- The complete six-worker gate passes 503 tests with no skips in 83.7 seconds.
+  Exact combined line/branch coverage is 95.089601% across 5,823 statements
+  and 1,264 branches. Ruff check/format, byte compilation,
+  architecture/import, current-state prose, and Sphinx warnings-as-errors
+  gates pass.
+- The wheel is 142,349 bytes with 29 members and the source distribution is
+  133,368 bytes with 35 members; Twine and distribution-content audits pass.
+  A clean environment installed released SOLVAX 0.14.0 and the LMX wheel,
+  then passed the CLI, a converged 2-D common-API solve, a real 3-D common-API
+  solve, and terminal-history checks from `/tmp`.
+- Next action: repeat pinned B2 Docker parity from this committed state, then
+  push the common-API and bounded-history commits with their evidence.

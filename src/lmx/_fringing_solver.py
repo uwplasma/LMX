@@ -922,6 +922,7 @@ def _solve_extruded_projection(
                 pressure_residual_by_step,
                 electric_linear_by_step,
                 potential_residual_by_step,
+                stride=case.output.history_stride,
             ),
         )
     materials = build_material_fields(case, mesh)
@@ -1109,6 +1110,7 @@ def _solve_extruded_projection(
         potential_scale=electric_potential_scale,
         forcing=forcing,
     )
+    retained_history_steps = len(residual_by_step)
     if use_alex_b2_finite_volume:
         (
             initialize_flux,
@@ -1750,7 +1752,7 @@ def _solve_extruded_projection(
             if use_alex_b2_finite_volume and case.solver.coupling_acceleration == "anderson"
             else None
         ),
-        stopping_state=(len(residual_by_step), steady_streak, "converged" if converged else "step_limit"),
+        stopping_state=(step + 1, steady_streak, "converged" if converged else "step_limit"),
         jx=jx,
         jy=jy,
         jz=jz,
@@ -1778,5 +1780,7 @@ def _solve_extruded_projection(
             courant_by_step,
             pressure_linear=pressure_linear_by_step,
             momentum_defect=(momentum_defect_by_step if use_alex_b2_finite_volume else None),
+            stride=case.output.history_stride,
+            retained_prefix=retained_history_steps,
         ),
     )

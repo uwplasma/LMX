@@ -314,7 +314,7 @@ def write_extruded_bundle_restart_npz(
     has_diagnostics = (
         (aitken_state is not None or anderson_state is not None)
         and courant_history.shape[1:] == (3,)
-        and stopping_state[0] == len(courant_history)
+        and 0 < len(courant_history) <= stopping_state[0]
     )
     has_pressure_diagnostics = pressure_linear_history.shape == (
         len(courant_history),
@@ -483,11 +483,12 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
         station_history = (
             tuple(json.loads(str(data["station_history_json"]))) if "station_history_json" in data else ()
         )
-        completed_steps = _load_optional_array(data, "iteration_residual_history").size
+        retained_steps = _load_optional_array(data, "iteration_residual_history").size
         stopping_state = metadata.get("stopping_state")
         if stopping_state is None:
             raise ValueError("Extruded restart is missing stopping state")
-        if len(stopping_state) != 3 or int(stopping_state[0]) != completed_steps:
+        completed_steps = int(stopping_state[0]) if len(stopping_state) == 3 else -1
+        if retained_steps > completed_steps or bool(retained_steps) != bool(completed_steps):
             raise ValueError("B2 restart stopping state has inconsistent step count")
         histories = {
             name: jnp.asarray(_load_optional_array(data, name)).reshape((-1, width))
@@ -536,7 +537,7 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
         )
         for field, _ in diagnostic_fields:
             history = getattr(bundle, field)
-            if has_diagnostics and history.shape[0] != completed_steps:
+            if has_diagnostics and history.shape[0] != retained_steps:
                 raise ValueError("B2 diagnostic restart histories have inconsistent lengths")
         if has_diagnostics and bundle.iteration_momentum_defect_history.ndim != 1:
             raise ValueError("B2 diagnostic restart histories have inconsistent lengths")
