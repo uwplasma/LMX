@@ -79,7 +79,8 @@ def test_benchmark_solver_returns_positive_timings(monkeypatch: pytest.MonkeyPat
 
     report = benchmark_solver(repeats=2, ha=5.0, ny=16, nz=16)
     assert float(report["cold_seconds"]) > 0.0
-    assert float(report["warm_seconds"]) > 0.0
+    assert float(report["warm_seconds"]) == pytest.approx(0.3)
+    assert report["warm_cv"] == 0.0
     assert report["backend"]
 
 

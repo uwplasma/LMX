@@ -19,9 +19,9 @@ lmx run fringing_rect --ha 20 --nx-stations 21 --ny 24 --nz 24 \
 ```
 
 `validate` solves a Hartmann, Shercliff, or Hunt case and writes profiles and
-validation metrics. `benchmark` measures cold and warm timings for a bounded
-Hartmann case; it is a local performance diagnostic, not a hardware-independent
-performance claim.
+validation metrics. `benchmark` reports cold time, warm median, and warm
+coefficient of variation for a bounded Hartmann case; it is a local performance
+diagnostic, not a hardware-independent performance claim.
 
 ## TOML sections
 

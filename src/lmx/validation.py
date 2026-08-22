@@ -1058,7 +1058,8 @@ def benchmark_solver(
         solve_steady(case)
         timings.append(time.perf_counter() - start)
     cold = timings[0]
-    warm = min(timings[1:] or timings)
+    warm_samples = np.asarray(timings[1:] or timings)
+    warm = float(np.median(warm_samples))
     return {
         "case": case.name,
         "ha": ha,
@@ -1067,6 +1068,7 @@ def benchmark_solver(
         "repeats": float(repeats),
         "cold_seconds": cold,
         "warm_seconds": warm,
+        "warm_cv": float(np.std(warm_samples, ddof=1) / warm) if warm_samples.size > 1 else 0.0,
         "mean_seconds": sum(timings) / len(timings),
         "backend": jax.default_backend(),
         "device_kind": jax.devices()[0].device_kind,

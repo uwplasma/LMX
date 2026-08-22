@@ -38,6 +38,7 @@ moving geometry or physics into SOLVAX.
 Analytical and manufactured tests check observed order on refined meshes.
 Production claims additionally require stable physical observables, stricter
 solver tolerances, and conservation gates. JAX compilation and warm execution
-are measured separately. Repeated cases benefit from the compilation cache and
-reused structured factors; optional output and histories should remain disabled
-when memory is the limiting resource.
+are measured separately. A fully developed solve assembles invariant potential
+and velocity coefficients and its preconditioner once, then reuses them at each
+coupling step. Repeated cases also benefit from the compilation cache; optional
+output and histories should remain disabled when memory is the limiting resource.
