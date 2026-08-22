@@ -1460,8 +1460,8 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow():
     r_faces = jnp.asarray([0.0, 0.2, 0.55, 1.0])
     r_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
     dtheta = 2.0 * jnp.pi / ntheta
-    # This tiny manufactured system reaches the strict gates within 32 steps;
-    # a larger budget only lengthens compilation in routine coverage runs.
+    # This tiny manufactured system reaches the normalized physical gates
+    # within 32 steps; a larger budget only lengthens routine coverage runs.
     inner_iterations = 32
     shape = (nx, nr, ntheta)
     x = jnp.linspace(-1.0, 1.0, nx)[:, None, None]
@@ -1518,7 +1518,10 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow():
 
     steady_result = steady_project()
     assert steady_result[-3] < 1.0e-7
-    assert steady_result[-2] < 1.0e-7
+    cross_section_area = jnp.mean(jnp.sum(cell_area, axis=(1, 2)))
+    assert steady_result[-2] / cross_section_area < 1.0e-7
+    assert steady_result[-1].converged
+    assert steady_result[-1].residual_norm < 1.0e-7
     assert bool(steady_result[-1].converged)
     with pytest.raises(ValueError, match="retained-modal coefficients"):
         steady_project(modal_stabilization=True)
