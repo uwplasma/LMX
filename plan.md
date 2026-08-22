@@ -1895,7 +1895,10 @@ surface, measurements, validation, decision, and next action.
 - Upgraded the flexible volume-potential FGMRES path to
   `solvax.linear_solve` with the same established right preconditioner applied
   to the transposed operator, so its iterations are not taped. The focused
-  conducting-rectangle solve and analytical RHS-scale gradient gate pass.
+  conducting-rectangle solve and analytical RHS-scale gradient gate pass on
+  current JAX and the Python 3.10 lane's JAX 0.6.2. An attempted eager
+  `linear_transpose` of the tensor preconditioner was rejected after JAX 0.6.2
+  raised inside the underlying scan even during primal type checking.
 - Rejected the first layered Hunt end-to-end adjoint after the transpose
   coupled solve diverged despite a converged primal. The centered field-scale
   derivative is `-9.973377e-3`; the failed adjoint returned values between
@@ -1904,11 +1907,11 @@ surface, measurements, validation, decision, and next action.
   of returning a plausible-looking false gradient. A block formulation or
   physics-aware transpose preconditioner is required before enabling Hunt.
 - LMX now requires the public `solvax>=0.17,<1` release and pins 0.17.0 in its
-  minimum-dependency lane. The architecture audit passes at 16 modules, 15,279
-  package lines, 6,016 maintained-core lines, and 28 root exports: the accepted
-  field API and tests reduce total source by 77 lines versus the preceding
-  candidate. The complete public-wheel gate passes 505 tests in 109.5 seconds
-  at 95.11% exact combined line/branch coverage; all curated examples, Ruff,
+  minimum-dependency lane. The architecture audit passes at 16 modules, 15,272
+  package lines, 6,009 maintained-core lines, and 28 root exports: the accepted
+  field API and tests reduce total source by 84 lines versus the preceding
+  candidate. The complete public-wheel gate passes 505 tests in 104.2 seconds
+  at 95.12% exact combined line/branch coverage; all curated examples, Ruff,
   formatting, architecture/import, warning-free HTML docs, linkcheck, build,
   Twine, distribution-content, and fresh-wheel value-and-gradient checks pass.
 - The LMX 1.2.0 tagged release workflow independently completed the pinned
