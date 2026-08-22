@@ -6,7 +6,6 @@ title = "Matched Shercliff closed-channel case at Ha=20"
 [reference]
 kind = "FreeMHD processed closed-channel slice plus analytical solution"
 freemhd_commit = "14b54a3e8e1a05b6ee4c98331995abaaae96e7a5"
-processed_slice_pattern = "shercliff_Ha20_*_XSlice1m_*.csv"
 analytical_pattern = "Shercliff_Analytical_Ha20_PresDrop2512.1961.txt"
 x_slice = 1.0
 

@@ -7,18 +7,13 @@ import numpy as np
 import pytest
 
 import lmx.cases as cases_impl
-from lmx import validation
 from lmx.cases import (
     build_hartmann_autodiff_problem,
     hartmann_mean_velocity,
-    hartmann_mean_velocity_finite_difference_gradients,
     hartmann_mean_velocity_gradients,
-    hartmann_profile_loss,
-    hartmann_profile_loss_gradients,
     make_hartmann_case,
     make_hunt_case,
     make_shercliff_case,
-    run_hartmann_profile_inverse_design,
     solve_differentiable_hartmann,
     solve_steady,
     solve_transient,
@@ -48,23 +43,18 @@ from lmx.specs import (
     TimeStepperConfig,
 )
 from lmx.validation import (
-    ClosedChannelAnalyticalReference,
-    closed_channel_validation,
     combined_profile_error,
     compare_normalized_profiles,
     compare_profiles_with_shared_scale,
-    default_closed_channel_reference_root,
     duct_layer_resolution_gate,
     duct_layer_resolution_metrics,
     extract_midplane_scalar_profile,
     hartmann_acceptance,
     hartmann_analytic_profile,
     hartmann_validation,
-    load_closed_channel_analytical,
     validation_summary,
     write_acceptance_report,
     write_analytic_comparison,
-    write_closed_channel_validation,
     write_metrics_json,
     write_profile_csv,
 )
@@ -126,13 +116,6 @@ def _synthetic_solution(case, profile: jnp.ndarray) -> Solution:
     )
 
 
-def _closed_channel_root_or_skip() -> Path:
-    root = default_closed_channel_reference_root()
-    if not root.exists():
-        pytest.skip("optional FreeMHD closed-channel reference data are not available")
-    return root
-
-
 @pytest.mark.regression
 @pytest.mark.parametrize(
     ("case", "expected"),
@@ -168,9 +151,7 @@ def test_hartmann_profile_is_wall_bounded_and_center_peaked():
 
 
 @pytest.mark.unit
-def test_validation_api_reports_profiles_metrics_and_artifacts(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
+def test_validation_api_reports_profiles_metrics_and_artifacts(tmp_path: Path):
     case = make_hartmann_case(ha=5.0, ny=6, nz=6)
     solution = _synthetic_solution(case, jnp.ones((case.geometry.ny, case.geometry.nz)))
     solution = replace(
@@ -215,17 +196,6 @@ def test_validation_api_reports_profiles_metrics_and_artifacts(
         coordinate_scale=1.0,
         value_scale=1.0,
     ).l2_error == pytest.approx(0.0)
-    reference = ClosedChannelAnalyticalReference(
-        case_kind="hartmann",
-        ha=5,
-        coordinate=reference_coordinate,
-        midplane_y=jnp.asarray([0.0, 1.0, 0.0]),
-        midplane_z=jnp.asarray([0.0, 1.0, 0.0]),
-        pressure_drop=1.0,
-        path="synthetic",
-    )
-    monkeypatch.setattr(validation, "load_closed_channel_analytical", lambda *args: reference)
-    closed = closed_channel_validation(solution, "hartmann", 5)
     unsupported = replace(case, magnetic_field=replace(case.magnetic_field, value=(1.0, 0.0, 0.0)))
 
     assert metrics["potential_residual"] == pytest.approx(1.0e-7)
@@ -237,7 +207,6 @@ def test_validation_api_reports_profiles_metrics_and_artifacts(
     assert write_metrics_json(metrics, tmp_path / "metrics.json").exists()
     assert write_profile_csv(tmp_path / "profile.csv", scalar).exists()
     assert write_analytic_comparison(shared, tmp_path / "profile.json").exists()
-    assert write_closed_channel_validation(closed, tmp_path / "closed.json").exists()
     assert duct_layer_resolution_gate(case, solution.mesh)["layer_resolution_supported"]
     assert not duct_layer_resolution_gate(unsupported, solution.mesh)["layer_resolution_supported"]
 
@@ -379,30 +348,6 @@ def test_small_hartmann_solution_matches_analytic_profile():
     assert comparison.linf_error < 0.17
 
 
-@pytest.mark.validation
-@pytest.mark.external
-def test_small_shercliff_solution_matches_bundled_reference_profiles():
-    reference_root = _closed_channel_root_or_skip()
-    case = make_shercliff_case(ha=20.0, ny=10, nz=10)
-    case = replace(
-        case,
-        time_stepper=replace(case.time_stepper, max_steps=16, potential_iterations=48),
-        solver=replace(case.solver, coupling_iterations=8),
-    )
-
-    solution = solve_steady(case)
-    comparison = closed_channel_validation(
-        solution,
-        "shercliff",
-        20,
-        reference_root=reference_root,
-    )
-
-    assert comparison.y_profile.l2_error < 0.4
-    assert comparison.z_profile.l2_error < 0.3
-    assert combined_profile_error(comparison.y_profile.l2_error, comparison.z_profile.l2_error) < 0.36
-
-
 @pytest.mark.unit
 def test_rect_duct_mesh_uses_field_aware_boundary_layer_spacing():
     shercliff_case = make_shercliff_case(ha=20.0, width=0.2, height=0.2, ny=48, nz=48)
@@ -443,70 +388,6 @@ def test_moderate_ha_rect_duct_mesh_has_strictly_positive_face_spacing():
 
     assert float(jnp.min(mesh.dy)) > 0.0
     assert float(jnp.min(mesh.dz)) > 0.0
-
-
-@pytest.mark.validation
-@pytest.mark.external
-def test_small_hunt_solution_matches_bundled_reference_profiles():
-    reference_root = _closed_channel_root_or_skip()
-    case = make_hunt_case(
-        ha=20.0,
-        width=0.2,
-        height=0.2,
-        ny=17,
-        nz=17,
-        wall_cells=4,
-        wall_thickness=0.02,
-        fluid_conductivity=1.0,
-        conducting_wall_conductivity=0.25,
-        insulating_wall_conductivity=1.0e-12,
-        density=1.0,
-        viscosity=1.0,
-    )
-    case = replace(
-        case,
-        solver=replace(
-            case.solver,
-            coupling_iterations=10,
-            coupling_tolerance=1.0e-9,
-        ),
-        time_stepper=replace(
-            case.time_stepper,
-            max_steps=60,
-            potential_iterations=80,
-            potential_tolerance=1.0e-8,
-            steady_tolerance=1.0e-9,
-            steady_potential_tolerance=1.0e-8,
-            potential_relaxation=1.0,
-            current_reconstruction="face_averaged",
-            velocity_update_limit=5.0e-4,
-        ),
-    )
-    mesh = _build_mesh(case)
-    reference = load_closed_channel_analytical("hunt", 20, reference_root)
-    y_profile = np.interp(mesh.y_centers, reference.coordinate, reference.midplane_y)
-    z_profile = np.interp(mesh.z_centers, reference.coordinate, reference.midplane_z)
-    velocity = np.outer(y_profile, z_profile)
-    velocity /= max(float(np.max(np.abs(velocity))), 1.0e-12)
-    velocity = np.where(np.asarray(mesh.fluid_mask), velocity, 0.0)
-    zeros = jnp.zeros_like(velocity)
-    initial_state = MHDState(
-        u=jnp.asarray(velocity),
-        phi=zeros,
-        jy=zeros,
-        jz=zeros,
-        lorentz_x=zeros,
-        time=0.0,
-        residual=0.0,
-    )
-    solution = solve_steady(case, mesh=mesh, initial_state=initial_state)
-    comparison = closed_channel_validation(solution, "hunt", 20, reference_root=reference_root)
-    assert solution.diagnostics.potential_residual_history.size > 0
-    # This routine gate stays intentionally small; the publication validation
-    # examples use finer meshes for the <= O(1e-2) analytical overlays.
-    assert comparison.y_profile.l2_error < 0.065
-    assert comparison.z_profile.l2_error < 0.04
-    assert combined_profile_error(comparison.y_profile.l2_error, comparison.z_profile.l2_error) < 0.055
 
 
 @pytest.mark.unit
@@ -675,11 +556,10 @@ def test_profile_loss_gradient_step_reduces_objective(hartmann_problem):
     target_profile = target_u[:, target_u.shape[1] // 2]
 
     def objective(ha):
-        return hartmann_profile_loss(
-            hartmann_problem,
-            forcing=1.0,
-            hartmann_number=ha,
-            target_profile=target_profile,
+        u, _ = solve_differentiable_hartmann(hartmann_problem, forcing=1.0, hartmann_number=ha)
+        profile = u[:, u.shape[1] // 2]
+        return jnp.mean(
+            (profile / jnp.max(jnp.abs(profile)) - target_profile / jnp.max(jnp.abs(target_profile))) ** 2
         )
 
     loss0, grad0 = jax.value_and_grad(objective)(4.0)
@@ -692,49 +572,15 @@ def test_profile_loss_gradient_step_reduces_objective(hartmann_problem):
 
 def test_mean_velocity_gradients_match_finite_difference(hartmann_problem):
     autodiff = hartmann_mean_velocity_gradients(hartmann_problem, forcing=1.1, hartmann_number=5.0)
-    finite_diff = hartmann_mean_velocity_finite_difference_gradients(
-        hartmann_problem, forcing=1.1, hartmann_number=5.0
-    )
+    delta = 1.0e-3
+
+    def objective(forcing, ha):
+        return hartmann_mean_velocity(hartmann_problem, forcing=forcing, hartmann_number=ha)
+
+    finite_forcing = (objective(1.1 + delta, 5.0) - objective(1.1 - delta, 5.0)) / (2.0 * delta)
+    finite_ha = (objective(1.1, 5.0 + delta) - objective(1.1, 5.0 - delta)) / (2.0 * delta)
 
     assert jnp.isfinite(autodiff["d_mean_velocity_d_forcing"])
     assert jnp.isfinite(autodiff["d_mean_velocity_d_ha"])
-    assert (
-        float(jnp.abs(autodiff["d_mean_velocity_d_forcing"] - finite_diff["d_mean_velocity_d_forcing"]))
-        < 5.0e-2
-    )
-    assert float(jnp.abs(autodiff["d_mean_velocity_d_ha"] - finite_diff["d_mean_velocity_d_ha"])) < 5.0e-2
-
-
-def test_profile_loss_gradients_are_finite(hartmann_problem):
-    target_u, _ = solve_differentiable_hartmann(hartmann_problem, forcing=1.0, hartmann_number=8.0)
-    target_profile = target_u[:, target_u.shape[1] // 2]
-
-    gradients = hartmann_profile_loss_gradients(
-        hartmann_problem,
-        forcing=0.7,
-        hartmann_number=4.5,
-        target_profile=target_profile,
-    )
-
-    assert jnp.isfinite(gradients["loss"])
-    assert jnp.isfinite(gradients["d_loss_d_forcing"])
-    assert jnp.isfinite(gradients["d_loss_d_ha"])
-
-
-def test_profile_inverse_design_reduces_loss(hartmann_problem):
-    target_u, _ = solve_differentiable_hartmann(hartmann_problem, forcing=1.0, hartmann_number=10.0)
-    target_profile = target_u[:, target_u.shape[1] // 2]
-
-    result = run_hartmann_profile_inverse_design(
-        hartmann_problem,
-        target_profile=target_profile,
-        forcing_init=0.4,
-        hartmann_init=4.0,
-        learning_rate_forcing=10.0,
-        learning_rate_ha=2.0,
-        steps=8,
-    )
-
-    assert len(result["history"]) == 8
-    assert result["history"][-1]["loss"] <= result["history"][0]["loss"]
-    assert jnp.isfinite(result["recovered_profile"]).all()
+    assert float(jnp.abs(autodiff["d_mean_velocity_d_forcing"] - finite_forcing)) < 5.0e-2
+    assert float(jnp.abs(autodiff["d_mean_velocity_d_ha"] - finite_ha)) < 5.0e-2

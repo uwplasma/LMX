@@ -178,8 +178,8 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
     if not isinstance(curated, list) or not curated:
         raise ValueError("examples/catalog.toml must define at least one [[example]]")
     curated_paths = [str(item["path"]) for item in curated]
-    allowed_example_statuses = {"stable", "research-stage", "external-data"}
-    allowed_runtime_tiers = {"portable", "external", "accelerator-optional"}
+    allowed_example_statuses = {"stable", "research-stage"}
+    allowed_runtime_tiers = {"portable", "accelerator-optional"}
     for item in curated:
         if item.get("status") not in allowed_example_statuses:
             raise ValueError(f"Unknown curated workflow status: {item.get('status')!r}")
@@ -245,16 +245,16 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
         },
         "targets": {
             "package_module_count_max": 15,
-            "total_package_lines_max": 16700,
+            "total_package_lines_max": 15000,
             "largest_package_module_lines_max": 1800,
             "maintained_core_lines_max": 10000,
             "test_file_count_max": 14,
-            "test_lines_max": 12600,
+            "test_lines_max": 12000,
             "external_validation_file_count_max": 1,
             "largest_external_validation_lines_max": 1800,
             "maintenance_script_count_max": 4,
-            "stable_root_exports_max": 30,
-            "curated_examples_max": 8,
+            "stable_root_exports_max": 26,
+            "curated_examples_max": 7,
             "checkout_bytes_max": 3500 * 1024,
             "root_import_median_seconds_max": 0.25,
             "sdist_bytes_max": 512 * 1024,

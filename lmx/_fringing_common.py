@@ -17,20 +17,14 @@ from jax.sharding import PartitionSpec as P
 from solvax import (
     fixed_point_iteration,
     pcg_linear_solve,
-    splu_solve,
     tridiagonal_solve,
 )
 
-try:
-    from scipy import sparse
-except Exception:  # pragma: no cover - SciPy should be present in shipped environments.
-    sparse = None
 from .specs import (
     EXTRUDED_HISTORY_WIDTHS,
     CaseSpec,
     ExtrudedFieldBundle,
     ExtrudedIterationProgress,
-    require_finite,
 )
 
 _EXTRUDED_NUMERICAL_RESULTS = (
@@ -774,161 +768,6 @@ def _gauge_invariant_scalar_update(
     return jnp.max(jnp.abs(delta)) / max(scale, 1.0e-20)
 
 
-def _jacobi_fixed_point(
-    update: Callable[[jnp.ndarray], jnp.ndarray],
-    field: jnp.ndarray,
-    residual_norm: Callable[[jnp.ndarray], jnp.ndarray],
-    *,
-    iterations: int,
-    tolerance: float,
-    stage: str,
-) -> tuple[jnp.ndarray, float, int, float]:
-    initial_residual = float(residual_norm(field))
-    solution = fixed_point_iteration(
-        update,
-        field,
-        residual_norm=residual_norm,
-        rtol=0.0,
-        atol=tolerance,
-        max_steps=iterations,
-    )
-    require_finite(stage, potential=solution.x, residual=solution.residual_norm)
-    return solution.x, float(solution.residual_norm), int(solution.iterations), initial_residual
-
-
-def _poisson_jacobi_3d(
-    rhs: jnp.ndarray,
-    *,
-    dx: float,
-    dy: float | jnp.ndarray,
-    dz: float | jnp.ndarray,
-    iterations: int,
-    tolerance: float,
-) -> tuple[jnp.ndarray, float, int, float]:
-    if jnp.asarray(dy).ndim or jnp.asarray(dz).ndim:
-        return _variable_coefficient_poisson_jacobi_3d(
-            rhs,
-            jnp.ones_like(rhs),
-            dx=dx,
-            dy=dy,
-            dz=dz,
-            iterations=iterations,
-            tolerance=tolerance,
-        )
-    rhs_compatible = rhs - jnp.mean(rhs)
-    diagonal = 2.0 / max(dx**2, 1.0e-12) + 2.0 / max(dy**2, 1.0e-12) + 2.0 / max(dz**2, 1.0e-12)
-    field = jnp.zeros_like(rhs_compatible)
-
-    def update(field):
-        x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
-            field,
-            mode_x="neumann",
-            mode_y="neumann",
-            mode_z="neumann",
-        )
-        updated = (
-            (x_west + x_east) / max(dx**2, 1.0e-12)
-            + (y_south + y_north) / max(dy**2, 1.0e-12)
-            + (z_bottom + z_top) / max(dz**2, 1.0e-12)
-            - rhs_compatible
-        ) / diagonal
-        return updated - jnp.mean(updated)
-
-    def residual_norm(field):
-        return jnp.max(
-            jnp.abs(
-                _laplacian_3d(
-                    field,
-                    dx=dx,
-                    dy=dy,
-                    dz=dz,
-                    mode_x="neumann",
-                    mode_y="neumann",
-                    mode_z="neumann",
-                )
-                - rhs_compatible
-            )
-        )
-
-    return _jacobi_fixed_point(
-        update,
-        field,
-        residual_norm,
-        iterations=iterations,
-        tolerance=tolerance,
-        stage="3-D Poisson iteration",
-    )
-
-
-def _variable_coefficient_poisson_jacobi_3d(
-    rhs: jnp.ndarray,
-    conductivity: jnp.ndarray,
-    *,
-    dx: float,
-    dy: float | jnp.ndarray,
-    dz: float | jnp.ndarray,
-    iterations: int,
-    tolerance: float,
-    initial_field: jnp.ndarray | None = None,
-) -> tuple[jnp.ndarray, float, int, float]:
-    dy_widths = _spacing_vector(dy, rhs.shape[1], dtype=rhs.dtype)
-    dz_widths = _spacing_vector(dz, rhs.shape[2], dtype=rhs.dtype)
-    volume_weights = jnp.broadcast_to(dy_widths[None, :, None] * dz_widths[None, None, :], rhs.shape)
-    rhs_compatible = rhs - jnp.sum(rhs * volume_weights) / jnp.sum(volume_weights)
-    coef_x_w, coef_x_e, coef_y_s, coef_y_n, coef_z_b, coef_z_t = _variable_diffusion_coefficients_3d(
-        conductivity, dx=dx, dy=dy_widths, dz=dz_widths
-    )
-    diagonal = coef_x_w + coef_x_e + coef_y_s + coef_y_n + coef_z_b + coef_z_t
-    diagonal = jnp.maximum(diagonal, 1.0e-12)
-    if initial_field is None:
-        field = jnp.zeros_like(rhs_compatible)
-    else:
-        field = jnp.asarray(initial_field, dtype=rhs_compatible.dtype)
-        require_finite("3-D Poisson initial state", potential=field)
-        field = field - jnp.sum(field * volume_weights) / jnp.sum(volume_weights)
-
-    def update(field):
-        x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
-            field,
-            mode_x="neumann",
-            mode_y="neumann",
-            mode_z="neumann",
-        )
-        updated = (
-            -rhs_compatible
-            + coef_x_w * x_west
-            + coef_x_e * x_east
-            + coef_y_s * y_south
-            + coef_y_n * y_north
-            + coef_z_b * z_bottom
-            + coef_z_t * z_top
-        ) / diagonal
-        return updated - jnp.sum(updated * volume_weights) / jnp.sum(volume_weights)
-
-    def residual_norm(field):
-        return jnp.max(
-            jnp.abs(
-                _variable_coefficient_residual_3d(
-                    field,
-                    rhs_compatible,
-                    conductivity,
-                    dx=dx,
-                    dy=dy,
-                    dz=dz,
-                )
-            )
-        )
-
-    return _jacobi_fixed_point(
-        update,
-        field,
-        residual_norm,
-        iterations=iterations,
-        tolerance=tolerance,
-        stage="3-D variable Poisson iteration",
-    )
-
-
 def _variable_coefficient_residual_3d(
     field: jnp.ndarray,
     rhs: jnp.ndarray,
@@ -1038,163 +877,57 @@ def _variable_diffusion_coefficients_3d(
     return coef_x_w, coef_x_e, coef_y_s, coef_y_n, coef_z_b, coef_z_t
 
 
-def _variable_coefficient_poisson_sparse_3d(
+def _projection_pressure_correction_3d(
     rhs: jnp.ndarray,
-    conductivity: jnp.ndarray,
     *,
     dx: float,
     dy: float | jnp.ndarray,
     dz: float | jnp.ndarray,
     iterations: int,
     tolerance: float,
-    initial_field: jnp.ndarray | None = None,
-) -> tuple[jnp.ndarray, float, int, float]:
-    if sparse is None:
-        return _variable_coefficient_poisson_jacobi_3d(
-            rhs,
-            conductivity,
-            dx=dx,
-            dy=dy,
-            dz=dz,
-            iterations=iterations,
-            tolerance=tolerance,
-            initial_field=initial_field,
+) -> jnp.ndarray:
+    """Apply the collocated projection stencil with SOLVAX fixed-point control."""
+
+    dy_widths = _spacing_vector(dy, rhs.shape[1], dtype=rhs.dtype)
+    dz_widths = _spacing_vector(dz, rhs.shape[2], dtype=rhs.dtype)
+    volume = jnp.broadcast_to(dy_widths[None, :, None] * dz_widths[None, None, :], rhs.shape)
+    compatible_rhs = rhs - jnp.sum(rhs * volume) / jnp.sum(volume)
+    coefficients = _variable_diffusion_coefficients_3d(jnp.ones_like(rhs), dx=dx, dy=dy_widths, dz=dz_widths)
+    diagonal = jnp.maximum(sum(coefficients), 1.0e-12)
+
+    def update(field):
+        neighbors = _neighbor_fields(
+            field,
+            mode_x="neumann",
+            mode_y="neumann",
+            mode_z="neumann",
         )
+        corrected = (
+            sum(coefficient * neighbor for coefficient, neighbor in zip(coefficients, neighbors))
+            - compatible_rhs
+        ) / diagonal
+        return corrected - jnp.sum(corrected * volume) / jnp.sum(volume)
 
-    conductivity_np = np.asarray(conductivity, dtype=float)
-    rhs_np = np.asarray(rhs, dtype=float)
-    nx, ny, nz = conductivity_np.shape
-    dy_widths_np = np.asarray(_spacing_vector(dy, ny, dtype=rhs.dtype), dtype=float)
-    dz_widths_np = np.asarray(_spacing_vector(dz, nz, dtype=rhs.dtype), dtype=float)
-    volume_weights = np.broadcast_to(dy_widths_np[None, :, None] * dz_widths_np[None, None, :], rhs_np.shape)
-    rhs_compatible = rhs_np - np.sum(rhs_np * volume_weights) / np.sum(volume_weights)
-    coefficients = tuple(
-        np.asarray(value, dtype=float)
-        for value in _variable_diffusion_coefficients_3d(
-            conductivity, dx=dx, dy=dy_widths_np, dz=dz_widths_np
-        )
-    )
-    coef_x_w, coef_x_e, coef_y_s, coef_y_n, coef_z_b, coef_z_t = coefficients
-    size = nx * ny * nz
-
-    def flat_index(i: int, j: int, k: int) -> int:
-        return (i * ny + j) * nz + k
-
-    rows: list[int] = []
-    cols: list[int] = []
-    data: list[float] = []
-    rhs_vector = (-rhs_compatible).reshape(-1)
-
-    for i in range(nx):
-        for j in range(ny):
-            for k in range(nz):
-                idx = flat_index(i, j, k)
-                if idx == 0:
-                    rows.append(idx)
-                    cols.append(idx)
-                    data.append(1.0)
-                    rhs_vector[idx] = 0.0
-                    continue
-
-                diag = 0.0
-                if i > 0:
-                    coef = float(coef_x_w[i, j, k])
-                    diag += coef
-                    rows.append(idx)
-                    cols.append(flat_index(i - 1, j, k))
-                    data.append(-coef)
-                if i + 1 < nx:
-                    coef = float(coef_x_e[i, j, k])
-                    diag += coef
-                    rows.append(idx)
-                    cols.append(flat_index(i + 1, j, k))
-                    data.append(-coef)
-                if j > 0:
-                    coef = float(coef_y_s[i, j, k])
-                    diag += coef
-                    rows.append(idx)
-                    cols.append(flat_index(i, j - 1, k))
-                    data.append(-coef)
-                if j + 1 < ny:
-                    coef = float(coef_y_n[i, j, k])
-                    diag += coef
-                    rows.append(idx)
-                    cols.append(flat_index(i, j + 1, k))
-                    data.append(-coef)
-                if k > 0:
-                    coef = float(coef_z_b[i, j, k])
-                    diag += coef
-                    rows.append(idx)
-                    cols.append(flat_index(i, j, k - 1))
-                    data.append(-coef)
-                if k + 1 < nz:
-                    coef = float(coef_z_t[i, j, k])
-                    diag += coef
-                    rows.append(idx)
-                    cols.append(flat_index(i, j, k + 1))
-                    data.append(-coef)
-                rows.append(idx)
-                cols.append(idx)
-                data.append(max(diag, 1.0e-12))
-
-    matrix = sparse.csr_matrix((data, (rows, cols)), shape=(size, size))
-    x0 = np.zeros(size, dtype=float)
-    if initial_field is not None:
-        initial_np = np.asarray(initial_field, dtype=float).reshape(-1)
-        x0 = initial_np - np.sum(initial_np.reshape(rhs_compatible.shape) * volume_weights) / np.sum(
-            volume_weights
-        )
-        x0 = np.asarray(x0, dtype=float).reshape(-1)
-        x0[0] = 0.0
-    initial_residual = float(
-        np.max(
-            np.abs(
-                np.asarray(
-                    _variable_coefficient_residual_3d(
-                        jnp.asarray(x0.reshape(rhs_compatible.shape)),
-                        jnp.asarray(rhs_compatible),
-                        conductivity,
-                        dx=dx,
-                        dy=dy,
-                        dz=dz,
-                    )
+    solution = fixed_point_iteration(
+        update,
+        jnp.zeros_like(rhs),
+        residual_norm=lambda field: jnp.max(
+            jnp.abs(
+                _variable_coefficient_residual_3d(
+                    field,
+                    compatible_rhs,
+                    jnp.ones_like(rhs),
+                    dx=dx,
+                    dy=dy_widths,
+                    dz=dz_widths,
                 )
             )
-        )
+        ),
+        rtol=0.0,
+        atol=tolerance,
+        max_steps=iterations,
     )
-    try:
-        solution = np.asarray(splu_solve(matrix, jnp.asarray(rhs_vector)))
-    except Exception:
-        return _variable_coefficient_poisson_jacobi_3d(
-            rhs,
-            conductivity,
-            dx=dx,
-            dy=dy,
-            dz=dz,
-            iterations=iterations,
-            tolerance=tolerance,
-            initial_field=initial_field,
-        )
-    field = solution.reshape(rhs_compatible.shape)
-    weights_sum = np.sum(volume_weights)
-    field = field - np.sum(field * volume_weights) / weights_sum
-    residual = float(
-        np.max(
-            np.abs(
-                np.asarray(
-                    _variable_coefficient_residual_3d(
-                        jnp.asarray(field),
-                        jnp.asarray(rhs_compatible),
-                        conductivity,
-                        dx=dx,
-                        dy=dy,
-                        dz=dz,
-                    )
-                )
-            )
-        )
-    )
-    return jnp.asarray(field, dtype=float), residual, 1, initial_residual
+    return solution.x
 
 
 def _rectangular_fluid_bounds(fluid_mask: jnp.ndarray) -> tuple[int, int, int, int]:

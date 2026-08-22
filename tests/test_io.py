@@ -22,7 +22,6 @@ from lmx.io import (
     write_extruded_restart_npz,
     write_extruded_solution_npz,
     write_extruded_solution_outputs,
-    write_freemhd_observable_parity_plots,
     write_paraview,
     write_solution_npz,
     write_solution_outputs,
@@ -56,11 +55,6 @@ def _sample_solution(case) -> Solution:
         u_max_history=jnp.asarray([1.0, 1.0, 1.0]),
         mean_velocity_history=jnp.asarray([0.8, 0.85, 0.9]),
         applied_forcing_history=jnp.asarray([1.2, 1.1, 1.0]),
-        pressure_proxy_history=jnp.asarray([0.3, 0.25, 0.2]),
-        current_scaled_pressure_proxy_history=jnp.asarray([0.4, 0.35, 0.3]),
-        raw_update_max_history=jnp.asarray([0.2, 0.1, 0.05]),
-        limiter_scale_history=jnp.asarray([1.0, 0.9, 0.8]),
-        limited_fraction_history=jnp.asarray([0.0, 0.1, 0.2]),
         current_max_history=jnp.asarray([1.5, 1.4, 1.3]),
         face_current_max_history=jnp.asarray([1.6, 1.5, 1.4]),
         emf_max_history=jnp.asarray([0.9, 0.8, 0.7]),
@@ -698,11 +692,6 @@ def _plot_solution(case) -> Solution:
         u_max_history=jnp.asarray([0.8, 0.9]),
         mean_velocity_history=jnp.asarray([0.5, 0.55]),
         applied_forcing_history=jnp.asarray([1.0, 1.0]),
-        pressure_proxy_history=jnp.asarray([0.2, 0.18]),
-        current_scaled_pressure_proxy_history=jnp.asarray([0.15, 0.13]),
-        raw_update_max_history=jnp.asarray([0.05, 0.02]),
-        limiter_scale_history=jnp.asarray([1.0, 1.0]),
-        limited_fraction_history=jnp.asarray([0.0, 0.0]),
         current_max_history=jnp.asarray([0.4, 0.35]),
         face_current_max_history=jnp.asarray([0.38, 0.33]),
         emf_max_history=jnp.asarray([0.25, 0.2]),
@@ -858,31 +847,3 @@ def test_write_extruded_overview_plots_writes_outputs(tmp_path: Path):
     )
 
     _assert_figure_pair(outputs, tmp_path, "extruded_overview")
-
-
-def test_write_freemhd_observable_parity_plots_writes_outputs(tmp_path: Path):
-    cut = {
-        "coordinate": np.linspace(-1.0, 1.0, 5).tolist(),
-        "simulated": np.array([0.0, 0.9, 1.0, 0.9, 0.0]).tolist(),
-        "reference": np.array([0.0, 0.92, 1.0, 0.92, 0.0]).tolist(),
-        "l2_error": 5.0e-3,
-        "linf_error": 2.0e-2,
-    }
-    records = [
-        {
-            "case_kind": "shercliff",
-            "observables": {
-                name: {"y": {**cut}, "z": {**cut}, "peak_ratio": 0.98}
-                for name in ("velocity", "potential", "current", "lorentz")
-            },
-        },
-        {
-            "case_kind": "hunt",
-            "observables": {
-                name: {"y": {**cut}, "z": {**cut}, "peak_ratio": 1.02}
-                for name in ("velocity", "potential", "current", "lorentz")
-            },
-        },
-    ]
-    outputs = write_freemhd_observable_parity_plots(records, tmp_path, case_title="Observable parity")
-    _assert_figure_pair(outputs, tmp_path, "freemhd_closed_channel_observable_parity")

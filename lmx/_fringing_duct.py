@@ -19,10 +19,6 @@ from solvax import (
     pcg_linear_solve,
 )
 
-try:
-    from scipy import sparse
-except Exception:  # pragma: no cover - SciPy should be present in shipped environments.
-    sparse = None
 from ._fringing_common import (
     _MIXED_AXIAL_PRESSURE_MODE,
     ALEX_BALANCE_TOLERANCE,
@@ -1378,7 +1374,7 @@ def _jit_b2_momentum_functions(
     flux_sharding: NamedSharding | None,
     vector_sharding: NamedSharding | None,
     kernel_key: tuple[object, ...],
-) -> tuple[Callable, ...]:
+) -> tuple[Callable, ...]:  # pragma: no cover - requires a multi-device mesh
     if field_sharding is None:
         return functions
     initialize, momentum, defect, embed, courant, pack_flux, unpack_flux, pack_vector, relax_flux = functions
@@ -1718,7 +1714,7 @@ def _jit_b2_coupling_functions(
     replicated_sharding: NamedSharding | None,
     flux_sharding: NamedSharding | None,
     kernel_key: tuple[object, ...],
-) -> tuple[Callable, ...]:
+) -> tuple[Callable, ...]:  # pragma: no cover - requires a multi-device mesh
     if field_sharding is None:
         return functions
     projection, electric, emf, reconstruct, lorentz, scale, difference, unscale, mix = functions

@@ -273,21 +273,15 @@ def test_hunt_case_uses_ha_aware_coupling_controls():
     ha100 = make_hunt_case(ha=100.0, ny=16, nz=16, wall_cells=2)
     ha1000 = make_hunt_case(ha=1000.0, ny=16, nz=16, wall_cells=2)
 
-    assert ha20.time_stepper.outer_iterations == 6
     assert ha20.time_stepper.velocity_update_limit == pytest.approx(2e-3)
     assert ha20.time_stepper.potential_tolerance is None
     assert ha20.time_stepper.potential_solver == "auto"
-    assert ha20.time_stepper.current_reconstruction == "cell_centered"
-    assert ha100.time_stepper.outer_iterations == 4
     assert ha100.time_stepper.velocity_update_limit == pytest.approx(1e-3)
     assert ha100.time_stepper.potential_tolerance is None
     assert ha100.time_stepper.potential_solver == "auto"
-    assert ha100.time_stepper.current_reconstruction == "cell_centered"
-    assert ha1000.time_stepper.outer_iterations == 3
     assert ha1000.time_stepper.velocity_update_limit == pytest.approx(1e-3)
     assert ha1000.time_stepper.potential_tolerance is None
     assert ha1000.time_stepper.potential_solver == "auto"
-    assert ha1000.time_stepper.current_reconstruction == "cell_centered"
     assert ha20.solver.kind == "fully_developed_inductionless"
     assert ha100.solver.kind == "fully_developed_inductionless"
     assert ha1000.solver.kind == "fully_developed_inductionless"
@@ -560,51 +554,6 @@ def test_concat_history_handles_append_and_empty_inputs():
     )
 
 
-def test_pressure_proxy_reference_current_prefers_face_current_history():
-    diagnostics = SimpleNamespace(
-        face_current_max_history=jnp.asarray([0.4, 0.3]),
-        current_max_history=jnp.asarray([0.2, 0.1]),
-    )
-
-    assert solvers._pressure_proxy_reference_current(diagnostics) == pytest.approx(0.4)
-    assert solvers._pressure_proxy_reference_current(
-        SimpleNamespace(
-            face_current_max_history=jnp.asarray([]),
-            current_max_history=jnp.asarray([0.2]),
-        )
-    ) == pytest.approx(0.2)
-    assert (
-        solvers._pressure_proxy_reference_current(
-            SimpleNamespace(
-                face_current_max_history=jnp.asarray([]),
-                current_max_history=jnp.asarray([]),
-            )
-        )
-        is None
-    )
-    assert solvers._pressure_proxy_reference_current(None) is None
-
-
-def test_scaled_pressure_proxy_value_uses_available_current_source():
-    value, reference = solvers._scaled_pressure_proxy_value(
-        pressure_proxy=2.0,
-        current_max=0.5,
-        face_current_max=0.0,
-        reference_current=None,
-    )
-    assert reference == pytest.approx(0.5)
-    assert value == pytest.approx(2.0)
-
-    value, reference = solvers._scaled_pressure_proxy_value(
-        pressure_proxy=2.0,
-        current_max=0.5,
-        face_current_max=1.0,
-        reference_current=0.25,
-    )
-    assert reference == pytest.approx(0.25)
-    assert value == pytest.approx(8.0)
-
-
 def test_magnetic_ramp_scale_disables_when_duration_is_zero():
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     assert float(magnetic_ramp_scale(case.magnetic_field, time=0.0)) == pytest.approx(1.0)
@@ -717,7 +666,7 @@ def test_potential_solver_backends_return_finite_fields_on_small_system():
         assert int(iterations) >= 0
 
 
-def test_current_reconstruction_modes_and_face_diagnostics_are_finite():
+def test_current_reconstruction_and_face_diagnostics_are_finite():
     case = make_hunt_case(ha=20.0, ny=4, nz=4, wall_cells=1)
     mesh = solvers._build_mesh(case)
     materials = build_material_fields(case, mesh)
@@ -727,20 +676,18 @@ def test_current_reconstruction_modes_and_face_diagnostics_are_finite():
     u = 0.1 + 0.01 * y_index - 0.02 * z_index
     phi = 0.03 * y_index + 0.04 * z_index
 
-    for reconstruction in ("cell_centered", "face_averaged", "hybrid_face_lorentz"):
-        jy, jz, lorentz = solvers._compute_current_and_lorentz(
-            mesh,
-            materials.conductivity,
-            materials.fluid_mask,
-            u,
-            phi,
-            by,
-            bz,
-            reconstruction=reconstruction,
-        )
-        assert jnp.isfinite(jy).all()
-        assert jnp.isfinite(jz).all()
-        assert jnp.isfinite(lorentz).all()
+    jy, jz, lorentz = solvers._compute_current_and_lorentz(
+        mesh,
+        materials.conductivity,
+        materials.fluid_mask,
+        u,
+        phi,
+        by,
+        bz,
+    )
+    assert jnp.isfinite(jy).all()
+    assert jnp.isfinite(jz).all()
+    assert jnp.isfinite(lorentz).all()
 
     face_current_max, emf_max, face_lorentz_max = solvers._face_current_emf_and_lorentz_max(
         mesh,
@@ -1114,7 +1061,6 @@ def test_conductive_current_components_keep_wall_currents_for_interface_audits()
         phi,
         by,
         bz,
-        reconstruction="cell_centered",
     )
 
     wall_mask = ~materials.fluid_mask
@@ -2099,21 +2045,6 @@ def test_fully_developed_case_step_uses_direct_wall_interpolation_for_rectangula
     assert flags == [True]
 
 
-def test_velocity_update_limiters_cover_local_clip_and_validation_errors():
-    current = jnp.zeros((2, 2))
-    trial = jnp.asarray([[2.0, -2.0], [0.25, -0.25]])
-    fluid_mask = jnp.asarray([[True, True], [True, False]])
-
-    clipped = solvers._limited_velocity_update(
-        current, trial, fluid_mask, max_delta=0.5, limiter="local_clip"
-    )
-    assert float(clipped[0, 0]) == pytest.approx(0.5)
-    assert float(clipped[0, 1]) == pytest.approx(-0.5)
-
-    with pytest.raises(ValueError, match="Unsupported velocity update limiter"):
-        solvers._limited_velocity_update(current, trial, fluid_mask, limiter="bad")
-
-
 def test_target_mean_velocity_projection_preserves_area_weighted_flow_rate():
     mesh = generate_rect_duct_mesh(width=2.0, height=1.0, ny=2, nz=2)
     fluid_mask = jnp.asarray([[True, True], [True, False]])
@@ -2135,13 +2066,11 @@ def test_target_mean_velocity_projection_preserves_area_weighted_flow_rate():
     )
 
 
-def test_velocity_update_global_scale_and_rhs_and_pressure_proxy_helpers():
+def test_velocity_update_global_scale_and_rhs_helpers():
     current = jnp.zeros((2, 2))
     trial = jnp.asarray([[2.0, -2.0], [0.25, -0.25]])
     fluid_mask = jnp.asarray([[True, True], [True, False]])
-    updated = solvers._limited_velocity_update(
-        current, trial, fluid_mask, max_delta=0.5, limiter="global_scale"
-    )
+    updated = solvers._limited_velocity_update(current, trial, fluid_mask, max_delta=0.5)
     assert float(jnp.max(jnp.abs(updated))) <= 0.5 + 1e-12
 
     mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=2, nz=2)
@@ -2163,56 +2092,6 @@ def test_velocity_update_global_scale_and_rhs_and_pressure_proxy_helpers():
     )
     assert rhs.shape == phi.shape
     assert lorentz_source.shape == phi.shape
-    rhs_face, lorentz_face = solvers._fully_developed_rhs(
-        mesh=mesh,
-        sigma=sigma,
-        rho=rho,
-        fluid_mask=jnp.ones((2, 2), dtype=bool),
-        u=jnp.asarray([[0.2, 0.1], [0.0, -0.1]]),
-        phi=phi,
-        by=by,
-        bz=bz,
-        forcing=jnp.asarray(1.0),
-        current_reconstruction="face_averaged",
-    )
-    assert jnp.isfinite(rhs_face).all()
-    assert jnp.isfinite(lorentz_face).all()
-    diagnostics = type(
-        "Diagnostics",
-        (),
-        {
-            "face_current_max_history": jnp.asarray([]),
-            "current_max_history": jnp.asarray([2.5]),
-        },
-    )()
-    assert solvers._pressure_proxy_reference_current(diagnostics) == pytest.approx(2.5)
-    diagnostics_empty = type(
-        "Diagnostics",
-        (),
-        {
-            "face_current_max_history": jnp.asarray([]),
-            "current_max_history": jnp.asarray([]),
-        },
-    )()
-    assert solvers._pressure_proxy_reference_current(diagnostics_empty) is None
-
-    scaled, reference = solvers._scaled_pressure_proxy_value(
-        pressure_proxy=3.0,
-        current_max=2.0,
-        face_current_max=0.0,
-        reference_current=None,
-    )
-    assert scaled == pytest.approx(3.0)
-    assert reference == pytest.approx(2.0)
-
-    scaled_face, reference_face = solvers._scaled_pressure_proxy_value(
-        pressure_proxy=3.0,
-        current_max=2.0,
-        face_current_max=4.0,
-        reference_current=8.0,
-    )
-    assert scaled_face == pytest.approx(1.5)
-    assert reference_face == pytest.approx(8.0)
 
 
 def test_concat_history_and_velocity_targets_cover_empty_and_forcing_paths():
@@ -2365,12 +2244,10 @@ def test_solver_logging_helpers_and_footer_are_emitted():
     logger = Logger()
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
     mesh = solvers._build_mesh(case)
-    materials = build_material_fields(case, mesh)
     solvers._emit_solver_header(
         logger,
         case=case,
         mesh=mesh,
-        materials=materials,
         mode="steady",
         potential_solver="cg",
         target_mean_velocity=None,
@@ -2380,30 +2257,19 @@ def test_solver_logging_helpers_and_footer_are_emitted():
         logger,
         step_index=1,
         step_time=0.1,
-        dt=0.1,
         u_max_value=0.1,
         mean_velocity=0.1,
         max_current=0.0,
-        face_current_max=0.0,
-        emf_max=0.0,
         max_lorentz=0.0,
-        face_lorentz_max=0.0,
         residual_value=1.0e-6,
         potential_residual=1.0e-6,
         potential_iteration_count=1.0,
         linear_residual=1.0e-6,
         linear_iteration_count=1.0,
         applied_forcing=1.0,
-        pressure_proxy=1.0,
-        current_scaled_pressure_proxy=1.0,
-        raw_update_max=1.0e-6,
-        limiter_scale=1.0,
-        limited_fraction=0.0,
         courant_like=0.0,
         ohmic=0.0,
         volumetric_flow_rate=0.0,
-        mean_current_magnitude=0.0,
-        lorentz_power=0.0,
         div_current_max=0.0,
         charge_balance_residual=0.0,
         gauge_residual=0.0,
@@ -2449,12 +2315,10 @@ def test_solve_steady_emits_footer_through_logger(monkeypatch: pytest.MonkeyPatc
 def test_emit_solver_header_is_noop_without_logger():
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
     mesh = solvers._build_mesh(case)
-    materials = build_material_fields(case, mesh)
     solvers._emit_solver_header(
         None,
         case=case,
         mesh=mesh,
-        materials=materials,
         mode="steady",
         potential_solver="cg",
         target_mean_velocity=None,
@@ -2467,30 +2331,19 @@ def test_emit_solver_step_is_noop_without_logger():
         None,
         step_index=0,
         step_time=0.0,
-        dt=1.0,
         u_max_value=0.0,
         mean_velocity=0.0,
         max_current=0.0,
-        face_current_max=0.0,
-        emf_max=0.0,
         max_lorentz=0.0,
-        face_lorentz_max=0.0,
         residual_value=0.0,
         potential_residual=0.0,
         potential_iteration_count=0.0,
         linear_residual=0.0,
         linear_iteration_count=0.0,
         applied_forcing=0.0,
-        pressure_proxy=0.0,
-        current_scaled_pressure_proxy=0.0,
-        raw_update_max=0.0,
-        limiter_scale=1.0,
-        limited_fraction=0.0,
         courant_like=0.0,
         ohmic=0.0,
         volumetric_flow_rate=0.0,
-        mean_current_magnitude=0.0,
-        lorentz_power=0.0,
         div_current_max=0.0,
         charge_balance_residual=0.0,
         gauge_residual=0.0,
@@ -2520,17 +2373,6 @@ def test_initial_solver_state_without_restart_zeros_auxiliary_fields():
     assert jnp.allclose(lorentz0, 0.0)
 
 
-def test_scaled_pressure_proxy_value_falls_back_to_unity_reference_for_zero_currents():
-    scaled, reference = solvers._scaled_pressure_proxy_value(
-        pressure_proxy=2.0,
-        current_max=0.0,
-        face_current_max=0.0,
-        reference_current=0.0,
-    )
-    assert scaled == pytest.approx(0.0)
-    assert reference == pytest.approx(1.0)
-
-
 def test_inlet_speed_defaults_tuple_axis_to_x_and_rejects_zero_area_flow_rate():
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     tuple_bc = BoundaryCondition("tuple", "inlet_velocity", value=(1.0, 2.0, 3.0), axis="bad")
@@ -2550,13 +2392,11 @@ def test_emit_solver_header_forwards_restart_payload():
 
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
     mesh = solvers._build_mesh(case)
-    materials = build_material_fields(case, mesh)
     restart = SimpleNamespace(time=0.5, source="restart.npz")
     solvers._emit_solver_header(
         Logger(),
         case=case,
         mesh=mesh,
-        materials=materials,
         mode="steady",
         potential_solver="cg",
         target_mean_velocity=None,
@@ -2713,7 +2553,7 @@ for _unit_test_name in (
     "test_magnetic_ramp_delays_short_transient_lorentz_response",
     "test_shercliff_solution_stays_finite_and_zero_at_walls",
     "test_potential_solver_backends_return_finite_fields_on_small_system",
-    "test_current_reconstruction_modes_and_face_diagnostics_are_finite",
+    "test_current_reconstruction_and_face_diagnostics_are_finite",
     "test_auto_potential_backend_uses_cg_for_single_region_and_volume_scaled_cg_for_layered_cases",
     "test_build_material_fields_assigns_hunt_side_and_hartmann_wall_regions",
     "test_volume_scaled_potential_system_is_symmetric_after_cell_metric_weighting",
@@ -2725,7 +2565,6 @@ for _unit_test_name in (
     "test_potential_solver_rejects_unknown_backend",
     "test_resolve_potential_solver_auto_handles_none_and_full_fluid_mask",
     "test_enforce_velocity_bc_supports_direct_wall_interpolation",
-    "test_velocity_update_limiters_cover_local_clip_and_validation_errors",
     "test_inlet_speed_supports_tuple_scalar_and_flow_rate_boundaries",
     "test_fully_developed_case_step_rejects_non_implicit_transient_scheme",
     "test_steady_solver_supports_opt_in_solvax_aitken_coupling",

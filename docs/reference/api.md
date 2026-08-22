@@ -11,7 +11,7 @@ live in the module that owns their concepts.
 | Meshes | `generate_rect_duct_mesh`, `generate_rect_duct_mesh_from_faces`, `generate_layered_duct_mesh`, `generate_layered_duct_mesh_from_fluid_faces`, `generate_multilayer_duct_mesh` |
 | Wall models | `WallLayer`, `wall_conductance_ratio`, `effective_pinhole_conductance_ratio`, `tangential_stack_conductance_ratio`, `normal_stack_leakage_ratio`, `equivalent_single_layer`, `nested_wall_layer_resolution_summary` |
 | Units | `dynamic_to_kinematic_viscosity`, `kinematic_to_dynamic_viscosity`, `hartmann_number`, `reynolds_number`, `interaction_parameter`, `magnetic_reynolds_number`, `magnetic_field_from_hartmann` |
-| Evidence | `fully_developed_power_balance`, `load_shercliff_analytical`, `load_hunt_analytical`, `load_closed_channel_analytical`, `load_processed_slice` |
+| Evidence | `fully_developed_power_balance` and the analytical, conservation, and packaged benchmark tools in `lmx.validation` |
 | Runtime | `enable_compilation_cache` |
 
 ## Case schema

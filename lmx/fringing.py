@@ -8,10 +8,6 @@ from dataclasses import replace
 import jax.numpy as jnp
 import numpy as np
 
-try:
-    from scipy import sparse
-except Exception:  # pragma: no cover - SciPy should be present in shipped environments.
-    sparse = None
 from ._fringing_common import (
     _EXTRUDED_NUMERICAL_RESULTS,
 )

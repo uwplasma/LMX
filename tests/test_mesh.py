@@ -3,7 +3,6 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-import lmx.mesh as mesh_module
 from lmx.mesh import (
     _broadcast_spacing_y,
     _broadcast_spacing_z,
@@ -32,8 +31,6 @@ from lmx.mesh import (
     sample_cross_section_field,
     sample_tabulated_cross_section_field,
     sample_tabulated_field_volume,
-    tabulated_cross_section_reconstruction_metrics,
-    tabulated_field_quality_metrics,
     write_tabulated_field_npz,
 )
 from lmx.physics import WallLayer
@@ -491,35 +488,6 @@ def test_tabulated_field_npz_round_trip_and_sampling(tmp_path):
     )
     assert sampled.shape == field.shape
     assert abs(float(sampled[..., 2].mean()) - float(field[..., 2].mean())) < 1.0e-8
-    quality = tabulated_field_quality_metrics(path)
-    assert quality["dimension"] == 2
-    assert quality["axis_monotonic"] is True
-    assert quality["validation_pass"] is True
-    assert quality["interpolation_node_linf_error"] < 1.0e-12
-
-
-def test_tabulated_cross_section_reconstruction_metrics_compare_solver_points(tmp_path):
-    field_fn = make_divergence_free_cross_section_field(width=2.0, height=1.0, base_bz=8.0, perturbation=0.1)
-    y, z, field = sample_cross_section_field(field_fn, width=2.0, height=1.0, ny=41, nz=41)
-    path = write_tabulated_field_npz(
-        tmp_path / "field.npz",
-        y=y,
-        z=z,
-        bx=field[..., 0],
-        by=field[..., 1],
-        bz=field[..., 2],
-    )
-    solver_y = np.linspace(-0.95, 0.95, 13)
-    solver_z = np.linspace(-0.45, 0.45, 11)
-    metrics = tabulated_cross_section_reconstruction_metrics(
-        path,
-        reference_field_fn=field_fn,
-        y=solver_y,
-        z=solver_z,
-    )
-    assert metrics["sample_count"] == 13 * 11
-    assert metrics["relative_l2_error"] < 1.0e-3
-    assert metrics["validation_pass"] is True
 
 
 def test_tabulated_field_volume_sampling_supports_3d_npz(tmp_path):
@@ -534,14 +502,9 @@ def test_tabulated_field_volume_sampling_supports_3d_npz(tmp_path):
     sampled = sample_tabulated_field_volume(path, x=xx, y=yy, z=zz)
     assert sampled.shape == xx.shape + (3,)
     assert sampled[..., 0] == pytest.approx(bx)
-    quality = tabulated_field_quality_metrics(path)
-    assert quality["dimension"] == 3
-    assert quality["axis_names"] == "x,y,z"
-    assert quality["validation_pass"] is True
-    assert quality["normalized_magnitude_max"] == pytest.approx(1.0)
 
 
-def test_tabulated_field_validation_and_dimension_mismatch_paths(tmp_path, monkeypatch):
+def test_tabulated_field_validation_and_dimension_mismatch_paths(tmp_path):
     text_path = tmp_path / "field.txt"
     text_path.write_text("not npz")
     with pytest.raises(ValueError, match="NPZ"):
@@ -567,9 +530,3 @@ def test_tabulated_field_validation_and_dimension_mismatch_paths(tmp_path, monke
         field2d, x=np.asarray([[0.0]]), y=np.asarray([[0.5]]), z=np.asarray([[0.5]])
     )
     assert sampled.shape == (1, 1, 3)
-
-    monkeypatch.setattr(mesh_module, "RegularGridInterpolator", None)
-    with pytest.raises(RuntimeError, match="RegularGridInterpolator"):
-        sample_tabulated_field_volume(
-            field2d, x=np.asarray([[0.0]]), y=np.asarray([[0.5]]), z=np.asarray([[0.5]])
-        )

@@ -18,13 +18,11 @@ from lmx._fringing_common import (
     _gradient_3d,
     _laplacian_3d,
     _normalized_pressure_observable_update,
-    _poisson_jacobi_3d,
+    _projection_pressure_correction_3d,
     _rectangular_fluid_bounds,
     _shard_extruded_fields,
     _spacing_vector,
     _thin_wall_interface_mean,
-    _variable_coefficient_poisson_jacobi_3d,
-    _variable_coefficient_poisson_sparse_3d,
     _variable_coefficient_residual_3d,
 )
 from lmx._fringing_duct import (
@@ -46,8 +44,6 @@ from lmx._fringing_pipe import (
     _pipe_face_divergence,
     _pipe_gradient_3d,
     _pipe_laplacian_3d,
-    _pipe_poisson_jacobi_3d,
-    _pipe_poisson_sparse_3d,
     _pipe_pressure_face_correction,
     _pipe_radial_fluid_count,
     _pipe_variable_diffusion_coefficients_3d,
@@ -100,18 +96,6 @@ def test_extruded_solution_reports_terminal_state():
     assert solution.steps == 7
     assert solution.status == "step_limit"
     assert solution.converged is False
-
-
-def test_poisson_iteration_rejects_nonfinite_state():
-    with pytest.raises(NumericalFailure, match="3-D Poisson iteration.*residual"):
-        _poisson_jacobi_3d(
-            jnp.full((2, 2, 2), jnp.nan),
-            dx=1.0,
-            dy=1.0,
-            dz=1.0,
-            iterations=1,
-            tolerance=1.0,
-        )
 
 
 def test_extruded_solver_rejects_nonfinite_result(monkeypatch: pytest.MonkeyPatch):
@@ -476,20 +460,7 @@ def test_nonuniform_variable_poisson_reconstructs_discrete_manufactured_field():
         dy=jnp.diff(y_faces),
         dz=jnp.diff(z_faces),
     )
-    solved, residual, _, _ = _variable_coefficient_poisson_sparse_3d(
-        rhs,
-        conductivity,
-        dx=0.4,
-        dy=jnp.diff(y_faces),
-        dz=jnp.diff(z_faces),
-        iterations=200,
-        tolerance=1.0e-10,
-    )
     expected = manufactured - jnp.mean(manufactured)
-    solved = solved - jnp.mean(solved)
-    assert float(jnp.max(jnp.abs(solved - expected))) < 1.0e-9
-    assert residual < 1.0e-8
-
     solved_result = _solvax_pressure_poisson_duct(
         rhs,
         conductivity,
@@ -517,35 +488,27 @@ def test_nonuniform_variable_poisson_reconstructs_discrete_manufactured_field():
     assert float(solvax_local_residual) < 1.0e-8
     assert float(jnp.max(jnp.abs(solvax_solved - expected))) < 1.0e-8
 
-    warm, warm_residual, warm_iterations, warm_initial = _variable_coefficient_poisson_jacobi_3d(
-        rhs,
-        conductivity,
+    projection_rhs = _variable_coefficient_residual_3d(
+        manufactured,
+        jnp.zeros_like(manufactured),
+        jnp.ones_like(manufactured),
         dx=0.4,
         dy=jnp.diff(y_faces),
         dz=jnp.diff(z_faces),
-        iterations=2,
-        tolerance=1.0e-8,
-        initial_field=manufactured + 7.0,
     )
-    assert warm_iterations == 0
-    assert warm_initial < 1.0e-8
-    assert warm_residual < 1.0e-8
-    volume_weights = jnp.broadcast_to(
-        jnp.diff(y_faces)[None, :, None] * jnp.diff(z_faces)[None, None, :], manufactured.shape
-    )
-    expected_weighted_gauge = manufactured - jnp.sum(manufactured * volume_weights) / jnp.sum(volume_weights)
-    assert warm == pytest.approx(expected_weighted_gauge, abs=1.0e-8)
-
-    zero_result = _poisson_jacobi_3d(
-        jnp.zeros((3, 4, 3)),
+    projection = _projection_pressure_correction_3d(
+        projection_rhs,
         dx=0.4,
-        dy=jnp.asarray([0.2, 0.3, 0.4, 0.5]),
-        dz=jnp.asarray([0.25, 0.35, 0.4]),
-        iterations=4,
+        dy=jnp.diff(y_faces),
+        dz=jnp.diff(z_faces),
+        iterations=300,
         tolerance=1.0e-12,
     )
-    assert jnp.allclose(zero_result[0], 0.0)
-    assert zero_result[1:] == pytest.approx((0.0, 0, 0.0))
+    volume = jnp.broadcast_to(
+        jnp.diff(y_faces)[None, :, None] * jnp.diff(z_faces)[None, None, :], manufactured.shape
+    )
+    projection_expected = manufactured - jnp.sum(manufactured * volume) / jnp.sum(volume)
+    assert float(jnp.max(jnp.abs(projection - projection_expected))) < 2.0e-5
 
 
 def test_solvax_metric_pressure_poisson_is_jitted_and_differentiable():
@@ -1801,23 +1764,7 @@ def test_fixed_flow_pipe_projection_closes_flow_and_rejects_invalid_masks():
         _pipe_radial_fluid_count(partial)
 
 
-def test_pipe_pressure_fallback_and_gauge_invariant_update():
-    rhs = jnp.zeros((3, 4, 8))
-    r = jnp.linspace(0.1, 0.4, 4)[None, :, None]
-    field, residual, iterations, initial = _pipe_poisson_jacobi_3d(
-        rhs,
-        dx=0.2,
-        dr=0.1,
-        dtheta=2.0 * jnp.pi / 8,
-        r=r,
-        iterations=4,
-        tolerance=1.0e-12,
-    )
-    assert jnp.allclose(field, 0.0)
-    assert residual == pytest.approx(0.0)
-    assert initial == pytest.approx(0.0)
-    assert iterations == 0
-
+def test_gauge_invariant_update_ignores_constant_shift():
     previous = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
     physical_update = jnp.asarray([[0.0, 0.2], [-0.1, 0.1]])
     volume = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
@@ -2083,28 +2030,20 @@ def test_solve_extruded_inductionless_projection_returns_finite_rectangular_bund
         )
 
 
-def test_rectangular_projection_uses_sparse_electric_solve(
-    monkeypatch: pytest.MonkeyPatch,
-):
+def test_rectangular_projection_uses_solvax_matrix_free_solve(monkeypatch: pytest.MonkeyPatch):
     problem = build_square_duct_extruded_problem(ha_peak=8.0, nx_stations=3, ny=4, nz=4)
-    sparse_calls = {"count": 0}
-    jacobi_calls = {"count": 0}
+    calls = {"count": 0}
+    original = duct_impl._solvax_pressure_poisson_duct
 
-    def wrapped_sparse(*args, **kwargs):
-        sparse_calls["count"] += 1
-        return _variable_coefficient_poisson_sparse_3d(*args, **kwargs)
+    def wrapped(*args, **kwargs):
+        calls["count"] += 1
+        return original(*args, **kwargs)
 
-    def wrapped_jacobi(*args, **kwargs):
-        jacobi_calls["count"] += 1
-        return _variable_coefficient_poisson_jacobi_3d(*args, **kwargs)
-
-    monkeypatch.setattr("lmx._fringing_solver._variable_coefficient_poisson_sparse_3d", wrapped_sparse)
-    monkeypatch.setattr("lmx._fringing_solver._variable_coefficient_poisson_jacobi_3d", wrapped_jacobi)
+    monkeypatch.setattr("lmx._fringing_solver._solvax_pressure_poisson_duct", wrapped)
 
     solve_extruded_inductionless(problem)
 
-    assert sparse_calls["count"] > 0
-    assert jacobi_calls["count"] == 0
+    assert calls["count"] >= 2
 
 
 def test_projection_solver_can_break_early_with_loose_tolerance():
@@ -2202,7 +2141,7 @@ def test_pipe_projection_supports_explicit_conducting_annulus_and_fixed_flow():
     assert jnp.isfinite(solution.bundle.phi).all()
 
 
-def test_pipe_sparse_potential_cancels_conservative_emf_divergence():
+def test_pipe_matrix_free_potential_cancels_conservative_emf_divergence():
     nx, nr, ntheta = 4, 5, 12
     dx = 0.3
     r_faces = jnp.linspace(0.0, 0.4, nr + 1)
@@ -2226,15 +2165,16 @@ def test_pipe_sparse_potential_cancels_conservative_emf_divergence():
         r_centers=r_centers,
         dtheta=float(dtheta),
     )
-    phi, residual, _, _ = _pipe_poisson_sparse_3d(
-        -emf_rhs,
+    phi, *_, local_residual = _solvax_pressure_poisson_pipe(
+        emf_rhs,
         sigma,
         dx=dx,
         r_faces=r_faces,
         r_centers=r_centers,
         dtheta=float(dtheta),
-        iterations=40,
+        iterations=400,
         tolerance=1.0e-12,
+        include_theta_line=True,
     )
     div_j = _pipe_conservative_current_diagnostics_3d(
         sigma,
@@ -2248,7 +2188,7 @@ def test_pipe_sparse_potential_cancels_conservative_emf_divergence():
         dtheta=float(dtheta),
     )[0]
 
-    assert residual < 1.0e-10
+    assert local_residual < 1.0e-10
     assert float(jnp.max(jnp.abs(div_j))) < 1.0e-10
 
 
@@ -2391,67 +2331,6 @@ def test_magnetic_obstacle_baseline_reports_velocity_deficit():
     assert validation["external_reference_available"] is False
     assert validation["research_grade_validation_pass"] is False
     assert isinstance(validation["validation_pass"], bool)
-
-
-def test_poisson_helpers_can_stop_early():
-    rhs = jnp.zeros((2, 2, 2))
-    field, residual, iterations, initial = _poisson_jacobi_3d(
-        rhs, dx=1.0, dy=1.0, dz=1.0, iterations=4, tolerance=1.0
-    )
-    assert iterations == 0
-    assert residual <= initial
-    conductivity = jnp.ones((2, 2, 2))
-    field_var, residual_var, iterations_var, initial_var = _variable_coefficient_poisson_jacobi_3d(
-        rhs,
-        conductivity,
-        dx=1.0,
-        dy=1.0,
-        dz=1.0,
-        iterations=4,
-        tolerance=1.0,
-    )
-    assert iterations_var == 0
-    assert residual_var <= initial_var
-    field_sparse, residual_sparse, iterations_sparse, initial_sparse = (
-        _variable_coefficient_poisson_sparse_3d(
-            rhs,
-            conductivity,
-            dx=1.0,
-            dy=1.0,
-            dz=1.0,
-            iterations=4,
-            tolerance=1.0,
-        )
-    )
-    assert iterations_sparse >= 1
-    assert residual_sparse <= initial_sparse
-    assert jnp.isfinite(field).all()
-    assert jnp.isfinite(field_var).all()
-    assert jnp.isfinite(field_sparse).all()
-
-
-def test_sparse_poisson_delegates_direct_solve_to_solvax(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    calls = []
-    original = common_impl.splu_solve
-
-    def record_call(matrix, rhs):
-        calls.append(matrix.shape)
-        return original(matrix, rhs)
-
-    monkeypatch.setattr(common_impl, "splu_solve", record_call)
-    _variable_coefficient_poisson_sparse_3d(
-        jnp.zeros((2, 2, 2)),
-        jnp.ones((2, 2, 2)),
-        dx=1.0,
-        dy=1.0,
-        dz=1.0,
-        iterations=4,
-        tolerance=1.0,
-    )
-
-    assert calls == [(8, 8)]
 
 
 def test_solve_extruded_inductionless_uses_projection_for_pipe_geometry(

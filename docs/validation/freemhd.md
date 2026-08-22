@@ -33,5 +33,3 @@ FreeMHD fixture parsing is useful for unit tests but cannot satisfy an executed
 parity gate. B1 pipe acceptance also requires the mapped-pipe formulation,
 conducting annulus, three mesh levels, tolerance/iteration independence, and a
 matched executable FreeMHD case.
-
-![LMX and FreeMHD observable parity](../_static/freemhd_closed_channel_observable_parity.webp)

@@ -17,7 +17,6 @@ from solvax import fixed_point_iteration
 from .mesh import (
     StructuredMesh,
     generate_rect_duct_mesh,
-    gradient_scalar,
 )
 from .physics import build_material_fields, magnetic_field_components, magnetic_field_from_hartmann
 from .solvers import (
@@ -44,10 +43,8 @@ from .solvers import (
     _nested_velocity_tolerance,
     _potential_coefficients,
     _potential_preconditioner_for_materials,
-    _pressure_proxy_reference_current,
     _reference_mean_velocity,
     _resolve_potential_solver,
-    _scaled_pressure_proxy_value,
     _solve_potential,
     _solve_velocity_system,
     _target_mean_velocity,
@@ -108,32 +105,26 @@ def _hunt_short_transient_controls(ha: float) -> TimeStepperConfig:
             dt=0.002,
             t_final=1.0,
             max_steps=500,
-            outer_iterations=6,
             potential_iterations=400,
             relaxation=0.08,
             velocity_update_limit=2e-3,
-            current_reconstruction="cell_centered",
         )
     if ha <= 100.0:
         return TimeStepperConfig(
             dt=0.002,
             t_final=1.0,
             max_steps=500,
-            outer_iterations=4,
             potential_iterations=400,
             relaxation=0.1,
             velocity_update_limit=1e-3,
-            current_reconstruction="cell_centered",
         )
     return TimeStepperConfig(
         dt=0.002,
         t_final=1.0,
         max_steps=500,
-        outer_iterations=3,
         potential_iterations=400,
         relaxation=0.1,
         velocity_update_limit=1e-3,
-        current_reconstruction="cell_centered",
     )
 
 
@@ -446,7 +437,6 @@ def _fully_developed_case_step(
             by=by,
             bz=bz,
             forcing=jnp.asarray(0.0, dtype=u_previous.dtype),
-            current_reconstruction=case.time_stepper.current_reconstruction,
         )
         rhs_base = rhs_base + magnetic_reaction * jnp.where(active_mask, u_iter, 0.0)
         if not steady_mode:
@@ -505,7 +495,6 @@ def _fully_developed_case_step(
             u_next,
             fluid_mask,
             max_delta=case.time_stepper.velocity_update_limit,
-            limiter=case.time_stepper.velocity_update_limiter,
         )
         u_next = _enforce_velocity_bc(
             jnp.where(fluid_mask, u_next, 0.0),
@@ -597,7 +586,6 @@ def _fully_developed_case_step(
         phi,
         by,
         bz,
-        reconstruction=case.time_stepper.current_reconstruction,
     )
     face_current_max, emf_max, face_lorentz_max = _face_current_emf_and_lorentz_max(
         mesh,
@@ -698,7 +686,6 @@ def _solve_fully_developed(
         logger,
         case=case,
         mesh=mesh,
-        materials=materials,
         mode=case.solver.mode,
         potential_solver=f"{potential_solver} / solvax_pcg",
         target_mean_velocity=target_mean_velocity,
@@ -715,8 +702,6 @@ def _solve_fully_developed(
     u_max_history: list[float] = []
     mean_velocity_history: list[float] = []
     applied_forcing_history: list[float] = []
-    pressure_proxy_history: list[float] = []
-    current_scaled_pressure_proxy_history: list[float] = []
     residual_history: list[float] = []
     courant_history: list[float] = []
     ohmic_history: list[float] = []
@@ -736,12 +721,6 @@ def _solve_fully_developed(
     charge_balance_residual_history: list[float] = []
     gauge_residual_history: list[float] = []
     interface_current_residual_history: list[float] = []
-    raw_update_max_history: list[float] = []
-    limiter_scale_history: list[float] = []
-    limited_fraction_history: list[float] = []
-    pressure_proxy_reference_current = _pressure_proxy_reference_current(
-        initial_diagnostics if append_diagnostics else None
-    )
     residual_value = float(initial_state.residual if initial_state is not None else 0.0)
     step_count = 0
 
@@ -812,7 +791,6 @@ def _solve_fully_developed(
         u_max_history.append(u_max_value)
         mean_velocity_history.append(float(mean_velocity))
         applied_forcing_history.append(float(applied_forcing))
-        pressure_proxy_history.append(float(applied_forcing))
         residual_history.append(residual_value)
         courant_history.append(courant_like)
         ohmic_history.append(ohmic)
@@ -832,44 +810,23 @@ def _solve_fully_developed(
         charge_balance_residual_history.append(float(charge_balance_residual))
         gauge_residual_history.append(float(gauge_residual))
         interface_current_residual_history.append(float(interface_current_residual))
-        raw_update_max_history.append(residual_value)
-        limiter_scale_history.append(1.0)
-        limited_fraction_history.append(0.0)
-        current_scaled_pressure_proxy, pressure_proxy_reference_current = _scaled_pressure_proxy_value(
-            float(applied_forcing),
-            max_current,
-            float(face_current_max),
-            pressure_proxy_reference_current,
-        )
-        current_scaled_pressure_proxy_history.append(float(current_scaled_pressure_proxy))
         _emit_solver_step(
             logger,
             step_index=step_index + 1,
             step_time=step_time,
-            dt=dt,
             u_max_value=u_max_value,
             mean_velocity=float(mean_velocity),
             max_current=max_current,
-            face_current_max=float(face_current_max),
-            emf_max=float(emf_max),
             max_lorentz=max_lorentz,
-            face_lorentz_max=float(face_lorentz_max),
             residual_value=residual_value,
             potential_residual=float(potential_residual),
             potential_iteration_count=float(potential_iteration_count),
             linear_residual=float(linear_residual),
             linear_iteration_count=float(_linear_iteration_count),
             applied_forcing=float(applied_forcing),
-            pressure_proxy=float(applied_forcing),
-            current_scaled_pressure_proxy=float(current_scaled_pressure_proxy),
-            raw_update_max=residual_value,
-            limiter_scale=1.0,
-            limited_fraction=0.0,
             courant_like=courant_like,
             ohmic=ohmic,
             volumetric_flow_rate=float(volumetric_flow_rate),
-            mean_current_magnitude=float(mean_current_magnitude),
-            lorentz_power=float(lorentz_power),
             div_current_max=float(div_current_max),
             charge_balance_residual=float(charge_balance_residual),
             gauge_residual=float(gauge_residual),
@@ -936,33 +893,6 @@ def _solve_fully_developed(
         applied_forcing_history=_concat_history(
             initial_diagnostics.applied_forcing_history if initial_diagnostics is not None else None,
             jnp.asarray(applied_forcing_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        pressure_proxy_history=_concat_history(
-            initial_diagnostics.pressure_proxy_history if initial_diagnostics is not None else None,
-            jnp.asarray(pressure_proxy_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        current_scaled_pressure_proxy_history=_concat_history(
-            initial_diagnostics.current_scaled_pressure_proxy_history
-            if initial_diagnostics is not None
-            else None,
-            jnp.asarray(current_scaled_pressure_proxy_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        raw_update_max_history=_concat_history(
-            initial_diagnostics.raw_update_max_history if initial_diagnostics is not None else None,
-            jnp.asarray(raw_update_max_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        limiter_scale_history=_concat_history(
-            initial_diagnostics.limiter_scale_history if initial_diagnostics is not None else None,
-            jnp.asarray(limiter_scale_history, dtype=float),
-            append=append_diagnostics,
-        ),
-        limited_fraction_history=_concat_history(
-            initial_diagnostics.limited_fraction_history if initial_diagnostics is not None else None,
-            jnp.asarray(limited_fraction_history, dtype=float),
             append=append_diagnostics,
         ),
         residual_history=_concat_history(
@@ -1324,18 +1254,6 @@ def solve_differentiable_hartmann(
     return u, phi
 
 
-def hartmann_current_proxy(
-    problem: HartmannAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    hartmann_number: float | jnp.ndarray,
-) -> jnp.ndarray:
-    u, phi = solve_differentiable_hartmann(problem, forcing=forcing, hartmann_number=hartmann_number)
-    dphi_dy, _ = gradient_scalar(phi, problem.mesh)
-    jy = -dphi_dy - u * jnp.asarray(hartmann_number, dtype=u.dtype)
-    return jnp.mean(jnp.abs(jy))
-
-
 def hartmann_mean_velocity(
     problem: HartmannAutodiffProblem,
     *,
@@ -1367,127 +1285,4 @@ def hartmann_mean_velocity_gradients(
         "mean_velocity": mean_velocity,
         "d_mean_velocity_d_forcing": d_mean_velocity_d_forcing,
         "d_mean_velocity_d_ha": d_mean_velocity_d_ha,
-    }
-
-
-def hartmann_mean_velocity_finite_difference_gradients(
-    problem: HartmannAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    hartmann_number: float | jnp.ndarray,
-    delta_forcing: float = 1.0e-3,
-    delta_ha: float = 1.0e-3,
-) -> dict[str, jnp.ndarray]:
-    mean_velocity = hartmann_mean_velocity(problem, forcing=forcing, hartmann_number=hartmann_number)
-    plus_forcing = hartmann_mean_velocity(
-        problem,
-        forcing=jnp.asarray(forcing) + delta_forcing,
-        hartmann_number=hartmann_number,
-    )
-    minus_forcing = hartmann_mean_velocity(
-        problem,
-        forcing=jnp.asarray(forcing) - delta_forcing,
-        hartmann_number=hartmann_number,
-    )
-    plus_ha = hartmann_mean_velocity(
-        problem,
-        forcing=forcing,
-        hartmann_number=jnp.asarray(hartmann_number) + delta_ha,
-    )
-    minus_ha = hartmann_mean_velocity(
-        problem,
-        forcing=forcing,
-        hartmann_number=jnp.asarray(hartmann_number) - delta_ha,
-    )
-    return {
-        "mean_velocity": mean_velocity,
-        "d_mean_velocity_d_forcing": (plus_forcing - minus_forcing) / (2.0 * delta_forcing),
-        "d_mean_velocity_d_ha": (plus_ha - minus_ha) / (2.0 * delta_ha),
-    }
-
-
-def hartmann_profile_loss(
-    problem: HartmannAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    hartmann_number: float | jnp.ndarray,
-    target_profile: jnp.ndarray,
-) -> jnp.ndarray:
-    u, _ = solve_differentiable_hartmann(problem, forcing=forcing, hartmann_number=hartmann_number)
-    centerline = u[:, u.shape[1] // 2]
-    centerline_scale = jnp.maximum(jnp.max(jnp.abs(centerline)), 1.0e-12)
-    target_scale = jnp.maximum(jnp.max(jnp.abs(target_profile)), 1.0e-12)
-    return jnp.mean((centerline / centerline_scale - target_profile / target_scale) ** 2)
-
-
-def hartmann_profile_loss_gradients(
-    problem: HartmannAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    hartmann_number: float | jnp.ndarray,
-    target_profile: jnp.ndarray,
-) -> dict[str, jnp.ndarray]:
-    def objective(force_value, ha_value):
-        return hartmann_profile_loss(
-            problem,
-            forcing=force_value,
-            hartmann_number=ha_value,
-            target_profile=target_profile,
-        )
-
-    loss, (d_loss_d_forcing, d_loss_d_ha) = jax.value_and_grad(objective, argnums=(0, 1))(
-        forcing, hartmann_number
-    )
-    return {
-        "loss": loss,
-        "d_loss_d_forcing": d_loss_d_forcing,
-        "d_loss_d_ha": d_loss_d_ha,
-    }
-
-
-def run_hartmann_profile_inverse_design(
-    problem: HartmannAutodiffProblem,
-    *,
-    target_profile: jnp.ndarray,
-    forcing_init: float,
-    hartmann_init: float,
-    learning_rate_forcing: float = 20.0,
-    learning_rate_ha: float = 5.0,
-    steps: int = 24,
-) -> dict[str, object]:
-    forcing = jnp.asarray(forcing_init, dtype=jnp.float32)
-    hartmann_number = jnp.asarray(hartmann_init, dtype=jnp.float32)
-    history: list[dict[str, float]] = []
-    for step in range(steps):
-        gradients = hartmann_profile_loss_gradients(
-            problem,
-            forcing=forcing,
-            hartmann_number=hartmann_number,
-            target_profile=target_profile,
-        )
-        history.append(
-            {
-                "iteration": float(step),
-                "forcing": float(forcing),
-                "hartmann_number": float(hartmann_number),
-                "loss": float(gradients["loss"]),
-                "d_loss_d_forcing": float(gradients["d_loss_d_forcing"]),
-                "d_loss_d_ha": float(gradients["d_loss_d_ha"]),
-            }
-        )
-        forcing = jnp.clip(forcing - learning_rate_forcing * gradients["d_loss_d_forcing"], 0.05, 5.0)
-        hartmann_number = jnp.clip(hartmann_number - learning_rate_ha * gradients["d_loss_d_ha"], 0.5, 40.0)
-
-    recovered_u, recovered_phi = solve_differentiable_hartmann(
-        problem,
-        forcing=forcing,
-        hartmann_number=hartmann_number,
-    )
-    recovered_profile = recovered_u[:, recovered_u.shape[1] // 2]
-    return {
-        "forcing": float(forcing),
-        "hartmann_number": float(hartmann_number),
-        "history": history,
-        "recovered_profile": recovered_profile,
-        "recovered_phi_max": float(jnp.max(jnp.abs(recovered_phi))),
     }

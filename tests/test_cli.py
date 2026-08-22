@@ -58,7 +58,7 @@ def _extruded_solution() -> SimpleNamespace:
         (["--help"], ("Run and validate", "Run a named", "CASE.toml")),
         (["run", "--help"], ("solver family", "geometry and resolution", "Hartmann")),
         (["benchmark", "--help"], ("cold and warm", "Timed repetitions", "JSON")),
-        (["validate", "--help"], ("FreeMHD", "reference", "L2 gate")),
+        (["validate", "--help"], ("duct case", "Hartmann", "L2 gate")),
     ),
 )
 def test_cli_help_describes_each_user_workflow(arguments, expected, capsys):
@@ -317,7 +317,6 @@ def test_run_config_uses_restart_bundle_and_writes_restart_output(
             u_max_history=[],
             mean_velocity_history=[],
             applied_forcing_history=[],
-            pressure_proxy_history=[],
             residual_history=[],
             courant_like=[],
             ohmic_power=[],
@@ -584,46 +583,6 @@ def test_run_config_supports_extruded_restart_and_structured_output_layout(
     assert '"restart"' in capsys.readouterr().out
 
 
-def test_cli_validate_branches_into_reference_comparison(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-):
-    output_dir = tmp_path / "validate"
-    recorded = _stub_validation_cli(monkeypatch, case_name="shercliff_ha5", output_dir=output_dir)
-    comparison = SimpleNamespace(
-        y_profile=SimpleNamespace(l2_error=0.2, linf_error=0.3),
-        z_profile=SimpleNamespace(l2_error=0.4, linf_error=0.5),
-    )
-    monkeypatch.setattr(
-        cli,
-        "closed_channel_validation",
-        lambda solved, case_name, ha, reference_root: comparison,
-    )
-    monkeypatch.setattr(
-        cli,
-        "write_closed_channel_validation",
-        lambda report, path: recorded.update(closed=path) or path,
-    )
-    exit_code = cli.main(
-        [
-            "validate",
-            "shercliff",
-            "--ha",
-            "5",
-            "--output",
-            str(output_dir),
-            "--reference-root",
-            str(tmp_path / "references"),
-        ]
-    )
-
-    assert exit_code == 0
-    assert "y_l2_error" in recorded["metrics"]
-    assert "combined_l2_error" in recorded["metrics"]
-    assert recorded["closed"] == output_dir / "shercliff_ha5_analytic.json"
-    assert recorded["metrics"]["combined_l2_error"] == pytest.approx(((0.2**2 + 0.4**2) / 2.0) ** 0.5)
-    assert '"y_l2_error": 0.2' in capsys.readouterr().out
-
-
 def test_cli_validate_hartmann_branch_writes_analytic_report(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ):
@@ -708,20 +667,9 @@ def test_run_config_requires_restart_path(tmp_path: Path):
         cli._run_config(config)
 
 
-@pytest.mark.parametrize(
-    ("flags", "expected_enabled", "expected_verbosity"),
-    (
-        (("--quiet",), False, None),
-        (("--verbose",), True, "debug"),
-        (("--verbosity", "normal"), True, "normal"),
-    ),
-)
-def test_run_branch_logging_flags(
+def test_run_branch_quiet_flag(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    flags: tuple[str, ...],
-    expected_enabled: bool,
-    expected_verbosity: str | None,
 ):
     case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path)))
     recorded: dict[str, object] = {}
@@ -730,15 +678,10 @@ def test_run_branch_logging_flags(
     monkeypatch.setattr(
         cli,
         "_run_config",
-        lambda config: (
-            recorded.update(enabled=config.logging.enabled, verbosity=config.logging.verbosity)
-            or {"case": case.name}
-        ),
+        lambda config: recorded.update(enabled=config.logging.enabled) or {"case": case.name},
     )
 
-    exit_code = cli.main(["run", "hartmann", "--output", str(tmp_path), *flags])
+    exit_code = cli.main(["run", "hartmann", "--output", str(tmp_path), "--quiet"])
 
     assert exit_code == 0
-    assert recorded["enabled"] is expected_enabled
-    if expected_verbosity is not None:
-        assert recorded["verbosity"] == expected_verbosity
+    assert recorded["enabled"] is False

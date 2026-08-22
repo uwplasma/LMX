@@ -93,8 +93,6 @@ Validation status and tolerances are stated in the
 [validation guide](https://lmx.readthedocs.io/en/latest/validation/index.html).
 Internal diagnostics are not presented as external validation.
 
-![LMX and FreeMHD observable comparison](docs/_static/freemhd_closed_channel_observable_parity.webp)
-
 ## Documentation
 
 - [Install and run](https://lmx.readthedocs.io/en/latest/getting_started/install.html)

@@ -16,7 +16,6 @@ _TEST_SHARDS = {
         "tests/test_config.py",
         "tests/test_io.py",
         "tests/test_mesh.py",
-        "tests/test_reference_data.py",
         "tests/test_runtime_logging.py",
         "tests/test_units_and_wall_models.py",
     ),

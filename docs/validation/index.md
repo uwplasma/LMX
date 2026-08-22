@@ -7,15 +7,15 @@ validation result.
 | Model | Required evidence | Current claim |
 |---|---|---|
 | Hartmann duct | analytical profile, charge closure, power balance, refinement | validated within documented mesh/tolerance gates |
-| Shercliff and Hunt ducts | analytical closed-channel profiles, symmetry, wall/interface current | validated within documented mesh/tolerance gates |
+| Shercliff and Hunt ducts | packaged benchmark values, symmetry, wall/interface current, mesh trends | validated within documented mesh/tolerance gates |
 | High-$Ha$ fully developed flow | layer resolution, Richardson trend, integral balances | bounded accepted campaign cases |
 | Rectangular 3-D fringe | manufactured operators, projection, restart, refinement, FreeMHD B2 | active validation; each artifact states the gates it passes |
 | Straight-pipe 3-D fringe | mapped operators, fixed flow, annular current, Benchmark B1 data | active validation; production parity requires the complete matched gate |
 | Bent pipe and magnetic obstacle | mapped/conservation tests and internal observables | development applications, not externally validated benchmarks |
 
 For 2-D cases, `validation_summary` reports convergence, current continuity,
-gauge, interface, flow, and profile metrics. `hartmann_validation` and
-`closed_channel_validation` compare against analytical data.
+gauge, interface, flow, and profile metrics. `hartmann_validation` compares
+the computed profile with the analytical Hartmann solution.
 
 For 3-D cases, `ExtrudedInductionlessValidation` reports maximum update,
 charge-balance and divergence residuals, boundary-current closure, stationwise

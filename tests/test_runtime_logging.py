@@ -5,7 +5,6 @@ import jax.numpy as jnp
 import pytest
 
 from lmx.cases import make_hartmann_case
-from lmx.physics import build_material_fields
 from lmx.solvers import _build_mesh
 from lmx.specs import (
     Diagnostics,
@@ -21,17 +20,16 @@ from lmx.specs import (
 pytestmark = pytest.mark.unit
 
 
-def test_streaming_solver_logger_prints_live_solver_sections():
+def test_streaming_solver_logger_prints_live_solver_sections(tmp_path: Path):
     stream = StringIO()
     logger = StreamingSolverLogger(LoggingSpec(step_stride=1), stream=stream)
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     mesh = _build_mesh(case)
-    materials = build_material_fields(case, mesh)
+    assert default_log_path(tmp_path, case.name) == tmp_path / f"{case.name}.log"
     shape = mesh.yz_shape
     logger.emit_header(
         case=case,
         mesh=mesh,
-        materials=materials,
         mode="steady",
         potential_solver=case.time_stepper.potential_solver,
         target_mean_velocity=None,
@@ -59,11 +57,6 @@ def test_streaming_solver_logger_prints_live_solver_sections():
                 u_max_history=jnp.asarray([1.0]),
                 mean_velocity_history=jnp.asarray([0.5]),
                 applied_forcing_history=jnp.asarray([1.0]),
-                pressure_proxy_history=jnp.asarray([0.4]),
-                current_scaled_pressure_proxy_history=jnp.asarray([0.3]),
-                raw_update_max_history=jnp.asarray([0.02]),
-                limiter_scale_history=jnp.asarray([1.0]),
-                limited_fraction_history=jnp.asarray([0.0]),
                 current_max_history=jnp.asarray([0.2]),
                 face_current_max_history=jnp.asarray([0.18]),
                 emf_max_history=jnp.asarray([0.12]),
@@ -86,53 +79,34 @@ def test_streaming_solver_logger_prints_live_solver_sections():
     )
 
     text = stream.getvalue()
-    assert "LMX Solver Run" in text
-    assert "Create mesh for case" in text
-    assert "Time =" in text
-    assert "smoothSolver: potE" in text
-    assert "smoothSolver: U" in text
-    assert "Initial residual" in text
-    assert "currentScaledPressureProxy" in text
-    assert "chargeBalanceResidual" in text
-    assert "MHD integrals" in text
-    assert "MHD conservation" in text
-    assert "rawUpdateMax" in text
-    assert "limitedFraction" in text
-    assert "steadySolver" in text
-    assert "Progress" in text
-    assert "complete =" in text
-    assert "remaining ≈" in text
-    assert "ExecutionTime" in text
+    assert "LMX solver" in text
+    assert f"case={case.name}" in text
+    assert "potential_residual=" in text
+    assert "linear_residual=" in text
+    assert "charge=" in text
+    assert "ohmic_power=" in text
+    assert "progress=" in text
+    assert "remaining=" in text
+    assert "completed case=" in text
 
 
 def _sample_record(step_index: int = 1) -> SolverStepRecord:
     return SolverStepRecord(
         step_index=step_index,
         time=0.1 * step_index,
-        dt=0.1,
         u_max=1.0,
         mean_velocity=0.5,
         current_max=0.2,
-        face_current_max=0.18,
-        emf_max=0.12,
         lorentz_max=0.08,
-        face_lorentz_max=0.07,
         residual=1e-6,
         potential_residual=1e-5,
         potential_iterations=12.0,
         linear_residual=1e-6,
         linear_iterations=8.0,
         applied_forcing=1.0,
-        pressure_proxy=0.4,
-        current_scaled_pressure_proxy=0.3,
-        raw_update_max=0.02,
-        limiter_scale=1.0,
-        limited_fraction=0.0,
         courant_like=0.05,
         ohmic_power=0.01,
         volumetric_flow_rate=0.9,
-        mean_current_magnitude=0.11,
-        lorentz_power=0.02,
         div_current_max=1e-8,
         charge_balance_residual=2e-9,
         gauge_residual=1e-10,
@@ -154,11 +128,9 @@ def test_streaming_solver_logger_respects_disable_stride_and_restart_sections():
     logger.add_stream(extra_stream)
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     mesh = _build_mesh(case)
-    materials = build_material_fields(case, mesh)
     logger.emit_header(
         case=case,
         mesh=mesh,
-        materials=materials,
         mode="steady",
         potential_solver=case.time_stepper.potential_solver,
         target_mean_velocity=None,
@@ -188,54 +160,11 @@ def test_streaming_solver_logger_respects_disable_stride_and_restart_sections():
     )
 
     text = step_stream.getvalue()
-    assert "Solver controls" in text
-    assert "Restart controls" in text
-    assert "Time =" not in text
-    assert "Final time" not in text
+    assert "linear=solvax_pcg" in text
+    assert "restart=restart.npz" in text
+    assert "step=2" not in text
+    assert "completed case=" not in text
     assert extra_stream.getvalue() == text
-
-
-def test_default_log_path_appends_case_log_name(tmp_path: Path):
-    assert default_log_path(tmp_path, "demo_case") == tmp_path / "demo_case.log"
-
-
-def test_streaming_solver_logger_normal_verbosity_suppresses_detailed_sections():
-    stream = StringIO()
-    logger = StreamingSolverLogger(LoggingSpec(verbosity="normal"), stream=stream)
-    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    mesh = _build_mesh(case)
-    materials = build_material_fields(case, mesh)
-
-    logger.emit_header(
-        case=case,
-        mesh=mesh,
-        materials=materials,
-        mode="steady",
-        potential_solver=case.time_stepper.potential_solver,
-        target_mean_velocity=None,
-        reference_mean_velocity=None,
-        restart=RestartLogInfo(enabled=False),
-    )
-    logger.emit_step(_sample_record())
-
-    text = stream.getvalue()
-    assert "LMX Solver Run" in text
-    assert "Read region properties" not in text
-    assert "Read boundary conditions" not in text
-    assert "MHD integrals" not in text
-    assert "MHD conservation" not in text
-    assert "MHD limiter" not in text
-    assert "steadySolver" in text
-
-
-def test_streaming_solver_logger_debug_verbosity_prints_debug_line():
-    stream = StringIO()
-    logger = StreamingSolverLogger(LoggingSpec(verbosity="debug"), stream=stream)
-    logger.emit_step(_sample_record())
-    text = stream.getvalue()
-    assert "MHD debug" in text
-    assert "faceCurrentRatio" in text
-    assert "faceLorentzRatio" in text
 
 
 def test_streaming_solver_logger_progress_falls_back_without_header_context():
@@ -243,5 +172,5 @@ def test_streaming_solver_logger_progress_falls_back_without_header_context():
     logger = StreamingSolverLogger(LoggingSpec(step_stride=1), stream=stream)
     logger.emit_step(_sample_record(step_index=3))
     text = stream.getvalue()
-    assert "Progress" in text
-    assert "avgStepWallTime" in text
+    assert "elapsed=" in text
+    assert "average_step=" in text

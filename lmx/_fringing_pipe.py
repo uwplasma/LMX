@@ -15,20 +15,13 @@ from solvax import (
     block_thomas_solve,
     gmres,
     pcg_linear_solve,
-    splu_solve,
     tridiagonal_solve,
 )
-
-try:
-    from scipy import sparse
-except Exception:  # pragma: no cover - SciPy should be present in shipped environments.
-    sparse = None
 
 from ._fringing_common import (
     _apply_fixed_flow_pressure_constraint,
     _finalize_local_pressure_solve,
     _harmonic_mean,
-    _jacobi_fixed_point,
     _nonuniform_axis_gradient,
     _reuse_fringing_jit,
     _reuse_modal_factors,
@@ -1383,68 +1376,6 @@ def _fixed_flow_face_flux_projection_pipe(
     )
 
 
-def _pipe_poisson_jacobi_3d(
-    rhs: jnp.ndarray,
-    *,
-    dx: float,
-    dr: float,
-    dtheta: float,
-    r: jnp.ndarray,
-    iterations: int,
-    tolerance: float,
-) -> tuple[jnp.ndarray, float, int, float]:
-    weights = jnp.maximum(r, 0.5 * dr)
-    rhs_compatible = rhs - jnp.sum(rhs * weights) / jnp.sum(weights)
-    safe_r = jnp.maximum(r, 0.5 * dr)
-    field = jnp.zeros_like(rhs_compatible)
-    diagonal = (
-        2.0 / max(dx**2, 1.0e-12)
-        + 2.0 / max(dr**2, 1.0e-12)
-        + 2.0 / jnp.maximum((safe_r**2) * dtheta**2, 1.0e-12)
-    )
-    diagonal = jnp.maximum(diagonal, 1.0e-12)
-
-    def update(field):
-        x_west = jnp.concatenate([field[:1], field[:-1]], axis=0)
-        x_east = jnp.concatenate([field[1:], field[-1:]], axis=0)
-        r_inner = jnp.concatenate([field[:, :1, :], field[:, :-1, :]], axis=1)
-        r_outer = jnp.concatenate([field[:, 1:, :], field[:, -1:, :]], axis=1)
-        theta_prev, theta_next = _pipe_theta_neighbors(field)
-        cross = (
-            (x_west + x_east) / max(dx**2, 1.0e-12)
-            + (r_inner + r_outer) / max(dr**2, 1.0e-12)
-            + (theta_prev + theta_next) / jnp.maximum((safe_r**2) * dtheta**2, 1.0e-12)
-            + (r_outer - r_inner) / jnp.maximum(2.0 * safe_r * dr, 1.0e-12)
-        )
-        updated = (cross - rhs_compatible) / diagonal
-        updated = updated.at[:, 0, :].set(updated[:, 1, :])
-        return updated - jnp.sum(updated * weights) / jnp.sum(weights)
-
-    def residual_norm(field):
-        return jnp.max(
-            jnp.abs(
-                _pipe_laplacian_3d(
-                    field,
-                    dx=dx,
-                    dr=dr,
-                    dtheta=dtheta,
-                    r=r,
-                    outer_dirichlet=False,
-                )
-                - rhs_compatible
-            )
-        )
-
-    return _jacobi_fixed_point(
-        update,
-        field,
-        residual_norm,
-        iterations=iterations,
-        tolerance=tolerance,
-        stage="3-D pipe Poisson iteration",
-    )
-
-
 def _pipe_conservative_current_fluxes_3d(
     sigma: jnp.ndarray,
     phi: jnp.ndarray,
@@ -1553,150 +1484,6 @@ def _pipe_conservative_emf_rhs_3d(
         r_centers[None, :, None] * dtheta, 1.0e-12
     )
     return (fx[1:] - fx[:-1]) / max(dx, 1.0e-12) + radial_term + theta_term
-
-
-def _pipe_poisson_sparse_3d(
-    rhs: jnp.ndarray,
-    conductivity: jnp.ndarray,
-    *,
-    dx: float,
-    r_faces: jnp.ndarray,
-    r_centers: jnp.ndarray,
-    dtheta: float,
-    iterations: int,
-    tolerance: float,
-    initial_field: jnp.ndarray | None = None,
-) -> tuple[jnp.ndarray, float, int, float]:
-    if sparse is None:
-        field, residual, iteration_count, initial_residual = _pipe_poisson_jacobi_3d(
-            rhs,
-            dx=dx,
-            dr=float(jnp.mean(jnp.diff(r_faces))),
-            dtheta=dtheta,
-            r=r_centers[None, :, None],
-            iterations=iterations,
-            tolerance=tolerance,
-        )
-        return field, residual, iteration_count, initial_residual
-
-    rhs_np = np.asarray(rhs, dtype=float)
-    sigma_np = np.asarray(conductivity, dtype=float)
-    r_faces_np = np.asarray(r_faces, dtype=float)
-    r_centers_np = np.asarray(r_centers, dtype=float)
-    dr_np = np.diff(r_faces_np)
-    cell_weights = (r_centers_np[None, :, None] * dr_np[None, :, None]) * dtheta
-    rhs_np = rhs_np - np.sum(rhs_np * cell_weights) / max(np.sum(cell_weights), 1.0e-20)
-
-    nx, nr, ntheta = rhs_np.shape
-    size = nx * nr * ntheta
-
-    def flat(i: int, j: int, k: int) -> int:
-        return (i * nr + j) * ntheta + k
-
-    rows: list[int] = []
-    cols: list[int] = []
-    data: list[float] = []
-    rhs_vector = rhs_np.reshape(-1).copy()
-    anchor = flat(0, 0, 0)
-
-    for i in range(nx):
-        for j in range(nr):
-            for k in range(ntheta):
-                row = flat(i, j, k)
-                if row == anchor:
-                    rows.append(row)
-                    cols.append(row)
-                    data.append(1.0)
-                    rhs_vector[row] = 0.0
-                    continue
-
-                diagonal = 0.0
-                sigma_cell = sigma_np[i, j, k]
-                if i > 0:
-                    sigma_face = _harmonic_mean(
-                        jnp.asarray(sigma_cell), jnp.asarray(sigma_np[i - 1, j, k])
-                    ).item()
-                    coeff = sigma_face / max(dx**2, 1.0e-12)
-                    diagonal += coeff
-                    rows.append(row)
-                    cols.append(flat(i - 1, j, k))
-                    data.append(-coeff)
-                if i < nx - 1:
-                    sigma_face = _harmonic_mean(
-                        jnp.asarray(sigma_cell), jnp.asarray(sigma_np[i + 1, j, k])
-                    ).item()
-                    coeff = sigma_face / max(dx**2, 1.0e-12)
-                    diagonal += coeff
-                    rows.append(row)
-                    cols.append(flat(i + 1, j, k))
-                    data.append(-coeff)
-                if j > 0:
-                    sigma_face = _harmonic_mean(
-                        jnp.asarray(sigma_cell), jnp.asarray(sigma_np[i, j - 1, k])
-                    ).item()
-                    dr_face = max(0.5 * (dr_np[j - 1] + dr_np[j]), 1.0e-12)
-                    coeff = r_faces_np[j] * sigma_face / max(r_centers_np[j] * dr_np[j] * dr_face, 1.0e-12)
-                    diagonal += coeff
-                    rows.append(row)
-                    cols.append(flat(i, j - 1, k))
-                    data.append(-coeff)
-                if j < nr - 1:
-                    sigma_face = _harmonic_mean(
-                        jnp.asarray(sigma_cell), jnp.asarray(sigma_np[i, j + 1, k])
-                    ).item()
-                    dr_face = max(0.5 * (dr_np[j] + dr_np[j + 1]), 1.0e-12)
-                    coeff = (
-                        r_faces_np[j + 1] * sigma_face / max(r_centers_np[j] * dr_np[j] * dr_face, 1.0e-12)
-                    )
-                    diagonal += coeff
-                    rows.append(row)
-                    cols.append(flat(i, j + 1, k))
-                    data.append(-coeff)
-
-                k_prev = (k - 1) % ntheta
-                k_next = (k + 1) % ntheta
-                sigma_prev = _harmonic_mean(
-                    jnp.asarray(sigma_cell), jnp.asarray(sigma_np[i, j, k_prev])
-                ).item()
-                sigma_next = _harmonic_mean(
-                    jnp.asarray(sigma_cell), jnp.asarray(sigma_np[i, j, k_next])
-                ).item()
-                theta_coeff_prev = sigma_prev / max(r_centers_np[j] ** 2 * dtheta**2, 1.0e-12)
-                theta_coeff_next = sigma_next / max(r_centers_np[j] ** 2 * dtheta**2, 1.0e-12)
-                diagonal += theta_coeff_prev + theta_coeff_next
-                rows.append(row)
-                cols.append(flat(i, j, k_prev))
-                data.append(-theta_coeff_prev)
-                rows.append(row)
-                cols.append(flat(i, j, k_next))
-                data.append(-theta_coeff_next)
-                rows.append(row)
-                cols.append(row)
-                data.append(max(diagonal, 1.0e-12))
-
-    matrix = sparse.csr_matrix((data, (rows, cols)), shape=(size, size))
-    if initial_field is not None:
-        _ = np.asarray(initial_field, dtype=float)
-    initial_residual = float(np.max(np.abs(matrix @ np.zeros(size) - rhs_vector)))
-    solution = np.asarray(splu_solve(matrix, jnp.asarray(rhs_vector)))
-    field = jnp.asarray(solution.reshape((nx, nr, ntheta)), dtype=rhs.dtype)
-    field = field - field[0, 0, 0]
-    residual_field = (
-        _pipe_conservative_current_diagnostics_3d(
-            jnp.asarray(conductivity, dtype=field.dtype),
-            field,
-            jnp.zeros_like(field),
-            jnp.zeros_like(field),
-            jnp.zeros_like(field),
-            dx=dx,
-            r_faces=jnp.asarray(r_faces, dtype=field.dtype),
-            r_centers=jnp.asarray(r_centers, dtype=field.dtype),
-            dtheta=dtheta,
-        )[0]
-        - rhs
-    )
-    residual = float(jnp.max(jnp.abs(residual_field)))
-    return field, residual, 1, initial_residual
 
 
 def _enforce_pipe_velocity_bc(

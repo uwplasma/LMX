@@ -11,7 +11,7 @@ import pytest
 
 import lmx
 from lmx.cases import _wall_conductivity_from_conductance_ratio
-from lmx.specs import LoggingSpec, _parse_boundary_value, load_run_config
+from lmx.specs import _parse_boundary_value, load_run_config
 from scripts.audit_architecture import (
     _checkout_size,
     architecture_budget_errors,
@@ -19,7 +19,6 @@ from scripts.audit_architecture import (
     inspect_sdist,
     inspect_wheel,
     measure_import,
-    write_inventory,
 )
 
 pytestmark = pytest.mark.unit
@@ -129,7 +128,6 @@ potential_iterations = 100
 potential_relaxation = 1.0
 potential_solver = "cg"
 steady_tolerance = 1e-8
-checkpoint_stride = 1
 
 [output]
 directory = "./out"
@@ -143,11 +141,7 @@ write_stride = 1
 
 [logging]
 enabled = true
-verbose = true
-verbosity = "debug"
 banner = true
-print_regions = true
-print_boundaries = true
 print_footer = true
 flush = true
 step_stride = 2
@@ -208,7 +202,6 @@ side = "max"
     assert config.case.solver.coupling_regularization == pytest.approx(1.0e-9)
     assert config.case.solver.coupling_damping == pytest.approx(0.8)
     assert config.case.time_stepper.potential_solver == "cg"
-    assert config.logging.verbosity == "debug"
     assert config.logging.step_stride == 2
     assert config.restart.enabled is True
     assert config.restart.path == (tmp_path / "previous_results.npz").resolve()
@@ -317,27 +310,6 @@ def test_parse_boundary_value_accepts_scalar_and_vector_and_rejects_bad_inputs()
         _parse_boundary_value({"bad": True})
 
 
-def test_logging_spec_from_user_controls_supports_verbose_alias_and_quiet():
-    detailed = LoggingSpec.from_user_controls(verbose=True)
-    assert detailed.enabled is True
-    assert detailed.verbosity == "detailed"
-
-    quiet = LoggingSpec.from_user_controls(verbose=False)
-    assert quiet.enabled is False
-    assert quiet.verbosity == "quiet"
-
-    debug = LoggingSpec.from_user_controls(enabled=True, verbosity="debug")
-    assert debug.enabled is True
-    assert debug.verbosity == "debug"
-    assert debug.verbosity_rank() == 3
-    assert debug.is_enabled() is True
-
-
-def test_logging_spec_rejects_invalid_verbosity():
-    with pytest.raises(ValueError, match="Unsupported logging verbosity"):
-        LoggingSpec.from_user_controls(verbosity="loud")
-
-
 @pytest.mark.parametrize(
     ("wall_thickness", "hartmann_half_spacing", "message"),
     ((0.0, 1.0, "wall_thickness"), (1.0, 0.0, "hartmann_half_spacing")),
@@ -381,19 +353,11 @@ EXPECTED_ROOT_API = {
     "normal_stack_leakage_ratio",
     "equivalent_single_layer",
     "nested_wall_layer_resolution_summary",
-    "load_shercliff_analytical",
-    "load_hunt_analytical",
-    "load_closed_channel_analytical",
-    "load_processed_slice",
 }
 
 
-def test_architecture_inventory_is_deterministic_without_timing(tmp_path: Path) -> None:
-    first = tmp_path / "first.json"
-    second = tmp_path / "second.json"
-    write_inventory(first)
-    write_inventory(second)
-    assert first.read_bytes() == second.read_bytes()
+def test_architecture_inventory_is_deterministic_without_timing() -> None:
+    assert build_inventory() == build_inventory()
 
 
 def test_stable_root_api_is_small_lazy_and_resolvable(
@@ -490,7 +454,6 @@ def test_curated_examples_use_submodules_and_linear_scripts_are_editable() -> No
         assert root_imports <= stable, f"{path} imports unsupported root APIs: {root_imports - stable}"
         linear_limits = {
             "autodiff_design_demo.py": 160,
-            "freemhd_closed_channel_observable_parity.py": 700,
             "fringing_benchmark_demo.py": 160,
             "hartmann_example.py": 160,
             "hunt_example.py": 160,
@@ -510,11 +473,11 @@ def test_curated_examples_declare_user_facing_contracts(tmp_path: Path) -> None:
     inventory = build_inventory()["inventory"]
     curated = inventory["curated_examples"]
     assert {item["path"] for item in curated} == set(inventory["examples"])
-    assert len(curated) == 8
+    assert len(curated) == 7
     for item in curated:
         assert item["command"]
         assert item["outputs"]
-        assert item["runtime"] in {"portable", "external", "accelerator-optional"}
+        assert item["runtime"] in {"portable", "accelerator-optional"}
         assert Path(item["docs"]).is_file()
     autodiff = Path(__file__).resolve().parents[1] / "examples/autodiff_design_demo.py"
     subprocess.run([sys.executable, autodiff], cwd=tmp_path, timeout=30, check=True)

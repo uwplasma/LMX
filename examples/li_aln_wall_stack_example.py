@@ -179,7 +179,6 @@ for model in WALL_MODELS:
             max_steps=MAX_STEPS,
             potential_iterations=POTENTIAL_ITERATIONS,
             potential_tolerance=1.0e-7,
-            current_reconstruction="hybrid_face_lorentz",
             relaxation=0.35,
             velocity_update_limit=2.0e-2,
         ),

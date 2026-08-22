@@ -115,7 +115,7 @@ algorithms and algebraic diagnostics. This table is the Phase 1 deletion map.
 
 | Current LMX surface | Owner | Action | Replacement/gate |
 |---|---|---|---|
-| SciPy `spsolve` calls in rectangular and pipe 3-D Poisson paths | SOLVAX | replace now | released `solvax.splu_solve`; preserve assembled matrices and 3-D/FreeMHD gates |
+| Rectangular and pipe 3-D Poisson paths | SOLVAX algorithm, LMX operator | **replaced** | matrix-free `solvax.pcg_linear_solve`; the validated collocated projection composes `solvax.fixed_point_iteration` with the LMX stencil and physical residual |
 | `solve_five_point_solvax_pcg_state` | SOLVAX algorithm, LMX residual contract | **deleted** | `solvax.pcg_linear_solve` is composed inside one measured JIT boundary with the MHD coefficient action and physical max-norm certification |
 | `solve_poisson_cg_state` | SOLVAX algorithm, LMX gauge/scaling | merge into MHD solve | direct `pcg_linear_solve`; retain only anchor projection, volume scaling, and physical residual in LMX |
 | `solve_poisson_jacobi_state` and 3-D Jacobi loops | SOLVAX | **replaced** | released `solvax.fixed_point_iteration` owns relaxation, stopping, and iteration state; LMX retains stencil maps, gauges, and physical residuals |
@@ -871,6 +871,7 @@ artifacts or release assets, not committed files.
 | D-023 | Keep one public fringing module over four private 3-D owners, and consolidate run configuration with result schemas | Users retain one `lmx.fringing` surface; generic kernels, duct kernels, pipe kernels, and solve orchestration have explicit internal ownership. Configuration and result schemas share one typed input/output contract in `specs.py`. |
 | D-024 | Keep FreeMHD execution, observation, and comparison in one repository-only validation module | Docker/reference tooling remains fully tested and executable from a checkout but is not installed with the runtime wheel. Shipped analytical and benchmark-data loaders remain in `lmx.validation`. |
 | D-025 | Remove the unbundled ClosedChannel/processed-slice adapter and example | A default clone and installed wheel cannot run this private-directory workflow; the packaged analytical and ALEX data plus the pinned, independently observed B2 Docker comparison provide standalone validation without silent optional-data skips. |
+| D-026 | Remove LMX's 3-D sparse-direct and duplicate Jacobi implementations | Reusable iteration belongs to SOLVAX. Matrix-free SOLVAX PCG serves the duct and pipe elliptic systems; the established collocated projection retains its LMX stencil and physical residual while SOLVAX owns fixed-point state and stopping. |
 
 ## Work log
 
@@ -1283,3 +1284,43 @@ surface, measurements, validation, decision, and next action.
 - Next action: reduce package source below 15,000 lines and tests below 12,000
   lines while profiling the retained 3-D paths and preserving all numerical,
   packaging, documentation, and independent FreeMHD gates.
+
+### 2026-08-22 — final source-budget and solver-ownership tranche
+
+- Removed the unbundled ClosedChannel/processed-slice adapter, example, tests,
+  and media. Packaged Hartmann and ALEX evidence plus the pinned B2 Docker
+  workflow remain; B1 continues to require a future matched executable case
+  before any external-parity claim.
+- Removed the rectangular, variable-coefficient, and cylindrical 3-D Jacobi
+  and SciPy sparse-direct solvers. Duct and pipe elliptic systems now compose
+  SOLVAX matrix-free PCG. The validated collocated projection keeps its LMX
+  stencil, gauge, and physical residual while SOLVAX owns fixed-point state
+  and stopping.
+- Removed the direct SciPy dependency, using JAX's regular-grid interpolator
+  for tabulated fields. Removed unused solver controls, alternate current and
+  limiter lanes, duplicate diagnostic histories, report-only field metrics,
+  and packaged differentiability testbeds. The retained differentiation API
+  follows the canonical Hartmann solve.
+- Replaced verbose emulation logging with a compact LMX-native stream and
+  reduced the logging schema to enabled/banner/footer/flush/stride controls.
+  Benchmark-B specifications use a canonical reviewed fingerprint rather than
+  a second hand-maintained schema validator while still checking identity,
+  physics, matched roles, semantics, stopping, smoke execution, and reference
+  bytes independently.
+- The live package is 14,946 lines across 15 modules; tests are 11,494 lines
+  across 13 files; the tracked checkout is 1,529,679 bytes. The root API has
+  26 names and the catalog contains seven runnable examples. Every package and
+  external-validation source file remains at or below 1,800 lines. The
+  architecture ceiling is ratcheted to 15,000 package lines.
+- All five release shards passed: 503 tests with no skips. Exact combined
+  line/branch coverage is 95.007845%; the two excluded functions are explicitly
+  multi-device JAX sharding wrappers covered only on accelerator hardware.
+  Ruff check/format, byte compilation, architecture/import, current-state prose,
+  and Sphinx warnings-as-errors gates pass.
+- The clean wheel is 141,522 bytes with 28 members and the source distribution
+  is 132,566 bytes with 34 members. Both pass Twine and the distribution audit.
+  A fresh isolated environment installed the wheel and passed both the CLI and
+  a converged Hartmann solve without importing the checkout.
+- Next action: commit this numerical/API checkpoint, run the canonical
+  performance comparison and pinned B2 Docker workflow from that commit, then
+  record and push the evidence before the remaining package/repository phases.

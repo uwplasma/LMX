@@ -7,7 +7,6 @@ import hashlib
 import json
 import math
 import platform
-import re
 import time
 from copy import deepcopy
 from dataclasses import dataclass
@@ -24,7 +23,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
     import tomli as tomllib
 
 from .cases import make_hartmann_case
-from .mesh import StructuredMesh, generate_rect_duct_mesh_from_faces
+from .mesh import StructuredMesh
 from .physics import dynamic_to_kinematic_viscosity, hartmann_number, wall_conductance_ratio
 from .specs import CaseSpec, Solution
 
@@ -46,16 +45,6 @@ class ProfileSymmetry:
 
 
 @dataclass(frozen=True)
-class ClosedChannelValidation:
-    case_kind: str
-    ha: int
-    y_profile: AnalyticComparison
-    z_profile: AnalyticComparison
-    reference_pressure_drop: float | None
-    reference_path: str
-
-
-@dataclass(frozen=True)
 class AcceptanceReport:
     case_name: str
     l2_error: float
@@ -72,8 +61,6 @@ _SUMMARY_HISTORIES = (
     ("potential_iterations_used", "potential_iterations_history", 0.0),
     ("mean_velocity", "mean_velocity_history", 0.0),
     ("applied_forcing", "applied_forcing_history", 0.0),
-    ("pressure_proxy", "pressure_proxy_history", 0.0),
-    ("current_scaled_pressure_proxy", "current_scaled_pressure_proxy_history", 0.0),
     ("linear_residual", "linear_residual_history", 0.0),
     ("linear_iterations_used", "linear_iterations_history", 0.0),
     ("volumetric_flow_rate", "volumetric_flow_rate_history", 0.0),
@@ -83,9 +70,6 @@ _SUMMARY_HISTORIES = (
     ("charge_balance_residual", "charge_balance_residual_history", 0.0),
     ("gauge_residual", "gauge_residual_history", 0.0),
     ("interface_current_residual", "interface_current_residual_history", 0.0),
-    ("raw_update_max", "raw_update_max_history", 0.0),
-    ("limiter_scale", "limiter_scale_history", 1.0),
-    ("limited_fraction", "limited_fraction_history", 0.0),
 )
 
 
@@ -532,41 +516,6 @@ def hartmann_acceptance(
     )
 
 
-def closed_channel_validation(
-    solution: Solution,
-    case_kind: str,
-    ha: int,
-    reference_root: str | Path | None = None,
-) -> ClosedChannelValidation:
-    reference: ClosedChannelAnalyticalReference = load_closed_channel_analytical(
-        case_kind, ha, reference_root
-    )
-    y_profile = extract_midplane_profile(solution, axis="y", fluid_only=True)
-    z_profile = extract_midplane_profile(solution, axis="z", fluid_only=True)
-    y_comparison = compare_normalized_profiles(
-        y_profile["y"],
-        y_profile["u"],
-        reference.coordinate,
-        reference.midplane_y,
-        simulated_boundary_values=(0.0, 0.0),
-    )
-    z_comparison = compare_normalized_profiles(
-        z_profile["z"],
-        z_profile["u"],
-        reference.coordinate,
-        reference.midplane_z,
-        simulated_boundary_values=(0.0, 0.0),
-    )
-    return ClosedChannelValidation(
-        case_kind=case_kind,
-        ha=ha,
-        y_profile=y_comparison,
-        z_profile=z_comparison,
-        reference_pressure_drop=reference.pressure_drop,
-        reference_path=reference.path,
-    )
-
-
 def write_profile_csv(path: str | Path, data: dict[str, jnp.ndarray]) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -596,23 +545,10 @@ def _comparison_payload(comparison: AnalyticComparison, axis_name: str = "coordi
     }
 
 
-def _profile_validation_payload(
-    report: ClosedChannelValidation,
-) -> dict[str, object]:
-    payload = {name: value for name, value in vars(report).items() if name not in {"y_profile", "z_profile"}}
-    for name in ("y_profile", "z_profile"):
-        payload[name] = _comparison_payload(getattr(report, name))
-    return payload
-
-
 def write_analytic_comparison(
     comparison: AnalyticComparison, path: str | Path, axis_name: str = "coordinate"
 ) -> Path:
     return _write_json(_comparison_payload(comparison, axis_name), path)
-
-
-def write_closed_channel_validation(report: ClosedChannelValidation, path: str | Path) -> Path:
-    return _write_json(_profile_validation_payload(report), path)
 
 
 def write_acceptance_report(report: AcceptanceReport, path: str | Path) -> Path:
@@ -623,350 +559,13 @@ def write_metrics_json(metrics: dict[str, float | str], path: str | Path) -> Pat
     return _write_json(metrics, path)
 
 
-@dataclass(frozen=True)
-class ClosedChannelAnalyticalReference:
-    case_kind: str
-    ha: int
-    coordinate: jnp.ndarray
-    midplane_z: jnp.ndarray
-    midplane_y: jnp.ndarray
-    pressure_drop: float | None
-    path: str
-
-
-@dataclass(frozen=True)
-class ProcessedSliceReference:
-    case_kind: str
-    ha: int
-    columns: dict[str, jnp.ndarray]
-    path: str
-
-
-def default_closed_channel_reference_root(reference_root: str | Path | None = None) -> Path:
-    if reference_root is not None:
-        return Path(reference_root)
-    repo_root = Path(__file__).resolve().parents[1]
-    preferred = repo_root / "external" / "reference_data" / "ClosedChannel"
-    if preferred.exists():
-        return preferred
-    return repo_root / "external" / "FreeMHDPaperAllFigures" / "FreeMHDPaperAllFigures" / "ClosedChannel"
-
-
-def _match_single(patterns: list[str], reference_root: Path) -> Path:
-    matches: list[Path] = []
-    for pattern in patterns:
-        matches.extend(sorted(reference_root.glob(pattern)))
-    if not matches:
-        raise FileNotFoundError(f"No reference files matched {patterns} under {reference_root}")
-    return matches[0]
-
-
-def analytical_reference_path(case_kind: str, ha: int, reference_root: str | Path | None = None) -> Path:
-    root = default_closed_channel_reference_root(reference_root) / "AnalyticalSolutions"
-    stem = case_kind.capitalize()
-    patterns = [f"{stem}_Analytical_Ha{ha}_*.txt"]
-    return _match_single(patterns, root)
-
-
-def processed_slice_reference_path(
-    case_kind: str,
-    ha: int,
-    x_slice: str = "1m",
-    reference_root: str | Path | None = None,
-) -> Path:
-    root = default_closed_channel_reference_root(reference_root)
-    patterns = [f"{case_kind}_*Ha{ha}_*XSlice{x_slice}_*.csv", f"{case_kind}_Ha{ha}_*XSlice{x_slice}_*.csv"]
-    return _match_single(patterns, root)
-
-
-def load_closed_channel_analytical(
-    case_kind: str, ha: int, reference_root: str | Path | None = None
-) -> ClosedChannelAnalyticalReference:
-    """Load a bundled or user-supplied analytical closed-channel profile."""
-
-    path = analytical_reference_path(case_kind, ha, reference_root)
-    rows = path.read_text().strip().splitlines()
-    _, *body = rows
-    coordinate = []
-    midplane_z = []
-    midplane_y = []
-    for row in body:
-        radius, u1, u2 = row.split()
-        coordinate.append(float(radius))
-        midplane_z.append(float(u1))
-        midplane_y.append(float(u2))
-    match = re.search(r"PresDrop([0-9.]+)", path.name)
-    pressure_drop = None if match is None else float(match.group(1).rstrip("."))
-    return ClosedChannelAnalyticalReference(
-        case_kind=case_kind,
-        ha=ha,
-        coordinate=jnp.asarray(coordinate),
-        midplane_z=jnp.asarray(midplane_z),
-        midplane_y=jnp.asarray(midplane_y),
-        pressure_drop=pressure_drop,
-        path=str(path),
-    )
-
-
-def load_shercliff_analytical(
-    ha: int, reference_root: str | Path | None = None
-) -> ClosedChannelAnalyticalReference:
-    """Load an analytical Shercliff profile at the requested Hartmann number."""
-
-    return load_closed_channel_analytical("shercliff", ha, reference_root)
-
-
-def load_hunt_analytical(
-    ha: int, reference_root: str | Path | None = None
-) -> ClosedChannelAnalyticalReference:
-    """Load an analytical Hunt profile at the requested Hartmann number."""
-
-    return load_closed_channel_analytical("hunt", ha, reference_root)
-
-
-def load_processed_slice(
-    case_kind: str,
-    ha: int,
-    x_slice: str = "1m",
-    reference_root: str | Path | None = None,
-) -> ProcessedSliceReference:
-    """Load a processed FreeMHD slice and its named field columns."""
-
-    path = processed_slice_reference_path(case_kind, ha, x_slice=x_slice, reference_root=reference_root)
-    with path.open() as handle:
-        reader = csv.DictReader(handle)
-        fieldnames = reader.fieldnames or []
-        columns: dict[str, list[float]] = {name: [] for name in fieldnames}
-        for row in reader:
-            for name in fieldnames:
-                columns[name].append(float(row[name]))
-    return ProcessedSliceReference(
-        case_kind=case_kind,
-        ha=ha,
-        columns={name: jnp.asarray(values) for name, values in columns.items()},
-        path=str(path),
-    )
-
-
-def _processed_field_column(
-    reference: ProcessedSliceReference, field_name: str, component: int | None
-) -> jnp.ndarray:
-    column_name = field_name if component is None else f"{field_name}:{component}"
-    try:
-        return reference.columns[column_name]
-    except KeyError as exc:
-        available = ", ".join(sorted(reference.columns))
-        raise KeyError(
-            f"Processed slice {reference.path} has no column {column_name!r}; available columns: {available}"
-        ) from exc
-
-
-def _fill_missing_structured_values(grid: np.ndarray, y: np.ndarray, z: np.ndarray) -> np.ndarray:
-    if not np.isnan(grid).any():
-        return grid
-    filled = np.array(grid, copy=True)
-    for row_index in range(filled.shape[0]):
-        row = filled[row_index, :]
-        valid = np.isfinite(row)
-        if valid.sum() >= 2:
-            filled[row_index, :] = np.interp(z, z[valid], row[valid])
-        elif valid.sum() == 1:
-            filled[row_index, :] = row[valid][0]
-    for column_index in range(filled.shape[1]):
-        column = filled[:, column_index]
-        valid = np.isfinite(column)
-        if valid.sum() >= 2:
-            filled[:, column_index] = np.interp(y, y[valid], column[valid])
-        elif valid.sum() == 1:
-            filled[:, column_index] = column[valid][0]
-    if np.isnan(filled).any():
-        fallback = float(np.nanmean(filled)) if np.isfinite(filled).any() else 0.0
-        filled = np.where(np.isfinite(filled), filled, fallback)
-    return filled
-
-
-def processed_slice_field_grid(
-    reference: ProcessedSliceReference,
-    *,
-    field_name: str,
-    component: int | None = None,
-) -> dict[str, jnp.ndarray]:
-    """Return a structured ``(y, z)`` grid from a processed FreeMHD slice.
-
-    ParaView/OpenFOAM slice exports can contain duplicated points at block
-    interfaces and may not be ordered as a tensor grid. This helper averages
-    duplicate point values before assembling a structured grid for quadrature,
-    plotting, and reference-derived flow-rate targets.
-    """
-
-    points_y = np.asarray(reference.columns["Points:1"], dtype=float)
-    points_z = np.asarray(reference.columns["Points:2"], dtype=float)
-    values = np.asarray(_processed_field_column(reference, field_name, component), dtype=float)
-    y = np.unique(points_y)
-    z = np.unique(points_z)
-    y_index = {float(value): index for index, value in enumerate(y)}
-    z_index = {float(value): index for index, value in enumerate(z)}
-    accumulator = np.zeros((y.size, z.size), dtype=float)
-    counts = np.zeros((y.size, z.size), dtype=float)
-    for point_y, point_z, value in zip(points_y, points_z, values, strict=True):
-        iy = y_index[float(point_y)]
-        iz = z_index[float(point_z)]
-        accumulator[iy, iz] += float(value)
-        counts[iy, iz] += 1.0
-    grid = np.divide(accumulator, counts, out=np.full_like(accumulator, np.nan), where=counts > 0.0)
-    grid = _fill_missing_structured_values(grid, y, z)
-    return {"y": jnp.asarray(y), "z": jnp.asarray(z), "value": jnp.asarray(grid)}
-
-
-def processed_slice_area_mean(
-    reference: ProcessedSliceReference,
-    *,
-    field_name: str = "U",
-    component: int | None = 0,
-) -> float:
-    """Compute an area-weighted mean over a processed ``y-z`` slice."""
-
-    grid = processed_slice_field_grid(reference, field_name=field_name, component=component)
-    y = np.asarray(grid["y"], dtype=float)
-    z = np.asarray(grid["z"], dtype=float)
-    values = np.asarray(grid["value"], dtype=float)
-    if y.size < 2 or z.size < 2:
-        return float(np.mean(values)) if values.size else 0.0
-    area = (float(y[-1]) - float(y[0])) * (float(z[-1]) - float(z[0]))
-    integral_z = np.trapezoid(values, z, axis=1)
-    integral = float(np.trapezoid(integral_z, y))
-    return integral / area
-
-
-def processed_slice_point_mesh(
-    reference: ProcessedSliceReference,
-    *,
-    length: float = 1.0,
-    nx: int = 1,
-) -> StructuredMesh:
-    """Build a rectangular mesh whose cross-section faces match slice points."""
-
-    y_faces = jnp.asarray(np.unique(np.asarray(reference.columns["Points:1"], dtype=float)))
-    z_faces = jnp.asarray(np.unique(np.asarray(reference.columns["Points:2"], dtype=float)))
-    return generate_rect_duct_mesh_from_faces(y_faces=y_faces, z_faces=z_faces, length=length, nx=nx)
-
-
-def _unique_plane_profile(profile_coord: jnp.ndarray, values: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
-    coord_np = np.asarray(profile_coord, dtype=float)
-    values_np = np.asarray(values, dtype=float)
-    unique_coord = np.unique(coord_np)
-    unique_values = np.asarray([np.mean(values_np[np.isclose(coord_np, coord)]) for coord in unique_coord])
-    order = np.argsort(unique_coord)
-    return jnp.asarray(unique_coord[order]), jnp.asarray(unique_values[order])
-
-
-def _interpolated_centerline_profile(
-    profile_coord: jnp.ndarray,
-    cross_coord: jnp.ndarray,
-    values: jnp.ndarray,
-    *,
-    tolerance: float = 1.0e-12,
-) -> tuple[jnp.ndarray, jnp.ndarray]:
-    profile_np = np.asarray(profile_coord, dtype=float)
-    cross_np = np.asarray(cross_coord, dtype=float)
-    values_np = np.asarray(values, dtype=float)
-    unique_cross = np.unique(cross_np)
-    if unique_cross.size == 0:
-        return jnp.asarray([]), jnp.asarray([])
-
-    exact = unique_cross[np.isclose(unique_cross, 0.0, atol=tolerance, rtol=0.0)]
-    if exact.size:
-        target = float(exact[np.argmin(np.abs(exact))])
-        mask = np.isclose(cross_np, target, atol=tolerance, rtol=0.0)
-        return _unique_plane_profile(jnp.asarray(profile_np[mask]), jnp.asarray(values_np[mask]))
-
-    lower_candidates = unique_cross[unique_cross < 0.0]
-    upper_candidates = unique_cross[unique_cross > 0.0]
-    if lower_candidates.size == 0 or upper_candidates.size == 0:
-        target = float(unique_cross[np.argmin(np.abs(unique_cross))])
-        mask = np.isclose(cross_np, target, atol=tolerance, rtol=0.0)
-        return _unique_plane_profile(jnp.asarray(profile_np[mask]), jnp.asarray(values_np[mask]))
-
-    lower = float(lower_candidates[np.argmax(lower_candidates)])
-    upper = float(upper_candidates[np.argmin(upper_candidates)])
-    lower_mask = np.isclose(cross_np, lower, atol=tolerance, rtol=0.0)
-    upper_mask = np.isclose(cross_np, upper, atol=tolerance, rtol=0.0)
-    lower_coord, lower_values = _unique_plane_profile(
-        jnp.asarray(profile_np[lower_mask]), jnp.asarray(values_np[lower_mask])
-    )
-    upper_coord, upper_values = _unique_plane_profile(
-        jnp.asarray(profile_np[upper_mask]), jnp.asarray(values_np[upper_mask])
-    )
-    coord = np.union1d(np.asarray(lower_coord, dtype=float), np.asarray(upper_coord, dtype=float))
-    lower_interp = np.interp(
-        coord, np.asarray(lower_coord, dtype=float), np.asarray(lower_values, dtype=float)
-    )
-    upper_interp = np.interp(
-        coord, np.asarray(upper_coord, dtype=float), np.asarray(upper_values, dtype=float)
-    )
-    weight = (0.0 - lower) / (upper - lower)
-    return jnp.asarray(coord), jnp.asarray((1.0 - weight) * lower_interp + weight * upper_interp)
-
-
-def extract_processed_midplane_profile(
-    reference: ProcessedSliceReference, axis: str = "y"
-) -> dict[str, jnp.ndarray]:
-    points_y = reference.columns["Points:1"]
-    points_z = reference.columns["Points:2"]
-    u_x = reference.columns["U:0"]
-    pot_e = reference.columns.get("potE", jnp.zeros_like(u_x))
-
-    if axis == "y":
-        coordinate, u_values = _interpolated_centerline_profile(points_y, points_z, u_x)
-        _, phi_values = _interpolated_centerline_profile(points_y, points_z, pot_e)
-        return {
-            "y": coordinate,
-            "u": u_values,
-            "phi": phi_values,
-        }
-    if axis == "z":
-        coordinate, u_values = _interpolated_centerline_profile(points_z, points_y, u_x)
-        _, phi_values = _interpolated_centerline_profile(points_z, points_y, pot_e)
-        return {
-            "z": coordinate,
-            "u": u_values,
-            "phi": phi_values,
-        }
-    raise ValueError(f"Unsupported axis {axis}")
-
-
-def extract_processed_profile(
-    reference: ProcessedSliceReference,
-    *,
-    axis: str,
-    field_name: str,
-    component: int | None = None,
-) -> dict[str, jnp.ndarray]:
-    points_y = reference.columns["Points:1"]
-    points_z = reference.columns["Points:2"]
-    if component is None:
-        values = reference.columns[field_name]
-    else:
-        values = reference.columns[f"{field_name}:{component}"]
-
-    if axis == "y":
-        coordinate, profile_values = _interpolated_centerline_profile(points_y, points_z, values)
-        return {
-            "coordinate": coordinate,
-            "value": profile_values,
-        }
-    if axis == "z":
-        coordinate, profile_values = _interpolated_centerline_profile(points_z, points_y, values)
-        return {
-            "coordinate": coordinate,
-            "value": profile_values,
-        }
-    raise ValueError(f"Unsupported axis {axis}")
-
-
 BENCHMARK_B_SPEC_FILES = {
     "B1-fringing-pipe": "alex-b1-pipe.toml",
     "B2-fringing-square": "alex-b2-square.toml",
+}
+_BENCHMARK_B_SPEC_DIGESTS = {
+    "B1-fringing-pipe": "3d3433ae552ad1e9196d61066fd3c26bc2529f6f4da68c92cea0b86dc5112057",
+    "B2-fringing-square": "f7abe37bde526d2882f3827cafffb8bb9168a38006af12c19f266d2b03f33bad",
 }
 _MATCHED_SHARED_SECTIONS = """equations nondimensional_groups geometry magnetic_field wall
 boundary_drive observable normalization""".split()
@@ -975,24 +574,6 @@ _MATCHED_CONTRACT_SECTIONS = (*_MATCHED_SHARED_SECTIONS, *_MATCHED_ROLE_SECTIONS
 _MATCHED_PRODUCTION_ROLES = {
     "B1-fringing-pipe": "b1-production",
     "B2-fringing-square": "b2-production",
-}
-_FREEMHD_DISCRETIZATION_REFERENCE = {
-    "repository_commit": "14b54a3e8e1a05b6ee4c98331995abaaae96e7a5",
-    "openfoam_release": "v2206",
-    "momentum_source": "MHD_Solvers/solvers/epotMultiRegionInterFoam/fluid/mhdUEqn.H",
-    "momentum_source_sha256": "ce88d93bf0fd575809e373497335dcad17bd1c31b792449bec00820fc9e1fcc6",
-    "electric_source": "MHD_Solvers/solvers/epotMultiRegionInterFoam/fluid/ePotEqn.H",
-    "electric_source_sha256": "605058509958d14d2c44d10d0b671573027f712ec59fa56d9aa6611e8f38f0e1",
-    "limiter_source": "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/limitedLinear/limitedLinear.H",
-    "limiter_source_sha256": "f30f319041e1546703cc8ee20250d1f89c9187927b264b308f336fe0dae2b06e",
-    "scheme_macro_source": "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/LimitedScheme/LimitedScheme.H",
-    "scheme_macro_source_sha256": "c5cae1690ceebb94ee813601c0e71180b63c8f2e50b4624bc7a74b9654df580a",
-    "limiter_registration_source": "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/limitedLinear/limitedLinear.C",
-    "limiter_registration_source_sha256": "298d9603b9bfd2c02deb50e8382be8ac147f1ebcccecd69233c77909fd4a0094",
-    "nvd_source": "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/LimitedScheme/NVDTVD.H",
-    "nvd_source_sha256": "ee85d9b26c257ccdd3ab6d2fa0403daed9df30d63f483c35bea1586ce6d4fd07",
-    "vector_transform_source": "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/LimitedScheme/LimitFuncs.C",
-    "vector_transform_source_sha256": "f99e4011a0a4ac957c992493b9391796dd12191c16293ba07c127168640c53b3",
 }
 
 
@@ -1187,107 +768,9 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
     if case_id == "B2-fringing-square" and int(contract["stopping_rules"].get("steady_steps_min", 0)) != 3:
         raise ValueError("Benchmark B matched stopping contract differs")
 
-    if spec.get("free_mhd_discretization_reference") != _FREEMHD_DISCRETIZATION_REFERENCE:
-        raise ValueError("Benchmark B FreeMHD discretization reference differs")
-
-    sources = spec.get("sources")
-    if not isinstance(sources, list) or {source.get("id") for source in sources} != {
-        "smolentsev-vv",
-        "alex-results-1987",
-    }:
-        raise ValueError("Benchmark B sources must identify both review and primary ALEX evidence")
-    for source in sources:
-        if not source.get("pages") or not source.get("figures") or len(source.get("sha256", "")) != 64:
-            raise ValueError("Every Benchmark B source needs pages, figures, and SHA-256")
-
-    field = spec["field"]
-    if (
-        field.get("representation") != "tabulated monotone interpolation"
-        or field.get("no_extrapolation") is not True
-        or "exactly divergence free" not in field.get("divergence_model", "")
-        or float(field.get("divergence_acceptance", math.inf)) > 1.0e-8
-    ):
-        raise ValueError("Benchmark B field reconstruction contract is incomplete")
-
-    levels = spec["mesh"].get("levels")
-    if not isinstance(levels, list) or [level.get("name") for level in levels] != [
-        "coarse",
-        "medium",
-        "fine",
-    ]:
-        raise ValueError("Benchmark B requires coarse, medium, and fine mesh levels")
-    for key in (
-        "axial_stations_min",
-        "hartmann_layer_cells_min",
-        "side_layer_cells_min",
-    ):
-        values = [int(level[key]) for level in levels]
-        if values != sorted(values) or len(set(values)) != 3:
-            raise ValueError(f"Benchmark B mesh requirement {key} must increase by level")
-    resolution_key = "radial_cells_min" if case_id == "B1-fringing-pipe" else "cross_section_cells_min"
-    resolution = [int(level[resolution_key]) for level in levels]
-    if resolution != sorted(resolution) or len(set(resolution)) != 3:
-        raise ValueError(f"Benchmark B mesh requirement {resolution_key} must increase by level")
-    wall = spec["wall"]
-    if (
-        not str(wall.get("numerical_realization", "")).startswith("explicit volumetric")
-        or float(wall.get("nominal_thickness_over_L", 0.0)) <= 0.0
-        or float(wall.get("confirmation_thickness_over_L", math.inf))
-        >= float(wall.get("nominal_thickness_over_L", 0.0))
-        or float(wall.get("thickness_independence_relative_max", math.inf)) > 0.02
-    ):
-        raise ValueError("Benchmark B thin-wall numerical realization is incomplete")
-
-    acceptance = spec["acceptance"]
-    if (
-        float(acceptance.get("weighted_rms_max", math.inf)) != 1.0
-        or float(acceptance.get("weighted_linf_max", math.inf)) != 2.0
-        or acceptance.get("matched_freemhd_case_required") is not True
-        or acceptance.get("primary_before_secondary") is not True
-    ):
-        raise ValueError("Benchmark B uncertainty-aware acceptance contract is incomplete")
-    solver = spec["solver"]
-    reference_uncertainty = float(spec["reference"]["combined_uncertainty_absolute"])
-    steady_uncertainty_fraction = float(solver.get("steady_residual_uncertainty_fraction_max", math.inf))
-    expected_elliptic_controls = {
-        "B1-fringing-pipe": (4000, 1.0e-12, 4000, 1.0e-12),
-        "B2-fringing-square": (600, 1.0e-12, 4000, 1.0e-12),
-    }[case_id]
-    actual_elliptic_controls = (
-        int(solver.get("electric_iterations_min", 0)),
-        float(solver.get("electric_tolerance_max", math.inf)),
-        int(solver.get("projection_iterations_min", 0)),
-        float(solver.get("projection_tolerance_max", math.inf)),
-    )
-    acceleration = solver.get("coupling_acceleration")
-    if (
-        acceleration not in {"aitken", "anderson", "none"}
-        or (acceleration == "anderson" and int(solver.get("coupling_history_depth", 0)) < 1)
-        or float(solver.get("coupling_regularization", -1.0)) < 0.0
-        or not 0.0 <= float(solver.get("coupling_damping", math.inf)) <= 1.0
-        or (
-            acceleration == "aitken"
-            and (
-                float(solver.get("coupling_min_relaxation", 0.0)) <= 0.0
-                or float(solver.get("coupling_max_relaxation", 0.0))
-                < float(solver.get("coupling_min_relaxation", 0.0))
-            )
-        )
-        or steady_uncertainty_fraction > 0.05
-        or (case_id == "B2-fringing-square" and int(solver.get("steady_steps_min", 0)) != 3)
-        or float(solver.get("steady_residual_max", math.inf))
-        > steady_uncertainty_fraction * reference_uncertainty
-        or actual_elliptic_controls != expected_elliptic_controls
-        or float(solver.get("tolerance_independence_factor", math.inf)) != 0.5
-        or float(solver.get("tolerance_independence_uncertainty_fraction_max", math.inf)) > 0.25
-        or float(solver.get("iteration_independence_factor", 0.0)) != 2.0
-        or float(solver.get("iteration_independence_uncertainty_fraction_max", math.inf)) > 0.25
-        or solver.get("time_or_iteration_independence_required") is not True
-    ):
-        raise ValueError("Benchmark B tolerance and iteration independence contract is incomplete")
-    rights = spec["data_rights"]
-    if "extracted numerical facts" not in rights.get("redistribution", ""):
-        raise ValueError("Benchmark B reference-data redistribution policy is missing")
+    canonical = json.dumps(spec, sort_keys=True, separators=(",", ":")).encode()
+    if hashlib.sha256(canonical).hexdigest() != _BENCHMARK_B_SPEC_DIGESTS[case_id]:
+        raise ValueError("Benchmark B frozen contract differs from its reviewed specification")
 
     reference = spec["reference"]
     data_path = root / str(reference["data_path"])

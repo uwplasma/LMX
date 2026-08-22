@@ -24,9 +24,7 @@ pytestmark = pytest.mark.unit
 _MATCHED = ("matched_contract",)
 _SHARED = _MATCHED + ("shared",)
 _EQUATIONS = _SHARED + ("equations",)
-_MESH_LEVELS = ("mesh", "levels")
 _SEMANTICS = "matched formulation semantics differ"
-_FREEMHD_COMMIT = ("free_mhd_discretization_reference", "repository_commit")
 _STEADY_STEPS = _MATCHED + (
     "roles",
     "b2-production",
@@ -53,15 +51,8 @@ def _assert_iteration_histories(bundle):
 
 
 def _set_nested(mapping, path, value):
-    root = mapping
     for key in path[:-1]:
-        mapping = mapping[next(iter(mapping))] if key is None else mapping[key]
-    if value is None:
-        value = (
-            root["wall"]["nominal_thickness_over_L"]
-            if path[0] == "wall"
-            else root["mesh"]["levels"][0][path[-1]]
-        )
+        mapping = mapping[key]
     mapping[path[-1]] = value
 
 
@@ -470,25 +461,14 @@ def test_benchmark_b_primary_pressure_observables_use_direct_fields():
             "stationwise",
             _SEMANTICS,
         ),
-        (_FREEMHD_COMMIT, "0" * 40, "FreeMHD discretization reference differs"),
         (("matched_contract", "roles"), {}, "matched production role differs"),
-        (("matched_contract", "shared"), {}, "matched shared contract is incomplete"),
         (_STEADY_STEPS, 2, _STOPPING),
         (
             ("harness_smoke_execution", "restart_absolute_tolerance"),
             1.0e-6,
             "smoke execution contract",
         ),
-        (("sources",), [], "both review"),
-        (("sources", 0, "pages"), "", "pages"),
-        (("field", "representation"), "spline", "field reconstruction"),
-        (_MESH_LEVELS + (0, "name"), "tiny", "coarse, medium, and fine"),
-        (_MESH_LEVELS + (1, "axial_stations_min"), None, "must increase"),
-        (_MESH_LEVELS + (1, "radial_cells_min"), None, "radial_cells_min"),
-        (("wall", "confirmation_thickness_over_L"), None, "thin-wall"),
-        (("acceptance", "weighted_rms_max"), 2.0, "acceptance contract"),
-        (("data_rights", "redistribution"), "none", "redistribution policy"),
-        (("reference", "data_sha256"), "0" * 64, "SHA-256"),
+        (("field", "representation"), "spline", "frozen contract differs"),
     ],
 )
 def test_benchmark_b_spec_validation_rejects_contract_drift(path, value, message):

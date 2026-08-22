@@ -1,7 +1,6 @@
 """Solve a Hunt duct with conducting Hartmann and insulating side walls.
 
-Edit the inputs below, then run ``python examples/hunt_example.py``. Set
-``REFERENCE_ROOT`` to a ClosedChannel data directory for an analytical overlay.
+Edit the inputs below, then run ``python examples/hunt_example.py``.
 """
 
 from __future__ import annotations
@@ -12,11 +11,10 @@ from pathlib import Path
 
 from lmx import make_hunt_case, solve_steady
 from lmx.io import write_case_overview_plots, write_solution_outputs
-from lmx.validation import closed_channel_validation, validation_summary
+from lmx.validation import validation_summary
 
 # Inputs: geometry, wall model, material properties, numerics, and outputs.
 OUTPUT_DIR = Path("artifacts/examples/hunt")
-REFERENCE_ROOT: Path | None = None
 HARTMANN_NUMBER = 20.0
 WIDTH = 2.0
 HEIGHT = 2.0
@@ -81,24 +79,14 @@ case = replace(
     ),
 )
 
-# Run the solve and optionally load an independent analytical comparison.
+# Run the solve and write the standard solution products.
 solution = solve_steady(case)
-comparison = (
-    closed_channel_validation(solution, "hunt", int(HARTMANN_NUMBER), reference_root=REFERENCE_ROOT)
-    if REFERENCE_ROOT is not None
-    else None
-)
 generated = write_solution_outputs(solution, case, OUTPUT_DIR)
 plots = (
     write_case_overview_plots(
         solution,
         OUTPUT_DIR,
         case_title=f"Hunt duct (Ha={HARTMANN_NUMBER:g})",
-        y_reference_coordinate=(None if comparison is None else comparison.y_profile.coordinate),
-        y_reference_values=(None if comparison is None else comparison.y_profile.reference),
-        z_reference_coordinate=(None if comparison is None else comparison.z_profile.coordinate),
-        z_reference_values=(None if comparison is None else comparison.z_profile.reference),
-        reference_label="Analytical",
     )
     if WRITE_PLOTS
     else []
@@ -107,13 +95,6 @@ summary = {
     "case": case.name,
     "wall_model": "conducting Hartmann walls; insulating side walls",
     "validation": validation_summary(solution, case.name, HARTMANN_NUMBER),
-    "analytical_profile": None
-    if comparison is None
-    else {
-        "reference": comparison.reference_path,
-        "y_l2_error": comparison.y_profile.l2_error,
-        "z_l2_error": comparison.z_profile.l2_error,
-    },
     "generated_files": {
         **{kind: [path.name for path in paths] for kind, paths in generated.items()},
         "plots": [path.name for path in plots],

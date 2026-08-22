@@ -15,10 +15,6 @@ from solvax import (
     anderson_mixing,
 )
 
-try:
-    from scipy import sparse
-except Exception:  # pragma: no cover - SciPy should be present in shipped environments.
-    sparse = None
 from ._fringing_common import (
     ALEX_B2_CANONICAL_SHELL_THICKNESS,
     ALEX_B2_MAGNETIC_STABILITY_SAFETY,
@@ -39,14 +35,12 @@ from ._fringing_common import (
     _iteration_history_arrays,
     _laplacian_3d,
     _normalized_pressure_observable_update,
-    _poisson_jacobi_3d,
+    _projection_pressure_correction_3d,
     _rectangular_fluid_bounds,
     _restore_duct_iteration_state,
     _reuse_fringing_jit,
     _shard_extruded_fields,
     _synchronized_phase,
-    _variable_coefficient_poisson_jacobi_3d,
-    _variable_coefficient_poisson_sparse_3d,
 )
 from ._fringing_duct import (
     _b2_coupling_functions,
@@ -58,6 +52,7 @@ from ._fringing_duct import (
     _jit_b2_coupling_functions,
     _prepare_b2_momentum_runtime,
     _sample_station_magnetic_field,
+    _solvax_pressure_poisson_duct,
     _station_axial_current_from_fluxes,
 )
 from ._fringing_pipe import (
@@ -69,7 +64,6 @@ from ._fringing_pipe import (
     _pipe_divergence_3d,
     _pipe_gradient_3d,
     _pipe_laplacian_3d,
-    _pipe_poisson_sparse_3d,
     _pipe_radial_fluid_count,
     _pipe_variable_diffusion_coefficients_3d,
     _separable_pressure_poisson_pipe,
@@ -564,16 +558,17 @@ def _solve_extruded_projection(
                 )
                 divergence = _pipe_divergence_3d(u_star, v_star, w_star, dx=dx, dr=dr, dtheta=dtheta, r=rr)
                 pressure_rhs = (rho / max(dt, 1.0e-12)) * divergence
-                p_corr, _, _, _ = _pipe_poisson_sparse_3d(
-                    -pressure_rhs,
+                p_corr, *_ = _solvax_pressure_poisson_pipe(
+                    pressure_rhs,
                     jnp.ones_like(rho),
                     dx=dx,
                     r_faces=r_faces,
                     r_centers=r,
                     dtheta=dtheta,
-                    iterations=electric_iterations,
-                    tolerance=electric_tolerance,
-                    initial_field=phi,
+                    iterations=projection_iterations,
+                    tolerance=projection_tolerance,
+                    initial_field=p,
+                    include_theta_line=True,
                 )
                 p_corr = _clip_state(p_corr, scalar_limit)
                 dpc_dx, dpc_dr, dpc_dtheta = _pipe_gradient_3d(p_corr, dx=dx, dr=dr, dtheta=dtheta, r=rr)
@@ -671,25 +666,26 @@ def _solve_extruded_projection(
                     include_theta_line=True,
                 )
             else:
-                # The sparse pipe operator represents -div(sigma grad(phi)); J
-                # is sigma(-grad(phi) + u x B), hence the opposite source sign.
-                phi, _, _, _ = _pipe_poisson_sparse_3d(
-                    -emf_rhs,
+                (
+                    phi,
+                    electric_residual,
+                    electric_converged,
+                    electric_relative_residual,
+                    electric_iteration_count,
+                    electric_status,
+                    electric_local_residual,
+                ) = _solvax_pressure_poisson_pipe(
+                    emf_rhs,
                     sigma,
                     dx=dx,
                     r_faces=r_faces,
                     r_centers=r,
                     dtheta=dtheta,
-                    iterations=poisson_iterations,
-                    tolerance=poisson_tolerance,
+                    iterations=electric_iterations,
+                    tolerance=electric_tolerance,
                     initial_field=phi,
+                    include_theta_line=True,
                 )
-                electric_residual = jnp.asarray(jnp.nan)
-                electric_relative_residual = jnp.asarray(jnp.nan)
-                electric_iteration_count = jnp.asarray(0)
-                electric_converged = jnp.asarray(False)
-                electric_status = jnp.asarray(-1)
-                electric_local_residual = jnp.asarray(jnp.nan)
             phi = _clip_state(phi, scalar_limit)
             potential_update = _gauge_invariant_scalar_update(
                 phi,
@@ -1314,7 +1310,7 @@ def _solve_extruded_projection(
             _, dv_dy, _ = _gradient_3d(v_star, dx=dx, dy=dy_momentum, dz=dz_momentum)
             _, _, dw_dz = _gradient_3d(w_star, dx=dx, dy=dy_momentum, dz=dz_momentum)
             divergence = jnp.where(fluid_mask, du_dx + dv_dy + dw_dz, 0.0)
-            p_corr, _, _, _ = _poisson_jacobi_3d(
+            p_corr = _projection_pressure_correction_3d(
                 (rho / max(dt, 1.0e-12)) * divergence,
                 dx=dx,
                 dy=dy_momentum,
@@ -1383,27 +1379,24 @@ def _solve_extruded_projection(
                 electric_local_residual,
             ) = electric_solve(emf_rhs, phi, sigma, fluid_mask)
         else:
-            electric_solver = (
-                _variable_coefficient_poisson_sparse_3d
-                if case.geometry.kind in {"rect_duct", "layered_duct"}
-                else _variable_coefficient_poisson_jacobi_3d
-            )
-            phi, _, _, _ = electric_solver(
+            (
+                phi,
+                electric_residual,
+                electric_converged,
+                electric_relative_residual,
+                electric_iteration_count,
+                electric_status,
+                electric_local_residual,
+            ) = _solvax_pressure_poisson_duct(
                 emf_rhs,
                 sigma,
                 dx=dx,
                 dy=dy,
                 dz=dz,
-                iterations=poisson_iterations,
-                tolerance=poisson_tolerance,
+                iterations=electric_iterations,
+                tolerance=electric_tolerance,
                 initial_field=phi,
             )
-            electric_residual = jnp.asarray(jnp.nan)
-            electric_relative_residual = jnp.asarray(jnp.nan)
-            electric_iteration_count = jnp.asarray(0)
-            electric_converged = jnp.asarray(False)
-            electric_status = jnp.asarray(-1)
-            electric_local_residual = jnp.asarray(jnp.nan)
         if use_alex_b2_finite_volume and not bool(jnp.all(jnp.isfinite(phi))):
             raise FloatingPointError("ALEX B2 electric solve produced non-finite potential")
         phi = phi if use_alex_b2_finite_volume else _clip_state(phi, scalar_limit)

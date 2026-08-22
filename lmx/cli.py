@@ -33,7 +33,6 @@ from .io import (
 )
 from .solvers import _build_mesh
 from .specs import (
-    LoggingSpec,
     RestartLogInfo,
     RunConfig,
     StreamingSolverLogger,
@@ -42,8 +41,6 @@ from .specs import (
 )
 from .validation import (
     benchmark_solver,
-    closed_channel_validation,
-    combined_profile_error,
     extract_centerline,
     extract_midplane_profile,
     hartmann_acceptance,
@@ -52,7 +49,6 @@ from .validation import (
     write_acceptance_report,
     write_analytic_comparison,
     write_benchmark_report,
-    write_closed_channel_validation,
     write_metrics_json,
     write_profile_csv,
 )
@@ -450,12 +446,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     run_parser.add_argument("--plots", action="store_true", help="Write summary plots.")
     run_parser.add_argument("--quiet", action="store_true", help="Disable solver logging.")
-    run_parser.add_argument("--verbose", action="store_true", help="Enable debug logging.")
-    run_parser.add_argument(
-        "--verbosity",
-        choices=["quiet", "normal", "detailed", "debug"],
-        help="Explicit logging detail.",
-    )
     geometry = run_parser.add_argument_group("geometry and resolution")
     geometry.add_argument("--width", type=float, default=2.0, help="Duct width.")
     geometry.add_argument("--height", type=float, default=2.0, help="Duct height.")
@@ -486,14 +476,13 @@ def main(argv: list[str] | None = None) -> int:
 
     validate_parser = subparsers.add_parser(
         "validate",
-        help="Compare a duct case with reference data.",
-        description="Solve a duct case and write analytical or FreeMHD validation metrics.",
+        help="Solve a duct case and write validation metrics.",
+        description="Solve a duct case and write profiles, diagnostics, and Hartmann acceptance metrics.",
         formatter_class=formatter,
     )
     validate_parser.add_argument("case", choices=["hartmann", "shercliff", "hunt"], help="Validation case.")
     validate_parser.add_argument("--ha", type=float, default=20.0, help="Hartmann number.")
     validate_parser.add_argument("--output", default="./out", help="Output directory.")
-    validate_parser.add_argument("--reference-root", default="", help="FreeMHD data root.")
     validate_parser.add_argument(
         "--hartmann-l2-threshold", type=float, default=0.05, help="Hartmann L2 gate."
     )
@@ -538,23 +527,6 @@ def main(argv: list[str] | None = None) -> int:
             payload["accepted"] = float(acceptance.passed)
             payload["acceptance_l2_threshold"] = acceptance.l2_threshold
             payload["acceptance_linf_threshold"] = acceptance.linf_threshold
-        elif args.reference_root:
-            comparison = closed_channel_validation(
-                solution, args.case, int(args.ha), reference_root=args.reference_root
-            )
-            write_closed_channel_validation(comparison, out_dir / f"{case.name}_analytic.json")
-            payload["y_l2_error"] = comparison.y_profile.l2_error
-            payload["y_linf_error"] = comparison.y_profile.linf_error
-            payload["z_l2_error"] = comparison.z_profile.l2_error
-            payload["z_linf_error"] = comparison.z_profile.linf_error
-            payload["combined_l2_error"] = combined_profile_error(
-                comparison.y_profile.l2_error,
-                comparison.z_profile.l2_error,
-            )
-            payload["combined_linf_error"] = combined_profile_error(
-                comparison.y_profile.linf_error,
-                comparison.z_profile.linf_error,
-            )
         write_metrics_json(payload, out_dir / f"{case.name}_metrics.json")
         print(json.dumps(payload, indent=2))
         return 2 if getattr(solution, "converged", None) is False else 0
@@ -610,28 +582,7 @@ def main(argv: list[str] | None = None) -> int:
     config = RunConfig(case=case)
     logging = config.logging
     if args.quiet:
-        logging = LoggingSpec.from_user_controls(
-            enabled=False,
-            verbosity="quiet",
-            banner=logging.banner,
-            print_regions=logging.print_regions,
-            print_boundaries=logging.print_boundaries,
-            print_footer=logging.print_footer,
-            flush=logging.flush,
-            step_stride=logging.step_stride,
-        )
-    elif args.verbose or args.verbosity is not None:
-        logging = LoggingSpec.from_user_controls(
-            enabled=True,
-            verbose=True if args.verbose else None,
-            verbosity=args.verbosity or ("debug" if args.verbose else logging.verbosity),
-            banner=logging.banner,
-            print_regions=logging.print_regions,
-            print_boundaries=logging.print_boundaries,
-            print_footer=logging.print_footer,
-            flush=logging.flush,
-            step_stride=logging.step_stride,
-        )
+        logging = replace(logging, enabled=False)
     if logging is not config.logging:
         config = replace(config, logging=logging)
     return _summary_exit_code(_run_config(config))

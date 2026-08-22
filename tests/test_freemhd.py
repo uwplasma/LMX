@@ -9,7 +9,6 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-import examples
 import lmx.validation as benchmarks
 from lmx.io import write_extruded_bundle_restart_npz
 from lmx.specs import ExtrudedFieldBundle
@@ -1299,11 +1298,6 @@ def test_parity_command_materializes_without_running_suite(tmp_path: Path, monke
         return {"case_kind": case_kind, "audit": {"matched": True}}
 
     monkeypatch.setattr(run_freemhd_parity_suite, "materialize_matched_freemhd_case", materialize)
-    monkeypatch.setattr(
-        run_freemhd_parity_suite,
-        "run_suite",
-        lambda **_: pytest.fail("parity must not run"),
-    )
     assert (
         run_freemhd_parity_suite.main(
             [
@@ -1502,96 +1496,6 @@ def test_matched_b2_bundle_runs_lmx_before_freemhd_and_builds_schema3(
         for name, item in captured["record"]["provenance"]["artifacts"].items()
         if name.endswith("output")
     )
-
-
-def test_parity_command_portably_skips_missing_references(tmp_path: Path):
-    output = tmp_path / "parity"
-    assert (
-        run_freemhd_parity_suite.main(
-            [
-                "--output",
-                str(output),
-                "--freemhd-install-dir",
-                str(tmp_path / "missing-freemhd"),
-                "--processed-root",
-                str(tmp_path / "missing-processed"),
-            ]
-        )
-        == 0
-    )
-    assert json.loads((output / "summary.json").read_text())["status"] == "skipped"
-    assert (output / "summary.md").is_file()
-
-
-@pytest.mark.parametrize("matched", [True, False])
-def test_parity_suite_gates_profile_comparison_on_audited_inputs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, matched: bool
-):
-    install = tmp_path / "freemhd"
-    for case_kind in ("shercliff", "hunt"):
-        (install / "freemhd_output" / case_kind).mkdir(parents=True)
-    transient = SimpleNamespace(OUTPUT_DIR=tmp_path / "unset", FREEMHD_INSTALL_DIR=tmp_path / "unset")
-    transient.run_freemhd_closed_channel_parity = lambda: {
-        "records": [{"y_l2_error": 0.03, "z_l2_error": 0.02, "u_max_abs_diff": 0.01}]
-    }
-    monkeypatch.setattr(examples, "freemhd_closed_channel_parity", transient, raising=False)
-    processed = tmp_path / ("processed" if matched else "missing")
-    if matched:
-        processed.mkdir()
-        observable_summary = {
-            "records": [
-                {
-                    "observables": {
-                        "velocity": {"y": {"l2_error": 0.04}, "z": {"l2_error": 0.05}},
-                        "current": {"y": {"l2_error": 0.06}, "z": {"l2_error": 0.01}},
-                    }
-                }
-            ],
-            "observable_gate": {"research_grade_validation_pass": True},
-        }
-
-        def run_observable(command, *, env, **_kwargs):
-            assert command[-1].endswith("examples/freemhd_closed_channel_observable_parity.py")
-            assert env["LMX_FREEMHD_PROCESSED_ROOT"] == str(processed)
-            observable_output = Path(env["LMX_FREEMHD_OBSERVABLE_OUTPUT"])
-            observable_output.mkdir(parents=True)
-            (observable_output / "freemhd_closed_channel_observable_parity_summary.json").write_text(
-                json.dumps(observable_summary)
-            )
-            return subprocess.CompletedProcess(command, 0)
-
-        monkeypatch.setattr(run_freemhd_parity_suite.subprocess, "run", run_observable)
-    monkeypatch.setattr(
-        run_freemhd_parity_suite,
-        "audit_freemhd_case_against_spec",
-        lambda *_args, case_kind, **_kwargs: {
-            "case_kind": case_kind,
-            "matched": matched,
-            "failed_check_count": 0 if matched else 1,
-        },
-    )
-
-    summary = run_freemhd_parity_suite.run_suite(
-        output=tmp_path / "out",
-        freemhd_install_dir=install,
-        processed_root=processed,
-    )
-
-    assert summary["status"] == ("completed" if matched else "invalid_reference")
-    assert summary["matched_case_gate"] is matched
-    assert ("closed_channel_parity" in summary["runs"]) is matched
-    metrics = summary["parity_report"]["metrics"]
-    assert metrics["reference_sample_y_l2_error"] == (0.06 if matched else None)
-    assert metrics["reference_sample_z_l2_error"] == (0.05 if matched else None)
-    if matched:
-        markdown = tmp_path / "summary.md"
-        run_freemhd_parity_suite._write_markdown(markdown, summary)
-        rendered = markdown.read_text()
-        assert "Research-grade pass: `True`" in rendered
-        assert "shercliff: matched=`True`" in rendered
-    else:
-        monkeypatch.setattr(run_freemhd_parity_suite, "run_suite", lambda **_: summary)
-        assert run_freemhd_parity_suite.main(["--output", str(tmp_path / "invalid")]) == 2
 
 
 def test_benchmark_a_spec_loader_rejects_unsupported_case():

@@ -46,7 +46,6 @@ from .physics import build_material_fields, magnetic_field_components
 from .specs import (
     BoundaryCondition,
     CaseSpec,
-    Diagnostics,
     MHDState,
     RestartLogInfo,
     Solution,
@@ -736,7 +735,6 @@ def _fully_developed_rhs(
     by: jnp.ndarray,
     bz: jnp.ndarray,
     forcing: jnp.ndarray,
-    current_reconstruction: str = "cell_centered",
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
     _, _, lorentz_source = _compute_current_and_lorentz(
         mesh,
@@ -746,7 +744,6 @@ def _fully_developed_rhs(
         phi,
         by,
         bz,
-        reconstruction=current_reconstruction,
     )
     rhs = jnp.where(fluid_mask, (forcing + lorentz_source) / rho, 0.0)
     return rhs, lorentz_source
@@ -942,29 +939,9 @@ def _compute_current_and_lorentz(
     phi: jnp.ndarray,
     by: jnp.ndarray,
     bz: jnp.ndarray,
-    reconstruction: str = "cell_centered",
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    use_face_currents = reconstruction in {"face_averaged", "hybrid_face_lorentz"}
-    if use_face_currents:
-        uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
-        uxb_z = jnp.where(fluid_mask, u * by, 0.0)
-        face_jy = _interface_conductance(mesh, sigma, axis=0) * (phi[:-1, :] - phi[1:, :]) + _face_emf(
-            mesh, sigma, uxb_y, axis=0
-        )
-        face_jz = _interface_conductance(mesh, sigma, axis=1) * (phi[:, :-1] - phi[:, 1:]) + _face_emf(
-            mesh, sigma, uxb_z, axis=1
-        )
-        face_jy_centered = 0.5 * (jnp.pad(face_jy, ((1, 0), (0, 0))) + jnp.pad(face_jy, ((0, 1), (0, 0))))
-        face_jz_centered = 0.5 * (jnp.pad(face_jz, ((0, 0), (1, 0))) + jnp.pad(face_jz, ((0, 0), (0, 1))))
-    if reconstruction == "face_averaged":
-        jy = face_jy_centered
-        jz = face_jz_centered
-        lorentz_x = jy * bz - jz * by
-    else:
-        jy, jz = _conductive_current_components(mesh, sigma, fluid_mask, u, phi, by, bz)
-        lorentz_x = jy * bz - jz * by
-        if reconstruction == "hybrid_face_lorentz":
-            lorentz_x = face_jy_centered * bz - face_jz_centered * by
+    jy, jz = _conductive_current_components(mesh, sigma, fluid_mask, u, phi, by, bz)
+    lorentz_x = jy * bz - jz * by
     jy = jnp.where(fluid_mask, jy, 0.0)
     jz = jnp.where(fluid_mask, jz, 0.0)
     lorentz_x = jnp.where(fluid_mask, lorentz_x, 0.0)
@@ -1237,14 +1214,8 @@ def _limited_velocity_update(
     trial: jnp.ndarray,
     fluid_mask: jnp.ndarray,
     max_delta: float = 1e-3,
-    limiter: str = "global_scale",
 ) -> jnp.ndarray:
     delta = jnp.where(fluid_mask, trial - current, 0.0)
-    if limiter == "local_clip":
-        clipped_delta = jnp.clip(delta, -max_delta, max_delta)
-        return jnp.where(fluid_mask, current + clipped_delta, 0.0)
-    if limiter != "global_scale":
-        raise ValueError(f"Unsupported velocity update limiter {limiter!r}")
     peak_delta = jnp.max(jnp.abs(delta))
     scale = jnp.minimum(1.0, max_delta / jnp.maximum(peak_delta, 1e-12))
     return jnp.where(fluid_mask, current + scale * delta, 0.0)
@@ -1312,7 +1283,6 @@ def _emit_solver_header(
     *,
     case,
     mesh,
-    materials,
     mode,
     potential_solver,
     target_mean_velocity,
@@ -1324,7 +1294,6 @@ def _emit_solver_header(
     logger.emit_header(
         case=case,
         mesh=mesh,
-        materials=materials,
         mode=mode,
         potential_solver=potential_solver,
         target_mean_velocity=target_mean_velocity,
@@ -1378,58 +1347,24 @@ def _concat_history(
     return jnp.concatenate((previous, current))
 
 
-def _pressure_proxy_reference_current(diagnostics: Diagnostics | None) -> float | None:
-    if diagnostics is None:
-        return None
-    if diagnostics.face_current_max_history.size:
-        return float(diagnostics.face_current_max_history[0])
-    if diagnostics.current_max_history.size:
-        return float(diagnostics.current_max_history[0])
-    return None
-
-
-def _scaled_pressure_proxy_value(
-    pressure_proxy: float,
-    current_max: float,
-    face_current_max: float,
-    reference_current: float | None,
-) -> tuple[float, float]:
-    current_source = float(face_current_max) if abs(float(face_current_max)) > 0.0 else float(current_max)
-    if reference_current is None or abs(reference_current) < 1e-20:
-        reference_current = current_source if abs(current_source) >= 1e-20 else 1.0
-    scaled = float(pressure_proxy) * current_source / reference_current
-    return scaled, reference_current
-
-
 def _emit_solver_step(
     logger,
     *,
     step_index: int,
     step_time: float,
-    dt: float,
     u_max_value: float,
     mean_velocity: float,
     max_current: float,
-    face_current_max: float,
-    emf_max: float,
     max_lorentz: float,
-    face_lorentz_max: float,
     residual_value: float,
     potential_residual: float,
     potential_iteration_count: float,
     linear_residual: float,
     linear_iteration_count: float,
     applied_forcing: float,
-    pressure_proxy: float,
-    current_scaled_pressure_proxy: float,
-    raw_update_max: float,
-    limiter_scale: float,
-    limited_fraction: float,
     courant_like: float,
     ohmic: float,
     volumetric_flow_rate: float,
-    mean_current_magnitude: float,
-    lorentz_power: float,
     div_current_max: float,
     charge_balance_residual: float,
     gauge_residual: float,
@@ -1443,14 +1378,10 @@ def _emit_solver_step(
         SolverStepRecord(
             step_index=step_index,
             time=step_time,
-            dt=dt,
             u_max=u_max_value,
             mean_velocity=mean_velocity,
             current_max=max_current,
-            face_current_max=face_current_max,
-            emf_max=emf_max,
             lorentz_max=max_lorentz,
-            face_lorentz_max=face_lorentz_max,
             residual=residual_value,
             potential_residual=potential_residual,
             potential_iterations=potential_iteration_count,
@@ -1459,16 +1390,9 @@ def _emit_solver_step(
             potential_initial_residual=potential_initial_residual,
             linear_initial_residual=linear_initial_residual,
             applied_forcing=applied_forcing,
-            pressure_proxy=pressure_proxy,
-            current_scaled_pressure_proxy=current_scaled_pressure_proxy,
-            raw_update_max=raw_update_max,
-            limiter_scale=limiter_scale,
-            limited_fraction=limited_fraction,
             courant_like=courant_like,
             ohmic_power=ohmic,
             volumetric_flow_rate=volumetric_flow_rate,
-            mean_current_magnitude=mean_current_magnitude,
-            lorentz_power=lorentz_power,
             div_current_max=div_current_max,
             charge_balance_residual=charge_balance_residual,
             gauge_residual=gauge_residual,

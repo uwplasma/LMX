@@ -37,15 +37,6 @@ outputs = ["wall-model comparison", "plots", "diagnostics"]
 docs = "docs/how_to/walls_and_fields.md"
 
 [[example]]
-id = "freemhd-validation"
-path = "examples/freemhd_closed_channel_observable_parity.py"
-command = "python examples/freemhd_closed_channel_observable_parity.py"
-status = "external-data"
-runtime = "external"
-outputs = ["observable comparison", "plots"]
-docs = "docs/validation/freemhd.md"
-
-[[example]]
 id = "fringing-benchmark"
 path = "examples/fringing_benchmark_demo.py"
 command = "python examples/fringing_benchmark_demo.py"
