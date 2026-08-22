@@ -1368,6 +1368,13 @@ surface, measurements, validation, decision, and next action.
   Twine and distribution-content audits pass, including the typing marker. A
   clean environment explicitly installed released SOLVAX 0.14.0 and the LMX
   wheel, then passed the CLI and a converged Hartmann solve from `/tmp`.
-- Next action: commit this source checkpoint and repeat the pinned B2 Docker
-  execution, native-output observation, and comparison against the committed
-  source snapshot.
+- Committed the source checkpoint as `cd29005` and repeated the pinned B2
+  Docker workflow with FreeMHD `14b54a3`. Execution, artifacts, contract,
+  native-output observation, and comparison pass with no failed checks;
+  pressure Linf is `0.0109172453` and RMS is `0.0045179771`. The report is
+  non-accepting only because this branch has the candidate role. Its untracked
+  record is
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-typed-src-cd29005/b2`.
+- Next action: push the evidenced checkpoint, complete the common
+  case/options/result API and opt-in history work, then finish tutorials,
+  scheduled/release validation, and the separately approved history gate.
