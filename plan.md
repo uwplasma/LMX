@@ -1234,5 +1234,24 @@ surface, measurements, validation, decision, and next action.
   failed checks and unchanged pressure errors. The report is non-accepting only
   because the branch has the candidate role. Its external record is
   `/Users/rogeriojorge/local/tests/lmx-audit/lmx-solver-ownership-99eac41/b2`.
-- Next action: decompose and consolidate the retained 3-D and FreeMHD paths
-  toward the final source/module ceilings.
+- Decomposed the 7,212-line fringing implementation behind the unchanged
+  `lmx.fringing` user surface into generic, rectangular-duct, mapped-pipe, and
+  orchestration owners. Consolidated run configuration and logging schemas
+  into `specs.py`, removing `config.py`. The package now meets the final
+  16-module ceiling; its 18,242 lines and 2,466-line orchestration module remain
+  above the final source-size targets.
+- All 550 tests ran after the ownership split: 545 passed and the same five
+  optional external-data tests skipped. Exact combined line/branch coverage is
+  95.122222%. Ruff, architecture/import, Sphinx warnings-as-errors, package
+  build, Twine, and distribution-content gates pass. The wheel is 173,468
+  bytes with 29 members and the source distribution is 163,983 bytes with 35
+  members.
+- Repeated the pinned B2 Docker smoke on committed source `1ca3735`.
+  Execution, artifacts, contract, observation, and comparison passed with no
+  failed checks; pressure Linf is `0.0109172453` and RMS is `0.0045179771`.
+  The report is non-accepting only because the branch has the candidate role.
+  Its external record is
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-fringing-ownership-1ca3735/b2`.
+- Next action: simplify the 3-D orchestration and FreeMHD evidence code toward
+  the 15,000-line and 1,800-line-largest-module targets without changing the
+  retained numerical contracts.
