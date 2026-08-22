@@ -11,7 +11,7 @@ import pytest
 
 import lmx
 from lmx.cases import _wall_conductivity_from_conductance_ratio
-from lmx.config import LoggingSpec, _parse_boundary_value, load_run_config
+from lmx.specs import LoggingSpec, _parse_boundary_value, load_run_config
 from scripts.audit_architecture import (
     _checkout_size,
     architecture_budget_errors,

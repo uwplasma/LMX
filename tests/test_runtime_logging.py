@@ -5,16 +5,18 @@ import jax.numpy as jnp
 import pytest
 
 from lmx.cases import make_hartmann_case
-from lmx.config import (
+from lmx.physics import build_material_fields
+from lmx.solvers import _build_mesh
+from lmx.specs import (
+    Diagnostics,
     LoggingSpec,
+    MHDState,
     RestartLogInfo,
+    Solution,
     SolverStepRecord,
     StreamingSolverLogger,
     default_log_path,
 )
-from lmx.physics import build_material_fields
-from lmx.solvers import _build_mesh
-from lmx.specs import Diagnostics, MHDState, Solution
 
 pytestmark = pytest.mark.unit
 

@@ -14,7 +14,6 @@ from solvax import (
 )
 from solvax import fixed_point_iteration
 
-from .config import RestartLogInfo
 from .mesh import (
     StructuredMesh,
     generate_rect_duct_mesh,
@@ -65,6 +64,7 @@ from .specs import (
     MHDState,
     OutputSpec,
     RegionSpec,
+    RestartLogInfo,
     Solution,
     SolverConfig,
     TimeStepperConfig,

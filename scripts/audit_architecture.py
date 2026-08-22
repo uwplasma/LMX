@@ -35,6 +35,10 @@ EXCLUDED_FILES = {".coverage", "coverage.xml"}
 CURRENT_STATE_TERMS = ("legacy", "deprecated", "previously", "no longer", "backward compat")
 
 RESEARCH_STAGE = {
+    "_fringing_common.py",
+    "_fringing_duct.py",
+    "_fringing_pipe.py",
+    "_fringing_solver.py",
     "fringing.py",
 }
 COMPATIBILITY: set[str] = set()
@@ -233,8 +237,8 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
             },
         },
         "targets": {
-            "package_module_count_max": 13,
-            "total_package_lines_max": 18100,
+            "package_module_count_max": 16,
+            "total_package_lines_max": 18300,
             "maintained_core_lines_max": 10000,
             "test_file_count_max": 14,
             "test_lines_max": 12600,

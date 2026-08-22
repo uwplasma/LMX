@@ -362,7 +362,7 @@ def load_benchmark_a_spec(case_kind: str, spec_dir: str | Path | None = None) ->
 def _decode_matched_b2_lmx_input(path: str | Path):
     from dataclasses import fields
 
-    from .fringing import _cross_section_mesh
+    from ._fringing_duct import _cross_section_mesh
     from .specs import (
         BoundaryCondition,
         CaseSpec,

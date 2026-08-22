@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from lmx import cli
-from lmx.config import FringingSpec, LoggingSpec, RestartSpec, RunConfig
+from lmx.specs import FringingSpec, LoggingSpec, RestartSpec, RunConfig
 
 pytestmark = pytest.mark.unit
 

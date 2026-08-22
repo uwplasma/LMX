@@ -868,6 +868,7 @@ artifacts or release assets, not committed files.
 | D-020 | Consolidate by stable concept: units and wall models into physics, and state/result schemas into specs | These types are small parts of the physical and public data contracts; separate modules added navigation and import boundaries without independent ownership. |
 | D-021 | Consolidate spatial construction, run configuration, output, and validation by user-facing ownership | Meshes own spatial operators and imposed fields; configuration owns run logging; IO owns lazy plotting; validation owns references and benchmark contracts. These boundaries minimize navigation while remaining acyclic and independently testable. |
 | D-022 | Separate reusable fully developed assembly from case-level solve workflows | `solvers.py` owns the physical systems delegated to SOLVAX; `cases.py` owns factories, orchestration, and differentiable case objectives. This keeps both files below 1,500 lines and removes a one-workflow autodiff module. |
+| D-023 | Keep one public fringing module over four private 3-D owners, and consolidate run configuration with result schemas | Users retain one `lmx.fringing` surface; generic kernels, duct kernels, pipe kernels, and solve orchestration have explicit internal ownership. Configuration and result schemas share one typed input/output contract in `specs.py`. |
 
 ## Work log
 

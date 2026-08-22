@@ -31,7 +31,6 @@ from solvax import (
     tridiagonal_solve as _solvax_tridiagonal_solve,
 )
 
-from .config import RestartLogInfo, SolverStepRecord
 from .mesh import (
     StructuredMesh,
     apply_five_point_operator,
@@ -44,7 +43,15 @@ from .mesh import (
     poisson_residual_norm,
 )
 from .physics import build_material_fields, magnetic_field_components
-from .specs import BoundaryCondition, CaseSpec, Diagnostics, MHDState, Solution
+from .specs import (
+    BoundaryCondition,
+    CaseSpec,
+    Diagnostics,
+    MHDState,
+    RestartLogInfo,
+    Solution,
+    SolverStepRecord,
+)
 
 _POTENTIAL_ADDITIVE_LINE_MIN_CELLS = 110
 _POTENTIAL_ADDITIVE_LINE_DIAGONAL_RATIO = 3.0e4

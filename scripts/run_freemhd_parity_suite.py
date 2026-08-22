@@ -306,7 +306,7 @@ def _tiny_b2_problem(
     solver_shape: tuple[int, int, int] = (8, 7, 7),
     executed_steps: int = 2,
 ) -> tuple[object, dict[str, object]]:
-    from lmx.fringing import _cross_section_mesh
+    from lmx._fringing_duct import _cross_section_mesh
     from lmx.specs import ExtrudedInductionlessProblem, FringingProfile
 
     if isinstance(executed_steps, bool) or not isinstance(executed_steps, int) or executed_steps < 2:

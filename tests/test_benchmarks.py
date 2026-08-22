@@ -6,11 +6,8 @@ from types import SimpleNamespace
 import pytest
 
 import lmx.validation as benchmarks
-from lmx.fringing import (
-    _cross_section_mesh,
-    _unpack_duct_mass_flux,
-    solve_extruded_inductionless,
-)
+from lmx._fringing_duct import _cross_section_mesh, _unpack_duct_mass_flux
+from lmx.fringing import solve_extruded_inductionless
 from lmx.io import load_extruded_restart_bundle, write_extruded_bundle_restart_npz
 from lmx.validation import (
     benchmark_b_pressure_observable,

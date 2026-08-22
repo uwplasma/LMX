@@ -6,23 +6,41 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
+import lmx._fringing_common as common_impl
+import lmx._fringing_duct as duct_impl
+import lmx._fringing_solver as solver_impl
 import lmx.fringing as fringing_impl
-from lmx.fringing import (
+from lmx._fringing_common import (
     _apply_fixed_flow_pressure_constraint,
-    _apply_pipe_diffusion_coefficients_3d,
-    _conservative_current_diagnostics_3d,
-    _conservative_current_fluxes_3d,
     _cross_duct_pressure_difference,
-    _cross_section_mesh,
     _distance_weighted_harmonic_mean,
     _enforce_stationwise_flow_rate_3d,
-    _face_flux_pressure_projection_duct,
-    _face_flux_pressure_projection_pipe,
-    _fixed_flow_face_flux_projection_pipe,
     _gauge_invariant_scalar_update,
     _gradient_3d,
     _laplacian_3d,
     _normalized_pressure_observable_update,
+    _poisson_jacobi_3d,
+    _rectangular_fluid_bounds,
+    _spacing_vector,
+    _thin_wall_interface_mean,
+    _variable_coefficient_poisson_jacobi_3d,
+    _variable_coefficient_poisson_sparse_3d,
+    _variable_coefficient_residual_3d,
+)
+from lmx._fringing_duct import (
+    _conservative_current_diagnostics_3d,
+    _conservative_current_fluxes_3d,
+    _cross_section_mesh,
+    _face_flux_pressure_projection_duct,
+    _sample_volume_field,
+    _solvax_implicit_momentum_duct,
+    _solvax_pressure_poisson_duct,
+    _station_axial_current_from_fluxes,
+)
+from lmx._fringing_pipe import (
+    _apply_pipe_diffusion_coefficients_3d,
+    _face_flux_pressure_projection_pipe,
+    _fixed_flow_face_flux_projection_pipe,
     _pipe_conservative_current_diagnostics_3d,
     _pipe_conservative_emf_rhs_3d,
     _pipe_face_divergence,
@@ -33,22 +51,15 @@ from lmx.fringing import (
     _pipe_pressure_face_correction,
     _pipe_radial_fluid_count,
     _pipe_variable_diffusion_coefficients_3d,
-    _poisson_jacobi_3d,
-    _rectangular_fluid_bounds,
-    _sample_volume_field,
     _separable_pressure_poisson_pipe,
-    _shard_extruded_fields,
     _solvax_diffusion_pipe,
-    _solvax_implicit_momentum_duct,
-    _solvax_pressure_poisson_duct,
     _solvax_pressure_poisson_pipe,
-    _spacing_vector,
-    _station_axial_current_from_fluxes,
     _steady_stokes_projection_pipe,
-    _thin_wall_interface_mean,
-    _variable_coefficient_poisson_jacobi_3d,
-    _variable_coefficient_poisson_sparse_3d,
-    _variable_coefficient_residual_3d,
+)
+from lmx._fringing_solver import (
+    _shard_extruded_fields,
+)
+from lmx.fringing import (
     build_bent_pipe_extruded_problem,
     build_extruded_problem_from_case,
     build_layered_duct_extruded_problem,
@@ -139,8 +150,8 @@ def test_b2_canonical_shell_widths_remove_realization_thickness():
     nominal = jnp.asarray([0.01, 0.01, 0.4, 0.4, 0.4, 0.4, 0.4, 0.01, 0.01])
     confirmation = nominal.at[:2].divide(2.0).at[-2:].divide(2.0)
 
-    expected = fringing_impl._canonical_shell_widths(nominal, 2, 7)
-    observed = fringing_impl._canonical_shell_widths(confirmation, 2, 7)
+    expected = common_impl._canonical_shell_widths(nominal, 2, 7)
+    observed = common_impl._canonical_shell_widths(confirmation, 2, 7)
 
     assert observed.tolist() == pytest.approx(expected.tolist())
     assert float(jnp.sum(observed[:2])) == pytest.approx(0.02)
@@ -148,12 +159,12 @@ def test_b2_canonical_shell_widths_remove_realization_thickness():
 
 
 def test_fringing_jit_cache_reuses_the_first_compiled_kernel():
-    fringing_impl._FRINGING_JIT_CACHE.clear()
+    common_impl._FRINGING_JIT_CACHE.clear()
     first = object()
     key = ("operator", "configuration")
 
-    assert fringing_impl._reuse_fringing_jit(key, first) is first
-    assert fringing_impl._reuse_fringing_jit(key, object()) is first
+    assert common_impl._reuse_fringing_jit(key, first) is first
+    assert common_impl._reuse_fringing_jit(key, object()) is first
 
 
 def test_axial_mean_preconditioner_matches_dense_mixed_gauge_and_autodiff():
@@ -166,7 +177,7 @@ def test_axial_mean_preconditioner_matches_dense_mixed_gauge_and_autodiff():
     for gauge in (True, False):
         faces = jnp.asarray([0.0, 0.8, 1.3, 0.6, 1.1, 0.0 if gauge else 1.7])
         west, east = faces[:-1, None, None] / volume, faces[1:, None, None] / volume
-        precondition = fringing_impl._axial_mean_preconditioner_3d(volume, west, east, gauge=gauge)
+        precondition = common_impl._axial_mean_preconditioner_3d(volume, west, east, gauge=gauge)
         dense = np.diag(np.asarray(faces[:-1] + faces[1:]))
         dense -= np.diag(np.asarray(faces[1:-1]), 1) + np.diag(np.asarray(faces[1:-1]), -1)
         if gauge:
@@ -194,7 +205,7 @@ def test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg():
     y = jnp.linspace(-1.0, 1.0, cross)[None, :, None]
     z = jnp.linspace(-1.0, 1.0, cross)[None, None, :]
     expected = jnp.sin(2.0 * jnp.pi * x) * jnp.cos(0.5 * jnp.pi * y) * jnp.cos(0.5 * jnp.pi * z)
-    coefficients = fringing_impl._variable_diffusion_coefficients_3d(
+    coefficients = common_impl._variable_diffusion_coefficients_3d(
         conductivity,
         dx=0.1,
         dy=spacing,
@@ -202,7 +213,7 @@ def test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg():
         validated_spacing=True,
         thin_wall_fluid_mask=mask,
     )
-    neighbors = fringing_impl._neighbor_fields(expected, mode_x="neumann", mode_y="neumann", mode_z="neumann")
+    neighbors = common_impl._neighbor_fields(expected, mode_x="neumann", mode_y="neumann", mode_z="neumann")
     rhs = sum(
         coefficient * (neighbor - expected)
         for coefficient, neighbor in zip(coefficients, neighbors, strict=True)
@@ -235,7 +246,7 @@ def test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg():
     assert accelerated[0] == pytest.approx(baseline[0], abs=5.0e-9)
 
     volume = jnp.broadcast_to(spacing[None, :, None] * spacing[None, None, :], conductivity.shape)
-    correction = fringing_impl._transverse_modal_correction_3d(
+    correction = common_impl._transverse_modal_correction_3d(
         volume,
         conductivity,
         coefficients,
@@ -252,9 +263,9 @@ def test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg():
     )
     assert float(jnp.vdot(left, correction(left))) > 0.0
 
-    mesh = fringing_impl.Mesh(np.asarray(jax.devices()[:1]), ("x",))
-    sharding = fringing_impl.NamedSharding(mesh, fringing_impl.P("x", None, None))
-    sharded_correction = fringing_impl._transverse_modal_correction_3d(
+    mesh = solver_impl.Mesh(np.asarray(jax.devices()[:1]), ("x",))
+    sharding = common_impl.NamedSharding(mesh, common_impl.P("x", None, None))
+    sharded_correction = common_impl._transverse_modal_correction_3d(
         volume,
         conductivity,
         coefficients,
@@ -297,7 +308,7 @@ def test_duct_solvers_forward_single_reduction_to_solvax(
             status=jnp.asarray(1),
         )
 
-    monkeypatch.setattr(fringing_impl, "pcg_linear_solve", fake_solve)
+    monkeypatch.setattr(duct_impl, "pcg_linear_solve", fake_solve)
     field = jnp.ones((2, 2, 2))
     spacing = jnp.ones(2)
     _solvax_pressure_poisson_duct(
@@ -587,7 +598,7 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
         fluxes = tuple(np.asarray(alpha * value) for value in rho_phi)
         weights = tuple(
             np.asarray(value)
-            for value in fringing_impl._limited_linear_vector_face_weights_duct(
+            for value in duct_impl._limited_linear_vector_face_weights_duct(
                 velocity, tuple(alpha * value for value in rho_phi), patches, widths
             )
         )
@@ -624,7 +635,7 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
         eye = np.eye(np.prod(shape))
         return np.column_stack([action(column) for column in eye])
 
-    captured, actual_linear_solve = {}, fringing_impl.linear_solve
+    captured, actual_linear_solve = {}, duct_impl.linear_solve
 
     def capture(matvec, rhs, solver, **kwargs):
         captured["matrix"] = jax.jacfwd(matvec)(jnp.zeros_like(rhs))
@@ -632,7 +643,7 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
         captured["has_aux"] = kwargs.get("has_aux", False)
         return actual_linear_solve(matvec, rhs, solver, **kwargs)
 
-    monkeypatch.setattr(fringing_impl, "linear_solve", capture)
+    monkeypatch.setattr(duct_impl, "linear_solve", capture)
 
     def solve(applied_force, flux=rho_phi, patches=boundary, rho=density, prescribed=True):
         return _solvax_implicit_momentum_duct(
@@ -677,7 +688,7 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
     assert split_residual == pytest.approx(
         linear_residual - np.repeat(np.asarray(density).reshape(-1), 3) * (mapped - old) / dt, abs=2.0e-12
     )
-    monkeypatch.setattr(fringing_impl, "linear_solve", actual_linear_solve)
+    monkeypatch.setattr(duct_impl, "linear_solve", actual_linear_solve)
     neutral = tuple(jnp.zeros_like(value) for value in boundary)
 
     def solve_alpha(alpha):
@@ -695,10 +706,8 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
     assert gradient == pytest.approx(-adjoint @ convection @ np.asarray(primal).reshape(-1), rel=2e-6)
     zero_flux = tuple(jnp.zeros_like(value) for value in rho_phi)
     diffused, *_ = solve(jnp.zeros_like(force), zero_flux, neutral, jnp.ones(shape), False)
-    coefficients = fringing_impl._variable_diffusion_coefficients_3d(viscosity, dx=dx, dy=dy, dz=dz)
-    neighbours = fringing_impl._neighbor_fields(
-        diffused, mode_x="neumann", mode_y="neumann", mode_z="neumann"
-    )
+    coefficients = common_impl._variable_diffusion_coefficients_3d(viscosity, dx=dx, dy=dy, dz=dz)
+    neighbours = common_impl._neighbor_fields(diffused, mode_x="neumann", mode_y="neumann", mode_z="neumann")
     wall = jnp.zeros(shape).at[:, 0, :].add(viscosity[:, 0, :] / (0.5 * dy[0] ** 2))
     wall = wall.at[:, -1, :].add(viscosity[:, -1, :] / (0.5 * dy[-1] ** 2))
     wall = wall.at[:, :, 0].add(viscosity[:, :, 0] / (0.5 * dz[0] ** 2))
@@ -714,7 +723,7 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
     lorentz = jnp.broadcast_to(jnp.asarray([1.0, 2.0, 3.0]), velocity.shape)
 
     def defect(scale):
-        return fringing_impl._duct_momentum_defect(
+        return duct_impl._duct_momentum_defect(
             zero_velocity,
             scale * lorentz,
             jnp.ones(shape),
@@ -771,7 +780,7 @@ def test_limited_linear_vector_convection_matches_manufactured_conservation_and_
     )
     q = jnp.sum(velocity**2, axis=-1)
     q_patches = tuple(jnp.sum(value**2, axis=-1) for value in boundary_velocity)
-    least_squares = fringing_impl._cell_limited_least_squares_gradient_duct
+    least_squares = duct_impl._cell_limited_least_squares_gradient_duct
     gradients = least_squares(q, q_patches, (dx, dy, dz))
     j, k = 3, 1
 
@@ -802,8 +811,8 @@ def test_limited_linear_vector_convection_matches_manufactured_conservation_and_
         state = scale * velocity
         flux = tuple(scale * values for values in rho_phi)
         patches = tuple(scale * values for values in boundary_velocity)
-        weights = fringing_impl._limited_linear_vector_face_weights_duct(state, flux, patches, (dx, dy, dz))
-        return fringing_impl._limited_linear_convection_matrix_action_duct(
+        weights = duct_impl._limited_linear_vector_face_weights_duct(state, flux, patches, (dx, dy, dz))
+        return duct_impl._limited_linear_convection_matrix_action_duct(
             state, flux, weights, patches, (dx, dy, dz)
         ), weights
 
@@ -829,7 +838,7 @@ def test_limited_linear_vector_convection_matches_manufactured_conservation_and_
     )
     assert jnp.sum(action * volume[..., None], axis=(0, 1, 2)) == pytest.approx(boundary_flux, abs=2.0e-5)
     zero_patches = tuple(jnp.zeros_like(value) for value in boundary_velocity)
-    assert fringing_impl._limited_linear_convection_matrix_action_duct(
+    assert duct_impl._limited_linear_convection_matrix_action_duct(
         jnp.zeros_like(velocity), rho_phi, weights, zero_patches, (dx, dy, dz)
     ) == pytest.approx(0.0)
     scaled, scaled_weights = convection(2.0)
@@ -914,7 +923,7 @@ def test_explicit_deviatoric_stress_matches_independent_finite_volume_oracle():
         return result
 
     def evaluate(scale):
-        return fringing_impl._explicit_deviatoric_stress_duct(
+        return duct_impl._explicit_deviatoric_stress_duct(
             scale * jnp.asarray(velocity),
             jnp.full(shape, 0.7),
             tuple(scale * jnp.asarray(value) for value in patches),
@@ -929,7 +938,7 @@ def test_explicit_deviatoric_stress_matches_independent_finite_volume_oracle():
     profile = jnp.arange(12.0).reshape(4, 3) / 20.0
     developed = jnp.zeros((*shape, 3)).at[..., 0].set(profile[None])
     developed_patches = (developed[0], developed[-1], *map(jnp.zeros_like, patches[2:]))
-    stress = fringing_impl._explicit_deviatoric_stress_duct
+    stress = duct_impl._explicit_deviatoric_stress_duct
     assert stress(developed, jnp.full(shape, 0.7), developed_patches, uniform) == pytest.approx(0.0)
     x = (jnp.arange(5) + 0.5) * uniform[0][0]
     quadratic = jnp.zeros((*shape, 3)).at[..., 0].set(1.2 * x[:, None, None] ** 2)
@@ -975,11 +984,11 @@ def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp():
 
     def diffusion(scale, inject):
         conductivity = scale * (1.0 + jnp.arange(np.prod(shape)).reshape(shape) / 20.0)
-        values = fringing_impl._variable_diffusion_coefficients_3d(
+        values = common_impl._variable_diffusion_coefficients_3d(
             conductivity, dx=0.2, dy=widths[1], dz=widths[2], validated_spacing=True
         )
         return (
-            fringing_impl._variable_diffusion_coefficients_3d(
+            common_impl._variable_diffusion_coefficients_3d(
                 conductivity,
                 dx=0.2,
                 dy=widths[1],
@@ -1007,10 +1016,10 @@ def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp():
             jnp.concatenate((q_patches[0][None], q[:-1])),
             jnp.concatenate((q[1:], q_patches[1][None])),
         )
-        gradient = fringing_impl._cell_limited_least_squares_gradient_duct(
+        gradient = duct_impl._cell_limited_least_squares_gradient_duct(
             q, q_patches, widths, axial_neighbours=axial_q if inject else None
         )
-        weights = fringing_impl._limited_linear_vector_face_weights_duct(
+        weights = duct_impl._limited_linear_vector_face_weights_duct(
             state, scaled_fluxes, boundaries, widths, gradient=gradient if inject else None
         )
         kwargs = {}
@@ -1026,7 +1035,7 @@ def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp():
                     jnp.concatenate((weights[0], jnp.zeros_like(weights[0][:1]))),
                 ),
             }
-        return fringing_impl._limited_linear_convection_matrix_action_duct(
+        return duct_impl._limited_linear_convection_matrix_action_duct(
             state, scaled_fluxes, weights, boundaries, widths, **kwargs
         )
 
@@ -1048,15 +1057,15 @@ def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp():
             q_patches,
         )
         scalar = tuple(
-            fringing_impl._cell_limited_least_squares_gradient_duct(field, boundary, widths)
+            duct_impl._cell_limited_least_squares_gradient_duct(field, boundary, widths)
             for field, boundary in zip(fields, boundary_fields, strict=True)
         )
         gradient = jnp.stack(tuple(jnp.stack(value, axis=-1) for value in scalar[:3]), axis=-1)
-        weights = fringing_impl._limited_linear_vector_face_weights_duct(
+        weights = duct_impl._limited_linear_vector_face_weights_duct(
             state, scaled_fluxes, boundaries, widths, gradient=scalar[3]
         )
         if packed:
-            setup = fringing_impl._frozen_duct_momentum_setup(
+            setup = duct_impl._frozen_duct_momentum_setup(
                 state,
                 jnp.ones(shape),
                 jnp.full(shape, 0.7),
@@ -1066,7 +1075,7 @@ def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp():
                 dx=widths[0][0],
             )
             weights, gradient = setup[-2:]
-        stress = fringing_impl._explicit_deviatoric_stress_duct(
+        stress = duct_impl._explicit_deviatoric_stress_duct(
             state, jnp.full(shape, 0.7), boundaries, widths, gradient=gradient
         )
         return gradient, weights, stress
@@ -1084,10 +1093,10 @@ def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp():
         boundaries = tuple(scale * value for value in patches)
         axial = (scale * west, scale * east)
         if inject:
-            return fringing_impl._explicit_deviatoric_stress_duct(
+            return duct_impl._explicit_deviatoric_stress_duct(
                 scale * velocity, jnp.full(shape, 0.7), boundaries, widths, axial_tractions=axial
             )
-        transverse = fringing_impl._explicit_deviatoric_stress_duct(
+        transverse = duct_impl._explicit_deviatoric_stress_duct(
             scale * velocity,
             jnp.full(shape, 0.7),
             boundaries,
@@ -1108,7 +1117,7 @@ def test_compact_duct_mass_flux_initializer_matches_fv_faces():
     shape = (2, 2, 2)
     compact = jnp.arange(24.0).reshape((3, *shape))
     inlet = jnp.arange(4.0).reshape(shape[1:])
-    full = jax.jit(fringing_impl._unpack_duct_mass_flux)(compact, inlet)
+    full = jax.jit(duct_impl._unpack_duct_mass_flux)(compact, inlet)
     assert jnp.all(full[1][:, 0] == 0.0) and jnp.all(full[2][:, :, 0] == 0.0)
     assert compact.size + inlet.size == 3 * np.prod(shape) + np.prod(shape[1:])
     velocity = jnp.arange(24.0).reshape((*shape, 3)) / 7.0
@@ -1117,7 +1126,7 @@ def test_compact_duct_mass_flux_initializer_matches_fv_faces():
     dy, dz, dx = jnp.asarray([0.3, 0.7]), jnp.asarray([0.2, 0.8]), 0.4
 
     def initialize(scale):
-        return fringing_impl._initialize_duct_mass_flux(
+        return duct_impl._initialize_duct_mass_flux(
             scale * velocity, density, scale * inlet_velocity, dx=dx, dy=dy, dz=dz
         )
 
@@ -1151,14 +1160,14 @@ def test_compact_duct_mass_flux_initializer_matches_fv_faces():
     )
     assert plus == pytest.approx(np.stack((expected_x, expected_y, expected_z)))
     assert initialized_inlet == pytest.approx(density[0] * inlet_velocity[..., 0] * jnp.outer(dy, dz))
-    fx, fy, fz = map(np.asarray, fringing_impl._unpack_duct_mass_flux(plus, initialized_inlet))
+    fx, fy, fz = map(np.asarray, duct_impl._unpack_duct_mass_flux(plus, initialized_inlet))
     volume = np.broadcast_to(dx * np.outer(dy, dz), shape)
     surface = (
         abs(fx[:-1]) + abs(fx[1:]) + abs(fy[:, :-1]) + abs(fy[:, 1:]) + abs(fz[:, :, :-1]) + abs(fz[:, :, 1:])
     ) / np.asarray(density)
     cell_courant = 0.5 * 0.13 * surface / volume
     courant = jax.jit(
-        lambda p, i: fringing_impl._compact_duct_courant_numbers(p, i, density, dt=0.13, dx=dx, dy=dy, dz=dz)
+        lambda p, i: duct_impl._compact_duct_courant_numbers(p, i, density, dt=0.13, dx=dx, dy=dy, dz=dz)
     )(plus, initialized_inlet)
     assert tuple(map(float, courant)) == pytest.approx(
         (np.sum(cell_courant * volume) / np.sum(volume), np.max(cell_courant))
@@ -1243,7 +1252,7 @@ def test_mixed_face_flux_projection_recovers_coefficients_and_boundary_flow():
         rhs,
         jnp.ones(shape),
         **settings,
-        axial_pressure_mode=fringing_impl._MIXED_AXIAL_PRESSURE_MODE,
+        axial_pressure_mode=common_impl._MIXED_AXIAL_PRESSURE_MODE,
     )
     assert pressure == pytest.approx(expected_pressure, abs=1.0e-7)
     zeros = jnp.zeros(shape)
@@ -1278,7 +1287,7 @@ def test_mixed_face_flux_projection_recovers_coefficients_and_boundary_flow():
     plus = jnp.stack((flux_x, flux_y, flux_z))
     assert divergence < 1.0e-8
     assert flow_error < 1.0e-8
-    fx, fy, fz = fringing_impl._unpack_duct_mass_flux(plus, inlet)
+    fx, fy, fz = duct_impl._unpack_duct_mass_flux(plus, inlet)
     assert jnp.sum(inlet) == pytest.approx(0.2) and jnp.sum(plus[0, -1]) == pytest.approx(0.2)
     assert jnp.max(jnp.abs(jnp.diff(fx, axis=0) + jnp.diff(fy, axis=1) + jnp.diff(fz, axis=2))) < 1.0e-10
     assert jnp.isfinite(pressure_loss).all()
@@ -1289,7 +1298,7 @@ def test_mixed_face_flux_projection_recovers_coefficients_and_boundary_flow():
     assert linear_iterations > 0
     assert linear_converged
     assert linear_status > 0
-    correction_x, correction_y, correction_z = fringing_impl._duct_pressure_face_corrections(
+    correction_x, correction_y, correction_z = duct_impl._duct_pressure_face_corrections(
         projected_pressure, jnp.full(shape, 0.1), dx=dx, dy=widths, dz=widths, mixed_axial_pressure=True
     )
     correction_x_west = jnp.concatenate((jnp.zeros_like(correction_x[:1]), correction_x[:-1]), axis=0)
@@ -1921,13 +1930,13 @@ def test_extruded_sharding_validates_placement_and_supported_paths(
     assert _shard_extruded_fields((field,), num_devices=None)[0] is field
 
     devices = [object(), object()]
-    monkeypatch.setattr("lmx.fringing.jax.devices", lambda: devices)
+    monkeypatch.setattr("lmx._fringing_solver.jax.devices", lambda: devices)
     with pytest.raises(ValueError, match="divisible"):
         _shard_extruded_fields((jnp.zeros((3, 2, 2)),), num_devices=2)
 
-    monkeypatch.setattr("lmx.fringing.Mesh", lambda *args, **kwargs: "mesh")
-    monkeypatch.setattr("lmx.fringing.NamedSharding", lambda *args, **kwargs: "sharding")
-    monkeypatch.setattr("lmx.fringing.jax.device_put", lambda value, sharding: value + 1)
+    monkeypatch.setattr("lmx._fringing_solver.Mesh", lambda *args, **kwargs: "mesh")
+    monkeypatch.setattr("lmx._fringing_solver.NamedSharding", lambda *args, **kwargs: "sharding")
+    monkeypatch.setattr("lmx._fringing_solver.jax.device_put", lambda value, sharding: value + 1)
     for count in (1, 2):
         placed = _shard_extruded_fields((field,), num_devices=count)
         assert jnp.all(placed[0] == 1)
@@ -2089,8 +2098,8 @@ def test_rectangular_projection_uses_sparse_electric_solve(
         jacobi_calls["count"] += 1
         return _variable_coefficient_poisson_jacobi_3d(*args, **kwargs)
 
-    monkeypatch.setattr("lmx.fringing._variable_coefficient_poisson_sparse_3d", wrapped_sparse)
-    monkeypatch.setattr("lmx.fringing._variable_coefficient_poisson_jacobi_3d", wrapped_jacobi)
+    monkeypatch.setattr("lmx._fringing_solver._variable_coefficient_poisson_sparse_3d", wrapped_sparse)
+    monkeypatch.setattr("lmx._fringing_solver._variable_coefficient_poisson_jacobi_3d", wrapped_jacobi)
 
     solve_extruded_inductionless(problem)
 
@@ -2425,13 +2434,13 @@ def test_sparse_poisson_delegates_direct_solve_to_solvax(
     monkeypatch: pytest.MonkeyPatch,
 ):
     calls = []
-    original = fringing_impl.splu_solve
+    original = common_impl.splu_solve
 
     def record_call(matrix, rhs):
         calls.append(matrix.shape)
         return original(matrix, rhs)
 
-    monkeypatch.setattr(fringing_impl, "splu_solve", record_call)
+    monkeypatch.setattr(common_impl, "splu_solve", record_call)
     _variable_coefficient_poisson_sparse_3d(
         jnp.zeros((2, 2, 2)),
         jnp.ones((2, 2, 2)),

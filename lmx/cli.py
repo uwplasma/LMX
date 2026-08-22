@@ -11,14 +11,6 @@ from pathlib import Path
 import jax.numpy as jnp
 
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case, solve_steady, solve_transient
-from .config import (
-    LoggingSpec,
-    RestartLogInfo,
-    RunConfig,
-    StreamingSolverLogger,
-    default_log_path,
-    load_run_config,
-)
 from .fringing import (
     build_extruded_problem_from_case,
     build_layered_duct_extruded_problem,
@@ -40,6 +32,14 @@ from .io import (
     write_solution_outputs,
 )
 from .solvers import _build_mesh
+from .specs import (
+    LoggingSpec,
+    RestartLogInfo,
+    RunConfig,
+    StreamingSolverLogger,
+    default_log_path,
+    load_run_config,
+)
 from .validation import (
     benchmark_solver,
     closed_channel_validation,

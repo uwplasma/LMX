@@ -26,8 +26,9 @@ import jax
 import numpy as np
 
 import lmx
+from lmx._fringing_duct import _cross_section_mesh
 from lmx.freemhd import validate_matched_b_record
-from lmx.fringing import _cross_section_mesh, solve_extruded_inductionless
+from lmx.fringing import solve_extruded_inductionless
 from lmx.io import (
     load_extruded_restart_bundle,
     write_extruded_bundle_restart_npz,
