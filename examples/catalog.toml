@@ -55,10 +55,10 @@ outputs = ["field reconstruction", "solution summary"]
 docs = "docs/tutorials/walls_and_fields.md"
 
 [[example]]
-id = "differentiable-design"
-path = "examples/autodiff_design_demo.py"
-command = "python examples/autodiff_design_demo.py"
+id = "q2d-vortex-decay"
+path = "examples/q2d_turbulence_demo.py"
+command = "python examples/q2d_turbulence_demo.py"
 status = "research-stage"
-runtime = "portable"
-outputs = ["sensitivity", "design trace"]
-docs = "docs/tutorials/differentiation.md"
+runtime = "accelerator-optional"
+outputs = ["vorticity poster", "energy trace", "MP4 when FFmpeg is available", "diagnostics"]
+docs = "docs/tutorials/q2d.md"

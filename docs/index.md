@@ -1,8 +1,9 @@
 # LMX
 
-LMX solves inductionless liquid-metal MHD in ducts with JAX. It provides
-analytical-reference fully developed flows and three-dimensional extruded duct
-and pipe models for spatially varying magnetic fields. LMX builds the physics;
+LMX solves inductionless liquid-metal MHD with JAX. It provides
+analytical-reference fully developed flows, three-dimensional extruded duct
+and pipe models for spatially varying magnetic fields, and periodic Q2D flow
+with Hartmann-layer damping. LMX builds the physics;
 [SOLVAX](https://github.com/uwplasma/SOLVAX) supplies reusable numerical solvers.
 
 ```{image} _static/fringing_solver_family.webp
@@ -33,6 +34,12 @@ Solve and validate a Hartmann duct from Python or TOML.
 Build a spatially varying field and inspect charge and flow diagnostics.
 :::
 
+:::{grid-item-card} Q2D vortex dynamics
+:link: tutorials/q2d
+:link-type: doc
+Evolve a depth-averaged strong-field model and reproduce its poster and movie.
+:::
+
 :::{grid-item-card} Validation
 :link: validation/index
 :link-type: doc
@@ -57,6 +64,7 @@ tutorials/fully_developed
 tutorials/fringing
 tutorials/walls_and_fields
 tutorials/differentiation
+tutorials/q2d
 ```
 
 ```{toctree}
