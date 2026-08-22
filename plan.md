@@ -757,7 +757,9 @@ demonstrated with a profile.
 - [x] Parameterize duplicated case setup and retain physical assertions.
 - [x] Replace maintenance scripts with `lmx validate`, tests, or deletion.
 - [ ] Implement the three-layer FreeMHD contract, local Docker smoke, and
-  scheduled/release production validation workflow.
+  scheduled/release production validation workflow. Contract fixtures and the
+  independently observed pinned Docker smoke pass; production refinement is
+  blocked on a suitable registered high-memory/GPU runner.
 - [x] Keep no more than seven Python examples plus one TOML case, including one
   3-D fringing example and one external-validation example.
 - [x] Make all examples fast, self-contained, editable, and CI-executed.
@@ -789,11 +791,11 @@ dominated by generated images, movies, repeated lockfiles, and deleted research
 artifacts. Meeting the normal-clone target requires a deliberate history
 operation.
 
-- [ ] Create a private read-only archival mirror containing every branch, tag,
+- [x] Create a private read-only archival mirror containing every branch, tag,
   release reference, and a checksummed `git bundle`.
-- [ ] Clone the archive independently and run `git fsck` before rewriting.
-- [ ] Export release metadata and move large reusable artifacts to releases.
-- [ ] Create a reviewed squashed root for the slim product.
+- [x] Clone the archive independently and run `git fsck` before rewriting.
+- [x] Export release metadata and move large reusable artifacts to releases.
+- [x] Create a reviewed squashed root for the slim product.
 - [ ] Delete old refs from the live repository and force-push only after
   separate explicit approval for this destructive operation.
 - [ ] Wait for/coordinate GitHub garbage collection or replace the live
@@ -809,10 +811,10 @@ approval at execution time.
 
 ### Phase 8 — release the standalone product
 
-- [ ] Run minimum/current Python and dependency matrices.
+- [x] Run minimum/current Python and dependency matrices.
 - [ ] Run complete 2-D duct, 3-D fringing, FreeMHD parity, conservation,
   convergence, gradient, packaging, documentation, and full validation gates.
-- [ ] Build and inspect wheel/sdist contents and sizes.
+- [x] Build and inspect wheel/sdist contents and sizes.
 - [ ] Publish one coherent major release from the same reviewed commit.
 - [ ] Verify clean install, first-run Python example, CLI, docs, citation, and
   fresh clone.
@@ -1533,3 +1535,44 @@ surface, measurements, validation, decision, and next action.
   executable for B1. Private branch protection remains unavailable under the
   current GitHub plan, and no repository-history rewrite occurs without
   separate explicit approval.
+
+### 2026-08-22 — verified archive and rewrite candidate
+
+- Created the private read-only
+  [`uwplasma/LMX-archive`](https://github.com/uwplasma/LMX-archive) repository.
+  It mirrors both live branches and all seven original tags. Its archival
+  release contains the release inventory and a complete 37 MiB Git bundle with
+  both pull-request refs in addition to the branches and tags.
+- The bundle SHA-256 is
+  `4e72d9659b5dbfdfb77e08fd8a5f9803fb7a3b65e584a5d0d4e2dc7abb4849fc`.
+  Local and remote-download copies pass `git bundle verify`; independent
+  ordinary and mirror clones pass strict full `git fsck`, and the mirror clone
+  reproduces the complete 12-ref inventory. The archive repository was then
+  set read-only through GitHub's archive state.
+- Exported a seven-release inventory covering 126 existing assets and
+  838,216,193 bytes. Reusable research fields and media already reside in the
+  812,719,898-byte `lmx-research-assets-v1` release, outside Git history.
+- Constructed an exact standalone root candidate from `47f3c0b`. Its commit is
+  `ac44448b0e6845483d9a0ddfeb3dfd2260f5c5f0`; an ordinary non-local clone is
+  2,304 KiB with an approximately 465 KiB pack, 1,560,830 tracked bytes, and 85
+  files. Architecture/import budgets pass and all 505 portable tests pass in
+  79.2 seconds against that candidate.
+- Confirmed the hosted minimum endpoint as Python 3.10, JAX/JAXLIB 0.6.2,
+  NumPy 2.2.6, and released SOLVAX 0.14.0. The current endpoint uses Python
+  3.13, JAX/JAXLIB 0.11.1, NumPy 2.5.2, and SOLVAX 0.14.0. All bounded shards
+  pass at the minimum endpoint and the exact combined coverage gate passes at
+  the current endpoint.
+- Removed 46 redundant Actions artifacts from the deleted Q2D validation lane,
+  releasing 245,123,217 bytes of quota. These ephemeral copies are no longer
+  recoverable from Actions; their source history is in the verified bundle and
+  their reusable data remains in the research-assets release.
+- The final hosted six-repeat Hartmann command completed with a 10.251-second
+  warm median and 0.00731 warm coefficient of variation on its two-core runner.
+  Manual benchmark JSON is always printed in the job log, while its
+  convenience artifact copy is best-effort during GitHub's documented quota
+  recalculation delay. Scheduled/release evidence remains fail-closed.
+- Next action: obtain production hardware and a matched B1 executable, then
+  require the complete production evidence before publication. Replacing live
+  history with the reviewed root, deleting refs, force-pushing, and measuring
+  the final authenticated clone remain withheld pending separate explicit
+  destructive-action approval.
