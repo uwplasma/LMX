@@ -19,34 +19,14 @@ jobs:
   external-validation:
     uses: ./.github/workflows/external-validation.yml
 
-  validate:
-    needs: external-validation
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup-lmx
-        with:
-          extras: dev,docs
-      - name: Check Python quality
-        run: |
-          python -m ruff check src/lmx validation tests examples scripts docs/conf.py
-          python -m ruff format --check src/lmx validation tests examples scripts docs/conf.py
-      - name: Enforce architecture budgets
-        run: python scripts/audit_architecture.py --check --measure-import
-      - name: Run portable quality gate
-        run: >-
-          python scripts/run_full_test_suite.py --budget-seconds 1200
-          --test-timeout-seconds 300
-      - name: Run every curated example
-        run: >-
-          python scripts/run_full_test_suite.py --budget-seconds 600
-          --shard examples --no-coverage
-      - name: Build documentation
-        run: python -m sphinx -W -b html docs docs/_build/html
+  validation:
+    uses: ./.github/workflows/ci.yml
+
+  documentation:
+    uses: ./.github/workflows/docs.yml
 
   build:
-    needs: validate
+    needs: [external-validation, validation, documentation]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -94,10 +74,11 @@ jobs:
           assert jnp.isfinite(value)
           assert jnp.isfinite(derivative)
           PY
-      - uses: actions/upload-artifact@v7
+      - name: Save distributions for publishing
+        uses: actions/cache/save@v6
         with:
-          name: python-distributions
-          path: dist/
+          path: dist
+          key: lmx-distributions-${{ github.run_id }}-${{ github.sha }}
 
   publish-testpypi:
     if: github.event_name == 'workflow_dispatch' && inputs.publish_target == 'testpypi'
@@ -109,10 +90,11 @@ jobs:
       name: testpypi
       url: https://test.pypi.org/p/lmx
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/cache/restore@v6
         with:
-          name: python-distributions
-          path: dist/
+          path: dist
+          key: lmx-distributions-${{ github.run_id }}-${{ github.sha }}
+          fail-on-cache-miss: true
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
@@ -127,8 +109,9 @@ jobs:
       name: pypi
       url: https://pypi.org/p/lmx
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/cache/restore@v6
         with:
-          name: python-distributions
-          path: dist/
+          path: dist
+          key: lmx-distributions-${{ github.run_id }}-${{ github.sha }}
+          fail-on-cache-miss: true
       - uses: pypa/gh-action-pypi-publish@release/v1

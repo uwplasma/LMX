@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: lmx-ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -37,43 +42,66 @@ jobs:
 
   compatibility:
     name: Python 3.10 (${{ matrix.shard }})
-    needs: quality
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        shard: [benchmarks, core, examples, physics, validation]
+        shard: [support, fringing, physics]
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-lmx
         with:
           python-version: "3.10"
           solvax-version: "0.17.0"
-      - name: Run test shard
-        run: >-
-          python scripts/run_full_test_suite.py --budget-seconds 720
-          --test-timeout-seconds 300 --shard ${{ matrix.shard }} --no-coverage
+          cache-suffix: ${{ matrix.shard }}
+      - name: Run covered test shard
+        env:
+          COVERAGE_FILE: artifacts/test-evidence/${{ matrix.shard }}/.coverage.${{ matrix.shard }}
+        run: |
+          mkdir -p "artifacts/test-evidence/${{ matrix.shard }}"
+          python scripts/run_full_test_suite.py --budget-seconds 540 \
+            --test-timeout-seconds 300 --shard ${{ matrix.shard }} \
+            --coverage-fail-under 0 \
+            --coverage-xml artifacts/test-evidence/${{ matrix.shard }}/coverage.xml \
+            --junit-xml artifacts/test-evidence/${{ matrix.shard }}/junit.xml
+      - name: Save covered test evidence
+        uses: actions/cache/save@v6
+        with:
+          path: artifacts/test-evidence/${{ matrix.shard }}
+          key: lmx-test-evidence-${{ github.run_id }}-${{ matrix.shard }}
 
   coverage:
     name: Combined branch coverage
-    needs: quality
+    needs: compatibility
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-lmx
         with:
           python-version: "3.13"
-      - name: Run bounded coverage shards
-        run: |
-          for lmx_shard in benchmarks core physics validation; do
-            COVERAGE_FILE=".coverage.${lmx_shard}" python scripts/run_full_test_suite.py \
-              --budget-seconds 900 --test-timeout-seconds 300 \
-              --shard "${lmx_shard}" --coverage-fail-under 0
-          done
+          cache-suffix: coverage-report
+      - name: Restore support evidence
+        uses: actions/cache/restore@v6
+        with:
+          path: artifacts/test-evidence/support
+          key: lmx-test-evidence-${{ github.run_id }}-support
+          fail-on-cache-miss: true
+      - name: Restore fringing evidence
+        uses: actions/cache/restore@v6
+        with:
+          path: artifacts/test-evidence/fringing
+          key: lmx-test-evidence-${{ github.run_id }}-fringing
+          fail-on-cache-miss: true
+      - name: Restore physics evidence
+        uses: actions/cache/restore@v6
+        with:
+          path: artifacts/test-evidence/physics
+          key: lmx-test-evidence-${{ github.run_id }}-physics
+          fail-on-cache-miss: true
       - name: Combine and enforce coverage
         run: |
-          python -m coverage combine
+          python -m coverage combine artifacts/test-evidence/*
           python -m coverage report --fail-under=95
           python -m coverage xml -o coverage.xml
