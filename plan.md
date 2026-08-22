@@ -885,12 +885,10 @@ purpose.
   field core shared by the retained fully developed solve. Its converged
   coupled equations must use a SOLVAX implicit linear/root derivative, with no
   Jacobi or coupling-iteration tape, and pass finite-difference, JVP/VJP,
-  residual, memory, and runtime checks. The accepted rectangular Hartmann and
-  Shercliff path uses `solve_fully_developed_fields`; the layered Hunt adjoint
-  remains in the next item after its transpose solve failed the independent
-  finite-difference gate.
-- [ ] Expose the retained fully developed Shercliff/Hunt and 3-D rectangular/
-  pipe production equations as field-level traced cores. The current 3-D host
+  residual, memory, and runtime checks. The accepted rectangular Hartmann,
+  Shercliff, and layered Hunt path uses `solve_fully_developed_fields`.
+- [ ] Expose the retained 3-D rectangular/pipe production equations as
+  field-level traced cores. The current 3-D host
   loop materializes geometry/scales and convergence decisions with Python
   `float`/`bool`; those boundaries must move outside a fixed-step or implicit
   differentiable core rather than being bypassed by a shadow solver.
@@ -1028,7 +1026,8 @@ artifacts or release assets, not committed files.
 | D-028 | Treat FreeMHD's public `S3_Buhler_Ha616` archive as a distinct candidate validation target, not ALEX B1 | The executed archive uses a 48.59 mm-radius pipe, a mirrored 0.21 T MEKKA-style fringe, and a thick copper wall; ALEX B1 uses a 54.1 mm radius, 2.1 T field, and different nondimensional groups and wall conductance. Similar geometry does not satisfy the matched-contract gate. |
 | D-029 | Make differentiability a release invariant and choose the derivative algorithm with the primal algorithm | JAX traceability alone does not control gradient meaning, accuracy, runtime, or memory. Linear/steady solves use implicit transpose solves; long finite trajectories use exact checkpointed discrete reverse mode; host diagnostics and discrete controls stay outside the traced core. |
 | D-030 | Differentiate the mathematical result, not incidental solver work | Implicit adjoints are the default for converged steady equations; checkpointed discrete adjoints are the default for finite trajectories. This matches established Optimistix, PETSc TSAdjoint/Revolve, and JAX scientific-computing practice while preserving one LMX production equation path. |
-| D-031 | Fail closed when a production adjoint does not converge | The layered Hunt trial produced a finite primal but its transposed coupled FGMRES solve diverged (`3.70e22` residual) and returned a false `-1.76e21` field-scale gradient versus the stable centered-difference value `-9.973e-3`. The public field API therefore accepts only rectangular Hartmann/Shercliff cases until a block or physics-aware transpose preconditioner passes the same gate. |
+| D-031 | Fail closed when a production adjoint does not converge | A finite primal is insufficient evidence: unsupported geometry remains unavailable until its transpose solve passes an independent derivative gate. |
+| D-032 | Eliminate inactive degrees of freedom from SPD off-diagonals | A fluid boundary contribution belongs on the diagonal, not as a coupling to an identity-constrained solid cell. Keeping the volume-scaled momentum operator symmetric makes primal PCG mathematically valid and gives its implicit transpose solve the same conditioning. |
 
 ## Work log
 
@@ -1928,6 +1927,33 @@ surface, measurements, validation, decision, and next action.
 - Removed 580 redundant non-release GitHub Actions artifacts while retaining
   26 distribution and release-validation records. This restores deliberate
   evidence retention without using transient CI products as permanent storage.
-- Next action: release 1.3.0, then implement and validate the layered
-  block/transpose preconditioner before making any Hunt differentiability
-  claim; GPU derivative parity waits for an unoccupied office device.
+
+### 2026-08-22 — layered Hunt implicit adjoint
+
+- Traced the failed Hunt transpose to momentum assembly rather than Krylov
+  restart policy. Fluid boundary coefficients were correctly included in the
+  diagonal but were also retained as off-diagonal couplings to solid cells
+  whose rows were identity constraints. The primal stayed unchanged at zero
+  solid velocity, while the full operator became nonsymmetric and invalidated
+  PCG's implicit transpose solve.
+- Eliminated only those inactive-neighbor off-diagonals while preserving their
+  no-slip diagonal contribution. This keeps the maintained source at 6,009
+  core lines and makes the volume-scaled layered momentum operator symmetric
+  to `4.33e-17` relative without adding a solver or preconditioner.
+- Enabled layered ducts in `solve_fully_developed_fields`. On an `8 x 8` fluid
+  Hunt case with one wall cell per side, all five returned fields match the
+  production steady solve within `1.67e-7` relative. The magnetic-scale VJP
+  agrees with a centered difference to `8.79e-8` relative; the exact forcing
+  identity agrees to `3.34e-11` relative.
+- The compiled Hunt reverse pass has a 36.91 ms warm median versus 34.24 ms for
+  the primal (1.08x) and 194,872 versus 129,976 temporary bytes (1.50x). It
+  differentiates the converged system without retaining PCG, potential, or
+  coupling iterations.
+- The complete portable gate passes 506 tests in 110.3 seconds at 95.12%
+  combined line/branch coverage. All curated examples, Ruff, formatting,
+  architecture/import checks, warning-free HTML documentation, and external
+  link checks pass at 16 modules, 15,272 package lines, 6,009 core lines, and
+  28 root exports.
+- Next action: merge the layered-Hunt tranche after every hosted gate passes,
+  then expose a differentiated 3-D field core. GPU parity remains queued until
+  an office device is unoccupied.

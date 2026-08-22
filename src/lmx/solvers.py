@@ -678,10 +678,10 @@ def _velocity_system_coefficients(
     )
     diagonal = west + east + south + north + jnp.where(active_mask, reaction, 1.0 - active)
     diagonal = jnp.where(active_mask, diagonal, 1.0)
-    west = jnp.where(active_mask, west, 0.0)
-    east = jnp.where(active_mask, east, 0.0)
-    south = jnp.where(active_mask, south, 0.0)
-    north = jnp.where(active_mask, north, 0.0)
+    west = jnp.where(west_connected, west, 0.0)
+    east = jnp.where(east_connected, east, 0.0)
+    south = jnp.where(south_connected, south, 0.0)
+    north = jnp.where(north_connected, north, 0.0)
     return diagonal, west, east, south, north
 
 

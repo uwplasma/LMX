@@ -533,8 +533,25 @@ def test_differentiable_fields_match_the_production_steady_solution(differentiab
     assert all(field.shape == (8, 8) and jnp.isfinite(field).all() for field in fields)
     assert jnp.linalg.norm(fields[0] - production.state.u) / jnp.linalg.norm(production.state.u) < 2e-6
     assert jnp.linalg.norm(fields[1] - production.state.phi) / jnp.linalg.norm(production.state.phi) < 2e-6
-    with pytest.raises(NotImplementedError, match="rect_duct"):
-        solve_fully_developed_fields(make_hunt_case(ha=5, ny=4, nz=4, wall_cells=1, insulator_cells=1))
+
+
+def test_layered_hunt_fields_and_implicit_gradient_match_independent_checks():
+    case = make_hunt_case(ha=5, ny=6, nz=6, wall_cells=1, insulator_cells=1)
+    fields = solve_fully_developed_fields(case)
+    production = solve_steady(case)
+
+    assert jnp.linalg.norm(fields[0] - production.state.u) / jnp.linalg.norm(production.state.u) < 2e-6
+    assert jnp.linalg.norm(fields[1] - production.state.phi) / jnp.linalg.norm(production.state.phi) < 2e-6
+
+    def response(scale):
+        return jnp.mean(solve_fully_developed_fields(case, magnetic_field_scale=scale)[0])
+
+    compiled = jax.jit(response)
+    value, derivative = jax.jit(jax.value_and_grad(response))(1.0)
+    delta = 1e-3
+    finite = (compiled(1.0 + delta) - compiled(1.0 - delta)) / (2.0 * delta)
+    assert jnp.isfinite(value)
+    assert derivative == pytest.approx(finite, rel=2e-5, abs=1e-8)
 
 
 def test_fully_developed_implicit_gradients_match_independent_checks(differentiable_hartmann_case):

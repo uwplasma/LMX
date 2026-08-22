@@ -4,7 +4,7 @@ LMX separates traced numerical fields from host-side validation, status, I/O,
 and plotting. An accepted field core must carry continuous physical parameters
 through the production discretization; mesh counts, iteration limits, and
 output policies remain static controls. The accepted field cores are the
-steady rectangular-duct and transient Q2D models below.
+steady rectangular/layered-duct and transient Q2D models below.
 
 SOLVAX-backed linear systems use implicit differentiation: a VJP solves one
 transposed system instead of recording PCG or GMRES iterations. A coupled
@@ -12,7 +12,7 @@ steady-flow interface is documented as end-to-end differentiable only when its
 production field equations use that contract and pass independent gradient,
 residual, runtime, and memory gates.
 
-## Steady rectangular-duct response
+## Steady duct response
 
 ```python
 import jax
@@ -39,8 +39,9 @@ momentum equation, no-slip interpolation, and current/Lorentz fields as
 `solve`. The coupled affine state and its nested linear systems use implicit
 SOLVAX derivatives, so iteration histories are absent from the reverse tape.
 The current continuous inputs are pressure forcing and a scalar multiplier on
-the imposed magnetic field. Fixed-flow, layered Hunt, and 3-D cases fail or
-remain outside this API until their independent adjoint gates pass.
+the imposed magnetic field. Rectangular Hartmann/Shercliff and layered Hunt
+cases pass production-field and independent adjoint gates. Fixed-flow and 3-D
+cases remain outside this API until their own gates pass.
 
 ## Transient Q2D response
 
