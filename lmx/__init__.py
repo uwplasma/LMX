@@ -1,7 +1,7 @@
 """Small, lazy convenience API for LMX.
 
 Research and advanced APIs live in their named modules, for example
-``lmx.fringing`` and ``lmx.autodiff``. Keeping the package root deliberately
+``lmx.fringing`` and ``lmx.cases``. Keeping the package root deliberately
 small makes supported concepts discoverable and avoids importing JAX-heavy
 solver modules until a symbol is used.
 """
@@ -49,8 +49,8 @@ _EXPORTS = {
     "make_hartmann_case": ("lmx.cases", "make_hartmann_case"),
     "make_shercliff_case": ("lmx.cases", "make_shercliff_case"),
     "make_hunt_case": ("lmx.cases", "make_hunt_case"),
-    "solve_steady": ("lmx.solvers", "solve_steady"),
-    "solve_transient": ("lmx.solvers", "solve_transient"),
+    "solve_steady": ("lmx.cases", "solve_steady"),
+    "solve_transient": ("lmx.cases", "solve_transient"),
     "fully_developed_power_balance": ("lmx.solvers", "fully_developed_power_balance"),
     "generate_rect_duct_mesh": ("lmx.mesh", "generate_rect_duct_mesh"),
     "generate_rect_duct_mesh_from_faces": ("lmx.mesh", "generate_rect_duct_mesh_from_faces"),

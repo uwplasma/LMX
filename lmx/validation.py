@@ -1478,7 +1478,7 @@ def benchmark_b_pressure_observable(solution, case_id: str) -> jnp.ndarray:
 def benchmark_solver(
     repeats: int = 3, ha: float = 20.0, ny: int = 48, nz: int = 48
 ) -> dict[str, float | str]:
-    from .solvers import solve_steady
+    from .cases import solve_steady
 
     case = make_hartmann_case(ha=ha, ny=ny, nz=nz)
     timings = []

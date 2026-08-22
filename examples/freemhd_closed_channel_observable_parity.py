@@ -15,10 +15,11 @@ from pathlib import Path
 import jax.numpy as jnp
 import numpy as np
 
+from lmx.cases import solve_steady
 from lmx.freemhd import load_benchmark_a_spec
 from lmx.io import write_freemhd_observable_parity_plots
 from lmx.mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
-from lmx.solvers import fully_developed_power_balance, solve_steady
+from lmx.solvers import fully_developed_power_balance
 from lmx.specs import (
     BoundaryCondition,
     CaseSpec,

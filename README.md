@@ -86,7 +86,7 @@ vector fields use the same problem interface.
 | 3-D rectangular fringing fields | `lmx.fringing` | manufactured operators, projection, restart, Benchmark B2 |
 | 3-D pipe fringing fields | `lmx.fringing` | mapped operators, current closure, fixed-flow and Benchmark B1 gates |
 | FreeMHD comparison | `lmx.freemhd`, validation scripts | pinned case contracts, native-output observers, executable Docker workflow |
-| Differentiable Hartmann objectives | `lmx.autodiff` | finite-difference, JVP, and VJP checks |
+| Cases, solve workflows, and differentiable Hartmann objectives | `lmx.cases` | finite-difference, JVP, and VJP checks |
 | Meshes and analytic/tabulated fields | `lmx.mesh` | geometry, divergence, and interpolation tests |
 
 Validation status and tolerances are stated in the

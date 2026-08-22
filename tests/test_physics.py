@@ -6,18 +6,23 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx import solvers, validation
-from lmx.autodiff import (
+import lmx.cases as cases_impl
+from lmx import validation
+from lmx.cases import (
     build_hartmann_autodiff_problem,
     hartmann_mean_velocity,
     hartmann_mean_velocity_finite_difference_gradients,
     hartmann_mean_velocity_gradients,
     hartmann_profile_loss,
     hartmann_profile_loss_gradients,
+    make_hartmann_case,
+    make_hunt_case,
+    make_shercliff_case,
     run_hartmann_profile_inverse_design,
     solve_differentiable_hartmann,
+    solve_steady,
+    solve_transient,
 )
-from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
 from lmx.mesh import (
     generate_layered_duct_mesh,
     generate_multilayer_duct_mesh,
@@ -30,7 +35,7 @@ from lmx.physics import (
     build_material_fields,
     magnetic_field_components,
 )
-from lmx.solvers import _build_mesh, solve_steady, solve_transient
+from lmx.solvers import _build_mesh
 from lmx.specs import (
     BoundaryCondition,
     CaseSpec,
@@ -334,7 +339,7 @@ def test_transient_solver_can_start_from_nonzero_initial_velocity(
             1.0e-2,
         )
 
-    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+    monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
 
     solution = solve_transient(case)
     center_value = float(solution.state.u[solution.state.u.shape[0] // 2, solution.state.u.shape[1] // 2])

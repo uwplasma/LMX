@@ -867,6 +867,7 @@ artifacts or release assets, not committed files.
 | D-019 | Expose one SOLVAX PCG velocity path instead of naming identical `auto`, `cg`, and `solvax_pcg` choices | LMX assembles and certifies the physical system; a user-facing switch between aliases of the same released algorithm adds no flexibility. |
 | D-020 | Consolidate by stable concept: units and wall models into physics, and state/result schemas into specs | These types are small parts of the physical and public data contracts; separate modules added navigation and import boundaries without independent ownership. |
 | D-021 | Consolidate spatial construction, run configuration, output, and validation by user-facing ownership | Meshes own spatial operators and imposed fields; configuration owns run logging; IO owns lazy plotting; validation owns references and benchmark contracts. These boundaries minimize navigation while remaining acyclic and independently testable. |
+| D-022 | Separate reusable fully developed assembly from case-level solve workflows | `solvers.py` owns the physical systems delegated to SOLVAX; `cases.py` owns factories, orchestration, and differentiable case objectives. This keeps both files below 1,500 lines and removes a one-workflow autodiff module. |
 
 ## Work log
 
@@ -1217,5 +1218,15 @@ surface, measurements, validation, decision, and next action.
   failed checks and unchanged pressure errors. The report is non-accepting only
   because the branch has the candidate role. Its external record is
   `/Users/rogeriojorge/local/tests/lmx-audit/lmx-ownership-consolidation-0a7ea11/b2`.
+- Split fully developed ownership between the reusable physical-system assembly
+  in `solvers.py` and case factories, orchestration, and differentiable
+  objectives in `cases.py`. The dedicated autodiff file was removed; both
+  retained modules are below 1,500 lines. The package now contains 13 modules
+  and 18,071 lines; the wheel contains 26 members.
+- All 550 tests passed with five optional external-data skips and exact combined
+  line/branch coverage of 95.102633%. Sphinx, Ruff, architecture, build, Twine,
+  and distribution-content gates pass. The module regression ceiling is
+  ratcheted to 13, leaving room for an owned decomposition of the 3-D solver
+  while retaining the final 16-module ceiling.
 - Next action: decompose and consolidate the retained 3-D and FreeMHD paths
   toward the final source/module ceilings.

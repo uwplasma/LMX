@@ -14,7 +14,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 
-from lmx.autodiff import (
+from lmx.cases import (
     build_hartmann_autodiff_problem,
     hartmann_mean_velocity,
     solve_differentiable_hartmann,

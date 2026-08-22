@@ -83,7 +83,7 @@ def test_benchmark_solver_returns_positive_timings(monkeypatch: pytest.MonkeyPat
         "make_hartmann_case",
         lambda ha, ny, nz: SimpleNamespace(name="hartmann_ha5"),
     )
-    monkeypatch.setattr("lmx.solvers.solve_steady", lambda case: SimpleNamespace())
+    monkeypatch.setattr("lmx.cases.solve_steady", lambda case: SimpleNamespace())
     monkeypatch.setattr(benchmarks.time, "perf_counter", lambda: next(times))
     monkeypatch.setattr(benchmarks.jax, "default_backend", lambda: "cpu")
     monkeypatch.setattr(benchmarks.jax, "devices", lambda: [SimpleNamespace(device_kind="cpu")])

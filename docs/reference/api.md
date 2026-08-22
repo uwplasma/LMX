@@ -39,7 +39,7 @@ live in the module that owns their concepts.
 ## Differentiation
 
 ```{eval-rst}
-.. automodule:: lmx.autodiff
+.. automodule:: lmx.cases
    :members:
 ```
 

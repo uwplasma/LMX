@@ -10,7 +10,7 @@ from pathlib import Path
 
 import jax.numpy as jnp
 
-from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
+from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case, solve_steady, solve_transient
 from .config import (
     LoggingSpec,
     RestartLogInfo,
@@ -39,7 +39,7 @@ from .io import (
     write_restart_npz,
     write_solution_outputs,
 )
-from .solvers import _build_mesh, solve_steady, solve_transient
+from .solvers import _build_mesh
 from .validation import (
     benchmark_solver,
     closed_channel_validation,

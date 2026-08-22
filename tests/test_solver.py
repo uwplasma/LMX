@@ -6,8 +6,9 @@ import jax
 import jax.numpy as jnp
 import pytest
 
+import lmx.cases as cases_impl
 import lmx.solvers as solvers
-from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
+from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case, solve_steady, solve_transient
 from lmx.io import load_restart_bundle, write_solution_npz
 from lmx.mesh import (
     StructuredMesh,
@@ -20,7 +21,6 @@ from lmx.physics import (
     magnetic_field_components,
     magnetic_ramp_scale,
 )
-from lmx.solvers import solve_steady, solve_transient
 from lmx.specs import BoundaryCondition, GeometrySpec, NumericalFailure
 
 
@@ -142,7 +142,7 @@ def test_hartmann_solver_runs(monkeypatch: pytest.MonkeyPatch):
             linear_initial_residual=1e-3,
         )
 
-    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+    monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case)
     assert solution.state.u.shape == (12, 12)
     assert float(jnp.max(solution.state.u)) > 0.0
@@ -178,7 +178,7 @@ def test_solve_steady_accepts_custom_mesh_override(monkeypatch: pytest.MonkeyPat
             linear_initial_residual=1e-9,
         )
 
-    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+    monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case, mesh=custom_mesh)
 
     assert solution.mesh is custom_mesh
@@ -376,7 +376,7 @@ def test_hunt_inlet_flow_rate_boundary_drives_short_transient(
             linear_initial_residual=1e-3,
         )
 
-    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+    monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
 
     driven_solution = solve_steady(driven)
     undriven_solution = solve_steady(undriven)
@@ -414,7 +414,7 @@ def transient_restart_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             linear_initial_residual=1e-3,
         )
 
-    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+    monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
     partial = solve_transient(partial_case)
     restart = load_restart_bundle(write_solution_npz(partial, partial_case, tmp_path / "partial_restart.npz"))
     return direct_case, restart
@@ -662,7 +662,7 @@ def test_magnetic_ramp_delays_short_transient_lorentz_response(
             linear_initial_residual=1e-3,
         )
 
-    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+    monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
 
     baseline = solve_steady(base)
     delayed = solve_steady(ramped)
@@ -1144,7 +1144,7 @@ def test_solve_steady_respects_t_final_when_tolerance_not_reached(
             linear_initial_residual=1e-2,
         )
 
-    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+    monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case)
 
     assert solution.diagnostics.time_history.shape[0] == 5
@@ -1199,7 +1199,7 @@ def test_fully_developed_solver_rejects_pipe_geometry():
         geometry=GeometrySpec(kind="pipe_ogrid", width=1.0, height=1.0, radius=0.5, nr=4, ntheta=8),
     )
     with pytest.raises(NotImplementedError, match="not supported by the laminar solver"):
-        solvers._solve_fully_developed(bad_case)
+        cases_impl._solve_fully_developed(bad_case)
 
 
 def test_fully_developed_case_step_rejects_non_implicit_transient_scheme():
@@ -1213,7 +1213,7 @@ def test_fully_developed_case_step_rejects_non_implicit_transient_scheme():
     u_previous = jnp.zeros(mesh.yz_shape)
 
     with pytest.raises(NotImplementedError, match="implicit_euler only"):
-        solvers._fully_developed_case_step(
+        cases_impl._fully_developed_case_step(
             case=case,
             mesh=mesh,
             materials=materials,
@@ -1238,7 +1238,7 @@ def test_fully_developed_case_step_uses_explicit_forcing_when_no_target_velocity
     call_counter = {"velocity": 0}
 
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "_solve_potential",
         _fake_potential_solver(mesh.yz_shape, 1.0e-9, 3, 1.0e-6),
     )
@@ -1253,9 +1253,9 @@ def test_fully_developed_case_step_uses_explicit_forcing_when_no_target_velocity
             jnp.asarray(4.0e-6),
         )
 
-    monkeypatch.setattr(solvers, "_solve_velocity_system", fake_solve_velocity_system)
+    monkeypatch.setattr(cases_impl, "_solve_velocity_system", fake_solve_velocity_system)
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "_compute_current_and_lorentz",
         lambda *args, **kwargs: (
             jnp.zeros(mesh.yz_shape),
@@ -1264,7 +1264,7 @@ def test_fully_developed_case_step_uses_explicit_forcing_when_no_target_velocity
         ),
     )
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "_face_current_emf_and_lorentz_max",
         lambda *args, **kwargs: (
             jnp.asarray(1.0e-4),
@@ -1291,7 +1291,7 @@ def test_fully_developed_case_step_uses_explicit_forcing_when_no_target_velocity
         applied_forcing,
         potential_initial_residual,
         linear_initial_residual,
-    ) = solvers._fully_developed_case_step(
+    ) = cases_impl._fully_developed_case_step(
         case=case,
         mesh=mesh,
         materials=materials,
@@ -1346,12 +1346,12 @@ def test_fully_developed_case_step_does_not_double_count_implicit_magnetic_react
     captured_rhs: list[jnp.ndarray] = []
 
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "_solve_potential",
         _fake_potential_solver(mesh.yz_shape, 1.0e-12, 1, 1.0e-12),
     )
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "_fully_developed_rhs",
         lambda **kwargs: (-magnetic_reaction * u_previous, jnp.zeros(mesh.yz_shape)),
     )
@@ -1365,9 +1365,9 @@ def test_fully_developed_case_step_does_not_double_count_implicit_magnetic_react
             jnp.asarray(0.0),
         )
 
-    monkeypatch.setattr(solvers, "_solve_velocity_system", fake_solve_velocity_system)
+    monkeypatch.setattr(cases_impl, "_solve_velocity_system", fake_solve_velocity_system)
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "_compute_current_and_lorentz",
         lambda *args, **kwargs: (
             jnp.zeros(mesh.yz_shape),
@@ -1376,7 +1376,7 @@ def test_fully_developed_case_step_does_not_double_count_implicit_magnetic_react
         ),
     )
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "_face_current_emf_and_lorentz_max",
         lambda *args, **kwargs: (
             jnp.asarray(0.0),
@@ -1385,7 +1385,7 @@ def test_fully_developed_case_step_does_not_double_count_implicit_magnetic_react
         ),
     )
 
-    solvers._fully_developed_case_step(
+    cases_impl._fully_developed_case_step(
         case=case,
         mesh=mesh,
         materials=materials,
@@ -1413,7 +1413,7 @@ def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity
     velocity_calls = {"count": 0}
 
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "_solve_potential",
         _fake_potential_solver(mesh.yz_shape, 5.0e-10, 2, 8.0e-7),
     )
@@ -1434,9 +1434,9 @@ def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity
             jnp.asarray(9.0e-6),
         )
 
-    monkeypatch.setattr(solvers, "_solve_velocity_system", fake_solve_velocity_system)
+    monkeypatch.setattr(cases_impl, "_solve_velocity_system", fake_solve_velocity_system)
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "_compute_current_and_lorentz",
         lambda *args, **kwargs: (
             jnp.zeros(mesh.yz_shape),
@@ -1445,7 +1445,7 @@ def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity
         ),
     )
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "_face_current_emf_and_lorentz_max",
         lambda *args, **kwargs: (
             jnp.asarray(0.0),
@@ -1472,7 +1472,7 @@ def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity
         applied_forcing,
         _potential_initial_residual,
         linear_initial_residual,
-    ) = solvers._fully_developed_case_step(
+    ) = cases_impl._fully_developed_case_step(
         case=case,
         mesh=mesh,
         materials=materials,
@@ -1523,7 +1523,7 @@ def test_fully_developed_steady_stops_once_residual_reaches_tolerance(
             linear_initial_residual=1e-2,
         )
 
-    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+    monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case)
 
     assert solution.diagnostics.residual_history.shape[0] == 3
@@ -1542,7 +1542,7 @@ def test_fully_developed_steady_reports_step_limit(
     case = _steady_stopping_case(max_steps=2, steady_tolerance=1.0e-4, potential_tolerance=1.0e-3)
 
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "_fully_developed_case_step",
         lambda **kwargs: _fake_step_result(
             kwargs["u_previous"],
@@ -1565,7 +1565,7 @@ def test_fully_developed_steady_rejects_nonfinite_output(
     case = _steady_stopping_case(max_steps=1)
 
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "_fully_developed_case_step",
         lambda **kwargs: _fake_step_result(
             kwargs["u_previous"],
@@ -1597,7 +1597,7 @@ def test_fully_developed_steady_requires_outer_state_convergence(
             linear_initial_residual=1e-3,
         )
 
-    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+    monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case)
 
     assert solution.diagnostics.residual_history == pytest.approx([1.0e-2, 1.0e-5])
@@ -1626,7 +1626,7 @@ def test_fully_developed_steady_can_require_potential_residual_when_requested(
             linear_initial_residual=1e-2,
         )
 
-    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_fully_developed_case_step)
+    monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
     solution = solve_steady(case)
 
     assert solution.diagnostics.residual_history.shape[0] == 3
@@ -2021,8 +2021,8 @@ def test_solve_fully_developed_enables_direct_wall_interpolation_only_for_rectan
         zeros = jnp.zeros(mesh.yz_shape, dtype=float)
         return zeros, zeros, zeros, zeros, zeros, 0.0
 
-    monkeypatch.setattr(solvers, "_initial_solver_state", fake_initial_solver_state)
-    monkeypatch.setattr(solvers, "_bounded_time_step_count", lambda **kwargs: 0)
+    monkeypatch.setattr(cases_impl, "_initial_solver_state", fake_initial_solver_state)
+    monkeypatch.setattr(cases_impl, "_bounded_time_step_count", lambda **kwargs: 0)
 
     solve_steady(make_shercliff_case(ha=10.0, ny=8, nz=8))
     solve_steady(make_hunt_case(ha=10.0, ny=8, nz=8, wall_cells=1))
@@ -2039,17 +2039,17 @@ def test_fully_developed_case_step_uses_direct_wall_interpolation_for_rectangula
     flags: list[bool] = []
 
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "_solve_potential",
         _fake_potential_solver(mesh.yz_shape, 0.0, 0, 0.0),
     )
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "_fully_developed_rhs",
         lambda **kwargs: (jnp.zeros(mesh.yz_shape), jnp.zeros(mesh.yz_shape)),
     )
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "_solve_velocity_system",
         lambda **kwargs: (
             jnp.ones(mesh.yz_shape),
@@ -2063,9 +2063,9 @@ def test_fully_developed_case_step_uses_direct_wall_interpolation_for_rectangula
         flags.append(interpolate_direct_fluid_walls)
         return u
 
-    monkeypatch.setattr(solvers, "_enforce_velocity_bc", fake_enforce)
+    monkeypatch.setattr(cases_impl, "_enforce_velocity_bc", fake_enforce)
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "_compute_current_and_lorentz",
         lambda *args, **kwargs: (
             jnp.zeros(mesh.yz_shape),
@@ -2074,7 +2074,7 @@ def test_fully_developed_case_step_uses_direct_wall_interpolation_for_rectangula
         ),
     )
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "_face_current_emf_and_lorentz_max",
         lambda *args, **kwargs: (
             jnp.asarray(0.0),
@@ -2083,7 +2083,7 @@ def test_fully_developed_case_step_uses_direct_wall_interpolation_for_rectangula
         ),
     )
 
-    solvers._fully_developed_case_step(
+    cases_impl._fully_developed_case_step(
         case=case,
         mesh=mesh,
         materials=materials,
@@ -2302,7 +2302,7 @@ def test_fully_developed_case_step_covers_forcing_and_target_velocity_paths():
     forcing_case = make_hartmann_case(ha=5.0, ny=4, nz=4)
     mesh = solvers._build_mesh(forcing_case)
     materials = build_material_fields(forcing_case, mesh)
-    result = solvers._fully_developed_case_step(
+    result = cases_impl._fully_developed_case_step(
         case=forcing_case,
         mesh=mesh,
         materials=materials,
@@ -2324,7 +2324,7 @@ def test_fully_developed_case_step_covers_forcing_and_target_velocity_paths():
     )
     flow_mesh = solvers._build_mesh(flow_case)
     flow_materials = build_material_fields(flow_case, flow_mesh)
-    flow_result = solvers._fully_developed_case_step(
+    flow_result = cases_impl._fully_developed_case_step(
         case=flow_case,
         mesh=flow_mesh,
         materials=flow_materials,
@@ -2437,7 +2437,7 @@ def test_solve_steady_emits_footer_through_logger(monkeypatch: pytest.MonkeyPatc
         updated = jnp.full_like(u_prev, 0.1)
         return _fake_step_result(updated)
 
-    monkeypatch.setattr(solvers, "_fully_developed_case_step", fake_case_step)
+    monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_case_step)
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
     case = replace(case, time_stepper=replace(case.time_stepper, max_steps=1))
 
@@ -2594,14 +2594,14 @@ def test_fully_developed_solver_rejects_unsupported_geometry_after_mesh_build(
         geometry=GeometrySpec(kind="pipe_ogrid", width=1.0, height=1.0, radius=0.5, nr=4, ntheta=8),
     )
     fake_mesh = generate_rect_duct_mesh(width=1.0, height=1.0, ny=4, nz=4)
-    monkeypatch.setattr(solvers, "_build_mesh", lambda case: fake_mesh)
+    monkeypatch.setattr(cases_impl, "_build_mesh", lambda case: fake_mesh)
     monkeypatch.setattr(
-        solvers,
+        cases_impl,
         "build_material_fields",
         lambda case, mesh: build_material_fields(make_hartmann_case(ha=5.0, ny=4, nz=4), fake_mesh),
     )
     with pytest.raises(NotImplementedError, match="does not yet support geometry"):
-        solvers._solve_fully_developed(case)
+        cases_impl._solve_fully_developed(case)
 
 
 def test_public_solver_entrypoints_coerce_or_preserve_mode_before_dispatch(
@@ -2615,7 +2615,7 @@ def test_public_solver_entrypoints_coerce_or_preserve_mode_before_dispatch(
         calls.append((case_arg.solver.mode, bool(kwargs.get("append_diagnostics", False))))
         return "ok"
 
-    monkeypatch.setattr(solvers, "_solve_fully_developed", fake_solve)
+    monkeypatch.setattr(cases_impl, "_solve_fully_developed", fake_solve)
 
     assert solve_transient(base_case) == "ok"
     assert solve_steady(steady_case, append_diagnostics=True) == "ok"

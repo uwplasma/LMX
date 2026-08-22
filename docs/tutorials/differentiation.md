@@ -6,7 +6,7 @@ the physical model.
 
 ```python
 import jax
-from lmx.autodiff import (
+from lmx.cases import (
     build_hartmann_autodiff_problem,
     hartmann_mean_velocity,
 )
