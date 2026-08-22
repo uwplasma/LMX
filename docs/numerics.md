@@ -325,7 +325,8 @@ regression test. This changed the public bent-pipe local charge residual from
 
 ## Linear solver backends
 
-Low-level iterative linear solver helpers are implemented in `lmx/linear.py`.
+LMX assembles boundary-aware operators in `lmx/operators.py` and composes them
+directly with released SOLVAX solvers in `lmx/solvers.py`.
 The current public linear-solver options are:
 
 - `auto` (released SOLVAX PCG)
@@ -369,10 +370,8 @@ robustness or runtime.
   - magnetic fields, ramps, and material-field assembly
 - `lmx/operators.py`
   - structured finite-volume operators
-- `lmx/linear.py`
-  - iterative linear solves and residual norms
 - `lmx/solvers.py`
-  - steady/transient solver families and diagnostics
+  - steady/transient solver families, SOLVAX composition, and diagnostics
 - `lmx/runtime_logging.py`
   - detailed runtime logging, including initial/final residuals
 - `lmx/io.py`

@@ -12,21 +12,19 @@ import jax.numpy as jnp
 from jax.scipy.linalg import cho_factor, cho_solve
 
 from .core import Diagnostics, MHDState, Solution, require_finite
-from .linear import (
-    apply_five_point_operator,
-    apply_poisson_operator,
-    five_point_residual_norm,
-    poisson_residual_norm,
-    solve_poisson_cg_state,
-    solve_poisson_jacobi_state,
-)
 from .mesh import (
     StructuredMesh,
     generate_layered_duct_mesh,
     generate_rect_duct_mesh,
     generate_rect_duct_mesh_from_faces,
 )
-from .operators import gradient_scalar
+from .operators import (
+    apply_five_point_operator,
+    apply_poisson_operator,
+    five_point_residual_norm,
+    gradient_scalar,
+    poisson_residual_norm,
+)
 from .physics import build_material_fields, magnetic_field_components
 from .runtime_logging import RestartLogInfo, SolverStepRecord
 from .specs import BoundaryCondition, CaseSpec
@@ -35,6 +33,7 @@ from solvax import (
     additive_preconditioner as _solvax_additive_preconditioner,
     aitken_relaxation as _solvax_aitken_relaxation,
     anderson_mixing as _solvax_anderson_mixing,
+    fixed_point_iteration as _solvax_fixed_point_iteration,
     galerkin_deflation as _solvax_galerkin_deflation,
     gmres as _solvax_gmres,
     jacobi as _solvax_jacobi,
@@ -51,6 +50,125 @@ _POTENTIAL_COUPLING_NORMALIZED_GATE = 1.0e-5
 _LINEAR_RESIDUAL_FLOOR = 1.0e-9
 _MIN_STRICT_POTENTIAL_COUPLING_SOLVES = 3
 _POTENTIAL_FGMRES_RELATIVE_TOLERANCE = 1.0e-12
+
+
+def solve_poisson_jacobi_state(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    rhs: jnp.ndarray,
+    anchor: tuple[int, int],
+    iterations: int,
+    tolerance: float | None = None,
+    relaxation: float = 1.0,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    phi0 = jnp.zeros_like(rhs)
+
+    def jacobi_update(phi: jnp.ndarray) -> jnp.ndarray:
+        west_phi = jnp.pad(phi[:-1, :], ((1, 0), (0, 0)))
+        east_phi = jnp.pad(phi[1:, :], ((0, 1), (0, 0)))
+        south_phi = jnp.pad(phi[:, :-1], ((0, 0), (1, 0)))
+        north_phi = jnp.pad(phi[:, 1:], ((0, 0), (0, 1)))
+        updated = (
+            rhs
+            + west * west_phi
+            + east * east_phi
+            + south * south_phi
+            + north * north_phi
+        ) / diagonal
+        return updated.at[anchor].set(0.0)
+
+    def residual_norm(phi: jnp.ndarray) -> jnp.ndarray:
+        return poisson_residual_norm(
+            diagonal, west, east, south, north, rhs, phi, anchor
+        )
+
+    fixed_steps = tolerance is None or tolerance <= 0.0
+    solution = _solvax_fixed_point_iteration(
+        jacobi_update,
+        phi0,
+        residual_norm=residual_norm,
+        relaxation=relaxation,
+        rtol=0.0,
+        atol=0.0 if fixed_steps else tolerance,
+        max_steps=iterations,
+        fixed_steps=fixed_steps,
+    )
+    return solution.x, solution.residual_norm, solution.iterations
+
+
+@partial(
+    jax.jit,
+    static_argnames=("anchor", "iterations", "tolerance", "residual_scale_min", "preconditioner"),
+)
+def solve_poisson_cg_state(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    rhs: jnp.ndarray,
+    anchor: tuple[int, int],
+    iterations: int,
+    tolerance: float | None = None,
+    initial: jnp.ndarray | None = None,
+    residual_scale: jnp.ndarray | None = None,
+    residual_scale_min: float | None = None,
+    preconditioner: Callable[[jnp.ndarray], jnp.ndarray] | None = None,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    """Solve a symmetric anchored Poisson system with SOLVAX implicit PCG."""
+
+    phi0 = jnp.zeros_like(rhs) if initial is None else jnp.asarray(initial).at[anchor].set(0.0)
+    if phi0.shape != rhs.shape:
+        raise ValueError(
+            "Poisson CG initial guess must match the right-hand side shape"
+        )
+    if residual_scale is not None:
+        residual_scale = jnp.asarray(residual_scale)
+        if residual_scale.shape != rhs.shape:
+            raise ValueError(
+                "Poisson CG residual scale must match the right-hand side shape"
+            )
+    tiny = jnp.asarray(jnp.finfo(rhs.dtype).tiny, dtype=rhs.dtype)
+    inverse_diagonal = 1.0 / jnp.maximum(diagonal, tiny)
+
+    def apply_preconditioner(residual: jnp.ndarray) -> jnp.ndarray:
+        # Extend the gauge-subspace preconditioner with an identity anchor.
+        projected = residual.at[anchor].set(0.0)
+        solved = inverse_diagonal * projected if preconditioner is None else preconditioner(projected)
+        return solved.at[anchor].set(residual[anchor])
+
+    def matvec(field: jnp.ndarray) -> jnp.ndarray:
+        return apply_poisson_operator(diagonal, west, east, south, north, field, anchor)
+
+    requested = 0.0 if tolerance is None else tolerance
+    scaled_stopping = residual_scale is not None and residual_scale_min is not None
+    rtol = 0.0 if scaled_stopping else requested / (rhs.size**0.5)
+    atol = requested * residual_scale_min if scaled_stopping else 0.0
+    solution = _solvax_pcg_linear_solve(
+        matvec,
+        rhs.at[anchor].set(0.0),
+        x0=phi0,
+        precond=apply_preconditioner,
+        rtol=rtol,
+        atol=atol,
+        max_steps=iterations,
+    )
+    phi = solution.x.at[anchor].set(0.0)
+    if residual_scale is None:
+        residual = poisson_residual_norm(
+            diagonal, west, east, south, north, rhs, phi, anchor
+        )
+    else:
+        physical_residual = rhs - apply_five_point_operator(
+            diagonal, west, east, south, north, phi
+        )
+        residual = jnp.max(
+            jnp.abs(physical_residual) / jnp.maximum(residual_scale, tiny)
+        )
+    return phi, residual, solution.iterations
 
 
 def _coupling_potential_tolerance(
@@ -1533,22 +1651,13 @@ def _fully_developed_case_step(
             and potential_iteration_tolerance <= requested_potential_tolerance
         ):
             strict_potential_solves += 1
-        if len(potential_result) == 4:  # compatibility for injected legacy backends
-            (
-                phi,
-                potential_residual,
-                potential_iteration_count,
-                potential_initial_residual,
-            ) = potential_result
-            potential_solver_residual = potential_residual
-        else:
-            (
-                phi,
-                potential_residual,
-                potential_iteration_count,
-                potential_initial_residual,
-                _potential_solver_residual,
-            ) = potential_result
+        (
+            phi,
+            potential_residual,
+            potential_iteration_count,
+            potential_initial_residual,
+            _potential_solver_residual,
+        ) = potential_result
         require_finite(
             "potential solve",
             potential=phi,

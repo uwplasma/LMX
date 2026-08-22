@@ -379,10 +379,8 @@ Useful references:
   - magnetic fields and material properties
 - `lmx/operators.py`
   - discrete operators
-- `lmx/linear.py`
-  - iterative solves and residual norms
 - `lmx/solvers.py`
-  - solver-family implementations
+  - solver-family implementations and SOLVAX composition
 - `lmx/autodiff.py`
   - differentiable lane
 - `lmx/fringing.py`

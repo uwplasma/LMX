@@ -15,7 +15,6 @@ from .fringing import (
     _enforce_velocity_bc_3d as _extruded_enforce_velocity_bc,
     _neighbor_fields,
 )
-from .linear import solve_poisson_jacobi_state
 from .mesh import StructuredMesh, generate_rect_duct_mesh
 from .operators import gradient_scalar
 from .solvers import (
@@ -24,6 +23,7 @@ from .solvers import (
     _fully_developed_rhs,
     _potential_coefficients,
     _velocity_system_coefficients,
+    solve_poisson_jacobi_state,
 )
 
 _extruded_conservative_current_fluxes = _canonical_current_fluxes_3d

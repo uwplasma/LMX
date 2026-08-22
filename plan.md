@@ -90,7 +90,7 @@ remains intact until its acceptance decision is recorded here.
 | WHAM mirror-pipe adapter | Branded builder and internal reduced validation around generic tabulated fields and pipe fringing | finite-state/bounded internal tests; no matched WHAM field/flow acceptance record | shared fringing/field code | **remove branded adapter after archive**; retain and document generic tabulated/vector-field plus straight-pipe capability, which can express a future validated WHAM case without product-specific proxy code |
 | Blanket reduced flow | Centerline/tube geometry, 1-D pressure budget, transient filling, sensitivities, and media | bounded numerical/unit/autodiff tests and internal plots; independent validation is incomplete | 2 modules / 2,274 lines plus media/tests | **remove after archive**; separate reduced model, geometry visualizer, and paper/media pipeline have no external validation owner and duplicate no protected 3-D capability |
 | Differentiable objectives | Gradients through selected physical solves and design observables | finite-difference/JVP/VJP tests across linear, 2-D, 3-D, and blanket paths | cross-cutting | **retain canonical Hartmann mean/profile objectives only in this refactor**; remove shadow 3-D projection, nonrectangular surrogate, WHAM, and blanket objectives; add 3-D gradients later only through the retained production solver |
-| Reusable solver algebra | Krylov, fixed point, structured direct solves, preconditioners, projected/nullspace algebra | LMX unit/manufactured tests and overlapping SOLVAX APIs | `linear.py`, large portions of `solvers.py`/`fringing.py` | **move to SOLVAX when general**; retain LMX coefficient assembly and physics gates |
+| Reusable solver algebra | Krylov, fixed point, structured direct solves, preconditioners, projected/nullspace algebra | LMX unit/manufactured tests and overlapping SOLVAX APIs | portions of `solvers.py`/`fringing.py` | **move to SOLVAX when general**; retain LMX coefficient assembly and physics gates |
 
 Current costs overlap where capabilities share modules; they are navigation
 estimates, not additive budgets. Each audit decision must name the accountable
@@ -692,7 +692,9 @@ and supported behavior has explicit gates.
   pass the upstream criteria.
 - [ ] Implement, benchmark, document, and release accepted SOLVAX additions.
 - [ ] Bump LMX's SOLVAX lower bound and remove copied implementations/tests.
-- [ ] Delete `lmx/linear.py` when no unique owner remains.
+- [x] Delete `lmx/linear.py` when no unique owner remains. Boundary-aware
+  stencil actions and physical residuals live with LMX operators; the remaining
+  adapters compose released SOLVAX APIs inside the physical solver module.
 
 Exit: no LMX module implements a general matrix solver, Krylov iteration,
 fixed-point algebra, direct structured solve, or generic preconditioner.
@@ -1092,3 +1094,26 @@ surface, measurements, validation, decision, and next action.
   complete external record is
   `/Users/rogeriojorge/local/tests/lmx-audit/lmx-phase1-fixedpoint-1305790/b2`.
 - Next action: continue the Phase 1 wrapper/structured-algebra audit.
+
+### 2026-08-21 — linear-module ownership collapse
+
+- Deleted `lmx/linear.py`. Its four boundary-aware five-point/Poisson actions
+  and physical residual norms now live in `operators.py`; its two thin Jacobi
+  and PCG adapters now compose the released SOLVAX APIs directly inside
+  `solvers.py`. No general iteration or matrix solve remains in the moved LMX
+  code.
+- Folded the four direct operator/solve/implicit-gradient tests into the
+  physical solver suite and deleted `tests/test_linear.py`. Removed the
+  four-value injected-backend compatibility branch so the internal potential
+  solve has one result shape. Samper provenance fingerprints now cover the
+  operator and solver sources that implement the current path.
+- The structural tranche removes one source module, one test file, 20 package
+  lines, 38 test lines, and 61 tracked lines overall. The package contains 31
+  Python modules and 30,891 lines; tests contain 27 files and 19,728 lines.
+- All 827 tests ran against the released SOLVAX 0.14.0 wheel: 822 passed, the
+  same 5 optional external-data tests skipped, and exact combined line/branch
+  coverage is 95.248%. The expanded 234-test physics shard passes on both JAX
+  0.6.2 and 0.10.2. Provenance, architecture, repository-integrity, Samper,
+  and Sphinx warnings-as-errors gates pass.
+- Next action: classify the remaining line, modal, deflation, projection, and
+  fixed-flow algebra by reusable SOLVAX contract before the next deletion.

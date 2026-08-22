@@ -5,6 +5,83 @@ import jax.numpy as jnp
 from .mesh import StructuredMesh
 
 
+def apply_five_point_operator(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    field: jnp.ndarray,
+) -> jnp.ndarray:
+    west_field = jnp.pad(field[:-1, :], ((1, 0), (0, 0)))
+    east_field = jnp.pad(field[1:, :], ((0, 1), (0, 0)))
+    south_field = jnp.pad(field[:, :-1], ((0, 0), (1, 0)))
+    north_field = jnp.pad(field[:, 1:], ((0, 0), (0, 1)))
+    return (
+        diagonal * field
+        - west * west_field
+        - east * east_field
+        - south * south_field
+        - north * north_field
+    )
+
+
+def five_point_residual_norm(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    rhs: jnp.ndarray,
+    field: jnp.ndarray,
+) -> jnp.ndarray:
+    applied = apply_five_point_operator(diagonal, west, east, south, north, field)
+    numerator = jnp.max(jnp.abs(applied - rhs))
+    scale = jnp.maximum(jnp.max(jnp.abs(applied)), jnp.max(jnp.abs(rhs)))
+    return numerator / jnp.maximum(scale, 1e-12)
+
+
+def apply_poisson_operator(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    phi: jnp.ndarray,
+    anchor: tuple[int, int],
+) -> jnp.ndarray:
+    projected = phi.at[anchor].set(0.0)
+    west_phi = jnp.pad(projected[:-1, :], ((1, 0), (0, 0)))
+    east_phi = jnp.pad(projected[1:, :], ((0, 1), (0, 0)))
+    south_phi = jnp.pad(projected[:, :-1], ((0, 0), (1, 0)))
+    north_phi = jnp.pad(projected[:, 1:], ((0, 0), (0, 1)))
+    matrix_phi = (
+        diagonal * projected
+        - west * west_phi
+        - east * east_phi
+        - south * south_phi
+        - north * north_phi
+    )
+    return matrix_phi.at[anchor].set(phi[anchor])
+
+
+def poisson_residual_norm(
+    diagonal: jnp.ndarray,
+    west: jnp.ndarray,
+    east: jnp.ndarray,
+    south: jnp.ndarray,
+    north: jnp.ndarray,
+    rhs: jnp.ndarray,
+    phi: jnp.ndarray,
+    anchor: tuple[int, int],
+) -> jnp.ndarray:
+    rhs_masked = rhs.at[anchor].set(0.0)
+    matrix_phi = apply_poisson_operator(diagonal, west, east, south, north, phi, anchor)
+    numerator = jnp.max(jnp.abs(matrix_phi - rhs_masked))
+    scale = jnp.maximum(jnp.max(jnp.abs(matrix_phi)), jnp.max(jnp.abs(rhs_masked)))
+    return numerator / jnp.maximum(scale, 1e-12)
+
+
 def _broadcast_spacing_y(mesh: StructuredMesh) -> jnp.ndarray:
     return mesh.dy[:, None]
 

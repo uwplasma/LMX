@@ -56,8 +56,8 @@ Public concepts map directly to source modules:
 |---|---|
 | `specs.py`, `config.py` | typed cases and TOML parsing |
 | `mesh.py`, `operators.py` | structured meshes and discrete operators |
-| `physics.py`, `linear.py` | material/field terms and linear solves |
-| `solvers.py` | fully developed steady and transient solvers |
+| `physics.py`, `operators.py` | material/field terms and boundary-aware discrete operators |
+| `solvers.py` | fully developed solves and direct SOLVAX composition |
 | `fringing.py` | extruded and mapped-pipe research solvers |
 | `validation.py`, `freemhd.py` | analytical and independent-code evidence |
 | `autodiff.py`, `scaling.py` | gradients and parallel performance |
@@ -100,7 +100,6 @@ The intended differentiable core is:
 
 - `lmx/operators.py`
 - `lmx/physics.py`
-- `lmx/linear.py`
 - `lmx/solvers.py`
 
 The CLI, plotting, reporting, and docs utilities are intentionally allowed to be
@@ -236,7 +235,7 @@ The hard rule for routine CI/CD is that the parallel workflow must stay under
 - direct operator/kernel tests instead of full solver runs
 
 That pattern is now the default test-design rule. The cheap numerical core
-(`lmx/operators.py`, `lmx/linear.py`) should be validated primarily through
+(`lmx/operators.py`, `lmx/solvers.py`) should be validated primarily through
 manufactured fields and direct kernel contracts, while the heavier solver
 families are covered through a smaller number of focused acceptance tests.
 

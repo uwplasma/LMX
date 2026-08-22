@@ -17,7 +17,6 @@ _TEST_SHARDS = {
         "tests/test_config.py",
         "tests/test_field_models.py",
         "tests/test_io.py",
-        "tests/test_linear.py",
         "tests/test_mesh.py",
         "tests/test_plotting.py",
         "tests/test_reference_data.py",

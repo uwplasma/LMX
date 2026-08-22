@@ -2,6 +2,7 @@ from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
+import jax
 import jax.numpy as jnp
 import pytest
 
@@ -45,6 +46,77 @@ def _steady_stopping_case(**time_stepper):
     return replace(
         case, time_stepper=replace(case.time_stepper, **time_stepper)
     )
+
+
+def _fake_potential_solver(shape, residual, iterations, initial_residual):
+    def solve(*args, return_solver_residual=False, **kwargs):
+        result = (
+            jnp.zeros(shape),
+            jnp.asarray(residual),
+            jnp.asarray(iterations, dtype=jnp.int32),
+            jnp.asarray(initial_residual),
+        )
+        return (*result, result[1]) if return_solver_residual else result
+
+    return solve
+
+
+def _poisson_coefficients():
+    diagonal = jnp.ones((2, 2)) * 4.0
+    neighbors = (jnp.ones((2, 2)),) * 4
+    return diagonal, *neighbors, jnp.zeros((2, 2))
+
+
+def test_solve_poisson_jacobi_can_stop_early_on_residual_tolerance():
+    *coefficients, rhs = _poisson_coefficients()
+    solution, residual, iterations = solvers.solve_poisson_jacobi_state(
+        *coefficients, rhs, anchor=(0, 0), iterations=50, tolerance=1e-6
+    )
+    assert solution.shape == (2, 2)
+    assert int(iterations) < 50
+    assert float(residual) <= 2e-6
+
+
+def test_solve_poisson_cg_converges_on_zero_rhs():
+    *coefficients, rhs = _poisson_coefficients()
+    solution, residual, iterations = solvers.solve_poisson_cg_state(
+        *coefficients, rhs, anchor=(0, 0), iterations=20, tolerance=1e-8
+    )
+    assert (int(iterations), float(residual)) == pytest.approx((0, 0.0))
+
+
+def test_anchored_poisson_operator_is_spd():
+    coefficients = _poisson_coefficients()[:5]
+    apply = lambda field: solvers.apply_poisson_operator(
+        *coefficients, field, anchor=(0, 0)
+    )
+    basis = jnp.eye(4).reshape(4, 2, 2)
+    matrix = jnp.stack([apply(vector).reshape(-1) for vector in basis], axis=1)
+    assert jnp.allclose(matrix, matrix.T) and jnp.all(jnp.linalg.eigvalsh(matrix) > 0)
+
+
+def test_poisson_pcg_gradient_is_implicit_and_matches_exact_solution():
+    diagonal = jnp.full((2, 2), 4.0)
+    zeros = jnp.zeros((2, 2))
+    anchored_rhs = jnp.arange(1.0, 5.0).reshape(2, 2).at[0, 0].set(0.0)
+
+    def poisson_objective(alpha):
+        field, _, _ = solvers.solve_poisson_cg_state(
+            diagonal + alpha,
+            zeros,
+            zeros,
+            zeros,
+            zeros,
+            anchored_rhs,
+            anchor=(0, 0),
+            iterations=8,
+            tolerance=1.0e-12,
+        )
+        return jnp.sum(field**2)
+
+    alpha = 0.3
+    expected = -2.0 * jnp.sum(anchored_rhs**2) / (4.0 + alpha) ** 3
+    assert jnp.allclose(jax.grad(poisson_objective)(alpha), expected, rtol=1.0e-6)
 
 
 def test_hartmann_solver_runs(monkeypatch: pytest.MonkeyPatch):
@@ -1281,12 +1353,7 @@ def test_fully_developed_case_step_uses_explicit_forcing_when_no_target_velocity
     monkeypatch.setattr(
         solvers,
         "_solve_potential",
-        lambda *args, **kwargs: (
-            jnp.zeros(mesh.yz_shape),
-            jnp.asarray(1.0e-9),
-            jnp.asarray(3, dtype=jnp.int32),
-            jnp.asarray(1.0e-6),
-        ),
+        _fake_potential_solver(mesh.yz_shape, 1.0e-9, 3, 1.0e-6),
     )
 
     def fake_solve_velocity_system(**kwargs):
@@ -1403,12 +1470,7 @@ def test_fully_developed_case_step_does_not_double_count_implicit_magnetic_react
     monkeypatch.setattr(
         solvers,
         "_solve_potential",
-        lambda *args, **kwargs: (
-            jnp.zeros(mesh.yz_shape),
-            jnp.asarray(1.0e-12),
-            jnp.asarray(1, dtype=jnp.int32),
-            jnp.asarray(1.0e-12),
-        ),
+        _fake_potential_solver(mesh.yz_shape, 1.0e-12, 1, 1.0e-12),
     )
     monkeypatch.setattr(
         solvers,
@@ -1478,12 +1540,7 @@ def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity
     monkeypatch.setattr(
         solvers,
         "_solve_potential",
-        lambda *args, **kwargs: (
-            jnp.zeros(mesh.yz_shape),
-            jnp.asarray(5.0e-10),
-            jnp.asarray(2, dtype=jnp.int32),
-            jnp.asarray(8.0e-7),
-        ),
+        _fake_potential_solver(mesh.yz_shape, 5.0e-10, 2, 8.0e-7),
     )
 
     def fake_solve_velocity_system(**kwargs):
@@ -2157,12 +2214,7 @@ def test_fully_developed_case_step_uses_direct_wall_interpolation_for_rectangula
     monkeypatch.setattr(
         solvers,
         "_solve_potential",
-        lambda *args, **kwargs: (
-            jnp.zeros(mesh.yz_shape),
-            jnp.asarray(0.0),
-            jnp.asarray(0),
-            jnp.asarray(0.0),
-        ),
+        _fake_potential_solver(mesh.yz_shape, 0.0, 0, 0.0),
     )
     monkeypatch.setattr(
         solvers,

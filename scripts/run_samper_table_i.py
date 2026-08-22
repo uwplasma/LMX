@@ -461,8 +461,8 @@ def _implementation_fingerprint() -> dict[str, str]:
     runner = Path(__file__).resolve()
     repository = runner.parent.parent
     solver_sources = (
+        repository / "lmx" / "operators.py",
         repository / "lmx" / "solvers.py",
-        repository / "lmx" / "linear.py",
     )
     solver_digest = hashlib.sha256()
     for source in solver_sources:
