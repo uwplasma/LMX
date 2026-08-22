@@ -1,0 +1,87 @@
+"""Small, lazy convenience API for LMX.
+
+Research and advanced APIs live in their named modules, for example
+``lmx.fringing`` and ``lmx.cases``. Keeping the package root deliberately
+small makes supported concepts discoverable and avoids importing JAX-heavy
+solver modules until a symbol is used.
+"""
+
+from __future__ import annotations
+
+from importlib import import_module
+
+__all__ = [
+    "enable_compilation_cache",
+    "make_hartmann_case",
+    "make_shercliff_case",
+    "make_hunt_case",
+    "solve",
+    "generate_rect_duct_mesh",
+    "generate_rect_duct_mesh_from_faces",
+    "generate_layered_duct_mesh",
+    "generate_layered_duct_mesh_from_fluid_faces",
+    "generate_multilayer_duct_mesh",
+    "WallLayer",
+    "dynamic_to_kinematic_viscosity",
+    "kinematic_to_dynamic_viscosity",
+    "hartmann_number",
+    "reynolds_number",
+    "interaction_parameter",
+    "magnetic_reynolds_number",
+    "magnetic_field_from_hartmann",
+    "wall_conductance_ratio",
+    "effective_pinhole_conductance_ratio",
+    "tangential_stack_conductance_ratio",
+    "normal_stack_leakage_ratio",
+    "equivalent_single_layer",
+    "nested_wall_layer_resolution_summary",
+]
+
+
+_EXPORTS = {
+    "enable_compilation_cache": ("lmx.io", "enable_compilation_cache"),
+    "make_hartmann_case": ("lmx.cases", "make_hartmann_case"),
+    "make_shercliff_case": ("lmx.cases", "make_shercliff_case"),
+    "make_hunt_case": ("lmx.cases", "make_hunt_case"),
+    "solve": ("lmx.cases", "solve"),
+    "generate_rect_duct_mesh": ("lmx.mesh", "generate_rect_duct_mesh"),
+    "generate_rect_duct_mesh_from_faces": ("lmx.mesh", "generate_rect_duct_mesh_from_faces"),
+    "generate_layered_duct_mesh": ("lmx.mesh", "generate_layered_duct_mesh"),
+    "generate_layered_duct_mesh_from_fluid_faces": (
+        "lmx.mesh",
+        "generate_layered_duct_mesh_from_fluid_faces",
+    ),
+    "generate_multilayer_duct_mesh": ("lmx.mesh", "generate_multilayer_duct_mesh"),
+    "WallLayer": ("lmx.physics", "WallLayer"),
+    "dynamic_to_kinematic_viscosity": ("lmx.physics", "dynamic_to_kinematic_viscosity"),
+    "kinematic_to_dynamic_viscosity": ("lmx.physics", "kinematic_to_dynamic_viscosity"),
+    "hartmann_number": ("lmx.physics", "hartmann_number"),
+    "reynolds_number": ("lmx.physics", "reynolds_number"),
+    "interaction_parameter": ("lmx.physics", "interaction_parameter"),
+    "magnetic_reynolds_number": ("lmx.physics", "magnetic_reynolds_number"),
+    "magnetic_field_from_hartmann": ("lmx.physics", "magnetic_field_from_hartmann"),
+    "wall_conductance_ratio": ("lmx.physics", "wall_conductance_ratio"),
+    "effective_pinhole_conductance_ratio": ("lmx.physics", "effective_pinhole_conductance_ratio"),
+    "tangential_stack_conductance_ratio": ("lmx.physics", "tangential_stack_conductance_ratio"),
+    "normal_stack_leakage_ratio": ("lmx.physics", "normal_stack_leakage_ratio"),
+    "equivalent_single_layer": ("lmx.physics", "equivalent_single_layer"),
+    "nested_wall_layer_resolution_summary": ("lmx.physics", "nested_wall_layer_resolution_summary"),
+}
+
+
+def __getattr__(name: str):
+    """Load a documented root export on first access."""
+
+    try:
+        module_name, attr_name = _EXPORTS[name]
+    except KeyError as exc:
+        raise AttributeError(f"module 'lmx' has no attribute {name!r}") from exc
+    value = getattr(import_module(module_name), attr_name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    """Return module globals plus the lazy public surface for discovery."""
+
+    return sorted(set(globals()) | set(__all__))

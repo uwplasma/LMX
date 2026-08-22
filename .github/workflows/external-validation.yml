@@ -1,0 +1,96 @@
+name: external-validation
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/external-validation.yml
+      - scripts/run_freemhd_parity_suite.py
+      - validation/freemhd.py
+      - src/lmx/_fringing_common.py
+      - src/lmx/_fringing_duct.py
+      - src/lmx/_fringing_pipe.py
+      - src/lmx/_fringing_solver.py
+      - src/lmx/fringing.py
+      - src/lmx/validation.py
+      - src/lmx/data/benchmarks/**
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  FREEMHD_COMMIT: 14b54a3e8e1a05b6ee4c98331995abaaae96e7a5
+  FREEMHD_INSTALL_COMMIT: 36f409d294ba3170d64d4073378d5ef68401072f
+  MPLBACKEND: Agg
+  XLA_PYTHON_CLIENT_PREALLOCATE: "false"
+  OMP_NUM_THREADS: "1"
+  OPENBLAS_NUM_THREADS: "1"
+  MKL_NUM_THREADS: "1"
+  NUMEXPR_NUM_THREADS: "1"
+
+jobs:
+  links:
+    name: External documentation links
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-lmx
+        with:
+          extras: docs
+      - run: python -m sphinx -W -b linkcheck docs docs/_build/linkcheck
+
+  freemhd-b2:
+    name: Pinned FreeMHD B2 Docker comparison
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-lmx
+
+      - name: Resolve pinned external sources
+        run: |
+          git clone --filter=blob:none https://github.com/rogeriojorge/freemhd_install.git \
+            "$RUNNER_TEMP/freemhd-install"
+          git -C "$RUNNER_TEMP/freemhd-install" checkout --detach "$FREEMHD_INSTALL_COMMIT"
+          git -C "$RUNNER_TEMP/freemhd-install" rev-parse HEAD > "$RUNNER_TEMP/freemhd-install.commit"
+          grep -qx "$FREEMHD_INSTALL_COMMIT" "$RUNNER_TEMP/freemhd-install.commit"
+
+          git clone --filter=blob:none https://github.com/PlasmaControl/FreeMHD.git \
+            "$RUNNER_TEMP/FreeMHD-source"
+          git -C "$RUNNER_TEMP/FreeMHD-source" checkout --detach "$FREEMHD_COMMIT"
+          git -C "$RUNNER_TEMP/FreeMHD-source" rev-parse HEAD > "$RUNNER_TEMP/FreeMHD-source.commit"
+          grep -qx "$FREEMHD_COMMIT" "$RUNNER_TEMP/FreeMHD-source.commit"
+
+      - name: Build the pinned FreeMHD image
+        run: |
+          docker build \
+            --build-arg FREEMHD_REF="$FREEMHD_COMMIT" \
+            --tag freemhd-install:validation \
+            "$RUNNER_TEMP/freemhd-install"
+          mkdir -p artifacts/freemhd-b2
+          docker image inspect freemhd-install:validation --format '{{.Id}}' \
+            > artifacts/freemhd-b2/image-id.txt
+
+      - name: Run and validate the matched comparison
+        run: |
+          python scripts/run_freemhd_parity_suite.py \
+            --matched-b2-smoke \
+            --freemhd-image freemhd-install:validation \
+            --freemhd-install-dir "$RUNNER_TEMP/freemhd-install" \
+            --freemhd-source-repo "$RUNNER_TEMP/FreeMHD-source" \
+            --smoke-timeout 1200 \
+            --output artifacts/freemhd-b2/evidence
+
+      - name: Upload evidence
+        if: always()
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: freemhd-b2-evidence
+          path: artifacts/freemhd-b2
+          if-no-files-found: error
+          retention-days: 7

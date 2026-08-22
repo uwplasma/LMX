@@ -1,0 +1,216 @@
+{
+  "benchmarks": [
+    {
+      "acceptance": {
+        "analytical_profile": true,
+        "charge_closure": true,
+        "power_balance": true
+      },
+      "id": "A1-hartmann",
+      "primary_observables": [
+        "axial velocity",
+        "electric current",
+        "power balance"
+      ],
+      "runtime_lane": "portable",
+      "source_ids": [
+        "muller-buhler-book"
+      ],
+      "status": "verified-bounded",
+      "tests": [
+        "tests/test_physics.py::test_small_hartmann_solution_matches_analytic_profile"
+      ],
+      "tier": "A",
+      "title": "Fully developed Hartmann duct",
+      "workflows": [
+        "examples/hartmann_example.py"
+      ]
+    },
+    {
+      "acceptance": {
+        "analytical_profile": true,
+        "charge_closure": true,
+        "mesh_refinement": true
+      },
+      "id": "A2-shercliff",
+      "primary_observables": [
+        "centerline velocity",
+        "flow rate",
+        "electric current"
+      ],
+      "runtime_lane": "portable",
+      "source_ids": [
+        "muller-buhler-book",
+        "samper-table-i",
+        "freemhd"
+      ],
+      "status": "verified-bounded",
+      "tests": [
+        "tests/test_physics.py::test_small_shercliff_solution_matches_bundled_reference_profiles"
+      ],
+      "tier": "A",
+      "title": "Fully developed Shercliff duct",
+      "workflows": [
+        "examples/hunt_example.py"
+      ]
+    },
+    {
+      "acceptance": {
+        "analytical_profile": true,
+        "interface_current": true,
+        "mesh_refinement": true
+      },
+      "id": "A2-hunt",
+      "primary_observables": [
+        "centerline velocity",
+        "wall current",
+        "flow rate"
+      ],
+      "runtime_lane": "portable",
+      "source_ids": [
+        "muller-buhler-book",
+        "samper-table-i",
+        "freemhd"
+      ],
+      "status": "verified-bounded",
+      "tests": [
+        "tests/test_physics.py::test_small_hunt_solution_matches_bundled_reference_profiles"
+      ],
+      "tier": "A",
+      "title": "Fully developed Hunt duct",
+      "workflows": [
+        "examples/hunt_example.py"
+      ]
+    },
+    {
+      "acceptance": {
+        "integral_balance": true,
+        "layer_resolution": true,
+        "reference_flow_rate": true
+      },
+      "id": "A3-high-ha",
+      "primary_observables": [
+        "dimensionless flow rate",
+        "current balance",
+        "power balance"
+      ],
+      "runtime_lane": "portable",
+      "source_ids": [
+        "samper-table-i",
+        "smolentsev-vv"
+      ],
+      "status": "verified-bounded",
+      "tests": [
+        "tests/test_freemhd.py::test_samper_table_i_reference_is_complete_and_exact"
+      ],
+      "tier": "A",
+      "title": "High-Hartmann-number duct integral checks",
+      "workflows": [
+        "examples/hartmann_example.py"
+      ]
+    },
+    {
+      "acceptance": {
+        "matched_freemhd": true,
+        "solver_independence": true,
+        "three_mesh_levels": true
+      },
+      "id": "B1-fringing-pipe",
+      "primary_observables": [
+        "pressure drop",
+        "velocity distortion",
+        "electric potential",
+        "current closure"
+      ],
+      "runtime_lane": "external",
+      "source_ids": [
+        "alex-results-1987",
+        "smolentsev-vv",
+        "freemhd"
+      ],
+      "spec_path": "lmx/data/benchmarks/specs/alex-b1-pipe.toml",
+      "status": "specification-frozen",
+      "tests": [
+        "tests/test_benchmarks.py::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"
+      ],
+      "tier": "B",
+      "title": "Conducting pipe through a fringing magnetic field",
+      "workflows": [
+        "scripts/run_benchmark_b_independence.py"
+      ]
+    },
+    {
+      "acceptance": {
+        "matched_freemhd": true,
+        "solver_independence": true,
+        "three_mesh_levels": true
+      },
+      "id": "B2-fringing-square",
+      "primary_observables": [
+        "pressure drop",
+        "velocity distortion",
+        "electric potential",
+        "current closure"
+      ],
+      "runtime_lane": "external",
+      "source_ids": [
+        "alex-results-1987",
+        "smolentsev-vv",
+        "freemhd"
+      ],
+      "spec_path": "lmx/data/benchmarks/specs/alex-b2-square.toml",
+      "status": "specification-frozen",
+      "tests": [
+        "tests/test_benchmarks.py::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"
+      ],
+      "tier": "B",
+      "title": "Conducting square duct through a fringing magnetic field",
+      "workflows": [
+        "scripts/run_freemhd_parity_suite.py"
+      ]
+    }
+  ],
+  "schema_version": 1,
+  "sources": [
+    {
+      "availability": "external",
+      "filename": "U. Müller, L. Bühler - Magnetofluiddynamics in channels and containers.pdf",
+      "id": "muller-buhler-book",
+      "kind": "book",
+      "sha256": "6f54c642f265fd115fce3abbc9f0edbae629e7c4be480b7418037cb56a02ce54",
+      "title": "Magnetofluiddynamics in Channels and Containers",
+      "year": 2001
+    },
+    {
+      "availability": "repository",
+      "id": "samper-table-i",
+      "kind": "reference_data",
+      "path": "lmx/data/benchmarks/references/samper-table-i.toml",
+      "sha256": "8140a5a19438baea503112be6247c4394fea0c4c7ce0f4bd75a81e74bc664105",
+      "title": "High-Hartmann-number reference flow rates"
+    },
+    {
+      "authors": "S. Smolentsev et al.",
+      "availability": "external",
+      "doi": "10.1016/j.fusengdes.2014.04.049",
+      "filename": "art042.pdf",
+      "id": "smolentsev-vv",
+      "kind": "article",
+      "sha256": "9d0986bc912fc4b7ba9c3b79756db52319295c3b8c3c7304103523e5755f91b9",
+      "title": "An approach to verification and validation of MHD codes for fusion applications"
+    },
+    {
+      "availability": "external",
+      "id": "alex-results-1987",
+      "kind": "report",
+      "title": "ALEX round- and rectangular-duct measurements and 3-D predictions",
+      "year": 1987
+    },
+    {
+      "availability": "external",
+      "id": "freemhd",
+      "kind": "software",
+      "title": "FreeMHD"
+    }
+  ]
+}

@@ -1,0 +1,241 @@
+schema_version = 1
+id = "B1-fringing-pipe"
+title = "ALEX conducting pipe in a fringing transverse magnetic field"
+status = "frozen"
+frozen_on = "2026-07-11"
+tolerances_frozen_before_production = true
+runtime_lane = "external-data"
+
+[physics]
+model = "steady incompressible inductionless MHD with finite inertia and viscosity"
+fluid = "eutectic NaK at the ALEX room-temperature test condition"
+hartmann_number = 6600.0
+interaction_parameter = 10700.0
+magnetic_reynolds_number_assumption = "Rm << 1"
+
+[geometry]
+kind = "pipe_ogrid"
+length_scale = "pipe radius"
+radius_m = 0.0541
+x_over_L_min = -15.0
+x_over_L_max = 10.0
+x_origin = "edge of the magnet pole face"
+constant_cross_section = true
+
+[wall]
+model = "uniform thin conducting wall"
+wall_conductance_ratio = 0.027
+definition = "c_w = sigma_wall * thickness / (sigma_fluid * radius)"
+numerical_realization = "explicit volumetric annulus preserving c_w"
+nominal_thickness_over_L = 0.02
+confirmation_thickness_over_L = 0.01
+thickness_independence_relative_max = 0.02
+
+[drive]
+mode = "inlet flow rate / outlet pressure"
+mean_velocity_m_per_s = 0.069
+volumetric_flow_rate_m3_per_s = 0.0006344442908172669
+nondimensional_mean_velocity = 1.0
+nondimensional_flow_rate = 3.141592653589793
+peak_magnetic_field_T = 2.1
+
+[matched_contract.shared.equations]
+momentum = "transient incompressible Navier-Stokes-Lorentz"
+inertia = "conservative div(rhoPhi,U)"
+time_discretization = "Euler"
+advection_discretization = "Gauss limitedLinear 1.0"
+advection_assembly = "implicit fvm::div with frozen rhoPhi and limiter weights"
+advection_vector_limiter = "single magSqr(U) limiter applied to all components"
+gradient_discretization = "cellLimited leastSquares 1.0"
+viscous_stress = "laminar divDevRhoReff"
+electric_model = "inductionless Ohm law with div(J)=0"
+phase_reduction = "alpha=1 invariant"
+thermal_reduction = "constant temperature and properties"
+
+[free_mhd_discretization_reference]
+repository_commit = "14b54a3e8e1a05b6ee4c98331995abaaae96e7a5"
+openfoam_release = "v2206"
+momentum_source = "MHD_Solvers/solvers/epotMultiRegionInterFoam/fluid/mhdUEqn.H"
+momentum_source_sha256 = "ce88d93bf0fd575809e373497335dcad17bd1c31b792449bec00820fc9e1fcc6"
+electric_source = "MHD_Solvers/solvers/epotMultiRegionInterFoam/fluid/ePotEqn.H"
+electric_source_sha256 = "605058509958d14d2c44d10d0b671573027f712ec59fa56d9aa6611e8f38f0e1"
+limiter_source = "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/limitedLinear/limitedLinear.H"
+limiter_source_sha256 = "f30f319041e1546703cc8ee20250d1f89c9187927b264b308f336fe0dae2b06e"
+scheme_macro_source = "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/LimitedScheme/LimitedScheme.H"
+scheme_macro_source_sha256 = "c5cae1690ceebb94ee813601c0e71180b63c8f2e50b4624bc7a74b9654df580a"
+limiter_registration_source = "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/limitedLinear/limitedLinear.C"
+limiter_registration_source_sha256 = "298d9603b9bfd2c02deb50e8382be8ac147f1ebcccecd69233c77909fd4a0094"
+nvd_source = "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/LimitedScheme/NVDTVD.H"
+nvd_source_sha256 = "ee85d9b26c257ccdd3ab6d2fa0403daed9df30d63f483c35bea1586ce6d4fd07"
+vector_transform_source = "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/LimitedScheme/LimitFuncs.C"
+vector_transform_source_sha256 = "f99e4011a0a4ac957c992493b9391796dd12191c16293ba07c127168640c53b3"
+
+[matched_contract.shared.nondimensional_groups]
+hartmann_number = 6600.0
+interaction_parameter = 10700.0
+reynolds_number = 4071.0280373831774
+magnetic_reynolds_number_assumption = "Rm << 1"
+
+[matched_contract.shared.geometry]
+kind = "pipe_ogrid"
+length_scale = "pipe radius"
+radius_m = 0.0541
+x_over_L_min = -15.0
+x_over_L_max = 10.0
+constant_cross_section = true
+
+[matched_contract.shared.magnetic_field]
+representation = "tabulated monotone interpolation"
+components = "B = (0, B_y(x), 0) in the global Cartesian frame"
+coordinate = "x / radius"
+normalization = "B_y / B0"
+no_extrapolation = true
+normal_current_at_axial_ends = 0.0
+
+[matched_contract.shared.wall]
+model = "uniform thin conducting wall"
+wall_conductance_ratio = 0.027
+numerical_realization = "explicit volumetric annulus preserving c_w"
+thickness_over_L = 0.02
+outer_electric_boundary = "zero normal current"
+
+[matched_contract.shared.boundary_drive]
+velocity_inlet = "integral flow rate with extrapolated profile"
+velocity_outlet = "zero normal gradient"
+velocity_walls = "no slip"
+pressure_inlet = "zero normal gradient"
+pressure_outlet = "fixed gauge"
+pressure_outlet_gauge = 0.0
+flow_constraint_scope = "inlet face only"
+nondimensional_flow_rate = 3.141592653589793
+electric_axial_ends = "zero normal current"
+
+[matched_contract.roles.b1-production.mesh_coordinates]
+coordinate_system = "cell-centred cylindrical x-r-theta"
+family = "wall-clustered pipe O-grid with axial fringe refinement"
+production_level = "fine"
+exact_coordinate_arrays_required = true
+
+[matched_contract.roles.b1-production.stopping_rules]
+electric_iterations_min = 4000
+electric_tolerance_max = 1.0e-12
+projection_iterations_min = 4000
+projection_tolerance_max = 1.0e-12
+steady_residual_max = 5.0e-5
+
+[matched_contract.shared.observable]
+primary = "excess axial pressure gradient"
+definition = "outlet-gauge pressure loss per axial distance"
+
+[matched_contract.shared.normalization]
+field = "B_y / B0"
+pressure = "Delta p / (Delta x * sigma * U * B0^2) minus downstream plateau"
+coordinate = "x / radius"
+
+[field]
+representation = "tabulated monotone interpolation"
+components = "B = (0, B_y(x), 0) in the global Cartesian frame"
+normalization = "B_y / B0"
+coordinate = "x / radius"
+divergence_model = "exactly divergence free because d(B_y(x))/dy = 0"
+divergence_acceptance = 1.0e-8
+no_extrapolation = true
+
+[reference]
+data_path = "benchmarks/references/alex-b1-pipe.csv"
+data_sha256 = "a687df23973852f32a8c0e9f88fcc0df1725cb518f3fb908ed507f604865cc0d"
+primary_observable = "excess axial pressure gradient"
+normalization = "[Delta p / (Delta x * sigma * U * B0^2)] minus the downstream plateau"
+downstream_plateau_x_over_L_min = 7.5
+source_series = "N = 10700, M (Ha) = 6600"
+digitization_method = "manual anchor extraction from published markers and axes"
+digitization_uncertainty_absolute = 0.0015
+marker_scatter_allowance_absolute = 0.0013
+combined_uncertainty_absolute = 0.0020
+experimental_instrument_uncertainty_status = "not reported in the accessible benchmark papers"
+
+[[sources]]
+id = "smolentsev-vv"
+doi = "10.1016/j.fusengdes.2014.04.049"
+pages = "71-72 in the accepted manuscript; PDF pages 8-9"
+figures = "Figure 3 and Table II"
+sha256 = "9d0986bc912fc4b7ba9c3b79756db52319295c3b8c3c7304103523e5755f91b9"
+
+[[sources]]
+id = "alex-results-1987"
+report = "CONF-871007-90 / OSTI 5332375"
+url = "https://www.osti.gov/servlets/purl/5332375"
+pages = "report pages 1-3; PDF pages 2-4"
+figures = "Figures 1-4 and Table 1"
+sha256 = "d67bfc6181a780e1a13f104f443746d1d05d359ba9886e4a0a2563542e6aa16a"
+
+[data_rights]
+reference_access = "publicly accessible US government technical report and cited manuscript"
+redistribution = "only manually extracted numerical facts are redistributed; source figures are not vendored"
+attribution_required = true
+
+[[mesh.levels]]
+name = "coarse"
+axial_stations_min = 101
+radial_cells_min = 64
+azimuthal_cells_min = 128
+hartmann_layer_cells_min = 6
+side_layer_cells_min = 6
+
+[[mesh.levels]]
+name = "medium"
+axial_stations_min = 151
+radial_cells_min = 96
+azimuthal_cells_min = 192
+hartmann_layer_cells_min = 8
+side_layer_cells_min = 8
+
+[[mesh.levels]]
+name = "fine"
+axial_stations_min = 201
+radial_cells_min = 128
+azimuthal_cells_min = 256
+hartmann_layer_cells_min = 10
+side_layer_cells_min = 10
+
+[mesh]
+family = "wall-clustered pipe O-grid with axial refinement across the measured field ramp"
+axial_cells_per_field_transition_min = 16
+geometric_quality_required = true
+
+[solver]
+coupling_acceleration = "anderson"
+coupling_history_depth = 16
+coupling_regularization = 1.0e-8
+coupling_damping = 1.0
+electric_iterations_min = 4000
+electric_tolerance_max = 1.0e-12
+projection_iterations_min = 4000
+projection_tolerance_max = 1.0e-12
+steady_residual_max = 5.0e-5
+steady_residual_uncertainty_fraction_max = 0.05
+mass_balance_max = 1.0e-3
+current_balance_max = 1.0e-3
+interface_current_max = 1.0e-3
+power_balance_max = 1.0e-3
+tolerance_independence_factor = 0.5
+tolerance_independence_uncertainty_fraction_max = 0.25
+time_or_iteration_independence_required = true
+iteration_independence_factor = 2.0
+iteration_independence_uncertainty_fraction_max = 0.25
+
+[acceptance]
+weighted_rms_max = 1.0
+weighted_linf_max = 2.0
+integrated_pressure_relative_error_max = 0.10
+finest_mesh_change_relative_max = 0.02
+monotonic_or_asymptotic_refinement_required = true
+matched_freemhd_case_required = true
+primary_before_secondary = true
+
+secondary_observables = [
+  "axial velocity at the centerline and near-wall stations",
+  "transverse pressure difference",
+  "electric potential and axial wall current",
+  "mass, current, interface-current, and mechanical/electrical power closure",
+]

@@ -1,0 +1,291 @@
+schema_version = 1
+id = "B2-fringing-square"
+title = "ALEX conducting square duct in a fringing transverse magnetic field"
+status = "frozen"
+frozen_on = "2026-07-11"
+tolerances_frozen_before_production = true
+runtime_lane = "external-data"
+
+[physics]
+model = "steady incompressible inductionless MHD with finite inertia and viscosity"
+fluid = "eutectic NaK at the ALEX room-temperature test condition"
+hartmann_number = 2900.0
+interaction_parameter = 540.0
+magnetic_reynolds_number_assumption = "Rm << 1"
+
+[geometry]
+kind = "square_duct"
+length_scale = "duct half-width"
+half_width_m = 0.0439
+x_over_L_min = -15.0
+x_over_L_max = 10.0
+x_origin = "edge of the magnet pole face"
+constant_cross_section = true
+
+[wall]
+model = "uniform thin conducting wall"
+wall_conductance_ratio = 0.07
+definition = "c_w = sigma_wall * thickness / (sigma_fluid * half-width)"
+numerical_realization = "explicit volumetric shell preserving c_w"
+mixed_dimensional_reference_thickness_over_L = 0.02
+nominal_thickness_over_L = 0.02
+confirmation_thickness_over_L = 0.01
+thickness_independence_relative_max = 0.02
+
+[drive]
+mode = "inlet flow rate / outlet pressure"
+mean_velocity_m_per_s = 0.339
+volumetric_flow_rate_m3_per_s = 0.00261329676
+nondimensional_mean_velocity = 1.0
+nondimensional_flow_rate = 4.0
+peak_magnetic_field_T = 1.1
+
+[matched_contract.shared.equations]
+momentum = "transient incompressible Navier-Stokes-Lorentz"
+inertia = "conservative div(rhoPhi,U)"
+time_discretization = "Euler"
+advection_discretization = "Gauss limitedLinear 1.0"
+advection_assembly = "implicit fvm::div with frozen rhoPhi and limiter weights"
+advection_vector_limiter = "single magSqr(U) limiter applied to all components"
+gradient_discretization = "cellLimited leastSquares 1.0"
+viscous_stress = "laminar divDevRhoReff"
+electric_model = "inductionless Ohm law with div(J)=0"
+phase_reduction = "alpha=1 invariant"
+thermal_reduction = "constant temperature and properties"
+
+[free_mhd_discretization_reference]
+repository_commit = "14b54a3e8e1a05b6ee4c98331995abaaae96e7a5"
+openfoam_release = "v2206"
+momentum_source = "MHD_Solvers/solvers/epotMultiRegionInterFoam/fluid/mhdUEqn.H"
+momentum_source_sha256 = "ce88d93bf0fd575809e373497335dcad17bd1c31b792449bec00820fc9e1fcc6"
+electric_source = "MHD_Solvers/solvers/epotMultiRegionInterFoam/fluid/ePotEqn.H"
+electric_source_sha256 = "605058509958d14d2c44d10d0b671573027f712ec59fa56d9aa6611e8f38f0e1"
+limiter_source = "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/limitedLinear/limitedLinear.H"
+limiter_source_sha256 = "f30f319041e1546703cc8ee20250d1f89c9187927b264b308f336fe0dae2b06e"
+scheme_macro_source = "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/LimitedScheme/LimitedScheme.H"
+scheme_macro_source_sha256 = "c5cae1690ceebb94ee813601c0e71180b63c8f2e50b4624bc7a74b9654df580a"
+limiter_registration_source = "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/limitedLinear/limitedLinear.C"
+limiter_registration_source_sha256 = "298d9603b9bfd2c02deb50e8382be8ac147f1ebcccecd69233c77909fd4a0094"
+nvd_source = "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/LimitedScheme/NVDTVD.H"
+nvd_source_sha256 = "ee85d9b26c257ccdd3ab6d2fa0403daed9df30d63f483c35bea1586ce6d4fd07"
+vector_transform_source = "OpenFOAM-v2206/src/finiteVolume/interpolation/surfaceInterpolation/limitedSchemes/LimitedScheme/LimitFuncs.C"
+vector_transform_source_sha256 = "f99e4011a0a4ac957c992493b9391796dd12191c16293ba07c127168640c53b3"
+
+[matched_contract.shared.nondimensional_groups]
+hartmann_number = 2900.0
+interaction_parameter = 540.0
+reynolds_number = 15574.074074074075
+magnetic_reynolds_number_assumption = "Rm << 1"
+
+[matched_contract.shared.geometry]
+kind = "square_duct"
+length_scale = "duct half-width"
+half_width_m = 0.0439
+x_over_L_min = -15.0
+x_over_L_max = 10.0
+constant_cross_section = true
+
+[matched_contract.shared.magnetic_field]
+representation = "tabulated monotone interpolation"
+components = "B = (0, B_y(x), 0) in the global Cartesian frame"
+coordinate = "x / half-width"
+normalization = "B_y / B0"
+no_extrapolation = true
+normal_current_at_axial_ends = 0.0
+
+[matched_contract.shared.wall]
+model = "uniform thin conducting wall"
+wall_conductance_ratio = 0.07
+numerical_realization = "explicit volumetric shell preserving c_w"
+thickness_over_L = 0.02
+outer_electric_boundary = "zero normal current"
+
+[matched_contract.shared.boundary_drive]
+velocity_inlet = "integral flow rate with extrapolated profile"
+velocity_outlet = "zero normal gradient"
+velocity_walls = "no slip"
+pressure_inlet = "zero normal gradient"
+pressure_outlet = "fixed gauge"
+pressure_outlet_gauge = 0.0
+flow_constraint_scope = "inlet face only"
+nondimensional_flow_rate = 4.0
+electric_axial_ends = "zero normal current"
+
+[matched_contract.roles.b2-production.mesh_coordinates]
+coordinate_system = "cell-centred Cartesian x-y-z"
+family = "wall-clustered square grid with axial fringe refinement"
+production_level = "fine"
+exact_coordinate_arrays_required = true
+
+[matched_contract.roles.b2-production.stopping_rules]
+electric_iterations_min = 600
+electric_tolerance_max = 1.0e-12
+projection_iterations_min = 4000
+projection_tolerance_max = 1.0e-12
+# Provisional fail-closed normalized-map bound; production remains blocked.
+steady_residual_max = 5.0e-5
+steady_steps_min = 3
+
+[matched_contract.roles.harness-smoke.mesh_coordinates]
+coordinate_system = "Cartesian x-y-z faces in duct-half-width units"
+family = "uniform 5x5 fluid grid with one explicit wall cell per side"
+exact_coordinate_arrays_required = true
+x_faces = [-15.0, -11.875, -8.75, -5.625, -2.5, 0.625, 3.75, 6.875, 10.0]
+y_faces = [-1.02, -1.0, -0.6, -0.2, 0.2, 0.6, 1.0, 1.02]
+z_faces = [-1.02, -1.0, -0.6, -0.2, 0.2, 0.6, 1.0, 1.02]
+field_source = "alex-b2-square.csv"
+field_source_sha256 = "6778defc3a4b94c2d6f47b480b951d5d780a7f526cb0b661d7a424b02a83f483"
+field_anchors_sha256 = "5af493e4f8f963eff014b71db360caee4fa80fa440afe4a828325322b35d219c"
+field_sample_x_over_L = [-13.4375, -10.3125, -7.1875, -4.0625, -0.9375, 2.1875, 5.3125, 8.4375]
+field_sample_b_over_B0 = [1.0, 1.0, 0.991875, 0.9371875, 0.69, 0.16125, 0.00875, 0.0]
+
+[matched_contract.roles.harness-smoke.stopping_rules]
+dt = 1.8518518518518519e-6
+electric_iterations = 600
+electric_tolerance = 1.0e-12
+projection_iterations = 4000
+projection_tolerance = 1.0e-12
+momentum_iterations = 400
+momentum_tolerance = 1.0e-10
+executed_steps = 2
+steady_steps_required = 3
+expected_stop_reason = "step_limit"
+
+[harness_smoke_execution]
+output_schema_version = 1
+executed_steps = 2
+dt_absolute_tolerance = 1.0e-18
+courant_max = 0.4
+mass_balance_max = 1.0e-3
+current_balance_max = 1.0e-3
+interface_current_balance_max = 1.0e-3
+interface_current_activity_min = 1.0e-12
+restart_absolute_tolerance = 1.0e-12
+cross_code_courant_relative_tolerance = 0.05
+cross_code_courant_absolute_tolerance = 1.0e-8
+cross_code_pressure_rms_max = 0.16
+cross_code_pressure_linf_max = 0.32
+pressure_tolerance_basis = "second-order smoke-grid truncation scale: h=0.4, RMS<=h^2 and Linf<=2h^2"
+outer_current_evidence = "zero normal current from the independently observed solid zeroGradient boundary; no reconstructed solid flux"
+
+[matched_contract.shared.observable]
+primary = "excess transverse pressure difference between published A/B taps"
+tap_geometry = "top and side wall midpoints at each axial station"
+signed_orientation = "side (+z) minus top (+y)"
+
+[matched_contract.shared.normalization]
+field = "B_y / B0"
+pressure = "Delta p_AB / (sigma * U * B0^2 * half-width) minus plateau"
+coordinate = "x / half-width"
+
+[field]
+representation = "tabulated monotone interpolation"
+components = "B = (0, B_y(x), 0) in the global Cartesian frame"
+normalization = "B_y / B0"
+coordinate = "x / half-width"
+divergence_model = "exactly divergence free because d(B_y(x))/dy = 0"
+divergence_acceptance = 1.0e-8
+no_extrapolation = true
+
+[reference]
+data_path = "benchmarks/references/alex-b2-square.csv"
+data_sha256 = "6778defc3a4b94c2d6f47b480b951d5d780a7f526cb0b661d7a424b02a83f483"
+primary_observable = "excess transverse pressure difference between published A/B taps"
+normalization = "[Delta p_AB / (sigma * U * B0^2 * half-width)] minus the uniform-field/no-field plateau"
+baseline_x_over_L_upstream_max = -7.5
+baseline_x_over_L_downstream_min = 5.0
+signed_orientation = "LMX side (+z, across B) minus top (+y, along B) is the published A-minus-B convention"
+tap_geometry = "adjacent wall midpoints at one axial cross-section: top and side, rectangular analogue of 12 and 3 o'clock stated for the pipe"
+source_series = "N = 540, M (Ha) = 2900"
+digitization_method = "manual anchor extraction from published markers and axes"
+digitization_uncertainty_absolute = 0.0030
+marker_scatter_allowance_absolute = 0.0026
+combined_uncertainty_absolute = 0.0040
+experimental_instrument_uncertainty_status = "not reported in the accessible benchmark papers"
+
+[[sources]]
+id = "smolentsev-vv"
+doi = "10.1016/j.fusengdes.2014.04.049"
+pages = "71-72 in the accepted manuscript; PDF pages 8-9"
+figures = "Figure 4 and Table II"
+sha256 = "9d0986bc912fc4b7ba9c3b79756db52319295c3b8c3c7304103523e5755f91b9"
+
+[[sources]]
+id = "alex-results-1987"
+report = "CONF-871007-90 / OSTI 5332375"
+url = "https://www.osti.gov/servlets/purl/5332375"
+pages = "report pages 1 and 3-4; PDF pages 2 and 4-5"
+figures = "Figures 1, 5-7 and Table 1"
+sha256 = "d67bfc6181a780e1a13f104f443746d1d05d359ba9886e4a0a2563542e6aa16a"
+
+[data_rights]
+reference_access = "publicly accessible US government technical report and cited manuscript"
+redistribution = "only manually extracted numerical facts are redistributed; source figures are not vendored"
+attribution_required = true
+
+[[mesh.levels]]
+name = "coarse"
+axial_stations_min = 101
+cross_section_cells_min = 65
+hartmann_layer_cells_min = 6
+side_layer_cells_min = 6
+
+[[mesh.levels]]
+name = "medium"
+axial_stations_min = 151
+cross_section_cells_min = 97
+hartmann_layer_cells_min = 8
+side_layer_cells_min = 8
+
+[[mesh.levels]]
+name = "fine"
+axial_stations_min = 201
+cross_section_cells_min = 129
+hartmann_layer_cells_min = 10
+side_layer_cells_min = 10
+
+[mesh]
+family = "wall-clustered square grid with axial refinement across the measured field ramp"
+axial_cells_per_field_transition_min = 16
+geometric_quality_required = true
+
+[solver]
+coupling_acceleration = "anderson"
+coupling_history_depth = 2
+coupling_regularization = 1.0e-8
+coupling_damping = 1.0
+coupling_min_relaxation = 2.0
+coupling_max_relaxation = 2.0
+coupling_damping_basis = "schema-6 bounded B2 study uses one SOLVAX depth-two weight vector for fields and conservative compact fluxes"
+electric_iterations_min = 600
+electric_tolerance_max = 1.0e-12
+projection_iterations_min = 4000
+projection_tolerance_max = 1.0e-12
+steady_residual_max = 5.0e-5
+steady_steps_min = 3
+steady_residual_uncertainty_fraction_max = 0.05
+mass_balance_max = 1.0e-3
+current_balance_max = 1.0e-3
+interface_current_max = 1.0e-3
+power_balance_max = 1.0e-3
+tolerance_independence_factor = 0.5
+tolerance_independence_uncertainty_fraction_max = 0.25
+time_or_iteration_independence_required = true
+iteration_independence_factor = 2.0
+iteration_independence_uncertainty_fraction_max = 0.25
+
+[acceptance]
+weighted_rms_max = 1.0
+weighted_linf_max = 2.0
+integrated_pressure_relative_error_max = 0.10
+finest_mesh_change_relative_max = 0.02
+monotonic_or_asymptotic_refinement_required = true
+matched_freemhd_case_required = true
+primary_before_secondary = true
+
+secondary_observables = [
+  "axial pressure gradient",
+  "axial wall-voltage difference over Delta x = 1.73 half-widths",
+  "velocity and current redistribution",
+  "mass, current, interface-current, and mechanical/electrical power closure",
+]
