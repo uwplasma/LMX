@@ -8,8 +8,7 @@ import jax
 import jax.numpy as jnp
 from solvax import fixed_point_iteration
 
-from .mesh import StructuredMesh, generate_rect_duct_mesh
-from .operators import gradient_scalar
+from .mesh import StructuredMesh, generate_rect_duct_mesh, gradient_scalar
 from .solvers import (
     _enforce_velocity_bc,
     _face_emf,

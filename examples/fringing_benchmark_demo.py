@@ -20,7 +20,7 @@ from lmx.fringing import (
     smooth_fringing_profile,
     solve_extruded_inductionless,
 )
-from lmx.plotting import write_extruded_overview_plots
+from lmx.io import write_extruded_overview_plots
 
 # Inputs: geometry, materials, field envelope, numerics, and output location.
 OUTPUT_DIR = Path("artifacts/examples/fringing_benchmark")

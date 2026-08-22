@@ -11,8 +11,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from lmx import make_hunt_case, solve_steady
-from lmx.io import write_solution_outputs
-from lmx.plotting import write_case_overview_plots
+from lmx.io import write_case_overview_plots, write_solution_outputs
 from lmx.validation import closed_channel_validation, validation_summary
 
 # Inputs: geometry, wall model, material properties, numerics, and outputs.

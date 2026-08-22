@@ -446,7 +446,7 @@ def test_root_import_is_lazy_and_within_budget() -> None:
 def test_numerical_modules_do_not_import_optional_visualization() -> None:
     code = """
 import sys
-import lmx.plotting
+import lmx.io
 assert not any(name == 'matplotlib' or name.startswith('matplotlib.') for name in sys.modules)
 assert not any(name == 'PIL' or name.startswith('PIL.') for name in sys.modules)
 """

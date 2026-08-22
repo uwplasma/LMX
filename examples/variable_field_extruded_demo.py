@@ -11,14 +11,14 @@ from dataclasses import replace
 from pathlib import Path
 
 from lmx.cases import make_shercliff_case
-from lmx.field_models import make_divergence_free_cross_section_field
 from lmx.fringing import (
     ExtrudedInductionlessProblem,
     smooth_fringing_profile,
     solve_extruded_inductionless,
     validate_variable_field_extruded_solution,
 )
-from lmx.plotting import write_extruded_overview_plots
+from lmx.io import write_extruded_overview_plots
+from lmx.mesh import make_divergence_free_cross_section_field
 from lmx.specs import CaseSpec, MagneticFieldSpec
 
 # Inputs: geometry, field variation, axial profile, solver effort, and outputs.

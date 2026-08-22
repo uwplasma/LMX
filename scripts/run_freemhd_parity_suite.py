@@ -19,11 +19,6 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lmx.benchmarks import (
-    build_benchmark_b_problem,
-    load_benchmark_b_reference,
-    load_benchmark_b_spec,
-)
 from lmx.freemhd import (
     artifact_sha256,
     infer_inlet_drive_mode,
@@ -41,7 +36,12 @@ from lmx.freemhd import (
     validate_matched_b_record,
 )
 from lmx.physics import hartmann_number
-from lmx.reference_data import default_closed_channel_reference_root
+from lmx.validation import (
+    build_benchmark_b_problem,
+    default_closed_channel_reference_root,
+    load_benchmark_b_reference,
+    load_benchmark_b_spec,
+)
 
 DEFAULT_FREEMHD_INSTALL_DIR = Path("/Users/rogerio/local/tests/freemhd_install")
 DEFAULT_FREEMHD_SOURCE_REPO = Path("/Users/rogerio/local/tests/lmx_external_codes/FreeMHD")
@@ -306,8 +306,8 @@ def _tiny_b2_problem(
     solver_shape: tuple[int, int, int] = (8, 7, 7),
     executed_steps: int = 2,
 ) -> tuple[object, dict[str, object]]:
-    from lmx._fringing_types import ExtrudedInductionlessProblem, FringingProfile
     from lmx.fringing import _cross_section_mesh
+    from lmx.specs import ExtrudedInductionlessProblem, FringingProfile
 
     if isinstance(executed_steps, bool) or not isinstance(executed_steps, int) or executed_steps < 2:
         raise ValueError("Matched B2 executed_steps must be an integer >= 2")

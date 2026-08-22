@@ -9,9 +9,7 @@ from typing import Sequence
 import jax.numpy as jnp
 import numpy as np
 
-from .field_models import sample_tabulated_cross_section_field
-from .mesh import StructuredMesh
-from .operators import center_coordinates
+from .mesh import StructuredMesh, center_coordinates, sample_tabulated_cross_section_field
 from .specs import BoundaryCondition, CaseSpec, MagneticFieldSpec, RegionSpec
 
 MU0 = 4.0e-7 * math.pi

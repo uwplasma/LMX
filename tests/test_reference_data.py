@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from lmx.reference_data import (
+from lmx.validation import (
     ProcessedSliceReference,
     _fill_missing_structured_values,
     _interpolated_centerline_profile,

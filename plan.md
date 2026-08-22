@@ -866,6 +866,7 @@ artifacts or release assets, not committed files.
 | D-018 | Use Ruff with a 110-column limit for all maintained Python | The numerical expressions remain readable, every file has one formatter, and the format reduces line count without hand-compressed layouts. |
 | D-019 | Expose one SOLVAX PCG velocity path instead of naming identical `auto`, `cg`, and `solvax_pcg` choices | LMX assembles and certifies the physical system; a user-facing switch between aliases of the same released algorithm adds no flexibility. |
 | D-020 | Consolidate by stable concept: units and wall models into physics, and state/result schemas into specs | These types are small parts of the physical and public data contracts; separate modules added navigation and import boundaries without independent ownership. |
+| D-021 | Consolidate spatial construction, run configuration, output, and validation by user-facing ownership | Meshes own spatial operators and imposed fields; configuration owns run logging; IO owns lazy plotting; validation owns references and benchmark contracts. These boundaries minimize navigation while remaining acyclic and independently testable. |
 
 ## Work log
 
@@ -1199,5 +1200,17 @@ surface, measurements, validation, decision, and next action.
   The report is non-accepting only because the branch has the candidate role.
   Its external record is
   `/Users/rogeriojorge/local/tests/lmx-audit/lmx-model-fusion-7b12a43/b2`.
+- Consolidated the 3-D result schemas into `specs.py`; spatial operators and
+  imposed fields into `mesh.py`; runtime reporting into `config.py`; lazy
+  plotting into `io.py`; and analytic references and benchmark contracts into
+  `validation.py`. Seven package files were removed without changing the
+  30-name root API. The live package now contains 14 modules and 18,037 lines,
+  below the 16-module completion ceiling; tests contain 12,586 lines.
+- All 550 tests passed with five optional external-data skips and exact combined
+  line/branch coverage of 95.102633%. Sphinx, Ruff, architecture, build, Twine,
+  and distribution-content gates pass. The wheel is 169,895 bytes with 27
+  members and the source distribution is 161,499 bytes with 33 members.
+  Architecture regression ceilings are ratcheted to 14 modules and 18,100
+  package lines.
 - Next action: decompose and consolidate the retained 3-D and FreeMHD paths
   toward the final source/module ceilings.

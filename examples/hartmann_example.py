@@ -11,8 +11,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from lmx import make_hartmann_case, solve_steady
-from lmx.io import write_solution_outputs
-from lmx.plotting import write_case_overview_plots
+from lmx.io import write_case_overview_plots, write_solution_outputs
 from lmx.validation import hartmann_validation, validation_summary
 
 # Inputs: geometry, material properties, numerics, and output controls.

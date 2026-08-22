@@ -3,9 +3,28 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx import field_models
-from lmx.field_models import (
+import lmx.mesh as mesh_module
+from lmx.mesh import (
+    _broadcast_spacing_y,
+    _broadcast_spacing_z,
+    _smooth_boundary_layer_segment,
+    center_coordinates,
+    center_spacing_y,
+    center_spacing_z,
     cross_section_divergence_metrics,
+    divergence_flux,
+    face_average_x,
+    face_average_z,
+    face_divergence,
+    generate_bent_pipe_mesh,
+    generate_layered_duct_mesh,
+    generate_layered_duct_mesh_from_fluid_faces,
+    generate_multilayer_duct_mesh,
+    generate_pipe_ogrid_mesh,
+    generate_rect_duct_mesh,
+    generate_rect_duct_mesh_from_faces,
+    gradient_scalar,
+    laplacian_scalar,
     load_tabulated_field,
     make_divergence_free_cross_section_field,
     make_localized_divergence_free_obstacle_field,
@@ -16,29 +35,6 @@ from lmx.field_models import (
     tabulated_cross_section_reconstruction_metrics,
     tabulated_field_quality_metrics,
     write_tabulated_field_npz,
-)
-from lmx.mesh import (
-    _smooth_boundary_layer_segment,
-    generate_bent_pipe_mesh,
-    generate_layered_duct_mesh,
-    generate_layered_duct_mesh_from_fluid_faces,
-    generate_multilayer_duct_mesh,
-    generate_pipe_ogrid_mesh,
-    generate_rect_duct_mesh,
-    generate_rect_duct_mesh_from_faces,
-)
-from lmx.operators import (
-    _broadcast_spacing_y,
-    _broadcast_spacing_z,
-    center_coordinates,
-    center_spacing_y,
-    center_spacing_z,
-    divergence_flux,
-    face_average_x,
-    face_average_z,
-    face_divergence,
-    gradient_scalar,
-    laplacian_scalar,
 )
 from lmx.physics import WallLayer
 
@@ -572,7 +568,7 @@ def test_tabulated_field_validation_and_dimension_mismatch_paths(tmp_path, monke
     )
     assert sampled.shape == (1, 1, 3)
 
-    monkeypatch.setattr(field_models, "RegularGridInterpolator", None)
+    monkeypatch.setattr(mesh_module, "RegularGridInterpolator", None)
     with pytest.raises(RuntimeError, match="RegularGridInterpolator"):
         sample_tabulated_field_volume(
             field2d, x=np.asarray([[0.0]]), y=np.asarray([[0.5]]), z=np.asarray([[0.5]])

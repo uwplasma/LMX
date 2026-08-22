@@ -37,27 +37,26 @@ try:
 except Exception:  # pragma: no cover - SciPy should be present in shipped environments.
     sparse = None
 
-from ._fringing_types import (
+from .cases import _ha_to_b, make_shercliff_case
+from .mesh import (
+    generate_bent_pipe_mesh,
+    generate_layered_duct_mesh,
+    generate_pipe_ogrid_mesh,
+    generate_rect_duct_mesh,
+    load_tabulated_field,
+    sample_tabulated_field_volume,
+)
+from .physics import build_material_fields
+from .specs import (
     EXTRUDED_HISTORY_WIDTHS,
+    BoundaryCondition,
+    CaseSpec,
     ExtrudedFieldBundle,
     ExtrudedInductionlessProblem,
     ExtrudedInductionlessSolution,
     ExtrudedInductionlessValidation,
     ExtrudedIterationProgress,
     FringingProfile,
-)
-from .cases import _ha_to_b, make_shercliff_case
-from .field_models import load_tabulated_field, sample_tabulated_field_volume
-from .mesh import (
-    generate_bent_pipe_mesh,
-    generate_layered_duct_mesh,
-    generate_pipe_ogrid_mesh,
-    generate_rect_duct_mesh,
-)
-from .physics import build_material_fields
-from .specs import (
-    BoundaryCondition,
-    CaseSpec,
     GeometrySpec,
     MagneticFieldSpec,
     OutputSpec,
@@ -4187,7 +4186,7 @@ def build_magnetic_obstacle_rect_extruded_problem(
     transition_width: float = 0.22,
     forcing: float = 1.0,
 ) -> ExtrudedInductionlessProblem:
-    from .field_models import make_localized_divergence_free_obstacle_field
+    from .mesh import make_localized_divergence_free_obstacle_field
 
     field_fn = make_localized_divergence_free_obstacle_field(
         width=width,
@@ -4599,7 +4598,7 @@ def _variable_field_metrics(
     field_kind = solution.problem.case.magnetic_field.kind
     geometry = solution.problem.case.geometry
     if field_kind == "analytic" and solution.problem.case.magnetic_field.fn is not None:
-        from .field_models import cross_section_divergence_metrics
+        from .mesh import cross_section_divergence_metrics
 
         return cross_section_divergence_metrics(
             solution.problem.case.magnetic_field.fn,
@@ -4651,7 +4650,7 @@ def validate_magnetic_obstacle_baseline(
     ):
         raise ValueError("Magnetic-obstacle baseline requires an analytic magnetic field")
 
-    from .field_models import cross_section_divergence_metrics
+    from .mesh import cross_section_divergence_metrics
 
     geometry = solution.problem.case.geometry
     field_metrics = cross_section_divergence_metrics(

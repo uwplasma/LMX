@@ -7,14 +7,6 @@ import numpy as np
 import pytest
 
 import lmx.fringing as fringing_impl
-from lmx._fringing_types import ExtrudedFieldBundle, ExtrudedInductionlessSolution
-from lmx.field_models import (
-    make_divergence_free_cross_section_field,
-    make_localized_divergence_free_obstacle_field,
-    make_maxwell_consistent_fringe_field,
-    sample_cross_section_field,
-    write_tabulated_field_npz,
-)
 from lmx.fringing import (
     _apply_fixed_flow_pressure_constraint,
     _apply_pipe_diffusion_coefficients_3d,
@@ -70,7 +62,21 @@ from lmx.fringing import (
     validate_variable_field_extruded_solution,
     validate_variable_field_pipe_solution,
 )
-from lmx.specs import GeometrySpec, MagneticFieldSpec, NumericalFailure, RegionSpec
+from lmx.mesh import (
+    make_divergence_free_cross_section_field,
+    make_localized_divergence_free_obstacle_field,
+    make_maxwell_consistent_fringe_field,
+    sample_cross_section_field,
+    write_tabulated_field_npz,
+)
+from lmx.specs import (
+    ExtrudedFieldBundle,
+    ExtrudedInductionlessSolution,
+    GeometrySpec,
+    MagneticFieldSpec,
+    NumericalFailure,
+    RegionSpec,
+)
 
 pytestmark = pytest.mark.unit
 

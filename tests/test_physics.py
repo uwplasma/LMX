@@ -18,22 +18,17 @@ from lmx.autodiff import (
     solve_differentiable_hartmann,
 )
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
-from lmx.field_models import write_tabulated_field_npz
 from lmx.mesh import (
     generate_layered_duct_mesh,
     generate_multilayer_duct_mesh,
     generate_rect_duct_mesh,
+    write_tabulated_field_npz,
 )
 from lmx.physics import (
     WallLayer,
     _boundary_sides,
     build_material_fields,
     magnetic_field_components,
-)
-from lmx.reference_data import (
-    ClosedChannelAnalyticalReference,
-    default_closed_channel_reference_root,
-    load_closed_channel_analytical,
 )
 from lmx.solvers import _build_mesh, solve_steady, solve_transient
 from lmx.specs import (
@@ -48,16 +43,19 @@ from lmx.specs import (
     TimeStepperConfig,
 )
 from lmx.validation import (
+    ClosedChannelAnalyticalReference,
     closed_channel_validation,
     combined_profile_error,
     compare_normalized_profiles,
     compare_profiles_with_shared_scale,
+    default_closed_channel_reference_root,
     duct_layer_resolution_gate,
     duct_layer_resolution_metrics,
     extract_midplane_scalar_profile,
     hartmann_acceptance,
     hartmann_analytic_profile,
     hartmann_validation,
+    load_closed_channel_analytical,
     validation_summary,
     write_acceptance_report,
     write_analytic_comparison,

@@ -5,14 +5,14 @@ import jax.numpy as jnp
 import pytest
 
 from lmx.cases import make_hartmann_case
-from lmx.config import LoggingSpec
-from lmx.physics import build_material_fields
-from lmx.runtime_logging import (
+from lmx.config import (
+    LoggingSpec,
     RestartLogInfo,
     SolverStepRecord,
     StreamingSolverLogger,
     default_log_path,
 )
+from lmx.physics import build_material_fields
 from lmx.solvers import _build_mesh
 from lmx.specs import Diagnostics, MHDState, Solution
 

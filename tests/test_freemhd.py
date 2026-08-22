@@ -10,14 +10,7 @@ import numpy as np
 import pytest
 
 import examples
-from lmx import benchmarks
-from lmx._fringing_types import ExtrudedFieldBundle
-from lmx.benchmarks import (
-    BENCHMARK_B_SPEC_FILES,
-    canonical_matched_b_contract,
-    load_benchmark_b_reference,
-    load_benchmark_b_spec,
-)
+import lmx.validation as benchmarks
 from lmx.freemhd import (
     _validate_b2_smoke_execution,
     artifact_sha256,
@@ -37,6 +30,13 @@ from lmx.freemhd import (
     validate_matched_b_record,
 )
 from lmx.io import write_extruded_bundle_restart_npz
+from lmx.specs import ExtrudedFieldBundle
+from lmx.validation import (
+    BENCHMARK_B_SPEC_FILES,
+    canonical_matched_b_contract,
+    load_benchmark_b_reference,
+    load_benchmark_b_spec,
+)
 from scripts import run_freemhd_parity_suite
 
 pytestmark = pytest.mark.unit

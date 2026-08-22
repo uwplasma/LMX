@@ -16,15 +16,8 @@ import jax.numpy as jnp
 import numpy as np
 
 from lmx.freemhd import load_benchmark_a_spec
+from lmx.io import write_freemhd_observable_parity_plots
 from lmx.mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
-from lmx.plotting import write_freemhd_observable_parity_plots
-from lmx.reference_data import (
-    default_closed_channel_reference_root,
-    extract_processed_profile,
-    load_closed_channel_analytical,
-    load_processed_slice,
-    processed_slice_area_mean,
-)
 from lmx.solvers import fully_developed_power_balance, solve_steady
 from lmx.specs import (
     BoundaryCondition,
@@ -38,8 +31,13 @@ from lmx.specs import (
 )
 from lmx.validation import (
     compare_profiles_with_shared_scale,
+    default_closed_channel_reference_root,
     duct_layer_resolution_gate,
     extract_midplane_scalar_profile,
+    extract_processed_profile,
+    load_closed_channel_analytical,
+    load_processed_slice,
+    processed_slice_area_mean,
     validation_summary,
 )
 

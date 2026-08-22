@@ -13,7 +13,8 @@ CaseSpec
 The stable package root contains the common 2-D workflow. Three-dimensional,
 field, differentiation, output, and validation APIs live in their named
 modules. Imports remain one-way: specifications and data containers do not
-depend on solvers; numerical modules do not import plotting.
+depend on solvers; plotting dependencies load only when an output function
+requests them.
 
 Reusable algebra belongs in SOLVAX when it is independent of LMX geometry,
 units, boundaries, and terminology and has its own correctness, gradient,

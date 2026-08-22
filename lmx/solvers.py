@@ -37,21 +37,19 @@ from solvax import (
     tridiagonal_solve as _solvax_tridiagonal_solve,
 )
 
+from .config import RestartLogInfo, SolverStepRecord
 from .mesh import (
     StructuredMesh,
-    generate_layered_duct_mesh,
-    generate_rect_duct_mesh,
-    generate_rect_duct_mesh_from_faces,
-)
-from .operators import (
     apply_five_point_operator,
     apply_poisson_operator,
     five_point_residual_norm,
+    generate_layered_duct_mesh,
+    generate_rect_duct_mesh,
+    generate_rect_duct_mesh_from_faces,
     gradient_scalar,
     poisson_residual_norm,
 )
 from .physics import build_material_fields, magnetic_field_components
-from .runtime_logging import RestartLogInfo, SolverStepRecord
 from .specs import BoundaryCondition, CaseSpec, Diagnostics, MHDState, Solution, require_finite
 
 _POTENTIAL_ADDITIVE_LINE_MIN_CELLS = 110

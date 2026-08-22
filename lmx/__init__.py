@@ -74,10 +74,10 @@ _EXPORTS = {
     "normal_stack_leakage_ratio": ("lmx.physics", "normal_stack_leakage_ratio"),
     "equivalent_single_layer": ("lmx.physics", "equivalent_single_layer"),
     "nested_wall_layer_resolution_summary": ("lmx.physics", "nested_wall_layer_resolution_summary"),
-    "load_shercliff_analytical": ("lmx.reference_data", "load_shercliff_analytical"),
-    "load_hunt_analytical": ("lmx.reference_data", "load_hunt_analytical"),
-    "load_closed_channel_analytical": ("lmx.reference_data", "load_closed_channel_analytical"),
-    "load_processed_slice": ("lmx.reference_data", "load_processed_slice"),
+    "load_shercliff_analytical": ("lmx.validation", "load_shercliff_analytical"),
+    "load_hunt_analytical": ("lmx.validation", "load_hunt_analytical"),
+    "load_closed_channel_analytical": ("lmx.validation", "load_closed_channel_analytical"),
+    "load_processed_slice": ("lmx.validation", "load_processed_slice"),
 }
 
 

@@ -32,7 +32,7 @@ live in the module that owns their concepts.
 ## Imposed fields
 
 ```{eval-rst}
-.. automodule:: lmx.field_models
+.. automodule:: lmx.mesh
    :members:
 ```
 

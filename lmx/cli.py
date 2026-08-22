@@ -10,9 +10,15 @@ from pathlib import Path
 
 import jax.numpy as jnp
 
-from .benchmarks import benchmark_solver, write_benchmark_report
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case
-from .config import LoggingSpec, RunConfig, load_run_config
+from .config import (
+    LoggingSpec,
+    RestartLogInfo,
+    RunConfig,
+    StreamingSolverLogger,
+    default_log_path,
+    load_run_config,
+)
 from .fringing import (
     build_extruded_problem_from_case,
     build_layered_duct_extruded_problem,
@@ -33,9 +39,9 @@ from .io import (
     write_restart_npz,
     write_solution_outputs,
 )
-from .runtime_logging import RestartLogInfo, StreamingSolverLogger, default_log_path
 from .solvers import _build_mesh, solve_steady, solve_transient
 from .validation import (
+    benchmark_solver,
     closed_channel_validation,
     combined_profile_error,
     extract_centerline,
@@ -45,6 +51,7 @@ from .validation import (
     validation_summary,
     write_acceptance_report,
     write_analytic_comparison,
+    write_benchmark_report,
     write_closed_channel_validation,
     write_metrics_json,
     write_profile_csv,

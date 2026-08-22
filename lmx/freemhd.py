@@ -362,11 +362,12 @@ def load_benchmark_a_spec(case_kind: str, spec_dir: str | Path | None = None) ->
 def _decode_matched_b2_lmx_input(path: str | Path):
     from dataclasses import fields
 
-    from ._fringing_types import ExtrudedInductionlessProblem, FringingProfile
     from .fringing import _cross_section_mesh
     from .specs import (
         BoundaryCondition,
         CaseSpec,
+        ExtrudedInductionlessProblem,
+        FringingProfile,
         GeometrySpec,
         MagneticFieldSpec,
         OutputSpec,
@@ -765,11 +766,11 @@ def observe_lmx_b2_output(
 
     from types import SimpleNamespace
 
-    from .benchmarks import benchmark_b_pressure_observable
     from .io import (
         load_extruded_restart_bundle,
         validate_extruded_restart_bundle,
     )
+    from .validation import benchmark_b_pressure_observable
 
     root = Path(output_dir)
     required = {"run.json", "checkpoint.npz", "direct.npz", "resumed.npz"}
@@ -1505,7 +1506,7 @@ def validate_matched_b_record(
 ) -> dict[str, object]:
     """Validate matched Benchmark-B semantics and recompute comparison gates."""
 
-    from .benchmarks import (
+    from .validation import (
         _MATCHED_CONTRACT_SECTIONS,
         BENCHMARK_B_SPEC_FILES,
         canonical_matched_b_contract,

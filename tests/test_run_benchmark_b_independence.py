@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from lmx._fringing_types import ExtrudedFieldBundle
+from lmx.specs import ExtrudedFieldBundle
 from scripts import run_benchmark_b_independence as campaign
 
 pytestmark = pytest.mark.unit

@@ -26,18 +26,18 @@ import jax
 import numpy as np
 
 import lmx
-from lmx.benchmarks import (
-    benchmark_b_pressure_observable,
-    build_benchmark_b_problem,
-    load_benchmark_b_reference,
-    load_benchmark_b_spec,
-)
 from lmx.freemhd import validate_matched_b_record
 from lmx.fringing import _cross_section_mesh, solve_extruded_inductionless
 from lmx.io import (
     load_extruded_restart_bundle,
     write_extruded_bundle_restart_npz,
     write_extruded_restart_npz,
+)
+from lmx.validation import (
+    benchmark_b_pressure_observable,
+    build_benchmark_b_problem,
+    load_benchmark_b_reference,
+    load_benchmark_b_spec,
 )
 
 if ROOT not in Path(lmx.__file__).resolve().parents:

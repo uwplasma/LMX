@@ -5,8 +5,14 @@ from types import SimpleNamespace
 
 import pytest
 
-import lmx.benchmarks as benchmarks
-from lmx.benchmarks import (
+import lmx.validation as benchmarks
+from lmx.fringing import (
+    _cross_section_mesh,
+    _unpack_duct_mass_flux,
+    solve_extruded_inductionless,
+)
+from lmx.io import load_extruded_restart_bundle, write_extruded_bundle_restart_npz
+from lmx.validation import (
     benchmark_b_pressure_observable,
     benchmark_solver,
     build_benchmark_b_field_profile,
@@ -15,12 +21,6 @@ from lmx.benchmarks import (
     load_benchmark_b_spec,
     write_benchmark_report,
 )
-from lmx.fringing import (
-    _cross_section_mesh,
-    _unpack_duct_mass_flux,
-    solve_extruded_inductionless,
-)
-from lmx.io import load_extruded_restart_bundle, write_extruded_bundle_restart_npz
 
 pytestmark = pytest.mark.unit
 

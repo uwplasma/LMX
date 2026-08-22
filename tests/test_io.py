@@ -10,27 +10,25 @@ import pytest
 
 from lmx.cases import make_hartmann_case
 from lmx.io import (
+    _prepare_plot_output,
+    _save_figure_pair,
     load_extruded_restart_bundle,
     load_restart_bundle,
     prepare_extruded_output_layout,
     validate_extruded_restart_bundle,
     validate_restart_bundle,
+    write_case_overview_plots,
+    write_extruded_overview_plots,
     write_extruded_restart_npz,
     write_extruded_solution_npz,
     write_extruded_solution_outputs,
+    write_freemhd_observable_parity_plots,
     write_paraview,
     write_solution_npz,
     write_solution_outputs,
     write_vtu,
 )
 from lmx.mesh import generate_pipe_ogrid_mesh
-from lmx.plotting import (
-    _prepare_plot_output,
-    _save_figure_pair,
-    write_case_overview_plots,
-    write_extruded_overview_plots,
-    write_freemhd_observable_parity_plots,
-)
 from lmx.solvers import _build_mesh
 from lmx.specs import Diagnostics, MHDState, Solution, zeros_state
 
@@ -760,7 +758,7 @@ def _stub_repeated_figure_pair_encoding(monkeypatch: pytest.MonkeyPatch) -> None
         plt.close(fig)
         return paths
 
-    monkeypatch.setattr("lmx.plotting._save_figure_pair", save)
+    monkeypatch.setattr("lmx.io._save_figure_pair", save)
 
 
 def test_figure_pair_owner_writes_real_png_and_pdf(tmp_path: Path):

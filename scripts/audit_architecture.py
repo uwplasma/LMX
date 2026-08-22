@@ -37,14 +37,12 @@ CURRENT_STATE_TERMS = ("legacy", "deprecated", "previously", "no longer", "backw
 RESEARCH_STAGE = {
     "autodiff.py",
     "fringing.py",
-    "_fringing_types.py",
 }
 COMPATIBILITY: set[str] = set()
-VISUALIZATION = {"plotting.py"}
+VISUALIZATION = {"io.py"}
 VALIDATION = {
     "validation.py",
     "freemhd.py",
-    "reference_data.py",
 }
 
 
@@ -236,8 +234,8 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
             },
         },
         "targets": {
-            "package_module_count_max": 21,
-            "total_package_lines_max": 18200,
+            "package_module_count_max": 14,
+            "total_package_lines_max": 18100,
             "maintained_core_lines_max": 10000,
             "test_file_count_max": 14,
             "test_lines_max": 12600,
