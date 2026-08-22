@@ -27,11 +27,42 @@ SOLVAX owns:
 - PCG, GMRES/FGMRES, and fixed-point iteration;
 - Jacobi, line, additive, deflation, and Schur preconditioning primitives;
 - tridiagonal and sparse direct solves;
-- solver state, termination metadata, and implicit linear differentiation.
+- solver state, termination metadata, implicit linear differentiation, and
+  checkpointed exact reverse mode for long recurrences.
 
 LMX calls these algorithms with MHD-specific operator actions and then certifies
 the returned state in physical units. This keeps solver policy reusable without
 moving geometry or physics into SOLVAX.
+
+## Q2D spectral evolution
+
+The periodic Q2D path uses full complex Fourier transforms, the two-thirds
+dealiasing rule for the vorticity-advection product, and fourth-order
+integrating-factor Runge--Kutta time stepping. Viscous and Hartmann-friction
+terms are integrated exactly within each step. SOLVAX supplies the reusable
+periodic Poisson symbol and zero-mean spectral inversion for the streamfunction;
+LMX owns vorticity dynamics, velocity reconstruction, the energy identity, and
+physical acceptance.
+
+The largest stable integration segment is JIT compiled. A positive
+`history_stride` divides a run into compiled segments and transfers only the
+requested vorticity frames to the host; zero retains no field history. This
+keeps primal result storage independent of the number of time steps.
+
+## Derivative policy
+
+The derivative algorithm is part of each numerical method. Converged linear or
+steady nonlinear equations use an implicit tangent/adjoint system, so reverse
+cost is one additional transposed solve and does not depend on the number of
+primal iterations. Finite transient models differentiate the discrete update.
+Q2D uses an exact two-level checkpoint schedule whose retained trajectory state
+is $O(N/C+C)$ for $N$ steps and width $C$, with a square-root default.
+
+Field arrays and continuous physical coefficients are traced. Mesh topology,
+array shapes, iteration limits, checkpoint widths, convergence strings,
+logging, and file output are static or host-side. Gradient acceptance combines
+an independent analytical/finite-difference/transpose check with primal and
+adjoint residuals, compiled memory scaling, warm runtime, and CPU/GPU parity.
 
 ## Accuracy and performance
 

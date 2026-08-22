@@ -8,9 +8,10 @@ CaseSpec
   └─ extruded/fringing ─────> mapped metrics + MHD coupling ─> SOLVAX ─> ExtrudedSolution
                                                                   │
                                        diagnostics + validation <─┘
+Q2DProblem ──> vorticity dynamics ──> SOLVAX periodic Poisson ──> Q2DResult
 ```
 
-The stable package root contains the common 2-D workflow. Three-dimensional,
+The stable package root contains the common 2-D and Q2D workflows. Three-dimensional,
 field, differentiation, output, and validation APIs live in their named
 modules. Imports remain one-way: specifications and data containers do not
 depend on solvers; plotting dependencies load only when an output function

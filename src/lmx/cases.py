@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import jax
 import jax.numpy as jnp
@@ -70,6 +71,9 @@ from .specs import (
     TimeStepperConfig,
     require_finite,
 )
+
+if TYPE_CHECKING:
+    from .q2d import Q2DProblem, Q2DResult
 
 _STEP_DIAGNOSTIC_NAMES = (
     "u_max_history",
@@ -1020,8 +1024,10 @@ def solve_steady(
     raise NotImplementedError(f"Solver kind {solver_kind!r} is not implemented for steady runs")
 
 
-def solve(model: CaseSpec | ExtrudedInductionlessProblem) -> Solution | ExtrudedInductionlessSolution:
-    """Solve a fully developed case or a three-dimensional fringing problem.
+def solve(
+    model: CaseSpec | ExtrudedInductionlessProblem | Q2DProblem,
+) -> Solution | ExtrudedInductionlessSolution | Q2DResult:
+    """Solve a fully developed, three-dimensional fringing, or Q2D problem.
 
     The configured mode selects steady or transient execution for ``CaseSpec``.
     Advanced restart, mesh, logging, progress, and timing hooks remain on the
@@ -1034,7 +1040,13 @@ def solve(model: CaseSpec | ExtrudedInductionlessProblem) -> Solution | Extruded
         from .fringing import solve_extruded_inductionless
 
         return solve_extruded_inductionless(model)
-    raise TypeError(f"solve expects CaseSpec or ExtrudedInductionlessProblem, got {type(model).__name__}")
+    from .q2d import Q2DProblem, solve_q2d
+
+    if isinstance(model, Q2DProblem):
+        return solve_q2d(model)
+    raise TypeError(
+        f"solve expects CaseSpec, ExtrudedInductionlessProblem, or Q2DProblem, got {type(model).__name__}"
+    )
 
 
 @dataclass(frozen=True)

@@ -471,7 +471,7 @@ def test_common_solve_dispatches_configured_mode_and_fringing(monkeypatch: pytes
     problem = ExtrudedInductionlessProblem(case=case, profile=profile)
     monkeypatch.setattr("lmx.fringing.solve_extruded_inductionless", lambda model: extruded_result)
     assert cases_impl.solve(problem) is extruded_result
-    with pytest.raises(TypeError, match="CaseSpec or ExtrudedInductionlessProblem"):
+    with pytest.raises(TypeError, match="CaseSpec, ExtrudedInductionlessProblem, or Q2DProblem"):
         cases_impl.solve(SimpleNamespace())
 
 

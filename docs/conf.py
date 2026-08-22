@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 project = "LMX"
 author = "LMX contributors"
 copyright = f"{datetime.now(timezone.utc).year}, LMX contributors"
-release = "1.1.3"
+release = "1.2.0"
 
 extensions = [
     "myst_parser",

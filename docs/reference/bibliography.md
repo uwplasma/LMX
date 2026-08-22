@@ -15,11 +15,39 @@ Core references used by the implemented models and validation contracts include:
 - S. Smolentsev, R. Moreau, L. Bühler, and C. Mistrangelo, “MHD thermofluid
   issues of liquid-metal blankets,” *Fusion Engineering and Design*, 2010,
   [doi:10.1016/j.fusengdes.2010.02.038](https://doi.org/10.1016/j.fusengdes.2010.02.038).
+- J. Sommeria and R. Moreau, “Why, how, and when, MHD turbulence becomes
+  two-dimensional,” *Journal of Fluid Mechanics* 118, 1982,
+  [doi:10.1017/S0022112082001177](https://doi.org/10.1017/S0022112082001177) —
+  basic Q2D Hartmann-friction closure.
+- A. Pothérat, J. Sommeria, and R. Moreau, “An effective two-dimensional model
+  for MHD flows with transverse magnetic field,” *Journal of Fluid Mechanics*
+  424, 2000,
+  [doi:10.1017/S0022112000001944](https://doi.org/10.1017/S0022112000001944) —
+  higher-order Q2D corrections and model limits.
 - ALEX results, “A comparison of measurements from a round and a rectangular
   duct with 3-D code predictions,” 1987 — Benchmark B1/B2 pressure and flow
   observables.
-- [FreeMHD](https://github.com/PlasmaControl/FreeMHD) — independent finite-volume MHD
-  implementation used by the executable external comparison.
+- S. Benavides and C. Gissinger, “FreeMHD: Validation and application of a new
+  open-source MHD solver for OpenFOAM,” *Physics of Plasmas* 32, 2025,
+  [doi:10.1063/5.0230242](https://doi.org/10.1063/5.0230242) — the
+  [FreeMHD source](https://github.com/PlasmaControl/FreeMHD) supplies the
+  independent finite-volume implementation used by the executable comparison.
+- A. Griewank and A. Walther, “Algorithm 799: Revolve: An implementation of
+  checkpointing for the reverse or adjoint mode of computational
+  differentiation,” *ACM Transactions on Mathematical Software* 26, 2000,
+  [doi:10.1145/347837.347846](https://doi.org/10.1145/347837.347846) — the
+  time/memory checkpointing principle used by bounded trajectory adjoints.
+- H. Zhang and A. Constantinescu, “PETSc TSAdjoint: a discrete adjoint ODE
+  solver for first-order and second-order sensitivity analysis,” 2019,
+  [arXiv:1912.07696](https://arxiv.org/abs/1912.07696) — discrete transient
+  adjoints and checkpoint scheduling for large time-dependent simulations.
+- [Optimistix adjoint documentation](https://docs.kidger.site/optimistix/api/adjoints/)
+  — the distinction between implicit derivatives of converged solves and
+  checkpointed derivatives of finite solver iterations.
+- D. Kochkov et al., “Machine learning–accelerated computational fluid
+  dynamics,” *PNAS* 118, 2021,
+  [doi:10.1073/pnas.2101784118](https://doi.org/10.1073/pnas.2101784118) —
+  traceable finite-volume and pseudospectral CFD kernels on accelerators.
 
 Each numerical result should cite the LMX version/commit and the specific
 benchmark source used for its physical claim.
