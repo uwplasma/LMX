@@ -7,11 +7,15 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-from solvax import periodic_poisson_eigenvalues, solve_periodic_poisson_spectral
+from solvax import (
+    checkpointed_fori_loop,
+    periodic_poisson_eigenvalues,
+    solve_periodic_poisson_spectral,
+)
 
 from .specs import require_finite
 
-__all__ = ["Q2DDiagnostics", "Q2DProblem", "Q2DResult", "make_q2d_case", "solve_q2d"]
+__all__ = ["Q2DDiagnostics", "Q2DProblem", "Q2DResult", "evolve_q2d", "make_q2d_case", "solve_q2d"]
 
 
 @dataclass(frozen=True)
@@ -31,6 +35,7 @@ class Q2DProblem:
     dt: float = 1.0e-2
     steps: int = 100
     history_stride: int = 0
+    adjoint_checkpoint_size: int | None = None
 
     def __post_init__(self) -> None:
         vorticity = jnp.asarray(self.initial_vorticity)
@@ -50,6 +55,8 @@ class Q2DProblem:
             raise ValueError("viscosity and hartmann_friction must be non-negative")
         if self.dt <= 0.0 or self.steps < 1 or self.history_stride < 0:
             raise ValueError("dt and steps must be positive and history_stride non-negative")
+        if self.adjoint_checkpoint_size is not None and self.adjoint_checkpoint_size < 1:
+            raise ValueError("adjoint_checkpoint_size must be positive")
         object.__setattr__(self, "initial_vorticity", vorticity)
         object.__setattr__(self, "forcing", forcing)
 
@@ -169,7 +176,7 @@ def _measures(omega_hat, forcing, eigenvalues, kx, ky, dt, spacing, viscosity, f
     return energy, enstrophy, jnp.max(jnp.abs(divergence)), courant, energy_rate
 
 
-@partial(jax.jit, static_argnames="steps")
+@partial(jax.jit, static_argnames=("steps", "checkpoint_size"))
 def _integrate(
     omega_hat,
     forcing,
@@ -189,35 +196,90 @@ def _integrate(
     max_courant,
     *,
     steps,
+    checkpoint_size,
 ):
-    def advance(carry, _):
+    def advance(_index, carry):
         omega, before, budget, max_courant = carry
         updated = _step(omega, forcing_hat, eigenvalues, kx, ky, dealias, dt, decay, half_decay)
         after = _measures(updated, forcing, eigenvalues, kx, ky, dt, spacing, viscosity, friction)
         budget += 0.5 * dt * (before[-1] + after[-1])
-        return (updated, after, budget, jnp.maximum(max_courant, after[-2])), None
+        return updated, after, budget, jnp.maximum(max_courant, after[-2])
 
     initial = (omega_hat, measures, budget, max_courant)
-    return jax.lax.scan(advance, initial, None, length=steps)[0]
+    return checkpointed_fori_loop(0, steps, advance, initial, checkpoint_size=checkpoint_size)
 
 
-def solve_q2d(problem: Q2DProblem) -> Q2DResult:
-    """Solve a periodic Q2D problem with dealiased Fourier IFRK4 evolution."""
-
-    shape = problem.initial_vorticity.shape
-    dtype = problem.initial_vorticity.dtype
-    spacing = (problem.length[0] / shape[0], problem.length[1] / shape[1])
+def _setup(initial_vorticity, forcing, length, viscosity, friction, dt):
+    shape, dtype = initial_vorticity.shape, initial_vorticity.dtype
+    spacing = (length[0] / shape[0], length[1] / shape[1])
     eigenvalues = periodic_poisson_eigenvalues(shape, spacing).astype(dtype)
     kx = (2.0 * jnp.pi * jnp.fft.fftfreq(shape[0], d=spacing[0])).astype(dtype)[:, None]
     ky = (2.0 * jnp.pi * jnp.fft.fftfreq(shape[1], d=spacing[1])).astype(dtype)[None, :]
     ix, iy = jnp.fft.fftfreq(shape[0]) * shape[0], jnp.fft.fftfreq(shape[1]) * shape[1]
     dealias = (jnp.abs(ix[:, None]) <= shape[0] / 3.0) & (jnp.abs(iy[None, :]) <= shape[1] / 3.0)
-    omega_hat = (
-        (jnp.fft.fftn(problem.initial_vorticity.astype(eigenvalues.dtype)) * dealias).at[0, 0].set(0.0)
+    omega_hat = (jnp.fft.fftn(initial_vorticity) * dealias).at[0, 0].set(0.0)
+    forcing_hat = (jnp.fft.fftn(forcing) * dealias).at[0, 0].set(0.0)
+    decay = jnp.exp(-dt * (viscosity * eigenvalues + friction))
+    return omega_hat, forcing_hat, eigenvalues, kx, ky, dealias, decay, spacing
+
+
+def _evolve(initial_vorticity, forcing, length, viscosity, friction, dt, steps, checkpoint_size):
+    omega_hat, forcing_hat, eigenvalues, kx, ky, dealias, decay, _ = _setup(
+        initial_vorticity, forcing, length, viscosity, friction, dt
     )
-    forcing_hat = (jnp.fft.fftn(problem.forcing.astype(eigenvalues.dtype)) * dealias).at[0, 0].set(0.0)
-    decay = jnp.exp(-problem.dt * (problem.viscosity * eigenvalues + problem.hartmann_friction))
-    half_decay = jnp.sqrt(decay)
+
+    def advance(_index, current):
+        return _step(current, forcing_hat, eigenvalues, kx, ky, dealias, dt, decay, jnp.sqrt(decay))
+
+    omega_hat = checkpointed_fori_loop(0, steps, advance, omega_hat, checkpoint_size=checkpoint_size)
+    _, ux, uy = _flow(omega_hat, eigenvalues, kx, ky)
+    return jnp.fft.ifftn(omega_hat).real, ux, uy
+
+
+def evolve_q2d(
+    initial_vorticity: jax.Array,
+    *,
+    forcing: jax.Array | None = None,
+    length: tuple[float, float] = (2.0 * jnp.pi, 2.0 * jnp.pi),
+    viscosity: float | jax.Array = 1.0e-2,
+    hartmann_friction: float | jax.Array = 0.1,
+    dt: float | jax.Array = 1.0e-2,
+    steps: int = 100,
+    adjoint_checkpoint_size: int | None = None,
+) -> tuple[jax.Array, jax.Array, jax.Array]:
+    """Return final Q2D fields through a JIT- and autodiff-safe numerical core.
+
+    Array state, forcing, domain lengths, viscosity, Hartmann friction, and
+    timestep are differentiable. ``steps`` and ``adjoint_checkpoint_size`` are
+    static controls; the default checkpoint schedule retains
+    ``O(sqrt(steps))`` trajectory states in reverse mode.
+    """
+    initial_vorticity = jnp.asarray(initial_vorticity)
+    forcing = jnp.zeros_like(initial_vorticity) if forcing is None else jnp.asarray(forcing)
+    return _evolve(
+        initial_vorticity,
+        forcing,
+        length,
+        viscosity,
+        hartmann_friction,
+        dt,
+        steps,
+        adjoint_checkpoint_size,
+    )
+
+
+def solve_q2d(problem: Q2DProblem) -> Q2DResult:
+    """Solve a periodic Q2D problem with dealiased Fourier IFRK4 evolution."""
+
+    shape, dtype = problem.initial_vorticity.shape, problem.initial_vorticity.dtype
+    omega_hat, forcing_hat, eigenvalues, kx, ky, dealias, decay, spacing = _setup(
+        problem.initial_vorticity,
+        problem.forcing,
+        problem.length,
+        problem.viscosity,
+        problem.hartmann_friction,
+        problem.dt,
+    )
     initial = _measures(
         omega_hat,
         problem.forcing,
@@ -247,7 +309,7 @@ def solve_q2d(problem: Q2DProblem) -> Q2DResult:
             ky,
             dealias,
             decay,
-            half_decay,
+            jnp.sqrt(decay),
             spacing,
             problem.viscosity,
             problem.hartmann_friction,
@@ -256,6 +318,7 @@ def solve_q2d(problem: Q2DProblem) -> Q2DResult:
             budget,
             max_courant,
             steps=segment,
+            checkpoint_size=problem.adjoint_checkpoint_size,
         )
         completed += segment
         if problem.history_stride:

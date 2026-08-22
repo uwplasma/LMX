@@ -1,31 +1,50 @@
-# Differentiate a Hartmann solve
+# Differentiate physical solves
 
-LMX exposes a focused differentiable Hartmann problem. The function returns JAX
-arrays and composes the same discrete coefficient and SOLVAX iteration path as
-the physical model.
+LMX separates traced numerical fields from host-side validation, status, I/O,
+and plotting. An accepted field core must carry continuous physical parameters
+through the production discretization; mesh counts, iteration limits, and
+output policies remain static controls. The currently documented end-to-end
+field core is the transient Q2D model below.
+
+SOLVAX-backed linear systems use implicit differentiation: a VJP solves one
+transposed system instead of recording PCG or GMRES iterations. A coupled
+steady-flow interface is documented as end-to-end differentiable only when its
+production field equations use that contract and pass independent gradient,
+residual, runtime, and memory gates.
+
+## Transient Q2D response
+
+For a time-dependent field objective, call the field-only core:
 
 ```python
-import jax
-from lmx.cases import (
-    build_hartmann_autodiff_problem,
-    hartmann_mean_velocity,
+import jax.numpy as jnp
+import lmx
+
+case = lmx.make_q2d_case(shape=(32, 32), steps=80)
+
+
+def objective(parameters):
+    viscosity, friction = parameters
+    vorticity, _, _ = lmx.evolve_q2d(
+        case.initial_vorticity,
+        viscosity=viscosity,
+        hartmann_friction=friction,
+        dt=case.dt,
+        steps=case.steps,
+    )
+    return jnp.mean(vorticity**2)
+
+
+value, gradient = jax.value_and_grad(objective)(
+    jnp.asarray([case.viscosity, case.hartmann_friction])
 )
-
-problem = build_hartmann_autodiff_problem(ny=24, nz=24)
-
-
-def response(ha):
-    return hartmann_mean_velocity(problem, forcing=1.0, hartmann_number=ha)
-
-
-value, derivative = jax.value_and_grad(response)(20.0)
-print(value, derivative)
 ```
 
-Mesh dimensions and fixed iteration counts are static compilation parameters.
-Inputs such as forcing and Hartmann number remain differentiable arrays. The
-accepted gradients are checked against finite differences and with JVP/VJP
-identities.
+This derivative is exact for the finite dealiased IFRK4 evolution. Its default
+SOLVAX checkpoint schedule stores `O(sqrt(steps))` trajectory states instead of
+the full tape. The analytical decay, JVP/VJP identity, and compiled reverse
+memory tests in `tests/test_physics.py` are the executable acceptance contract.
 
-The finite-difference, JVP, and VJP tests in `tests/test_physics.py` are the
-executable reference for extending this compact differentiable surface.
+The explicit field-level optimization surface is currently `evolve_q2d`.
+Other result objects are host orchestration unless their API reference
+explicitly identifies a traced field core and derivative evidence.
