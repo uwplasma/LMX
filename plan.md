@@ -1029,6 +1029,7 @@ artifacts or release assets, not committed files.
 | D-031 | Fail closed when a production adjoint does not converge | A finite primal is insufficient evidence: unsupported geometry remains unavailable until its transpose solve passes an independent derivative gate. |
 | D-032 | Eliminate inactive degrees of freedom from SPD off-diagonals | A fluid boundary contribution belongs on the diagonal, not as a coupling to an identity-constrained solid cell. Keeping the volume-scaled momentum operator symmetric makes primal PCG mathematically valid and gives its implicit transpose solve the same conditioning. |
 | D-033 | Differentiate one production 3-D recurrence with bounded nested derivatives | Generic rectangular/layered ducts expose pressure forcing and imposed-field scale through the retained field update. SOLVAX uses an implicit VJP for converged electric closure and exact checkpointing for finite projection and outer iterations. Specialized B2 and pipe lanes remain unavailable until their distinct coupled operators pass the same gates. |
+| D-034 | Execute each PR test once and aggregate its evidence | Three duration-balanced shards run concurrently with branch coverage and save run-scoped JUnit/coverage caches. A report-only job enforces the repository threshold; release reuses the same workflow in parallel with docs and external validation. This preserves fail-closed evidence while targeting a sub-10-minute critical path. |
 
 ## Work log
 
@@ -1992,3 +1993,52 @@ surface, measurements, validation, decision, and next action.
 - Next action: complete hosted CI, package, and FreeMHD gates, then merge the
   3-D tranche. Measure CPU/GPU parity and strong scaling as soon as an office
   GPU is available.
+
+### 2026-08-22 — sub-10-minute evidence architecture
+
+- Measured the hosted PR critical path rather than reducing test scope:
+  combined coverage took 15m21s because it reran four already-tested shards
+  serially; the unsplit physics lane took 9m23s without coverage and 11m49s
+  with coverage. Core and validation took only 40s and 17s of test time.
+- Split the existing physics inventory at its natural ownership boundary:
+  54 fringing/3-D tests and 117 fully-developed/solver tests. With branch
+  coverage enabled, the local lanes pass in 2m55s and 1m31s respectively.
+  All six local evidence files combine to the unchanged 95.12% repository
+  line/branch result across 5,950 statements and 1,304 branches.
+- CI now runs quality and three evidence lanes immediately, runs every test once,
+  records JUnit summaries in the job logs, transfers covered-lane databases by
+  exact run-scoped cache keys, and performs only a report merge afterward.
+  Every numerical, physics, literature-contract, regression, API, and example
+  assertion remains active; no tolerance or coverage exclusion was relaxed.
+  Superseded runs cancel automatically.
+- Enabled lane-scoped JAX persistent compilation caching with source-keyed,
+  branch-scoped GitHub caches. Release validation, documentation, external
+  links, and pinned FreeMHD start concurrently and reuse the PR CI definition,
+  eliminating the separate 18-minute release-only full-suite rerun.
+- The cold-cache target is a PR critical path below 10 minutes, enforced by
+  10-minute job and 9-minute test budgets. Warm trusted-main caches should
+  reduce repeated XLA compilation further without entering numerical timing
+  claims; the standalone benchmark workflow remains the performance oracle.
+- A first cold hosted run with six evidence lanes passed every check, including
+  the cache-transport coverage merge, but finished in about 10m16s because the
+  6m30s fringing lane waited 3m29s for one of four runner slots. Core,
+  validation, examples, and benchmarks are therefore one serial `support`
+  lane; together they remain shorter than fringing, reduce setup/cache churn,
+  and let support, fringing, physics, and metadata start within available
+  concurrency. The fused covered lane passes all 336 tests locally in 2m40s.
+- Next action: require the redesigned hosted matrix and combined coverage to
+  pass, record its cold-cache wall time, then merge and use it to revalidate the
+  pending differentiated 3-D tranche.
+- The final three-lane hosted PR gate passed from creation through combined
+  coverage in 8m08s, including a 1m43s GitHub runner queue. Actual lane times
+  were 5m49s for support, 4m56s for fringing, 4m01s for physics, 16s for
+  metadata/architecture, and 22s for the report-only coverage merge.
+- The first optimized release run completed all tests, exact coverage, docs,
+  links, pinned FreeMHD (7m03s), distribution inspection, and fresh-wheel
+  differentiability smoke. Only the final distribution artifact upload failed
+  because GitHub's previously cleared quota had not recalculated. Distribution
+  handoff now uses an exact run/SHA-scoped cache, and same-commit main/release
+  CI calls share a concurrency key so the release automatically replaces the
+  redundant push run.
+- Next action: require the quota-independent release PR to pass, publish 1.3.0,
+  then revalidate and merge the pending differentiated production 3-D tranche.
