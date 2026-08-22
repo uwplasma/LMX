@@ -1115,5 +1115,11 @@ surface, measurements, validation, decision, and next action.
   coverage is 95.248%. The expanded 234-test physics shard passes on both JAX
   0.6.2 and 0.10.2. Provenance, architecture, repository-integrity, Samper,
   and Sphinx warnings-as-errors gates pass.
+- The rebuilt 283 KiB wheel and 268 KiB source distribution pass Twine and no
+  longer contain `lmx/linear.py`. The pinned B2 Docker smoke on committed
+  source `81e9122` again passed execution, artifacts, contract, observation,
+  and comparison with no failed checks and unchanged pressure Linf
+  `0.0109172453` and RMS `0.0045179771`. Its external record is
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-phase1-no-linear-81e9122/b2`.
 - Next action: classify the remaining line, modal, deflation, projection, and
   fixed-flow algebra by reusable SOLVAX contract before the next deletion.
