@@ -1994,3 +1994,16 @@ surface, measurements, validation, decision, and next action.
 - Next action: require the redesigned hosted matrix and combined coverage to
   pass, record its cold-cache wall time, then merge and use it to revalidate the
   pending differentiated 3-D tranche.
+- The final three-lane hosted PR gate passed from creation through combined
+  coverage in 8m08s, including a 1m43s GitHub runner queue. Actual lane times
+  were 5m49s for support, 4m56s for fringing, 4m01s for physics, 16s for
+  metadata/architecture, and 22s for the report-only coverage merge.
+- The first optimized release run completed all tests, exact coverage, docs,
+  links, pinned FreeMHD (7m03s), distribution inspection, and fresh-wheel
+  differentiability smoke. Only the final distribution artifact upload failed
+  because GitHub's previously cleared quota had not recalculated. Distribution
+  handoff now uses an exact run/SHA-scoped cache, and same-commit main/release
+  CI calls share a concurrency key so the release automatically replaces the
+  redundant push run.
+- Next action: require the quota-independent release PR to pass, publish 1.3.0,
+  then revalidate and merge the pending differentiated production 3-D tranche.
