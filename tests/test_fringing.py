@@ -61,6 +61,7 @@ from lmx.fringing import (
     build_magnetic_obstacle_rect_extruded_problem,
     build_pipe_ogrid_extruded_problem,
     build_square_duct_extruded_problem,
+    evolve_extruded_fields,
     smooth_fringing_profile,
     solve_extruded_inductionless,
     validate_bent_pipe_low_de_baseline,
@@ -572,13 +573,25 @@ def test_nonuniform_variable_poisson_reconstructs_discrete_manufactured_field():
         dy=jnp.diff(y_faces),
         dz=jnp.diff(z_faces),
         iterations=300,
-        tolerance=1.0e-12,
     )
     volume = jnp.broadcast_to(
         jnp.diff(y_faces)[None, :, None] * jnp.diff(z_faces)[None, None, :], manufactured.shape
     )
     projection_expected = manufactured - jnp.sum(manufactured * volume) / jnp.sum(volume)
     assert float(jnp.max(jnp.abs(projection - projection_expected))) < 2.0e-5
+
+    def projection_energy(scale):
+        field = _projection_pressure_correction_3d(
+            scale * projection_rhs,
+            dx=0.4,
+            dy=jnp.diff(y_faces),
+            dz=jnp.diff(z_faces),
+            iterations=300,
+        )
+        return jnp.sum(field**2 * volume) / jnp.sum(volume)
+
+    value, derivative = jax.jit(jax.value_and_grad(projection_energy))(jnp.asarray(1.0))
+    assert derivative == pytest.approx(2.0 * value, rel=2.0e-6, abs=1.0e-8)
 
 
 def test_solvax_metric_pressure_poisson_is_jitted_and_differentiable():
@@ -2011,6 +2024,109 @@ def test_extruded_problem_builders_mark_solver_family(builder, kwargs, geometry_
     assert problem.case.solver.kind == "extruded_inductionless"
     assert problem.case.geometry.kind == geometry_kind
     assert problem.profile.x.shape == (5,)
+
+
+def test_extruded_fields_match_production_and_bound_reverse_memory():
+    problem = build_square_duct_extruded_problem(
+        ha_peak=3.0,
+        nx_stations=4,
+        ny=4,
+        nz=4,
+        length=2.0,
+        entry_center=0.5,
+        exit_center=1.5,
+        transition_width=0.2,
+    )
+    problem = replace(
+        problem,
+        case=replace(
+            problem.case,
+            time_stepper=replace(problem.case.time_stepper, max_steps=8, potential_iterations=30),
+            solver=replace(problem.case.solver, coupling_iterations=1, coupling_tolerance=1.0e-8),
+        ),
+    )
+    production = solve_extruded_inductionless(
+        replace(
+            problem, case=replace(problem.case, time_stepper=replace(problem.case.time_stepper, max_steps=3))
+        )
+    ).bundle
+    fields = evolve_extruded_fields(problem, steps=3)
+    for actual, name in zip(
+        fields,
+        ("u", "v", "w", "p", "phi", "jx", "jy", "jz", "lorentz_x", "lorentz_y", "lorentz_z"),
+        strict=True,
+    ):
+        assert actual == pytest.approx(getattr(production, name), rel=2.0e-6, abs=1.0e-9)
+
+    def objective(parameters, checkpoint_size=None):
+        evolved = evolve_extruded_fields(
+            problem,
+            forcing=parameters[0],
+            magnetic_field_scale=parameters[1],
+            steps=8,
+            checkpoint_size=checkpoint_size,
+        )
+        return jnp.mean(evolved[0] ** 2) + 0.01 * jnp.mean(evolved[4] ** 2)
+
+    parameters = jnp.asarray([1.0, 1.0])
+    value, gradient = jax.jit(jax.value_and_grad(objective))(parameters)
+    epsilon = 2.0e-3
+    finite_difference = jnp.asarray(
+        [
+            (objective(parameters.at[index].add(epsilon)) - objective(parameters.at[index].add(-epsilon)))
+            / (2.0 * epsilon)
+            for index in range(2)
+        ]
+    )
+    assert jnp.isfinite(value)
+    assert gradient == pytest.approx(finite_difference, rel=2.0e-3, abs=2.0e-9)
+    direction = jnp.asarray([0.3, -0.2])
+    tangent = jax.jvp(objective, (parameters,), (direction,))[1]
+    pullback = jax.vjp(objective, parameters)[1](jnp.ones_like(value))[0]
+    assert tangent == pytest.approx(jnp.vdot(pullback, direction), rel=2.0e-6, abs=1.0e-9)
+
+    bounded = jax.jit(jax.value_and_grad(objective)).lower(parameters).compile()
+    full_tape = jax.jit(jax.value_and_grad(lambda values: objective(values, 8))).lower(parameters).compile()
+    assert (
+        bounded.memory_analysis().temp_size_in_bytes < 0.75 * full_tape.memory_analysis().temp_size_in_bytes
+    )
+
+
+def test_layered_extruded_fields_share_the_production_update():
+    problem = build_layered_duct_extruded_problem(
+        ha_peak=2.0,
+        nx_stations=3,
+        ny=4,
+        nz=4,
+        wall_cells=1,
+        length=1.5,
+        entry_center=0.4,
+        exit_center=1.1,
+        transition_width=0.2,
+    )
+    problem = replace(
+        problem,
+        case=replace(
+            problem.case,
+            time_stepper=replace(problem.case.time_stepper, max_steps=2, potential_iterations=30),
+            solver=replace(problem.case.solver, coupling_iterations=1, coupling_tolerance=1.0e-8),
+        ),
+    )
+    production = solve_extruded_inductionless(problem).bundle
+    fields = evolve_extruded_fields(problem, steps=2)
+    for actual, name in zip(
+        fields,
+        ("u", "v", "w", "p", "phi", "jx", "jy", "jz", "lorentz_x", "lorentz_y", "lorentz_z"),
+        strict=True,
+    ):
+        assert actual == pytest.approx(getattr(production, name), rel=2.0e-6, abs=1.0e-9)
+
+    gradient = jax.jit(
+        jax.grad(
+            lambda scale: jnp.mean(evolve_extruded_fields(problem, magnetic_field_scale=scale, steps=2)[0])
+        )
+    )(jnp.asarray(1.0))
+    assert jnp.isfinite(gradient)
 
 
 def test_cross_section_mesh_supports_pipe_ogrid_geometry():

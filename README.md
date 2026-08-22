@@ -76,6 +76,29 @@ momentum transport, and face-flux pressure projection on rectangular,
 layered-duct, straight-pipe, and mapped bent-pipe meshes. Analytic and tabulated
 vector fields use the same problem interface.
 
+Generic rectangular and layered ducts also expose their production finite-step
+fields for optimization. SOLVAX differentiates electric closure implicitly and
+checkpoints both projection iterations and the outer recurrence:
+
+```python
+import jax
+import jax.numpy as jnp
+from lmx.fringing import evolve_extruded_fields
+
+
+def fringe_response(parameters):
+    fields = evolve_extruded_fields(
+        problem,
+        forcing=parameters[0],
+        magnetic_field_scale=parameters[1],
+        steps=40,
+    )
+    return jnp.mean(fields[0] ** 2)
+
+
+value, gradient = jax.jit(jax.value_and_grad(fringe_response))(jnp.ones(2))
+```
+
 ![Three-dimensional fringing-field result](docs/_static/fringing_solver_family.webp)
 
 ## Differentiate a steady duct
@@ -107,7 +130,7 @@ value, derivative = jax.jit(jax.value_and_grad(mean_velocity))(1.0)
 
 Mesh topology, material-region layout, boundary kinds, and solver controls are
 static. Pressure forcing and magnetic-field scale are currently continuous;
-fixed-flow and 3-D derivative contracts remain gated work.
+fixed-flow steady derivatives remain gated work.
 
 ## Evolve a Q2D flow
 
@@ -160,7 +183,7 @@ value, derivative = jax.value_and_grad(response)(case.hartmann_friction)
 | Hartmann, Shercliff, and Hunt flow | `lmx.make_*_case`, `solve` | analytical profiles, conservation, power balance, mesh convergence |
 | Differentiable steady rectangular/layered ducts | `solve_fully_developed_fields` | production-field parity, forcing identity, magnetic-scale finite difference, implicit Krylov adjoint |
 | Conducting and insulating wall layers | `WallLayer`, layered mesh builders | interface-current and layer-resolution gates |
-| 3-D rectangular fringing fields | `lmx.fringing` | manufactured operators, projection, restart, Benchmark B2 |
+| 3-D rectangular/layered fringing fields | `solve_extruded_inductionless`, `evolve_extruded_fields` | production-field parity, manufactured operators, projection, finite differences, JVP/VJP, bounded reverse memory, Benchmark B2 |
 | 3-D pipe fringing fields | `lmx.fringing` | mapped operators, current closure, fixed-flow and Benchmark B1 gates |
 | Periodic Q2D flow | `Q2DProblem`, `make_q2d_case`, `solve`, `evolve_q2d` | analytical decay/gradients, energy identity, spatial refinement, bounded reverse memory, measured CPU/GPU parity |
 | FreeMHD comparison | `validation/freemhd.py`, validation scripts | pinned case contracts, native-output observers, executable Docker workflow |
