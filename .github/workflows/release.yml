@@ -64,7 +64,10 @@ jobs:
           cd /tmp
           /tmp/lmx-wheel-check/bin/lmx --help >/dev/null
           /tmp/lmx-wheel-check/bin/python - <<'PY'
-          from lmx import make_hartmann_case, solve
+          import jax
+          import jax.numpy as jnp
+
+          from lmx import make_hartmann_case, solve, solve_fully_developed_fields
           from lmx.validation import (
               load_benchmark_a_spec,
               load_benchmark_b_reference,
@@ -80,6 +83,14 @@ jobs:
           load_samper_table_i()
           solution = solve(make_hartmann_case(ha=5, ny=4, nz=4))
           assert solution.state.residual < 1e-7
+          case = make_hartmann_case(ha=5, ny=4, nz=4)
+          value, derivative = jax.jit(jax.value_and_grad(
+              lambda scale: jnp.mean(
+                  solve_fully_developed_fields(case, magnetic_field_scale=scale)[0]
+              )
+          ))(jnp.asarray(1.0))
+          assert jnp.isfinite(value)
+          assert jnp.isfinite(derivative)
           PY
       - uses: actions/upload-artifact@v7
         with:
