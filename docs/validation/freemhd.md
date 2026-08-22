@@ -17,8 +17,8 @@ The reproducible build uses
 `36f409d294ba3170d64d4073378d5ef68401072f`, FreeMHD commit
 `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5`, and OpenFOAM v2206. The weekly
 external-validation workflow rebuilds that image, checks the two source pins,
-runs the comparison, and uploads the complete evidence directory. Release
-validation calls the same workflow.
+runs the comparison, and uploads the complete evidence directory. Relevant
+3-D/validation pull requests and release validation call the same workflow.
 
 ```console
 python scripts/run_freemhd_parity_suite.py \

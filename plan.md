@@ -1453,7 +1453,7 @@ surface, measurements, validation, decision, and next action.
   between the two-update harness and production-mesh acceptance. Corrected the
   FreeMHD repository link and documented the pinned installer, FreeMHD, and
   OpenFOAM inputs.
-- Added one reusable weekly/release external-validation workflow. It rebuilds
+- Added one reusable PR/weekly/release external-validation workflow. It rebuilds
   the pinned FreeMHD image, verifies both source commits, runs the independently
   observed B2 Docker comparison, uploads its full evidence tree, and checks all
   external documentation links. Release wheel smoke uses the common API and
