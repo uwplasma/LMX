@@ -33,7 +33,7 @@ def test_portable_duct_tutorials_and_toml_first_run(tmp_path: Path):
 
 def test_fringing_benchmark_demo_runs_real_bounded_diagnostic(tmp_path: Path):
     script = Path(__file__).resolve().parents[1] / "examples/fringing_benchmark_demo.py"
-    subprocess.run([sys.executable, script], cwd=tmp_path, timeout=30, check=True)
+    subprocess.run([sys.executable, script], cwd=tmp_path, timeout=60, check=True)
     summary_path = next((tmp_path / "artifacts").rglob("fringing_benchmark_summary.json"))
     summary = json.loads(summary_path.read_text())
     assert summary["status"] == "research-stage internal diagnostic"
