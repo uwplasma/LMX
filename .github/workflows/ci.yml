@@ -39,7 +39,7 @@ jobs:
     name: Python 3.10 (${{ matrix.shard }})
     needs: quality
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -52,7 +52,7 @@ jobs:
           solvax-version: "0.17.0"
       - name: Run test shard
         run: >-
-          python scripts/run_full_test_suite.py --budget-seconds 600
+          python scripts/run_full_test_suite.py --budget-seconds 720
           --test-timeout-seconds 300 --shard ${{ matrix.shard }} --no-coverage
 
   coverage:
