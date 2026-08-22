@@ -1846,6 +1846,18 @@ surface, measurements, validation, decision, and next action.
   architecture/import audit pass at 16 modules, 15,356 package lines, and 27
   root exports. Office GPU derivative/scaling measurements remain queued
   because both devices are fully occupied by unrelated jobs.
-- Next action: verify the LMX wheel against public SOLVAX 0.16.0, commit and
-  push the immutable Q2D-adjoint candidate, repeat the pinned B2 Docker gate,
-  and merge PR #2 only after every hosted check is green.
+- Built the 147,168-byte, 30-member LMX 1.2.0 wheel with an explicit
+  `solvax>=0.16,<1` requirement. Twine passes, and a fresh non-editable install
+  from public dependencies completes the CLI, a compiled Q2D
+  value-and-gradient, and a converged Hartmann smoke with SOLVAX 0.16.0.
+- Committed the immutable source candidate as `6225e3c` and repeated the pinned
+  two-rank B2 Docker comparison with FreeMHD `14b54a3` and image
+  `sha256:44e9c9c1cc9d69aa4e50ca773aef7971010905a529462273bf913e6bc5b2c238`.
+  Execution, artifact identity, matched contract, independent observation, and
+  comparison gates pass with no failed checks; pressure Linf is 0.0109172453
+  and RMS is 0.0045179771. The harness remains non-accepting only because its
+  two-update candidate role cannot establish production-mesh B2 acceptance.
+  Evidence is under
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-q2d-adjoint-6225e3c/b2`.
+- Next action: push the evidenced candidate, require every hosted PR gate, and
+  merge PR #2 only when the latest source-bearing checks are green.
