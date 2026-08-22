@@ -131,7 +131,7 @@ It is algebraically and JVP exact, but at `7 x 9 x 16` and `11 x 17 x 32` it is
 27--29% slower cold and 38--39% slower warm. Device peak falls by at most 1.2%
 while host peak rises about 4%, so it is rejected before a production B1 run.
 
-LMX requires released `solvax>=0.13,<1`. SOLVAX owns PCG/GMRES, sparse-direct
+LMX requires released `solvax>=0.14,<1`. SOLVAX owns PCG/GMRES, sparse-direct
 solves, fixed-point acceleration, line/additive preconditioners, block Thomas,
 and tridiagonal algebra; LMX supplies MHD coefficient actions, gauges,
 physical residual normalization, and acceptance gates.

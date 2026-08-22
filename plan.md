@@ -118,7 +118,7 @@ algorithms and algebraic diagnostics. This table is the Phase 1 deletion map.
 | SciPy `spsolve` calls in rectangular and pipe 3-D Poisson paths | SOLVAX | replace now | released `solvax.splu_solve`; preserve assembled matrices and 3-D/FreeMHD gates |
 | `solve_five_point_solvax_pcg_state` | SOLVAX algorithm, LMX residual contract | **deleted** | `solvax.pcg_linear_solve` is composed inside one measured JIT boundary with the MHD coefficient action and physical max-norm certification |
 | `solve_poisson_cg_state` | SOLVAX algorithm, LMX gauge/scaling | merge into MHD solve | direct `pcg_linear_solve`; retain only anchor projection, volume scaling, and physical residual in LMX |
-| `solve_poisson_jacobi_state` and 3-D Jacobi loops | SOLVAX | upstream or replace | one generic fixed/stationary-iteration primitive with explicit stopping diagnostics; keep only stencil mapping and gauge in LMX |
+| `solve_poisson_jacobi_state` and 3-D Jacobi loops | SOLVAX | **replaced** | released `solvax.fixed_point_iteration` owns relaxation, stopping, and iteration state; LMX retains stencil maps, gauges, and physical residuals |
 | five-point/Poisson coefficient application | LMX | keep and merge into operators | it is the action of LMX-assembled boundary-aware coefficients, not a general solver |
 | five-point/Poisson physical residual norms | LMX | keep and merge into validation/solve | acceptance normalization is part of the MHD convergence contract |
 | 2-D line, additive, and deflated preconditioner builders | shared boundary | reduce to composition | LMX forms coefficient lines/coarse restriction; SOLVAX supplies tridiagonal solves, additive composition, and deflation |
@@ -660,10 +660,10 @@ change, a numerical algorithm change, and a history rewrite in one commit.
   runner termination; the exact bounded-shard replacement and combined-coverage
   gate are pending. Branch protection still requires a plan that supports it
   for this private repo.
-- [ ] Record clean-clone, tracked-tree, wheel, module/file/line, import,
-  runtime, memory, and test baselines using reproducible commands. Clone,
-  tree, distribution, import, and test baselines are recorded; the canonical
-  runtime/memory matrix remains.
+- [x] Record clean-clone, tracked-tree, wheel, module/file/line, import,
+  runtime, memory, and test baselines using reproducible commands. The full
+  canonical runtime/memory matrix is stored outside the checkout with its
+  environment, commit, repetition policy, stopping state, and physical gates.
 - [x] Create a capability matrix for 2-D, 3-D fringing, straight pipe, Q2D,
   Dean/bent-pipe, obstacle, blanket, and WHAM lanes; record owner, equations,
   call sites, tests, evidence, cost, and intended user workflow.
@@ -1046,6 +1046,42 @@ surface, measurements, validation, decision, and next action.
   test now accepts that documented backend error alongside the older runtime
   error classes. The targeted local test passes and the corrected matrix is
   pending on commit `8cfe56c`.
-- Next action: review/release the SOLVAX stationary primitive before replacing
-  LMX's remaining Jacobi loops; independently complete the Shercliff, Hunt,
-  fixed-flow, reduced 3-D, straight-pipe, and gradient performance baselines.
+- Next action: release the SOLVAX stationary primitive before replacing LMX's
+  remaining Jacobi loops; independently complete the canonical performance
+  matrix.
+
+### 2026-08-21 — canonical baselines and fixed-point handoff
+
+- Completed the canonical CPU performance matrix at commit `c41bdd5` with five
+  warm repeats and fresh-process RSS measurements. The external record is
+  `/Users/rogeriojorge/local/tests/lmx-audit/phase0-baselines/lmx-canonical-matrix-20260821.json`.
+  It covers Hartmann `Ha=20`, Shercliff and Hunt `Ha=5/20/100`, fixed flow,
+  reduced rectangular and pipe 3-D cases, and a retained Hartmann gradient.
+  Every declared converged case converged; the deliberately bounded pipe case
+  reported `step_limit` while satisfying its numerical conservation checks.
+- Merged SOLVAX PR #78 with the generic JAX-native
+  `fixed_point_iteration`, user guide, API reference, decision table, examples,
+  and focused tests. Its minimum/current/AD Linux and current macOS matrices,
+  lint, types, docs, distribution build, benchmark verification, and
+  reproduction smoke passed with 98.16% coverage.
+- Merged SOLVAX release PR #79, tagged `v0.14.0`, and verified the trusted PyPI
+  publication by downloading the released 139 KiB wheel. LMX now requires
+  `solvax>=0.14,<1`, and the compatibility workflow pins the published 0.14.0
+  floor.
+- Replaced the local two-dimensional Jacobi loop and all three rectangular,
+  variable-coefficient, and cylindrical 3-D Jacobi loop/state implementations
+  with `solvax.fixed_point_iteration`. LMX retains only its boundary-aware
+  stencil maps, gauges, physical residuals, and fail-closed result validation.
+  The tranche removes 29 net source/test lines and avoids an unnecessary first
+  sweep when the initial state already satisfies the physical tolerance.
+- On a deterministic `20^3`, 50-sweep CPU case, the replacement matches the
+  prior field and residual to roundoff and reduces the seven-repeat warm median
+  from 99.3 ms to 67.3 ms, a 32% improvement. Focused solver tests and the full
+  230-test physics shard pass on both JAX 0.6.2 and JAX 0.10.2 using the
+  released SOLVAX wheel.
+- The released-wheel five-shard gate ran all 827 collected tests: 822 passed,
+  the same 5 optional external-data tests skipped, and combined line/branch
+  coverage is 95.25%. Provenance, architecture, Sphinx warnings-as-errors,
+  wheel/sdist build, and Twine checks pass; the wheel is 284 KiB.
+- Next action: run the pinned B2 Docker smoke from the committed tranche, then
+  continue the Phase 1 wrapper/structured-algebra audit.

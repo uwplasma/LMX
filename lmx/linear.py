@@ -6,6 +6,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
+from solvax import fixed_point_iteration as _solvax_fixed_point_iteration
 from solvax import pcg_linear_solve as _solvax_pcg_linear_solve
 
 
@@ -100,8 +101,6 @@ def solve_poisson_jacobi_state(
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     phi0 = jnp.zeros_like(rhs)
 
-    omega = jnp.asarray(relaxation, dtype=rhs.dtype)
-
     def jacobi_update(phi: jnp.ndarray) -> jnp.ndarray:
         west_phi = jnp.pad(phi[:-1, :], ((1, 0), (0, 0)))
         east_phi = jnp.pad(phi[1:, :], ((0, 1), (0, 0)))
@@ -114,39 +113,25 @@ def solve_poisson_jacobi_state(
             + south * south_phi
             + north * north_phi
         ) / diagonal
-        blended = (1.0 - omega) * phi + omega * updated
-        blended = blended.at[anchor].set(0.0)
-        return blended
+        return updated.at[anchor].set(0.0)
 
     def residual_norm(phi: jnp.ndarray) -> jnp.ndarray:
         return poisson_residual_norm(
             diagonal, west, east, south, north, rhs, phi, anchor
         )
 
-    if tolerance is None or tolerance <= 0.0:
-        phi = jax.lax.fori_loop(0, iterations, lambda i, p: jacobi_update(p), phi0)
-        residual = residual_norm(phi)
-        return phi, residual, jnp.asarray(iterations, dtype=jnp.int32)
-
-    tolerance_value = jnp.asarray(tolerance, dtype=rhs.dtype)
-
-    def cond_fun(state):
-        count, _, residual = state
-        return jnp.logical_and(count < iterations, residual > tolerance_value)
-
-    def body_fun(state):
-        count, phi, _ = state
-        updated = jacobi_update(phi)
-        residual = residual_norm(updated)
-        return count + 1, updated, residual
-
-    init_state = (
-        jnp.asarray(0, dtype=jnp.int32),
+    fixed_steps = tolerance is None or tolerance <= 0.0
+    solution = _solvax_fixed_point_iteration(
+        jacobi_update,
         phi0,
-        jnp.asarray(jnp.inf, dtype=rhs.dtype),
+        residual_norm=residual_norm,
+        relaxation=relaxation,
+        rtol=0.0,
+        atol=0.0 if fixed_steps else tolerance,
+        max_steps=iterations,
+        fixed_steps=fixed_steps,
     )
-    iteration_count, phi, residual = jax.lax.while_loop(cond_fun, body_fun, init_state)
-    return phi, residual, iteration_count
+    return solution.x, solution.residual_norm, solution.iterations
 
 
 @partial(

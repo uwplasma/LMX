@@ -23,6 +23,7 @@ from solvax import (
     anderson_weights,
     block_thomas_factor,
     block_thomas_solve,
+    fixed_point_iteration,
     gmres,
     linear_solve,
     pcg_linear_solve,
@@ -339,7 +340,8 @@ def _laplacian_3d(
     dy_values = jnp.asarray(dy)
     dz_values = jnp.asarray(dz)
     y_term = (
-        (y_south - 2.0 * field + y_north) / max(float(dy_values) ** 2, 1.0e-12)
+        (y_south - 2.0 * field + y_north)
+        / jnp.maximum(dy_values**2, 1.0e-12)
         if dy_values.ndim == 0
         else _nonuniform_axis_laplacian(
             field,
@@ -349,7 +351,8 @@ def _laplacian_3d(
         )
     )
     z_term = (
-        (z_bottom - 2.0 * field + z_top) / max(float(dz_values) ** 2, 1.0e-12)
+        (z_bottom - 2.0 * field + z_top)
+        / jnp.maximum(dz_values**2, 1.0e-12)
         if dz_values.ndim == 0
         else _nonuniform_axis_laplacian(
             field,
@@ -562,6 +565,24 @@ def _gauge_invariant_scalar_update(
     return jnp.max(jnp.abs(delta)) / max(scale, 1.0e-20)
 
 
+def _jacobi_fixed_point(
+    update: Callable[[jnp.ndarray], jnp.ndarray],
+    field: jnp.ndarray,
+    residual_norm: Callable[[jnp.ndarray], jnp.ndarray],
+    *,
+    iterations: int,
+    tolerance: float,
+    stage: str,
+) -> tuple[jnp.ndarray, float, int, float]:
+    initial_residual = float(residual_norm(field))
+    solution = fixed_point_iteration(
+        update, field, residual_norm=residual_norm, rtol=0.0,
+        atol=tolerance, max_steps=iterations,
+    )
+    require_finite(stage, potential=solution.x, residual=solution.residual_norm)
+    return solution.x, float(solution.residual_norm), int(solution.iterations), initial_residual
+
+
 def _poisson_jacobi_3d(
     rhs: jnp.ndarray,
     *,
@@ -588,8 +609,24 @@ def _poisson_jacobi_3d(
         + 2.0 / max(dz**2, 1.0e-12)
     )
     field = jnp.zeros_like(rhs_compatible)
-    initial_residual = float(
-        jnp.max(
+
+    def update(field):
+        x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
+            field,
+            mode_x="neumann",
+            mode_y="neumann",
+            mode_z="neumann",
+        )
+        updated = (
+            (x_west + x_east) / max(dx**2, 1.0e-12)
+            + (y_south + y_north) / max(dy**2, 1.0e-12)
+            + (z_bottom + z_top) / max(dz**2, 1.0e-12)
+            - rhs_compatible
+        ) / diagonal
+        return updated - jnp.mean(updated)
+
+    def residual_norm(field):
+        return jnp.max(
             jnp.abs(
                 _laplacian_3d(
                     field,
@@ -603,44 +640,11 @@ def _poisson_jacobi_3d(
                 - rhs_compatible
             )
         )
+
+    return _jacobi_fixed_point(
+        update, field, residual_norm, iterations=iterations, tolerance=tolerance,
+        stage="3-D Poisson iteration",
     )
-    residual = initial_residual
-    iteration_count = 0
-    for iteration in range(iterations):
-        x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
-            field,
-            mode_x="neumann",
-            mode_y="neumann",
-            mode_z="neumann",
-        )
-        updated = (
-            (x_west + x_east) / max(dx**2, 1.0e-12)
-            + (y_south + y_north) / max(dy**2, 1.0e-12)
-            + (z_bottom + z_top) / max(dz**2, 1.0e-12)
-            - rhs_compatible
-        ) / diagonal
-        field = updated - jnp.mean(updated)
-        require_finite("3-D Poisson iteration", potential=field)
-        residual = float(
-            jnp.max(
-                jnp.abs(
-                    _laplacian_3d(
-                        field,
-                        dx=dx,
-                        dy=dy,
-                        dz=dz,
-                        mode_x="neumann",
-                        mode_y="neumann",
-                        mode_z="neumann",
-                    )
-                    - rhs_compatible
-                )
-            )
-        )
-        iteration_count = iteration + 1
-        if residual <= tolerance:
-            break
-    return field, residual, iteration_count, initial_residual
 
 
 def _variable_coefficient_poisson_jacobi_3d(
@@ -673,18 +677,7 @@ def _variable_coefficient_poisson_jacobi_3d(
         field = jnp.asarray(initial_field, dtype=rhs_compatible.dtype)
         require_finite("3-D Poisson initial state", potential=field)
         field = field - jnp.sum(field * volume_weights) / jnp.sum(volume_weights)
-    initial_residual = float(
-        jnp.max(
-            jnp.abs(
-                _variable_coefficient_residual_3d(
-                    field, rhs_compatible, conductivity, dx=dx, dy=dy, dz=dz
-                )
-            )
-        )
-    )
-    residual = initial_residual
-    iteration_count = 0
-    for iteration in range(iterations):
+    def update(field):
         x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
             field,
             mode_x="neumann",
@@ -700,26 +693,26 @@ def _variable_coefficient_poisson_jacobi_3d(
             + coef_z_b * z_bottom
             + coef_z_t * z_top
         ) / diagonal
-        field = updated - jnp.sum(updated * volume_weights) / jnp.sum(volume_weights)
-        require_finite("3-D variable Poisson iteration", potential=field)
-        residual = float(
-            jnp.max(
-                jnp.abs(
-                    _variable_coefficient_residual_3d(
-                        field,
-                        rhs_compatible,
-                        conductivity,
-                        dx=dx,
-                        dy=dy,
-                        dz=dz,
-                    )
+        return updated - jnp.sum(updated * volume_weights) / jnp.sum(volume_weights)
+
+    def residual_norm(field):
+        return jnp.max(
+            jnp.abs(
+                _variable_coefficient_residual_3d(
+                    field,
+                    rhs_compatible,
+                    conductivity,
+                    dx=dx,
+                    dy=dy,
+                    dz=dz,
                 )
             )
         )
-        iteration_count = iteration + 1
-        if residual <= tolerance:
-            break
-    return field, residual, iteration_count, initial_residual
+
+    return _jacobi_fixed_point(
+        update, field, residual_norm, iterations=iterations, tolerance=tolerance,
+        stage="3-D variable Poisson iteration",
+    )
 
 
 def _variable_coefficient_residual_3d(
@@ -2424,7 +2417,7 @@ def _pipe_gradient_3d(
         safe_r = jnp.broadcast_to(jnp.asarray(r, dtype=field.dtype), field.shape)
     else:
         widths = None
-        safe_r = jnp.maximum(r, 0.5 * float(dr_values))
+        safe_r = jnp.maximum(r, 0.5 * dr_values)
     x_west = jnp.concatenate([field[:1], field[:-1]], axis=0)
     x_east = jnp.concatenate([field[1:], field[-1:]], axis=0)
     r_inner = jnp.concatenate([field[:, :1, :], field[:, :-1, :]], axis=1)
@@ -2462,7 +2455,7 @@ def _pipe_laplacian_3d(
         safe_r = jnp.broadcast_to(r_centers[None, :, None], field.shape)
     else:
         widths = None
-        safe_r = jnp.maximum(r, 0.5 * float(dr_values))
+        safe_r = jnp.maximum(r, 0.5 * dr_values)
     x_west = jnp.concatenate([field[:1], field[:-1]], axis=0)
     x_east = jnp.concatenate([field[1:], field[-1:]], axis=0)
     r_inner = jnp.concatenate([field[:, :1, :], field[:, :-1, :]], axis=1)
@@ -2472,12 +2465,11 @@ def _pipe_laplacian_3d(
     r_outer = jnp.concatenate([field[:, 1:, :], outer_ghost], axis=1)
     theta_prev, theta_next = _pipe_theta_neighbors(field)
     dxx = (x_west - 2.0 * field + x_east) / max(dx**2, 1.0e-12)
-    drr = (r_inner - 2.0 * field + r_outer) / max(
-        float(dr_values) ** 2 if widths is None else 1.0, 1.0e-12
+    radial_step = dr_values if widths is None else jnp.asarray(1.0)
+    drr = (r_inner - 2.0 * field + r_outer) / jnp.maximum(
+        radial_step**2, 1.0e-12
     )
-    d_dr = (r_outer - r_inner) / max(
-        2.0 * float(dr_values) if widths is None else 1.0, 1.0e-12
-    )
+    d_dr = (r_outer - r_inner) / jnp.maximum(2.0 * radial_step, 1.0e-12)
     dtheta2 = (theta_prev - 2.0 * field + theta_next) / jnp.maximum(
         (safe_r**2) * dtheta**2, 1.0e-12
     )
@@ -2487,7 +2479,7 @@ def _pipe_laplacian_3d(
             dxx[:, 0, :]
             + 2.0
             * (field[:, 1, :] - field[:, 0, :])
-            / max(float(dr_values) ** 2, 1.0e-12)
+            / jnp.maximum(dr_values**2, 1.0e-12)
         )
     radial_flux = jnp.zeros(
         (field.shape[0], field.shape[1] + 1, field.shape[2]), dtype=field.dtype
@@ -3897,25 +3889,14 @@ def _pipe_poisson_jacobi_3d(
     rhs_compatible = rhs - jnp.sum(rhs * weights) / jnp.sum(weights)
     safe_r = jnp.maximum(r, 0.5 * dr)
     field = jnp.zeros_like(rhs_compatible)
-    initial_residual = float(
-        jnp.max(
-            jnp.abs(
-                _pipe_laplacian_3d(
-                    field, dx=dx, dr=dr, dtheta=dtheta, r=r, outer_dirichlet=False
-                )
-                - rhs_compatible
-            )
-        )
-    )
-    residual = initial_residual
-    iteration_count = 0
     diagonal = (
         2.0 / max(dx**2, 1.0e-12)
         + 2.0 / max(dr**2, 1.0e-12)
         + 2.0 / jnp.maximum((safe_r**2) * dtheta**2, 1.0e-12)
     )
     diagonal = jnp.maximum(diagonal, 1.0e-12)
-    for iteration in range(iterations):
+
+    def update(field):
         x_west = jnp.concatenate([field[:1], field[:-1]], axis=0)
         x_east = jnp.concatenate([field[1:], field[-1:]], axis=0)
         r_inner = jnp.concatenate([field[:, :1, :], field[:, :-1, :]], axis=1)
@@ -3929,22 +3910,27 @@ def _pipe_poisson_jacobi_3d(
         )
         updated = (cross - rhs_compatible) / diagonal
         updated = updated.at[:, 0, :].set(updated[:, 1, :])
-        field = updated - jnp.sum(updated * weights) / jnp.sum(weights)
-        require_finite("3-D pipe Poisson iteration", potential=field)
-        residual = float(
-            jnp.max(
-                jnp.abs(
-                    _pipe_laplacian_3d(
-                        field, dx=dx, dr=dr, dtheta=dtheta, r=r, outer_dirichlet=False
-                    )
-                    - rhs_compatible
+        return updated - jnp.sum(updated * weights) / jnp.sum(weights)
+
+    def residual_norm(field):
+        return jnp.max(
+            jnp.abs(
+                _pipe_laplacian_3d(
+                    field,
+                    dx=dx,
+                    dr=dr,
+                    dtheta=dtheta,
+                    r=r,
+                    outer_dirichlet=False,
                 )
+                - rhs_compatible
             )
         )
-        iteration_count = iteration + 1
-        if residual <= tolerance:
-            break
-    return field, residual, iteration_count, initial_residual
+
+    return _jacobi_fixed_point(
+        update, field, residual_norm, iterations=iterations, tolerance=tolerance,
+        stage="3-D pipe Poisson iteration",
+    )
 
 
 def _pipe_conservative_current_fluxes_3d(

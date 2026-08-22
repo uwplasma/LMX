@@ -97,7 +97,7 @@ def test_extruded_solution_reports_terminal_state():
 
 
 def test_poisson_iteration_rejects_nonfinite_state():
-    with pytest.raises(NumericalFailure, match="3-D Poisson iteration.*potential"):
+    with pytest.raises(NumericalFailure, match="3-D Poisson iteration.*residual"):
         _poisson_jacobi_3d(
             jnp.full((2, 2, 2), jnp.nan),
             dx=1.0,
@@ -519,7 +519,7 @@ def test_nonuniform_variable_poisson_reconstructs_discrete_manufactured_field():
     warm, warm_residual, warm_iterations, warm_initial = _variable_coefficient_poisson_jacobi_3d(
         rhs, conductivity, dx=0.4, dy=jnp.diff(y_faces), dz=jnp.diff(z_faces),
         iterations=2, tolerance=1.0e-8, initial_field=manufactured + 7.0)
-    assert warm_iterations == 1
+    assert warm_iterations == 0
     assert warm_initial < 1.0e-8
     assert warm_residual < 1.0e-8
     volume_weights = jnp.broadcast_to(jnp.diff(y_faces)[None, :, None]
@@ -532,7 +532,7 @@ def test_nonuniform_variable_poisson_reconstructs_discrete_manufactured_field():
         dz=jnp.asarray([0.25, 0.35, 0.4]), iterations=4, tolerance=1.0e-12
     )
     assert jnp.allclose(zero_result[0], 0.0)
-    assert zero_result[1:] == pytest.approx((0.0, 1, 0.0))
+    assert zero_result[1:] == pytest.approx((0.0, 0, 0.0))
 
 
 def test_solvax_metric_pressure_poisson_is_jitted_and_differentiable():
@@ -1680,7 +1680,7 @@ def test_pipe_pressure_fallback_and_gauge_invariant_update():
     assert jnp.allclose(field, 0.0)
     assert residual == pytest.approx(0.0)
     assert initial == pytest.approx(0.0)
-    assert iterations == 1
+    assert iterations == 0
 
     previous = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
     physical_update = jnp.asarray([[0.0, 0.2], [-0.1, 0.1]])
@@ -2442,7 +2442,7 @@ def test_poisson_helpers_can_stop_early():
     field, residual, iterations, initial = _poisson_jacobi_3d(
         rhs, dx=1.0, dy=1.0, dz=1.0, iterations=4, tolerance=1.0
     )
-    assert iterations == 1
+    assert iterations == 0
     assert residual <= initial
     conductivity = jnp.ones((2, 2, 2))
     field_var, residual_var, iterations_var, initial_var = (
@@ -2456,7 +2456,7 @@ def test_poisson_helpers_can_stop_early():
             tolerance=1.0,
         )
     )
-    assert iterations_var == 1
+    assert iterations_var == 0
     assert residual_var <= initial_var
     field_sparse, residual_sparse, iterations_sparse, initial_sparse = (
         _variable_coefficient_poisson_sparse_3d(
