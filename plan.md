@@ -1177,5 +1177,10 @@ surface, measurements, validation, decision, and next action.
 - Added Ruff to the declared development extra after the first hosted quality
   job correctly reported that the executable was absent; local lint, format,
   architecture, and test gates pass with the declared configuration.
+- Repeated the pinned B2 Docker smoke on committed source `9ce2069` after the
+  solver-control collapse. Execution, artifacts, contract, observation, and
+  comparison passed with no failed checks and unchanged pressure errors. The
+  external record is
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-solver-api-9ce2069/b2`.
 - Next action: decompose and consolidate the retained 3-D and FreeMHD paths
   toward the final source/module ceilings.
