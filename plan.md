@@ -1893,9 +1893,9 @@ surface, measurements, validation, decision, and next action.
   376,984 temporary bytes, a 2.15x marginal runtime and only 9.76% more
   compiler-reported temporary storage. Compile times are 2.56 and 2.42 seconds.
 - Upgraded the flexible volume-potential FGMRES path to
-  `solvax.linear_solve`, including a deliberately transposed preconditioner,
-  so its iterations are not taped. The focused conducting-rectangle solve and
-  analytical RHS-scale gradient gate pass.
+  `solvax.linear_solve` with the same established right preconditioner applied
+  to the transposed operator, so its iterations are not taped. The focused
+  conducting-rectangle solve and analytical RHS-scale gradient gate pass.
 - Rejected the first layered Hunt end-to-end adjoint after the transpose
   coupled solve diverged despite a converged primal. The centered field-scale
   derivative is `-9.973377e-3`; the failed adjoint returned values between

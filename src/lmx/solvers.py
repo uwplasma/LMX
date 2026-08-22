@@ -328,11 +328,6 @@ def _solve_potential_fgmres_state(
     def precondition_flat(vector: jnp.ndarray) -> jnp.ndarray:
         return preconditioner(vector.reshape(shape)).reshape(-1)
 
-    zero = jnp.zeros(rhs.size, dtype=rhs.dtype)
-
-    def transpose_precondition_flat(vector: jnp.ndarray) -> jnp.ndarray:
-        return jax.linear_transpose(precondition_flat, zero)(vector)[0]
-
     def solve_with(precondition):
         def solve(operator, source):
             solution = _solvax_gmres(
@@ -348,14 +343,12 @@ def _solve_potential_fgmres_state(
         return solve
 
     solve = solve_with(precondition_flat)
-    transpose_solve = solve_with(transpose_precondition_flat)
     source = rhs.at[anchor].set(0.0).reshape(-1)
     start = initial.at[anchor].set(0.0).reshape(-1)
     correction, iterations = _solvax_linear_solve(
         matvec_flat,
         source - matvec_flat(start),
         solve,
-        transpose_solver=transpose_solve,
         has_aux=True,
     )
     phi = (start + correction).reshape(shape).at[anchor].set(0.0)
