@@ -1426,5 +1426,12 @@ surface, measurements, validation, decision, and next action.
   A clean environment installed released SOLVAX 0.14.0 and the LMX wheel,
   then passed the CLI, a converged 2-D common-API solve, a real 3-D common-API
   solve, and terminal-history checks from `/tmp`.
-- Next action: repeat pinned B2 Docker parity from this committed state, then
-  push the common-API and bounded-history commits with their evidence.
+- Committed the bounded-history checkpoint as `64d0292` and repeated the
+  pinned B2 Docker workflow with FreeMHD `14b54a3`. Execution, artifacts,
+  contract, native-output observation, and comparison pass with no failed
+  checks; pressure Linf is `0.0109172453` and RMS is `0.0045179771`. The
+  record is non-accepting only because the harness declares its candidate
+  role. Its untracked evidence is
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-history-64d0292/b2`.
+- Next action: push the common-API and bounded-history commits with this
+  evidence, then finish tutorial and scheduled/release validation work.
