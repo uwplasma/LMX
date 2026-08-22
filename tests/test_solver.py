@@ -1936,6 +1936,20 @@ def test_conducting_rectangle_preconditioner_crops_exact_insulators() -> None:
     assert float(residual) <= 1.0e-12
     assert jnp.linalg.norm(solved - known) / jnp.linalg.norm(known) <= 1.0e-10
 
+    def response(scale):
+        field, _, _ = solvers._solve_potential_fgmres_state(
+            *scaled[:5],
+            scale * physical_rhs,
+            anchor,
+            initial=jnp.zeros_like(rhs),
+            residual_scale=jnp.ones_like(rhs),
+            preconditioner=selected,
+        )
+        return jnp.vdot(field, known)
+
+    value, gradient = jax.value_and_grad(response)(jnp.asarray(1.0))
+    assert gradient == pytest.approx(value, rel=1.0e-9, abs=1.0e-11)
+
     nonrectangular = sigma.at[4, 4].set(0.0)
     assert (
         solvers._potential_conducting_rectangle_preconditioner(
