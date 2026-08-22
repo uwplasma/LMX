@@ -2041,7 +2041,7 @@ def test_extruded_fields_match_production_and_bound_reverse_memory():
         problem,
         case=replace(
             problem.case,
-            time_stepper=replace(problem.case.time_stepper, max_steps=8, potential_iterations=20),
+            time_stepper=replace(problem.case.time_stepper, max_steps=8, potential_iterations=10),
             solver=replace(problem.case.solver, coupling_iterations=1, coupling_tolerance=1.0e-8),
         ),
     )
@@ -2112,7 +2112,7 @@ def test_layered_extruded_fields_share_the_production_update():
         problem,
         case=replace(
             problem.case,
-            time_stepper=replace(problem.case.time_stepper, max_steps=2, potential_iterations=20),
+            time_stepper=replace(problem.case.time_stepper, max_steps=2, potential_iterations=10),
             solver=replace(problem.case.solver, coupling_iterations=1, coupling_tolerance=1.0e-8),
         ),
     )
