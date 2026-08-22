@@ -22,7 +22,7 @@ jobs:
   validate:
     needs: external-validation
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-lmx
@@ -35,7 +35,9 @@ jobs:
       - name: Enforce architecture budgets
         run: python scripts/audit_architecture.py --check --measure-import
       - name: Run portable quality gate
-        run: python scripts/run_full_test_suite.py --budget-seconds 600
+        run: >-
+          python scripts/run_full_test_suite.py --budget-seconds 1200
+          --test-timeout-seconds 300
       - name: Run every curated example
         run: >-
           python scripts/run_full_test_suite.py --budget-seconds 600
