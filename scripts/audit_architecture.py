@@ -45,7 +45,6 @@ COMPATIBILITY: set[str] = set()
 VISUALIZATION = {"io.py"}
 VALIDATION = {
     "validation.py",
-    "freemhd.py",
 }
 
 
@@ -112,6 +111,7 @@ def _current_state_violations(root: Path) -> list[str]:
     paths = [root / name for name in ("README.md", "CONTRIBUTING.md", "CITATION.cff")]
     for directory, patterns in (
         ("lmx", ("*.py",)),
+        ("validation", ("*.py",)),
         ("docs", ("*.md", "*.py")),
         ("examples", ("*.py", "*.toml")),
         ("scripts", ("*.py",)),
@@ -162,6 +162,7 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
             }
         )
     test_files = sorted((root / "tests").glob("test_*.py"))
+    external_validation = sorted((root / "validation").glob("*.py"))
     maintenance_scripts = sorted((root / "scripts").glob("*.py"))
     examples = sorted(
         path.relative_to(root).as_posix()
@@ -206,6 +207,7 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
         "inventory": {
             "package_module_count": len(modules),
             "total_package_lines": sum(module["lines"] for module in modules),
+            "largest_package_module_lines": max(module["lines"] for module in modules),
             "maintained_core_lines": sum(
                 module["lines"]
                 for module in modules
@@ -213,6 +215,11 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
             ),
             "test_file_count": len(test_files),
             "test_lines": sum(len(path.read_text(encoding="utf-8").splitlines()) for path in test_files),
+            "external_validation_file_count": len(external_validation),
+            "largest_external_validation_lines": max(
+                (len(path.read_text(encoding="utf-8").splitlines()) for path in external_validation),
+                default=0,
+            ),
             "maintenance_script_count": len(maintenance_scripts),
             "package_modules": modules,
             "root_export_count": len(exports),
@@ -237,11 +244,14 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
             },
         },
         "targets": {
-            "package_module_count_max": 16,
-            "total_package_lines_max": 18300,
+            "package_module_count_max": 15,
+            "total_package_lines_max": 16700,
+            "largest_package_module_lines_max": 1800,
             "maintained_core_lines_max": 10000,
             "test_file_count_max": 14,
             "test_lines_max": 12600,
+            "external_validation_file_count_max": 1,
+            "largest_external_validation_lines_max": 1800,
             "maintenance_script_count_max": 4,
             "stable_root_exports_max": 30,
             "curated_examples_max": 8,
@@ -334,9 +344,12 @@ def architecture_budget_errors(
     checks = {
         "package_module_count": "package_module_count_max",
         "total_package_lines": "total_package_lines_max",
+        "largest_package_module_lines": "largest_package_module_lines_max",
         "maintained_core_lines": "maintained_core_lines_max",
         "test_file_count": "test_file_count_max",
         "test_lines": "test_lines_max",
+        "external_validation_file_count": "external_validation_file_count_max",
+        "largest_external_validation_lines": "largest_external_validation_lines_max",
         "maintenance_script_count": "maintenance_script_count_max",
         "root_export_count": "stable_root_exports_max",
         "curated_example_count": "curated_examples_max",

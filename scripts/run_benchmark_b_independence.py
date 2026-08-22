@@ -27,7 +27,6 @@ import numpy as np
 
 import lmx
 from lmx._fringing_duct import _cross_section_mesh
-from lmx.freemhd import validate_matched_b_record
 from lmx.fringing import solve_extruded_inductionless
 from lmx.io import (
     load_extruded_restart_bundle,
@@ -40,6 +39,7 @@ from lmx.validation import (
     load_benchmark_b_reference,
     load_benchmark_b_spec,
 )
+from validation.freemhd import validate_matched_b_record
 
 if ROOT not in Path(lmx.__file__).resolve().parents:
     raise RuntimeError(f"Benchmark B runner imported LMX outside its source tree: {lmx.__file__}")

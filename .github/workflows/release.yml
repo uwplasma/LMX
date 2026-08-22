@@ -26,8 +26,8 @@ jobs:
           extras: dev,docs
       - name: Check Python quality
         run: |
-          python -m ruff check lmx tests examples scripts docs/conf.py
-          python -m ruff format --check lmx tests examples scripts docs/conf.py
+          python -m ruff check lmx validation tests examples scripts docs/conf.py
+          python -m ruff format --check lmx validation tests examples scripts docs/conf.py
       - name: Enforce architecture budgets
         run: python scripts/audit_architecture.py --check --measure-import
       - name: Run portable quality gate
@@ -57,8 +57,12 @@ jobs:
           /tmp/lmx-wheel-check/bin/lmx --help >/dev/null
           /tmp/lmx-wheel-check/bin/python - <<'PY'
           from lmx import make_hartmann_case, solve_steady
-          from lmx.benchmarks import load_benchmark_b_reference, load_benchmark_b_spec
-          from lmx.freemhd import load_benchmark_a_spec, load_samper_table_i
+          from lmx.validation import (
+              load_benchmark_a_spec,
+              load_benchmark_b_reference,
+              load_benchmark_b_spec,
+              load_samper_table_i,
+          )
 
           for name in ("shercliff", "hunt"):
               load_benchmark_a_spec(name)

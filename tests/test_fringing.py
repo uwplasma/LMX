@@ -8,7 +8,6 @@ import pytest
 
 import lmx._fringing_common as common_impl
 import lmx._fringing_duct as duct_impl
-import lmx._fringing_solver as solver_impl
 import lmx.fringing as fringing_impl
 from lmx._fringing_common import (
     _apply_fixed_flow_pressure_constraint,
@@ -21,6 +20,7 @@ from lmx._fringing_common import (
     _normalized_pressure_observable_update,
     _poisson_jacobi_3d,
     _rectangular_fluid_bounds,
+    _shard_extruded_fields,
     _spacing_vector,
     _thin_wall_interface_mean,
     _variable_coefficient_poisson_jacobi_3d,
@@ -55,9 +55,6 @@ from lmx._fringing_pipe import (
     _solvax_diffusion_pipe,
     _solvax_pressure_poisson_pipe,
     _steady_stokes_projection_pipe,
-)
-from lmx._fringing_solver import (
-    _shard_extruded_fields,
 )
 from lmx.fringing import (
     build_bent_pipe_extruded_problem,
@@ -263,7 +260,7 @@ def test_transverse_modal_correction_is_accurate_spd_and_accelerates_pcg():
     )
     assert float(jnp.vdot(left, correction(left))) > 0.0
 
-    mesh = solver_impl.Mesh(np.asarray(jax.devices()[:1]), ("x",))
+    mesh = common_impl.Mesh(np.asarray(jax.devices()[:1]), ("x",))
     sharding = common_impl.NamedSharding(mesh, common_impl.P("x", None, None))
     sharded_correction = common_impl._transverse_modal_correction_3d(
         volume,
@@ -1926,17 +1923,20 @@ def test_cross_duct_pressure_difference_values_and_contract():
 def test_extruded_sharding_validates_placement_and_supported_paths(
     monkeypatch: pytest.MonkeyPatch,
 ):
+    timings = []
+    measured = common_impl._synchronized_phase(lambda x: x + 1, "test", lambda *x: timings.append(x))
+    assert int(measured(jnp.array(1))) == 2 and timings[0][0] == "test"
     field = jnp.zeros((4, 2, 2))
     assert _shard_extruded_fields((field,), num_devices=None)[0] is field
 
     devices = [object(), object()]
-    monkeypatch.setattr("lmx._fringing_solver.jax.devices", lambda: devices)
+    monkeypatch.setattr("lmx._fringing_common.jax.devices", lambda: devices)
     with pytest.raises(ValueError, match="divisible"):
         _shard_extruded_fields((jnp.zeros((3, 2, 2)),), num_devices=2)
 
-    monkeypatch.setattr("lmx._fringing_solver.Mesh", lambda *args, **kwargs: "mesh")
-    monkeypatch.setattr("lmx._fringing_solver.NamedSharding", lambda *args, **kwargs: "sharding")
-    monkeypatch.setattr("lmx._fringing_solver.jax.device_put", lambda value, sharding: value + 1)
+    monkeypatch.setattr("lmx._fringing_common.Mesh", lambda *args, **kwargs: "mesh")
+    monkeypatch.setattr("lmx._fringing_common.NamedSharding", lambda *args, **kwargs: "sharding")
+    monkeypatch.setattr("lmx._fringing_common.jax.device_put", lambda value, sharding: value + 1)
     for count in (1, 2):
         placed = _shard_extruded_fields((field,), num_devices=count)
         assert jnp.all(placed[0] == 1)

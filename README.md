@@ -85,7 +85,7 @@ vector fields use the same problem interface.
 | Conducting and insulating wall layers | `WallLayer`, layered mesh builders | interface-current and layer-resolution gates |
 | 3-D rectangular fringing fields | `lmx.fringing` | manufactured operators, projection, restart, Benchmark B2 |
 | 3-D pipe fringing fields | `lmx.fringing` | mapped operators, current closure, fixed-flow and Benchmark B1 gates |
-| FreeMHD comparison | `lmx.freemhd`, validation scripts | pinned case contracts, native-output observers, executable Docker workflow |
+| FreeMHD comparison | `validation/freemhd.py`, validation scripts | pinned case contracts, native-output observers, executable Docker workflow |
 | Cases, solve workflows, and differentiable Hartmann objectives | `lmx.cases` | finite-difference, JVP, and VJP checks |
 | Meshes and analytic/tabulated fields | `lmx.mesh` | geometry, divergence, and interpolation tests |
 

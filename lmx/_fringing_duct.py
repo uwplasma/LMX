@@ -13,6 +13,7 @@ from jax.sharding import NamedSharding
 from jax.sharding import PartitionSpec as P
 from solvax import (
     additive_tridiagonal_line_preconditioner,
+    anderson_weights,
     gmres,
     linear_solve,
     pcg_linear_solve,
@@ -24,14 +25,17 @@ except Exception:  # pragma: no cover - SciPy should be present in shipped envir
     sparse = None
 from ._fringing_common import (
     _MIXED_AXIAL_PRESSURE_MODE,
+    ALEX_BALANCE_TOLERANCE,
     _axial_mean_preconditioner_3d,
     _broadcast_cross_section,
     _coerce_spacing_vector,
     _distance_weighted_harmonic_mean,
     _finalize_local_pressure_solve,
+    _gradient_3d,
     _harmonic_mean,
     _neighbor_fields,
     _rectangular_fluid_bounds,
+    _reuse_fringing_jit,
     _spacing_vector,
     _thin_wall_interface_mean,
     _transverse_modal_correction_3d,
@@ -1223,4 +1227,547 @@ def _conservative_emf_rhs_3d(
         (fx[1:] - fx[:-1]) / max(dx, 1.0e-12)
         + (fy[:, 1:, :] - fy[:, :-1, :]) / dy_widths[None, :, None]
         + (fz[:, :, 1:] - fz[:, :, :-1]) / dz_widths[None, None, :]
+    )
+
+
+def _b2_momentum_functions(
+    *,
+    case: CaseSpec,
+    shape: tuple[int, int, int],
+    fluid_bounds: tuple[int, int, int, int],
+    dt: float,
+    dx: float,
+    dy: jnp.ndarray,
+    dz: jnp.ndarray,
+    target_flow_rate: float,
+    electromagnetic_force_scale: float,
+    momentum_iterations: int,
+    momentum_tolerance: float,
+    field_sharding: NamedSharding | None,
+) -> tuple[Callable, ...]:
+    """Build the conservative B2 momentum and compact-flux operations."""
+
+    nx, ny, nz = shape
+    y0, y1, z0, z1 = fluid_bounds
+    local_dy, local_dz = dy[y0:y1], dz[z0:z1]
+    face_area = local_dy[:, None] * local_dz[None, :]
+
+    def initialize_flux(u0, v0, w0, density):
+        velocity = jnp.stack((u0[:, y0:y1, z0:z1], v0[:, y0:y1, z0:z1], w0[:, y0:y1, z0:z1]), axis=-1)
+        density = density[:, y0:y1, z0:z1]
+        inlet = (
+            velocity[0]
+            .at[..., 0]
+            .set(_flow_rate_inlet_profile(velocity[0, ..., 0], face_area, target_flow_rate))
+        )
+        return _initialize_duct_mass_flux(
+            velocity, density, inlet, dx=dx, dy=local_dy, dz=local_dz, sharding=field_sharding
+        )
+
+    def momentum_solve(velocity, force, density, viscosity, rho_phi_plus, rho_phi_inlet):
+        local_velocity, local_density, local_viscosity = (
+            field[:, y0:y1, z0:z1] for field in (velocity, density, viscosity)
+        )
+        inlet_patch = local_velocity[0].at[..., 0].set(rho_phi_inlet / (local_density[0] * face_area))
+        zero_y, zero_z = jnp.zeros_like(local_velocity[:, 0]), jnp.zeros_like(local_velocity[:, :, 0])
+        boundary_velocity = (inlet_patch, local_velocity[-1], zero_y, zero_y, zero_z, zero_z)
+        widths = (jnp.full((nx,), dx), local_dy, local_dz)
+        rho_phi = _unpack_duct_mass_flux(rho_phi_plus, rho_phi_inlet)
+        setup = _frozen_duct_momentum_setup(
+            local_velocity, local_density, local_viscosity, rho_phi, boundary_velocity, widths, dx=dx
+        )
+        local_force = force[:, y0:y1, z0:z1] + _explicit_deviatoric_stress_duct(
+            local_velocity, setup[0], boundary_velocity, widths, gradient=setup[-1]
+        )
+        return _solvax_implicit_momentum_duct(
+            local_velocity,
+            local_force,
+            local_density,
+            local_viscosity,
+            rho_phi,
+            boundary_velocity,
+            dt=dt,
+            dx=dx,
+            dy=local_dy,
+            dz=local_dz,
+            iterations=momentum_iterations,
+            tolerance=momentum_tolerance,
+            frozen_setup=setup,
+        )
+
+    def momentum_defect(velocity, force, density, viscosity, rho_phi_plus, rho_phi_inlet, pressure):
+        return _duct_momentum_defect(
+            velocity[:, y0:y1, z0:z1],
+            force[:, y0:y1, z0:z1],
+            density[:, y0:y1, z0:z1],
+            viscosity[:, y0:y1, z0:z1],
+            rho_phi_plus,
+            rho_phi_inlet,
+            pressure[:, y0:y1, z0:z1],
+            forcing=float(case.forcing),
+            force_scale=electromagnetic_force_scale,
+            dt=dt,
+            dx=dx,
+            dy=local_dy,
+            dz=local_dz,
+            field_sharding=field_sharding,
+        )
+
+    def embed_velocity(local_velocity, mask):
+        embedded = jnp.pad(local_velocity, ((0, 0), (y0, ny - y1), (z0, nz - z1), (0, 0)))
+        return tuple(jnp.where(mask, embedded[..., i], 0.0) for i in range(3))
+
+    def courant_numbers(east, north, top, inlet, density):
+        return _compact_duct_courant_numbers(
+            (east, north, top),
+            inlet,
+            density[:, y0:y1, z0:z1],
+            dt=dt,
+            dx=dx,
+            dy=local_dy,
+            dz=local_dz,
+            sharding=field_sharding,
+        )
+
+    def pack_flux(x, y, z):
+        return jnp.stack((x, y, z))
+
+    def unpack_flux(flux):
+        return tuple(flux)
+
+    def pack_vector(x, y, z):
+        return jnp.stack((x, y, z), axis=-1)
+
+    def relax_flux(
+        current_x,
+        current_y,
+        current_z,
+        current_inlet,
+        mapped_x,
+        mapped_y,
+        mapped_z,
+        mapped_inlet,
+        relaxation,
+    ):
+        components = tuple(
+            current + relaxation * (mapped - current)
+            for current, mapped in zip(
+                (current_x, current_y, current_z), (mapped_x, mapped_y, mapped_z), strict=True
+            )
+        )
+        return (*components, current_inlet + relaxation * (mapped_inlet - current_inlet))
+
+    return (
+        initialize_flux,
+        jax.named_call(momentum_solve, name="lmx.b2.momentum"),
+        jax.named_call(momentum_defect, name="lmx.b2.momentum_defect"),
+        embed_velocity,
+        courant_numbers,
+        pack_flux,
+        unpack_flux,
+        pack_vector,
+        relax_flux,
+    )
+
+
+def _jit_b2_momentum_functions(
+    functions: tuple[Callable, ...],
+    *,
+    field_sharding: NamedSharding | None,
+    replicated_sharding: NamedSharding | None,
+    flux_sharding: NamedSharding | None,
+    vector_sharding: NamedSharding | None,
+    kernel_key: tuple[object, ...],
+) -> tuple[Callable, ...]:
+    if field_sharding is None:
+        return functions
+    initialize, momentum, defect, embed, courant, pack_flux, unpack_flux, pack_vector, relax_flux = functions
+    initialize = jax.jit(
+        initialize,
+        in_shardings=(field_sharding,) * 4,
+        out_shardings=(field_sharding,) * 3 + (replicated_sharding,),
+    )
+    momentum = jax.jit(
+        momentum,
+        in_shardings=(vector_sharding,) * 2 + (field_sharding,) * 2 + (flux_sharding, replicated_sharding),
+        out_shardings=(vector_sharding, replicated_sharding, replicated_sharding),
+    )
+    defect = jax.jit(
+        defect,
+        in_shardings=(vector_sharding,) * 2
+        + (field_sharding,) * 2
+        + (flux_sharding, replicated_sharding, field_sharding),
+        out_shardings=replicated_sharding,
+    )
+    embed = jax.jit(
+        embed,
+        in_shardings=(vector_sharding, field_sharding),
+        out_shardings=(field_sharding,) * 3,
+    )
+    courant = jax.jit(
+        courant,
+        in_shardings=(field_sharding,) * 3 + (replicated_sharding, field_sharding),
+        out_shardings=(replicated_sharding, replicated_sharding),
+    )
+    pack_flux = jax.jit(pack_flux, in_shardings=(field_sharding,) * 3, out_shardings=flux_sharding)
+    unpack_flux = jax.jit(unpack_flux, in_shardings=flux_sharding, out_shardings=(field_sharding,) * 3)
+    pack_vector = jax.jit(pack_vector, in_shardings=(field_sharding,) * 3, out_shardings=vector_sharding)
+    relax_flux = jax.jit(
+        relax_flux,
+        in_shardings=(field_sharding,) * 3
+        + (replicated_sharding,)
+        + (field_sharding,) * 3
+        + (replicated_sharding,) * 2,
+        out_shardings=(field_sharding,) * 3 + (replicated_sharding,),
+    )
+    names = (
+        "initialize_flux",
+        "momentum",
+        "momentum_defect",
+        "embed_velocity",
+        "courant",
+        "pack_flux",
+        "unpack_flux",
+        "pack_vector",
+        "relax_flux",
+    )
+    return tuple(
+        _reuse_fringing_jit((name, *kernel_key), function)
+        for name, function in zip(
+            names,
+            (initialize, momentum, defect, embed, courant, pack_flux, unpack_flux, pack_vector, relax_flux),
+            strict=True,
+        )
+    )
+
+
+def _prepare_b2_momentum_runtime(
+    *,
+    case: CaseSpec,
+    velocity: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
+    density: jnp.ndarray,
+    fluid_bounds: tuple[int, int, int, int],
+    num_devices: int | None,
+    dy: jnp.ndarray,
+    dz: jnp.ndarray,
+    dt: float,
+    dx: float,
+    momentum_iterations: int,
+    momentum_tolerance: float,
+    projection_iterations: int,
+    projection_tolerance: float,
+    electric_iterations: int,
+    electric_tolerance: float,
+    forcing: float,
+    target_flow_rate: float,
+    initial: ExtrudedFieldBundle | None,
+    previous_anderson_flux: jnp.ndarray | None,
+    previous_anderson_inlet: jnp.ndarray | None,
+):
+    """Prepare sharding, compiled kernels, and compact B2 flux restart state."""
+
+    u, v, w = velocity
+    y0, y1, z0, z1 = fluid_bounds
+    field_sharding = u.sharding if num_devices is not None else None
+    replicated = None if field_sharding is None else NamedSharding(field_sharding.mesh, P())
+    flux_sharding = (
+        None if field_sharding is None else NamedSharding(field_sharding.mesh, P(None, "x", None, None))
+    )
+    vector_sharding = (
+        None if field_sharding is None else NamedSharding(field_sharding.mesh, P("x", None, None, None))
+    )
+    force_scale = (
+        next(region for region in case.regions if region.kind == "fluid").conductivity
+        * target_flow_rate
+        / float(jnp.sum(dy[y0:y1, None] * dz[None, z0:z1]))
+        * sum(float(component) ** 2 for component in (case.magnetic_field.value or (0.0, 0.0, 0.0)))
+    )
+    if force_scale <= 0.0:
+        raise ValueError("ALEX B2 requires a positive electromagnetic force scale")
+    kernel_key = (
+        field_sharding,
+        u.shape,
+        fluid_bounds,
+        dt,
+        dx,
+        tuple(np.asarray(dy)),
+        tuple(np.asarray(dz)),
+        momentum_iterations,
+        momentum_tolerance,
+        projection_iterations,
+        projection_tolerance,
+        electric_iterations,
+        electric_tolerance,
+        forcing,
+        target_flow_rate,
+        force_scale,
+        case.solver.coupling_regularization,
+        case.solver.coupling_damping,
+    )
+    functions = _jit_b2_momentum_functions(
+        _b2_momentum_functions(
+            case=case,
+            shape=u.shape,
+            fluid_bounds=fluid_bounds,
+            dt=dt,
+            dx=dx,
+            dy=dy,
+            dz=dz,
+            target_flow_rate=target_flow_rate,
+            electromagnetic_force_scale=force_scale,
+            momentum_iterations=momentum_iterations,
+            momentum_tolerance=momentum_tolerance,
+            field_sharding=field_sharding,
+        ),
+        field_sharding=field_sharding,
+        replicated_sharding=replicated,
+        flux_sharding=flux_sharding,
+        vector_sharding=vector_sharding,
+        kernel_key=kernel_key,
+    )
+    initialize_flux, *_, pack_flux, _, _, _ = functions
+    restart_flux = None if initial is None else initial.rho_phi_plus
+    restart_inlet = None if initial is None else initial.rho_phi_inlet
+    if (restart_flux is None) != (restart_inlet is None):
+        raise ValueError("B2 restart requires both compact flux arrays")
+    if restart_flux is None:
+        *current_flux, current_inlet = initialize_flux(u, v, w, density)
+    else:
+        restart_flux = np.asarray(restart_flux, dtype=np.dtype(u.dtype))
+        current_flux = tuple(
+            jnp.asarray(value) if field_sharding is None else jax.device_put(value, field_sharding)
+            for value in restart_flux
+        )
+        current_inlet = jnp.asarray(restart_inlet, dtype=u.dtype)
+        if replicated is not None:
+            current_inlet = jax.device_put(np.asarray(current_inlet), replicated)
+    current_plus = pack_flux(*current_flux)
+    if previous_anderson_flux is not None:
+        if (
+            previous_anderson_flux.shape != current_plus.shape
+            or previous_anderson_inlet.shape != current_inlet.shape
+        ):
+            raise ValueError("B2 restart Anderson flux state has inconsistent shape")
+        if flux_sharding is not None:  # pragma: no cover - hardware gate
+            previous_anderson_flux = jax.device_put(np.asarray(previous_anderson_flux), flux_sharding)
+            previous_anderson_inlet = jax.device_put(np.asarray(previous_anderson_inlet), replicated)
+    return (
+        *functions,
+        field_sharding,
+        replicated,
+        flux_sharding,
+        kernel_key,
+        current_flux,
+        current_inlet,
+        current_plus,
+        previous_anderson_flux,
+        previous_anderson_inlet,
+    )
+
+
+def _b2_coupling_functions(
+    *,
+    case: CaseSpec,
+    target_flow_rate: float,
+    dt: float,
+    dx: float,
+    dy: jnp.ndarray,
+    dz: jnp.ndarray,
+    projection_iterations: int,
+    projection_tolerance: float,
+    electric_iterations: int,
+    electric_tolerance: float,
+    electric_volume_min: float,
+    fluid_bounds: tuple[int, int, int, int],
+    field_sharding: NamedSharding | None,
+    fixed_point_scale: jnp.ndarray,
+) -> tuple[Callable, ...]:
+    """Build B2 pressure, electric, Lorentz, and coupling operations."""
+
+    def mixed_boundary_projection(u, v, w, pressure, density, mask):
+        return _face_flux_pressure_projection_duct(
+            u,
+            v,
+            w,
+            density,
+            mask,
+            inlet_flow_rate=target_flow_rate,
+            dt=dt,
+            dx=dx,
+            dy=dy,
+            dz=dz,
+            iterations=projection_iterations,
+            tolerance=projection_tolerance,
+            fluid_bounds=fluid_bounds,
+            initial_pressure=pressure,
+            single_reduction=field_sharding is not None,
+            include_axial_line=False,
+            field_sharding=field_sharding,
+        )
+
+    def electric_solve(rhs, initial, conductivity, mask):
+        return _solvax_pressure_poisson_duct(
+            rhs,
+            conductivity,
+            dx=dx,
+            dy=dy,
+            dz=dz,
+            iterations=electric_iterations,
+            tolerance=electric_tolerance,
+            initial_field=initial,
+            local_tolerance=ALEX_BALANCE_TOLERANCE,
+            local_volume_min=electric_volume_min,
+            single_reduction=field_sharding is not None,
+            include_axial_line=False,
+            thin_wall_fluid_mask=mask,
+            transverse_coarse_bounds=fluid_bounds,
+            field_sharding=field_sharding,
+        )
+
+    def emf_operator(conductivity, emf_x, emf_y, emf_z, mask):
+        return _conservative_emf_rhs_3d(
+            conductivity,
+            emf_x,
+            emf_y,
+            emf_z,
+            dx=dx,
+            dy=dy,
+            dz=dz,
+            thin_wall_fluid_mask=mask,
+        )
+
+    def reconstruct_electric(potential, conductivity, emf_x, emf_y, emf_z, bx, by, bz, mask):
+        dphi_dx, dphi_dy, dphi_dz = _gradient_3d(potential, dx=dx, dy=dy, dz=dz)
+        current_x = conductivity * (-dphi_dx + emf_x)
+        current_y = conductivity * (-dphi_dy + emf_y)
+        current_z = conductivity * (-dphi_dz + emf_z)
+        divergence, _, _ = _conservative_current_diagnostics_3d(
+            conductivity,
+            potential,
+            emf_x,
+            emf_y,
+            emf_z,
+            dx=dx,
+            dy=dy,
+            dz=dz,
+            thin_wall_fluid_mask=mask,
+        )
+        return (
+            current_x,
+            current_y,
+            current_z,
+            divergence,
+            current_y * bz - current_z * by,
+            current_z * bx - current_x * bz,
+            current_x * by - current_y * bx,
+        )
+
+    def lorentz_operator(potential, conductivity, emf_x, emf_y, emf_z, bx, by, bz):
+        dphi_dx, dphi_dy, dphi_dz = _gradient_3d(potential, dx=dx, dy=dy, dz=dz)
+        current_x = conductivity * (-dphi_dx + emf_x)
+        current_y = conductivity * (-dphi_dy + emf_y)
+        current_z = conductivity * (-dphi_dz + emf_z)
+        return (
+            current_x,
+            current_y,
+            current_z,
+            current_y * bz - current_z * by,
+            current_z * bx - current_x * bz,
+            current_x * by - current_y * bx,
+        )
+
+    def scaled_state(u, v, w, potential):
+        return jnp.stack((u, v, w, potential)) / fixed_point_scale
+
+    def state_difference(mapped, current):
+        return mapped - current
+
+    def unscaled_state(state):
+        values = state * fixed_point_scale
+        return values[0], values[1], values[2], values[3]
+
+    def mix_anderson(mapped0, residual0, flux0, inlet0, mapped1, residual1, flux1, inlet1):
+        weights = anderson_weights(
+            jnp.stack((residual0, residual1)), regularization=case.solver.coupling_regularization
+        )
+        damping = case.solver.coupling_damping
+
+        def mix(previous, current):
+            weighted = jnp.tensordot(weights, jnp.stack((previous, current)), axes=(0, 0))
+            return current + damping * (weighted - current)
+
+        return mix(mapped0, mapped1), mix(flux0, flux1), mix(inlet0, inlet1)
+
+    return (
+        jax.named_call(mixed_boundary_projection, name="lmx.b2.projection"),
+        jax.named_call(electric_solve, name="lmx.b2.electric"),
+        jax.named_call(emf_operator, name="lmx.b2.emf"),
+        jax.named_call(reconstruct_electric, name="lmx.b2.reconstruction"),
+        lorentz_operator,
+        scaled_state,
+        state_difference,
+        unscaled_state,
+        jax.named_call(mix_anderson, name="lmx.b2.anderson"),
+    )
+
+
+def _jit_b2_coupling_functions(
+    functions: tuple[Callable, ...],
+    *,
+    field_sharding: NamedSharding | None,
+    replicated_sharding: NamedSharding | None,
+    flux_sharding: NamedSharding | None,
+    kernel_key: tuple[object, ...],
+) -> tuple[Callable, ...]:
+    if field_sharding is None:
+        return functions
+    projection, electric, emf, reconstruct, lorentz, scale, difference, unscale, mix = functions
+    axial_sharding = NamedSharding(field_sharding.mesh, P("x"))
+    state_sharding = NamedSharding(field_sharding.mesh, P(None, "x", None, None))
+    projection = jax.jit(
+        projection,
+        in_shardings=(field_sharding,) * 6,
+        out_shardings=(field_sharding,) * 4
+        + (axial_sharding, replicated_sharding, replicated_sharding)
+        + (field_sharding,) * 3
+        + (replicated_sharding,) * 6,
+    )
+    electric = jax.jit(
+        electric,
+        in_shardings=(field_sharding,) * 4,
+        out_shardings=(field_sharding,) + (replicated_sharding,) * 6,
+    )
+    emf = jax.jit(emf, in_shardings=(field_sharding,) * 5, out_shardings=field_sharding)
+    reconstruct = jax.jit(
+        reconstruct, in_shardings=(field_sharding,) * 9, out_shardings=(field_sharding,) * 7
+    )
+    lorentz = jax.jit(lorentz, in_shardings=(field_sharding,) * 8, out_shardings=(field_sharding,) * 6)
+    scale = jax.jit(scale, in_shardings=(field_sharding,) * 4, out_shardings=state_sharding)
+    difference = jax.jit(
+        difference, in_shardings=(state_sharding, state_sharding), out_shardings=state_sharding
+    )
+    unscale = jax.jit(unscale, in_shardings=state_sharding, out_shardings=(field_sharding,) * 4)
+    mix = jax.jit(
+        mix,
+        in_shardings=(state_sharding, state_sharding, flux_sharding, replicated_sharding) * 2,
+        out_shardings=(state_sharding, flux_sharding, replicated_sharding),
+    )
+    names = (
+        "mixed_boundary",
+        "electric",
+        "emf",
+        "reconstruct",
+        "lorentz",
+        "scale_state",
+        "state_difference",
+        "unscale_state",
+        "anderson",
+    )
+    return tuple(
+        _reuse_fringing_jit((name, *kernel_key), function)
+        for name, function in zip(
+            names,
+            (projection, electric, emf, reconstruct, lorentz, scale, difference, unscale, mix),
+            strict=True,
+        )
     )

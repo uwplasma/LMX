@@ -18,8 +18,14 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
+    import tomli as tomllib
+
 from .cases import make_hartmann_case
 from .mesh import StructuredMesh, generate_rect_duct_mesh_from_faces
+from .physics import dynamic_to_kinematic_viscosity, hartmann_number, wall_conductance_ratio
 from .specs import CaseSpec, Solution
 
 
@@ -994,6 +1000,86 @@ def _repository_root(root: str | Path | None = None) -> Path:
     """Return an override root or the benchmark data shipped with LMX."""
 
     return Path(root) if root is not None else Path(__file__).with_name("data")
+
+
+def load_benchmark_a_spec(case_kind: str, spec_dir: str | Path | None = None) -> dict[str, object]:
+    """Load and internally validate a canonical matched Benchmark-A TOML spec."""
+
+    if case_kind not in {"shercliff", "hunt"}:
+        raise ValueError(f"Unsupported matched Benchmark-A case {case_kind!r}")
+    root = _repository_root() / "benchmarks" / "specs" if spec_dir is None else Path(spec_dir)
+    path = root / f"{case_kind}-ha20.toml"
+    payload = tomllib.loads(path.read_text(encoding="utf-8"))
+    if payload.get("schema_version") != 1 or payload.get("case_kind") != case_kind:
+        raise ValueError(f"Invalid matched benchmark identity in {path}")
+
+    fluid = payload["fluid"]
+    geometry = payload["geometry"]
+    field = payload["magnetic_field"]
+    expected_nu = dynamic_to_kinematic_viscosity(float(fluid["dynamic_viscosity"]), float(fluid["density"]))
+    if not math.isclose(expected_nu, float(fluid["kinematic_viscosity"]), rel_tol=1.0e-12):
+        raise ValueError(f"Inconsistent dynamic and kinematic viscosity in {path}")
+    vector = [float(value) for value in field["vector"]]
+    expected_ha = hartmann_number(
+        magnetic_field=math.sqrt(sum(value * value for value in vector)),
+        length_scale=float(geometry["length_scale"]),
+        conductivity=float(fluid["conductivity"]),
+        density=float(fluid["density"]),
+        kinematic_viscosity=float(fluid["kinematic_viscosity"]),
+    )
+    if not math.isclose(expected_ha, float(field["hartmann_number"]), rel_tol=1.0e-12):
+        raise ValueError(f"Magnetic field and material properties do not reproduce Ha in {path}")
+    if case_kind == "hunt":
+        wall = payload["wall"]
+        expected_c = wall_conductance_ratio(
+            wall_conductivity=float(wall["conducting_wall_conductivity"]),
+            wall_thickness=float(geometry["wall_thickness"]),
+            fluid_conductivity=float(fluid["conductivity"]),
+            length_scale=float(geometry["length_scale"]),
+        )
+        if not math.isclose(expected_c, float(wall["conductance_ratio"]), rel_tol=1.0e-12):
+            raise ValueError(f"Wall properties do not reproduce the conductance ratio in {path}")
+    levels = payload["mesh"]["levels"]
+    if len(levels) < 3 or any(len(level) != 2 for level in levels):
+        raise ValueError(f"Matched benchmark mesh ladder requires at least three 2D levels in {path}")
+    spacings = [1.0 / math.sqrt(float(ny) * float(nz)) for ny, nz in levels]
+    if any(coarse <= fine for coarse, fine in zip(spacings, spacings[1:])):
+        raise ValueError(f"Matched benchmark mesh ladder is not monotonically refined in {path}")
+    refinement_ratios = [coarse / fine for coarse, fine in zip(spacings, spacings[1:])]
+    if max(refinement_ratios) / min(refinement_ratios) > 1.1:
+        raise ValueError(f"Matched benchmark mesh refinement ratios are too uneven in {path}")
+    payload["path"] = path.relative_to(path.parents[2]).as_posix()
+    payload["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return payload
+
+
+def load_samper_table_i(path: str | Path | None = None) -> dict[str, object]:
+    """Load and validate the supplied Samper et al. Benchmark-A Table I."""
+
+    source = (
+        _repository_root() / "benchmarks" / "references" / "samper-table-i.toml"
+        if path is None
+        else Path(path)
+    )
+    payload = tomllib.loads(source.read_text(encoding="utf-8"))
+    cases = payload.get("cases", [])
+    if payload.get("schema_version") != 1 or len(cases) != 8:
+        raise ValueError(f"Invalid Samper Table I reference in {source}")
+    expected_ha = {500, 5000, 10000, 15000}
+    for case_kind, expected_conductance in (("shercliff", 0.0), ("hunt", 0.01)):
+        subset = [case for case in cases if case.get("case_kind") == case_kind]
+        if {int(case["hartmann_number"]) for case in subset} != expected_ha:
+            raise ValueError(f"Incomplete {case_kind} Hartmann ladder in {source}")
+        if any(
+            not math.isclose(float(case["hartmann_wall_conductance"]), expected_conductance)
+            for case in subset
+        ):
+            raise ValueError(f"Incorrect {case_kind} wall conductance in {source}")
+        if any(float(case["analytical_flow_rate"]) <= 0.0 for case in subset):
+            raise ValueError(f"Non-positive {case_kind} flow-rate reference in {source}")
+    payload["path"] = source.relative_to(source.parents[2]).as_posix()
+    payload["sha256"] = hashlib.sha256(source.read_bytes()).hexdigest()
+    return payload
 
 
 def canonical_matched_b_contract(spec: dict[str, Any], role: str) -> dict[str, Any]:

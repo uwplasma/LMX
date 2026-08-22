@@ -16,7 +16,6 @@ import jax.numpy as jnp
 import numpy as np
 
 from lmx.cases import solve_steady
-from lmx.freemhd import load_benchmark_a_spec
 from lmx.io import write_freemhd_observable_parity_plots
 from lmx.mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
 from lmx.solvers import fully_developed_power_balance
@@ -36,6 +35,7 @@ from lmx.validation import (
     duct_layer_resolution_gate,
     extract_midplane_scalar_profile,
     extract_processed_profile,
+    load_benchmark_a_spec,
     load_closed_channel_analytical,
     load_processed_slice,
     processed_slice_area_mean,

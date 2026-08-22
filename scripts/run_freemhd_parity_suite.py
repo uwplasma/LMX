@@ -19,7 +19,15 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lmx.freemhd import (
+from lmx.physics import hartmann_number
+from lmx.validation import (
+    build_benchmark_b_problem,
+    default_closed_channel_reference_root,
+    load_benchmark_a_spec,
+    load_benchmark_b_reference,
+    load_benchmark_b_spec,
+)
+from validation.freemhd import (
     artifact_sha256,
     infer_inlet_drive_mode,
     infer_inlet_flow_rate,
@@ -27,20 +35,12 @@ from lmx.freemhd import (
     infer_rectangular_geometry,
     infer_solid_conductivities,
     infer_uniform_b0,
-    load_benchmark_a_spec,
     load_matched_b2_lmx_input,
     observe_freemhd_b2_contract,
     observe_freemhd_b2_output,
     observe_lmx_b2_contract,
     observe_lmx_b2_output,
     validate_matched_b_record,
-)
-from lmx.physics import hartmann_number
-from lmx.validation import (
-    build_benchmark_b_problem,
-    default_closed_channel_reference_root,
-    load_benchmark_b_reference,
-    load_benchmark_b_spec,
 )
 
 DEFAULT_FREEMHD_INSTALL_DIR = Path("/Users/rogerio/local/tests/freemhd_install")
@@ -779,7 +779,7 @@ def materialize_matched_b2_preflight(
 ) -> dict[str, object]:
     """Materialize and independently observe the complete solver-free B2 bundle."""
 
-    from lmx.freemhd import observe_freemhd_b2_contract, observe_lmx_b2_contract
+    from validation.freemhd import observe_freemhd_b2_contract, observe_lmx_b2_contract
 
     destination = Path(output_dir)
     destination.mkdir(parents=True)

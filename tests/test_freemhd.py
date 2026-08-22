@@ -11,7 +11,18 @@ import pytest
 
 import examples
 import lmx.validation as benchmarks
-from lmx.freemhd import (
+from lmx.io import write_extruded_bundle_restart_npz
+from lmx.specs import ExtrudedFieldBundle
+from lmx.validation import (
+    BENCHMARK_B_SPEC_FILES,
+    canonical_matched_b_contract,
+    load_benchmark_a_spec,
+    load_benchmark_b_reference,
+    load_benchmark_b_spec,
+    load_samper_table_i,
+)
+from scripts import run_freemhd_parity_suite
+from validation.freemhd import (
     _validate_b2_smoke_execution,
     artifact_sha256,
     infer_inlet_drive_mode,
@@ -20,24 +31,13 @@ from lmx.freemhd import (
     infer_rectangular_geometry,
     infer_solid_conductivities,
     infer_uniform_b0,
-    load_benchmark_a_spec,
     load_matched_b2_lmx_input,
-    load_samper_table_i,
     observe_freemhd_b2_contract,
     observe_freemhd_b2_output,
     observe_lmx_b2_contract,
     observe_lmx_b2_output,
     validate_matched_b_record,
 )
-from lmx.io import write_extruded_bundle_restart_npz
-from lmx.specs import ExtrudedFieldBundle
-from lmx.validation import (
-    BENCHMARK_B_SPEC_FILES,
-    canonical_matched_b_contract,
-    load_benchmark_b_reference,
-    load_benchmark_b_spec,
-)
-from scripts import run_freemhd_parity_suite
 
 pytestmark = pytest.mark.unit
 

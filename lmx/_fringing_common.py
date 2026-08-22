@@ -5,13 +5,14 @@ from __future__ import annotations
 import hashlib
 import math
 from collections.abc import Callable
+from time import perf_counter
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax.scipy.fft import dct, idct
 from jax.scipy.linalg import solve_triangular
-from jax.sharding import NamedSharding
+from jax.sharding import Mesh, NamedSharding
 from jax.sharding import PartitionSpec as P
 from solvax import (
     fixed_point_iteration,
@@ -25,6 +26,10 @@ try:
 except Exception:  # pragma: no cover - SciPy should be present in shipped environments.
     sparse = None
 from .specs import (
+    EXTRUDED_HISTORY_WIDTHS,
+    CaseSpec,
+    ExtrudedFieldBundle,
+    ExtrudedIterationProgress,
     require_finite,
 )
 
@@ -102,6 +107,298 @@ ALEX_B2_STEADY_STEPS = 3
 ALEX_B2_CANONICAL_SHELL_THICKNESS = 0.02
 ALEX_B2_MAGNETIC_STABILITY_SAFETY = 0.064
 ALEX_B2_SETTLED_RELAXATION = 2.0
+
+
+def _axial_field_sharding(num_devices: int) -> NamedSharding:
+    """Return one process-stable axial mesh for compilation and repeat reuse."""
+
+    devices = jax.devices()
+    if not 1 <= num_devices <= len(devices):
+        raise ValueError(f"Requested {num_devices} devices, but only {len(devices)} are visible.")
+    return NamedSharding(Mesh(np.asarray(devices[:num_devices], dtype=object), ("x",)), P("x", None, None))
+
+
+def _shard_extruded_fields(
+    fields: tuple[jnp.ndarray, ...], *, num_devices: int | None
+) -> tuple[jnp.ndarray, ...]:
+    """Place 3-D fields on an axial mesh, staging initial values through the host."""
+
+    if num_devices is None:
+        return fields
+    devices = jax.devices()
+    if not 1 <= num_devices <= len(devices):
+        raise ValueError(f"Requested {num_devices} devices, but only {len(devices)} are visible.")
+    axial_size = fields[0].shape[0]
+    if axial_size % num_devices:
+        raise ValueError(f"Axial cell count {axial_size} must be divisible by {num_devices} devices.")
+    sharding = _axial_field_sharding(num_devices)
+    return tuple(jax.device_put(np.asarray(field), sharding) for field in fields)
+
+
+def _iteration_history_arrays(
+    residual,
+    component,
+    pressure,
+    electric,
+    potential,
+    courant=None,
+    pressure_linear=None,
+    momentum_defect=None,
+):
+    """Build consistently shaped outer-iteration histories."""
+
+    values = (
+        residual,
+        momentum_defect or (),
+        component,
+        pressure,
+        pressure_linear or (),
+        electric,
+        potential,
+        courant or (),
+    )
+    return {
+        name: jnp.asarray(value, dtype=float).reshape((-1, width))
+        if width
+        else jnp.asarray(value, dtype=float)
+        for (name, width), value in zip(EXTRUDED_HISTORY_WIDTHS, values, strict=True)
+    }
+
+
+def _iteration_checkpoint_bundle(
+    *,
+    case: CaseSpec,
+    x: jnp.ndarray,
+    y: jnp.ndarray,
+    z: jnp.ndarray,
+    field_scale: jnp.ndarray,
+    u: jnp.ndarray,
+    v: jnp.ndarray,
+    w: jnp.ndarray,
+    p: jnp.ndarray,
+    phi: jnp.ndarray,
+    axial_pressure_loss_gradient: jnp.ndarray | None,
+    transverse_pressure_difference: jnp.ndarray | None,
+    residual_history: list[float],
+    component_history: list[tuple[float, ...]],
+    pressure_history: list[float],
+    electric_history: list[tuple[float, ...]],
+    potential_history: list[float],
+    pressure_linear_history: list[tuple[float, ...]] | None = None,
+    rho_phi_plus: jnp.ndarray | None = None,
+    rho_phi_inlet: jnp.ndarray | None = None,
+    aitken_state: tuple[jnp.ndarray | None, float, int] | None = None,
+    anderson_state: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray] | None = None,
+    stopping_state: tuple[int, int, str] = (0, 0, "not_recorded"),
+    courant_history: list[tuple[float, float, float]] | None = None,
+    momentum_defect_history: list[float] | None = None,
+) -> ExtrudedFieldBundle:
+    """Build the minimal bundle needed to resume a solve."""
+
+    return ExtrudedFieldBundle(
+        x=x,
+        y=y,
+        z=z,
+        field_scale=field_scale,
+        u=u,
+        v=v,
+        w=w,
+        p=p,
+        phi=phi,
+        rho_phi_plus=rho_phi_plus,
+        rho_phi_inlet=rho_phi_inlet,
+        aitken_state=aitken_state,
+        anderson_state=anderson_state,
+        stopping_state=stopping_state,
+        geometry_kind=case.geometry.kind,
+        solver_kind=case.solver.kind,
+        axial_pressure_loss_gradient=(
+            jnp.zeros_like(x) if axial_pressure_loss_gradient is None else axial_pressure_loss_gradient
+        ),
+        transverse_pressure_difference=(
+            jnp.zeros_like(x) if transverse_pressure_difference is None else transverse_pressure_difference
+        ),
+        **_iteration_history_arrays(
+            residual_history,
+            component_history,
+            pressure_history,
+            electric_history,
+            potential_history,
+            courant_history,
+            pressure_linear_history,
+            momentum_defect_history,
+        ),
+    )
+
+
+def _emit_iteration_progress(
+    callback: Callable[[ExtrudedIterationProgress], None] | None,
+    *,
+    checkpoint_interval: int | None,
+    step: int,
+    total_steps: int,
+    converged: bool,
+    residual: float,
+    component_residuals: tuple[float, ...],
+    pressure_residual: float,
+    potential_residual: float,
+    checkpoint_factory: Callable[[], ExtrudedFieldBundle],
+) -> None:
+    if callback is None:
+        return
+    write_checkpoint = bool(
+        checkpoint_interval and (step % checkpoint_interval == 0 or converged or step == total_steps)
+    )
+    callback(
+        ExtrudedIterationProgress(
+            step=step,
+            total_steps=total_steps,
+            residual=float(residual),
+            component_residuals=tuple(float(value) for value in component_residuals),
+            pressure_residual=float(pressure_residual),
+            potential_residual=float(potential_residual),
+            checkpoint=checkpoint_factory() if write_checkpoint else None,
+        )
+    )
+
+
+def _synchronized_phase(
+    function: Callable, name: str, callback: Callable[[str, float], None] | None
+) -> Callable:
+    """Wrap one diagnostic phase with a completion barrier and wall timer."""
+
+    if callback is None:
+        return function
+
+    def measured(*args):
+        jax.block_until_ready(args)
+        started = perf_counter()
+        result = function(*args)
+        jax.block_until_ready(result)
+        callback(name, perf_counter() - started)
+        return result
+
+    return measured
+
+
+def _restore_duct_iteration_state(
+    initial: ExtrudedFieldBundle | None,
+    *,
+    case: CaseSpec,
+    use_b2: bool,
+    velocity: jnp.ndarray,
+    velocity_limit: float,
+    potential_scale: float,
+    forcing: float,
+):
+    """Restore current duct histories and fixed-point accelerator state."""
+
+    history_names = (
+        "iteration_residual_history",
+        "iteration_component_residual_history",
+        "iteration_pressure_residual_history",
+        "iteration_electric_linear_history",
+        "iteration_potential_residual_history",
+    )
+    histories = tuple(
+        [] if initial is None else np.asarray(getattr(initial, name, jnp.zeros((0,)))).tolist()
+        for name in history_names
+    )
+    if len({len(history) for history in histories}) != 1:
+        raise ValueError("B2 restart iteration histories have inconsistent lengths")
+    completed_steps = len(histories[0])
+    momentum_defect = (
+        [] if initial is None else np.asarray(initial.iteration_momentum_defect_history).tolist()
+    )
+    if use_b2 and len(momentum_defect) != completed_steps:
+        raise ValueError("B2 restart predates the electromagnetic momentum-defect contract")
+    pressure_linear = (
+        []
+        if initial is None
+        else np.asarray(getattr(initial, "iteration_pressure_linear_history", jnp.zeros((0, 5)))).tolist()
+    )
+    if completed_steps and not pressure_linear:
+        pressure_linear = [[math.nan, math.nan, 0.0, 0.0, -1.0]] * completed_steps
+    if len(pressure_linear) != completed_steps:
+        raise ValueError("B2 restart pressure-linear history has inconsistent length")
+    courant = (
+        []
+        if initial is None
+        else np.asarray(getattr(initial, "iteration_courant_history", jnp.zeros((0, 3)))).tolist()
+    )
+    if completed_steps and not courant:
+        courant = [[-1.0, -1.0, -1.0]] * completed_steps
+    if len(courant) != completed_steps:
+        raise ValueError("B2 restart CFL histories have inconsistent lengths")
+
+    fixed_aitken = (
+        float(case.solver.coupling_min_relaxation)
+        if use_b2
+        and case.solver.coupling_acceleration == "aitken"
+        and case.solver.coupling_min_relaxation == case.solver.coupling_max_relaxation
+        else None
+    )
+    restart_stopping = (
+        (0, 0, "not_recorded")
+        if initial is None
+        else getattr(initial, "stopping_state", (0, 0, "not_recorded"))
+    )
+    if restart_stopping[0] not in (0, completed_steps):
+        raise ValueError("B2 restart stopping state has inconsistent step count")
+    steady_streak = int(restart_stopping[1])
+    fixed_relaxation = jnp.asarray(1.0, dtype=velocity.dtype)
+    previous_fixed_residual = None
+    restart_aitken = None if initial is None else getattr(initial, "aitken_state", None)
+    if use_b2 and restart_aitken is not None:
+        previous_fixed_residual, fixed_relaxation, stored_streak = restart_aitken
+        if restart_stopping[2] == "not_recorded":
+            steady_streak = stored_streak
+        elif steady_streak != stored_streak:
+            raise ValueError("B2 restart stopping and Aitken streaks disagree")
+        fixed_relaxation = jnp.asarray(fixed_relaxation, dtype=velocity.dtype)
+        if fixed_aitken is not None:
+            previous_fixed_residual = None
+        elif previous_fixed_residual is not None:
+            previous_fixed_residual = jnp.asarray(previous_fixed_residual, dtype=velocity.dtype)
+            if previous_fixed_residual.shape != (4, *velocity.shape):
+                raise ValueError("B2 restart Aitken residual has inconsistent shape")
+
+    previous_mapped = previous_anderson_residual = None
+    previous_flux = previous_inlet = None
+    restart_anderson = None if initial is None else getattr(initial, "anderson_state", None)
+    if use_b2 and case.solver.coupling_acceleration == "anderson":
+        if completed_steps and restart_anderson is None:
+            raise ValueError("B2 Anderson restart is missing accelerator state")
+        if restart_anderson is not None:
+            if len(restart_anderson) != 4 or any(value is None for value in restart_anderson):
+                raise ValueError("B2 Anderson restart state must be all-or-none")
+            previous_mapped, previous_anderson_residual, previous_flux, previous_inlet = (
+                jnp.asarray(value, dtype=velocity.dtype) for value in restart_anderson
+            )
+            expected = (4, *velocity.shape)
+            if previous_mapped.shape != expected or previous_anderson_residual.shape != expected:
+                raise ValueError("B2 restart Anderson field state has inconsistent shape")
+
+    fixed_scale = jnp.asarray(
+        [velocity_limit, velocity_limit, velocity_limit, potential_scale], dtype=velocity.dtype
+    )[:, None, None, None]
+    return (
+        *histories,
+        completed_steps,
+        momentum_defect,
+        pressure_linear,
+        courant,
+        previous_fixed_residual,
+        fixed_aitken,
+        steady_streak,
+        fixed_relaxation,
+        previous_mapped,
+        previous_anderson_residual,
+        previous_flux,
+        previous_inlet,
+        fixed_scale,
+        jnp.full((velocity.shape[0],), forcing, dtype=float),
+    )
 
 
 def _canonical_shell_widths(widths: jnp.ndarray, lower: int, upper: int) -> jnp.ndarray:
