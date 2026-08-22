@@ -362,6 +362,7 @@ EXPECTED_ROOT_API = {
     "make_shercliff_case",
     "make_hunt_case",
     "make_q2d_case",
+    "evolve_q2d",
     "Q2DProblem",
     "solve",
     "generate_rect_duct_mesh",

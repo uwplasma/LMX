@@ -659,6 +659,50 @@ def test_q2d_model_contract_refinement_and_failures():
     assert coarse_error < 5.0e-3
     assert medium_error < coarse_error * 0.1
 
+    coordinate = 2.0 * jnp.pi * jnp.arange(16) / 16
+    mode = jnp.sin(coordinate[:, None]) * jnp.sin(coordinate[None, :])
+    parameters = jnp.asarray([1.0, 0.02, 0.1, 0.0, 2.0 * np.pi, 0.01], dtype=jnp.float32)
+
+    def objective(values, checkpoint_size=None):
+        vorticity, _, _ = lmx.evolve_q2d(
+            values[0] * mode,
+            forcing=values[3] * mode,
+            length=(values[4], 2.0 * jnp.pi),
+            viscosity=values[1],
+            hartmann_friction=values[2],
+            dt=values[5],
+            steps=32,
+            adjoint_checkpoint_size=checkpoint_size,
+        )
+        return jnp.mean(vorticity**2)
+
+    value, gradient = jax.jit(jax.value_and_grad(objective))(parameters)
+    time = parameters[5] * 32
+    expected_gradient = jnp.asarray(
+        [
+            2.0 * value,
+            -4.0 * time * value,
+            -2.0 * time * value,
+            gradient[3],
+            4.0 * time * parameters[1] * value / parameters[4],
+            -2.0 * 32 * (2.0 * parameters[1] + parameters[2]) * value,
+        ]
+    )
+    assert gradient == pytest.approx(expected_gradient, rel=3.0e-6, abs=2.0e-7)
+    perturbation = jnp.zeros_like(parameters).at[3].set(3.0e-2)
+    finite_forcing = (
+        jax.jit(objective)(parameters + perturbation) - jax.jit(objective)(parameters - perturbation)
+    ) / 6.0e-2
+    assert gradient[3] == pytest.approx(finite_forcing, rel=1.0e-4)
+    direction = jnp.asarray([0.2, -0.4, 0.7, 0.1, -0.05, 0.3], dtype=parameters.dtype)
+    tangent = jax.jvp(objective, (parameters,), (direction,))[1]
+    pullback = jax.vjp(objective, parameters)[1](jnp.ones_like(value))[0]
+    assert tangent == pytest.approx(jnp.vdot(pullback, direction), rel=2.0e-6)
+
+    bounded = jax.jit(jax.value_and_grad(objective)).lower(parameters).compile()
+    full_tape = jax.jit(jax.value_and_grad(lambda values: objective(values, 32))).lower(parameters).compile()
+    assert bounded.memory_analysis().temp_size_in_bytes < 0.5 * full_tape.memory_analysis().temp_size_in_bytes
+
     unstable = solve_q2d(
         make_q2d_case(shape=(18, 18), amplitude=20.0, viscosity=0.0, hartmann_friction=0.0, dt=0.1, steps=4)
     )
@@ -671,6 +715,7 @@ def test_q2d_model_contract_refinement_and_failures():
         (lambda: Q2DProblem(jnp.zeros((4, 4)), length=(0.0, 1.0)), "positive"),
         (lambda: Q2DProblem(jnp.zeros((4, 4)), viscosity=-1.0), "non-negative"),
         (lambda: Q2DProblem(jnp.zeros((4, 4)), dt=0.0), "dt and steps"),
+        (lambda: Q2DProblem(jnp.zeros((4, 4)), adjoint_checkpoint_size=0), "checkpoint_size"),
         (lambda: make_q2d_case(mode=(0, 1)), "describe two axes"),
     )
     for action, message in invalid:

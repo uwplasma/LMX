@@ -7,7 +7,7 @@ live in the module that owns their concepts.
 
 | Area | Names |
 |---|---|
-| Cases and solves | `make_hartmann_case`, `make_shercliff_case`, `make_hunt_case`, `make_q2d_case`, `Q2DProblem`, `solve` |
+| Cases and solves | `make_hartmann_case`, `make_shercliff_case`, `make_hunt_case`, `make_q2d_case`, `evolve_q2d`, `Q2DProblem`, `solve` |
 | Meshes | `generate_rect_duct_mesh`, `generate_rect_duct_mesh_from_faces`, `generate_layered_duct_mesh`, `generate_layered_duct_mesh_from_fluid_faces`, `generate_multilayer_duct_mesh` |
 | Wall models | `WallLayer`, `wall_conductance_ratio`, `effective_pinhole_conductance_ratio`, `tangential_stack_conductance_ratio`, `normal_stack_leakage_ratio`, `equivalent_single_layer`, `nested_wall_layer_resolution_summary` |
 | Units | `dynamic_to_kinematic_viscosity`, `kinematic_to_dynamic_viscosity`, `hartmann_number`, `reynolds_number`, `interaction_parameter`, `magnetic_reynolds_number`, `magnetic_field_from_hartmann` |

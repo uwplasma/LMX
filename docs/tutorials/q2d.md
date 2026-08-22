@@ -36,6 +36,41 @@ Run `python examples/q2d_turbulence_demo.py` to reproduce this poster, a JSON
 diagnostic record, and an MP4 when FFmpeg is installed. Sparse field frames are
 opt-in through `history_stride`; the default keeps only the final state.
 
+## Differentiate the finite evolution
+
+`evolve_q2d` is the field-only numerical core for optimization. It omits host
+status and output assembly so continuous array, forcing, length, viscosity,
+Hartmann-friction, and timestep parameters remain traced:
+
+```python
+import jax
+
+
+def objective(friction):
+    vorticity, velocity_x, velocity_y = lmx.evolve_q2d(
+        case.initial_vorticity,
+        viscosity=case.viscosity,
+        hartmann_friction=friction,
+        dt=case.dt,
+        steps=case.steps,
+    )
+    return jnp.mean(vorticity**2) + 0.1 * jnp.mean(velocity_x**2 + velocity_y**2)
+
+
+value, gradient = jax.jit(jax.value_and_grad(objective))(case.hartmann_friction)
+```
+
+This is the exact reverse derivative of the dealiased IFRK4 discretization.
+SOLVAX divides a long recurrence into segments and rematerializes one segment
+during the backward pass. With $N$ steps and checkpoint width $C$, retained
+trajectory state is $O(N/C+C)$; the default $C=\lceil\sqrt N\rceil$ is
+`O(sqrt(N))`. Set `adjoint_checkpoint_size` only after measuring a different
+memory/recomputation trade-off.
+
+`steps`, grid shape, and checkpoint width are discrete static controls. Use
+`Q2DProblem` plus `solve` when validated host diagnostics or saved frames are
+needed; use `evolve_q2d` inside `grad`, `jvp`, `vjp`, or `vmap`.
+
 ## CPU and GPU execution
 
 The same public API selects JAX's active backend. A controlled office-host run

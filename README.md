@@ -12,7 +12,9 @@ extruded ducts and pipes in spatially varying magnetic fields, and periodic Q2D
 vortex dynamics with Hartmann-layer damping. LMX owns the MHD models, boundary
 conditions, coupling, diagnostics, and validation;
 [SOLVAX](https://github.com/uwplasma/SOLVAX) supplies reusable linear and
-fixed-point algorithms.
+fixed-point algorithms and their memory-efficient derivatives. The Q2D field
+core supports gradient-based design with a checkpointed reverse pass instead
+of retaining the complete time trajectory.
 
 ![Analytical duct profiles](docs/_static/analytic_velocity_profiles.webp)
 
@@ -96,6 +98,28 @@ The compact Q2D path uses dealiased Fourier vorticity evolution and a released
 SOLVAX periodic Poisson inversion. It reports energy, enstrophy, divergence,
 Courant number, and energy-budget closure.
 
+For optimization, `evolve_q2d` returns only traced JAX fields. Continuous
+state, forcing, length, viscosity, friction, and timestep inputs differentiate
+through the same finite evolution; the reverse pass checkpoints the trajectory
+with `O(sqrt(steps))` retained state by default.
+
+```python
+import jax
+
+
+def response(friction):
+    return lmx.evolve_q2d(
+        case.initial_vorticity,
+        viscosity=case.viscosity,
+        hartmann_friction=friction,
+        dt=case.dt,
+        steps=case.steps,
+    )[0].var()
+
+
+value, derivative = jax.value_and_grad(response)(case.hartmann_friction)
+```
+
 ![Q2D vortex decay](docs/_static/q2d_vortex_decay.webp)
 
 ## Capabilities and evidence
@@ -106,9 +130,8 @@ Courant number, and energy-budget closure.
 | Conducting and insulating wall layers | `WallLayer`, layered mesh builders | interface-current and layer-resolution gates |
 | 3-D rectangular fringing fields | `lmx.fringing` | manufactured operators, projection, restart, Benchmark B2 |
 | 3-D pipe fringing fields | `lmx.fringing` | mapped operators, current closure, fixed-flow and Benchmark B1 gates |
-| Periodic Q2D flow | `Q2DProblem`, `make_q2d_case`, `solve` | analytical decay, energy identity, spatial refinement, measured CPU/GPU parity |
+| Periodic Q2D flow | `Q2DProblem`, `make_q2d_case`, `solve`, `evolve_q2d` | analytical decay/gradients, energy identity, spatial refinement, bounded reverse memory, measured CPU/GPU parity |
 | FreeMHD comparison | `validation/freemhd.py`, validation scripts | pinned case contracts, native-output observers, executable Docker workflow |
-| Cases, solve workflows, and differentiable Hartmann objectives | `lmx.cases` | finite-difference, JVP, and VJP checks |
 | Meshes and analytic/tabulated fields | `lmx.mesh` | geometry, divergence, and interpolation tests |
 
 Validation status and tolerances are stated in the
