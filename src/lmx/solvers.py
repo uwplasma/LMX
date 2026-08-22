@@ -26,6 +26,9 @@ from solvax import (
     jacobi as _solvax_jacobi,
 )
 from solvax import (
+    linear_solve as _solvax_linear_solve,
+)
+from solvax import (
     pcg_linear_solve as _solvax_pcg_linear_solve,
 )
 from solvax import (
@@ -315,7 +318,7 @@ def _solve_potential_fgmres_state(
     residual_scale: jnp.ndarray,
     preconditioner: Callable[[jnp.ndarray], jnp.ndarray],
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    """Solve the anchored potential system with SOLVAX flexible GMRES."""
+    """Solve the anchored potential system with implicit SOLVAX FGMRES."""
     shape = rhs.shape
 
     def matvec_flat(vector: jnp.ndarray) -> jnp.ndarray:
@@ -325,19 +328,33 @@ def _solve_potential_fgmres_state(
     def precondition_flat(vector: jnp.ndarray) -> jnp.ndarray:
         return preconditioner(vector.reshape(shape)).reshape(-1)
 
-    solution = _solvax_gmres(
+    def solve_with(precondition):
+        def solve(operator, source):
+            solution = _solvax_gmres(
+                operator,
+                source,
+                precond=precondition,
+                restart=20,
+                rtol=_POTENTIAL_FGMRES_RELATIVE_TOLERANCE,
+                max_restarts=10,
+            )
+            return solution.x, solution.iterations
+
+        return solve
+
+    solve = solve_with(precondition_flat)
+    source = rhs.at[anchor].set(0.0).reshape(-1)
+    start = initial.at[anchor].set(0.0).reshape(-1)
+    correction, iterations = _solvax_linear_solve(
         matvec_flat,
-        rhs.at[anchor].set(0.0).reshape(-1),
-        x0=initial.at[anchor].set(0.0).reshape(-1),
-        precond=precondition_flat,
-        restart=20,
-        rtol=_POTENTIAL_FGMRES_RELATIVE_TOLERANCE,
-        max_restarts=10,
+        source - matvec_flat(start),
+        solve,
+        has_aux=True,
     )
-    phi = solution.x.reshape(shape).at[anchor].set(0.0)
+    phi = (start + correction).reshape(shape).at[anchor].set(0.0)
     physical_residual = rhs - apply_five_point_operator(diagonal, west, east, south, north, phi)
     residual = jnp.max(jnp.abs(physical_residual) / jnp.maximum(residual_scale, 1.0e-30))
-    return phi, residual, solution.iterations
+    return phi, residual, iterations
 
 
 def _potential_fast_diagonalization_preconditioner(
