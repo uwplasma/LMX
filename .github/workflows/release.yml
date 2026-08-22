@@ -16,7 +16,11 @@ permissions:
   contents: read
 
 jobs:
+  external-validation:
+    uses: ./.github/workflows/external-validation.yml
+
   validate:
+    needs: external-validation
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -32,6 +36,10 @@ jobs:
         run: python scripts/audit_architecture.py --check --measure-import
       - name: Run portable quality gate
         run: python scripts/run_full_test_suite.py --budget-seconds 600
+      - name: Run every curated example
+        run: >-
+          python scripts/run_full_test_suite.py --budget-seconds 600
+          --shard examples --no-coverage
       - name: Build documentation
         run: python -m sphinx -W -b html docs docs/_build/html
 
@@ -56,7 +64,7 @@ jobs:
           cd /tmp
           /tmp/lmx-wheel-check/bin/lmx --help >/dev/null
           /tmp/lmx-wheel-check/bin/python - <<'PY'
-          from lmx import make_hartmann_case, solve_steady
+          from lmx import make_hartmann_case, solve
           from lmx.validation import (
               load_benchmark_a_spec,
               load_benchmark_b_reference,
@@ -70,7 +78,7 @@ jobs:
               load_benchmark_b_spec(name)
               load_benchmark_b_reference(name)
           load_samper_table_i()
-          solution = solve_steady(make_hartmann_case(ha=5, ny=4, nz=4))
+          solution = solve(make_hartmann_case(ha=5, ny=4, nz=4))
           assert solution.state.residual < 1e-7
           PY
       - uses: actions/upload-artifact@v4

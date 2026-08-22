@@ -34,8 +34,8 @@ coupling_tolerance = 1.0e-8
 
 [time_stepper]
 dt = 0.002
-t_final = 0.02
-max_steps = 200
+t_final = 0.1
+max_steps = 50
 potential_iterations = 400
 potential_tolerance = 1.0e-6
 potential_relaxation = 1.0
@@ -49,7 +49,7 @@ write_paraview = true
 write_csv_profiles = true
 write_npz = true
 write_json_summary = true
-write_plots = true
+write_plots = false
 copy_input_file = true
 write_stride = 1
 history_stride = 0
@@ -66,7 +66,7 @@ name = "fluid"
 kind = "fluid"
 conductivity = 1.0
 density = 1.0
-viscosity = 0.01
+viscosity = 1.0
 
 [[boundary_conditions]]
 name = "y_min_wall"

@@ -41,6 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--workers", type=int)
     parser.add_argument("--budget-seconds", type=float, default=600.0)
     parser.add_argument("--warning-seconds", type=float, default=300.0)
+    parser.add_argument("--test-timeout-seconds", type=float)
     parser.add_argument("--no-coverage", action="store_true")
     parser.add_argument("--shard", choices=tuple(_TEST_SHARDS))
     parser.add_argument("--coverage-fail-under", type=float, default=95.0)
@@ -58,6 +59,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--budget-seconds must be positive")
     if args.warning_seconds <= 0.0:
         parser.error("--warning-seconds must be positive")
+    if args.test_timeout_seconds is not None and args.test_timeout_seconds <= 0.0:
+        parser.error("--test-timeout-seconds must be positive")
     if not 0.0 <= args.coverage_fail_under <= 100.0:
         parser.error("--coverage-fail-under must be between 0 and 100")
     if args.shard and args.tests:
@@ -76,6 +79,8 @@ def main(argv: list[str] | None = None) -> int:
         "worksteal",
         f"--junitxml={junit_path}",
     ]
+    if args.test_timeout_seconds is not None:
+        command.append(f"--timeout={args.test_timeout_seconds:g}")
     if not args.no_coverage:
         command.extend(
             [
@@ -86,6 +91,8 @@ def main(argv: list[str] | None = None) -> int:
                 f"--cov-fail-under={args.coverage_fail_under}",
             ]
         )
+    if not args.shard and not args.tests:
+        command.extend(("-m", "not curated"))
     command.extend(_TEST_SHARDS[args.shard] if args.shard else args.tests or ["tests"])
 
     environment = os.environ.copy()

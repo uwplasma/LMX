@@ -26,6 +26,21 @@ The benchmark specifications and reference arrays shipped under `src/lmx/data/be
 are versioned package data. `benchmarks/provenance.json` records bibliographic
 sources and executable test/workflow links.
 
+## Quantitative evidence
+
+The CI-executed `examples/hartmann_example.py` case uses $Ha=20$ on a
+$24\times24$ cross-section. Its analytical errors are 0.02276 in $L_2$ and
+0.06204 in $L_\infty$, with charge-balance residual
+$4.24\times10^{-19}$ and final velocity update $9.48\times10^{-9}$. The
+documented profile-error limits are 0.05 and 0.10.
+
+The pinned two-update B2 Docker comparison executes LMX and FreeMHD from the
+same observed contract. It passes execution, artifact identity, contract,
+native-output observation, and comparison gates. The normalized transverse
+pressure difference has RMS error 0.004518 and maximum error 0.01092 against
+FreeMHD on the harness mesh, below its frozen 0.16 and 0.32 bounds. This is an
+executable integration check, not a production-mesh validation result.
+
 ## Test gates
 
 The portable suite includes analytical, manufactured, regression, physics, and

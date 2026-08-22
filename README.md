@@ -32,11 +32,11 @@ Plots are optional: `python -m pip install "lmx[visualization]"`.
 ```python
 import lmx
 
-case = lmx.make_hartmann_case(ha=20.0, ny=48, nz=48)
+case = lmx.make_hartmann_case(ha=5.0, ny=8, nz=8)
 result = lmx.solve(case)
 
-print(result.converged, result.status)
-print(result.residual)
+assert result.converged, result.status
+print(result.steps, result.residual)
 ```
 
 The case object contains the geometry, materials, imposed field, boundary
@@ -45,7 +45,7 @@ contains the final fields, convergence status, iteration counts, and physical
 diagnostics. The same workflow is available from TOML:
 
 ```console
-lmx examples/hartmann_case.toml --plots
+lmx examples/hartmann_case.toml
 ```
 
 ## Solve a three-dimensional fringe
@@ -96,6 +96,7 @@ Internal diagnostics are not presented as external validation.
 - [Install and run](https://lmx.readthedocs.io/en/latest/getting_started/install.html)
 - [First 2-D solve](https://lmx.readthedocs.io/en/latest/getting_started/first_run.html)
 - [3-D fringing tutorial](https://lmx.readthedocs.io/en/latest/tutorials/fringing.html)
+- [Walls and imposed fields](https://lmx.readthedocs.io/en/latest/tutorials/walls_and_fields.html)
 - [Equations and assumptions](https://lmx.readthedocs.io/en/latest/physics/equations.html)
 - [Numerical methods and SOLVAX boundary](https://lmx.readthedocs.io/en/latest/physics/numerics.html)
 - [Python API](https://lmx.readthedocs.io/en/latest/reference/api.html)

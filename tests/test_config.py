@@ -9,6 +9,11 @@ from pathlib import Path
 
 import pytest
 
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10
+    import tomli as tomllib
+
 import lmx
 from lmx.cases import _wall_conductivity_from_conductance_ratio
 from lmx.specs import _parse_boundary_value, load_run_config
@@ -300,6 +305,26 @@ def test_shipped_example_toml_files_parse():
         assert config.case.regions
 
 
+def test_four_tutorials_map_to_ci_executed_examples():
+    root = Path(__file__).resolve().parents[1]
+    tutorial_paths = sorted((root / "docs/tutorials").glob("*.md"))
+    expected = {
+        "differentiation.md",
+        "fringing.md",
+        "fully_developed.md",
+        "walls_and_fields.md",
+    }
+    assert {path.name for path in tutorial_paths} == expected
+
+    catalog = tomllib.loads((root / "examples/catalog.toml").read_text())
+    documented = {Path(item["docs"]).name for item in catalog["example"]}
+    index = (root / "docs/index.md").read_text()
+    for path in tutorial_paths:
+        assert path.name in documented
+        assert f"tutorials/{path.stem}" in index
+        assert "```python" in path.read_text()
+
+
 def test_parse_boundary_value_accepts_scalar_and_vector_and_rejects_bad_inputs():
     assert _parse_boundary_value(None) is None
     assert _parse_boundary_value(1.25) == pytest.approx(1.25)
@@ -367,6 +392,8 @@ def test_stable_root_api_is_small_lazy_and_resolvable(
     assert EXPECTED_ROOT_API <= set(dir(lmx))
     assert all(callable(getattr(lmx, name)) for name in lmx.__all__)
     assert all(inspect.getdoc(getattr(lmx, name)) for name in lmx.__all__)
+    api_reference = Path("docs/reference/api.md").read_text()
+    assert all(f"`{name}`" in api_reference for name in lmx.__all__)
 
     updates = []
     monkeypatch.setattr("lmx.io.jax.config.update", lambda *args: updates.append(args))

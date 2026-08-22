@@ -19,8 +19,8 @@ OUTPUT_DIR = Path("artifacts/examples/hartmann")
 HARTMANN_NUMBER = 20.0
 WIDTH = 2.0
 HEIGHT = 2.0
-NY = 32
-NZ = 32
+NY = 24
+NZ = 24
 CONDUCTIVITY = 1.0
 DENSITY = 1.0
 VISCOSITY = 1.0
@@ -34,7 +34,7 @@ STEADY_TOLERANCE = 1.0e-8
 WRITE_PARAVIEW = True
 WRITE_CSV = True
 WRITE_NPZ = True
-WRITE_PLOTS = True
+WRITE_PLOTS = False
 
 
 # Set up the case. ``replace`` exposes solver controls without private APIs.

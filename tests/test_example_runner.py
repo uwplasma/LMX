@@ -8,6 +8,29 @@ import pytest
 pytestmark = pytest.mark.unit
 
 
+@pytest.mark.curated
+def test_portable_duct_tutorials_and_toml_first_run(tmp_path: Path):
+    examples = Path(__file__).resolve().parents[1] / "examples"
+    for script_name in ("hartmann_example.py", "hunt_example.py"):
+        subprocess.run([sys.executable, examples / script_name], cwd=tmp_path, timeout=30, check=True)
+
+    hartmann = json.loads(next((tmp_path / "artifacts").rglob("hartmann_summary.json")).read_text())
+    hunt = json.loads(next((tmp_path / "artifacts").rglob("hunt_summary.json")).read_text())
+    assert hartmann["analytical_profile"]["l2_error"] < 0.05
+    assert hunt["validation"]["interface_current_residual"] < 1.0e-8
+
+    source = Path(__file__).resolve().parents[1] / "examples/hartmann_case.toml"
+    case_path = tmp_path / source.name
+    case_path.write_text(
+        source.read_text().replace("../artifacts/examples/toml_hartmann", "artifacts/toml_hartmann")
+    )
+    subprocess.run([sys.executable, "-m", "lmx", case_path], cwd=tmp_path, timeout=30, check=True)
+    summary = json.loads(next((tmp_path / "artifacts").rglob("hartmann_ha20_toml_summary.json")).read_text())
+    assert summary["converged"] is True
+    assert summary["status"] == "converged"
+    assert summary["residual"] < 1.0e-8
+
+
 def test_fringing_benchmark_demo_runs_real_bounded_diagnostic(tmp_path: Path):
     script = Path(__file__).resolve().parents[1] / "examples/fringing_benchmark_demo.py"
     subprocess.run([sys.executable, script], cwd=tmp_path, timeout=30, check=True)

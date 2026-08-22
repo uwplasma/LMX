@@ -18,8 +18,8 @@ OUTPUT_DIR = Path("artifacts/examples/hunt")
 HARTMANN_NUMBER = 20.0
 WIDTH = 2.0
 HEIGHT = 2.0
-NY = 32
-NZ = 32
+NY = 24
+NZ = 24
 WALL_CELLS = 3
 WALL_THICKNESS = 0.1
 WALL_CONDUCTANCE_RATIO = 0.05
@@ -37,7 +37,7 @@ STEADY_TOLERANCE = 1.0e-8
 WRITE_PARAVIEW = True
 WRITE_CSV = True
 WRITE_NPZ = True
-WRITE_PLOTS = True
+WRITE_PLOTS = False
 
 
 # Set up the layered wall regions and solver controls with public dataclasses.

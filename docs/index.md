@@ -55,6 +55,7 @@ getting_started/first_run
 
 tutorials/fully_developed
 tutorials/fringing
+tutorials/walls_and_fields
 tutorials/differentiation
 ```
 
@@ -62,7 +63,6 @@ tutorials/differentiation
 :hidden:
 :caption: How-to guides
 
-how_to/walls_and_fields
 how_to/restart_and_output
 ```
 

@@ -67,9 +67,10 @@ jobs:
           python-version: "3.13"
       - name: Run bounded coverage shards
         run: |
-          for lmx_shard in benchmarks core examples physics validation; do
+          for lmx_shard in benchmarks core physics validation; do
             COVERAGE_FILE=".coverage.${lmx_shard}" python scripts/run_full_test_suite.py \
-              --budget-seconds 600 --shard "${lmx_shard}" --coverage-fail-under 0
+              --budget-seconds 900 --test-timeout-seconds 300 \
+              --shard "${lmx_shard}" --coverage-fail-under 0
           done
       - name: Combine and enforce coverage
         run: |

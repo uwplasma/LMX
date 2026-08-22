@@ -773,11 +773,11 @@ source/tests/scripts meet their budgets.
   target information architecture from the stable API.
 - [x] Write equations and equation-to-code mapping from primary sources.
 - [x] Generate complete API reference from docstrings.
-- [ ] Write and execute four tutorials, including 3-D fringing, and focused
+- [x] Write and execute four tutorials, including 3-D fringing, and focused
   how-to guides, including local FreeMHD Docker validation.
-- [ ] Publish validation with regenerated current-source evidence.
+- [x] Publish validation with regenerated current-source evidence.
 - [x] Create the product-first README and one compact validated hero visual.
-- [ ] Run the current-state prose scan, Sphinx `-W`, API coverage, and links.
+- [x] Run the current-state prose scan, Sphinx `-W`, API coverage, and links.
 
 Exit: a new user can install, solve, interpret, validate, and extend LMX from
 the docs without reading source or this plan.
@@ -1435,3 +1435,43 @@ surface, measurements, validation, decision, and next action.
   `/Users/rogeriojorge/local/tests/lmx-audit/lmx-history-64d0292/b2`.
 - Next action: push the common-API and bounded-history commits with this
   evidence, then finish tutorial and scheduled/release validation work.
+
+### 2026-08-22 — tutorials and continuous external validation
+
+- Completed four indexed tutorials by promoting the existing walls-and-fields
+  material into the tutorial sequence. Every tutorial maps to a curated
+  workflow, and CI executes all seven shipped examples. The stable Hartmann,
+  Hunt, and TOML workflows use bounded default output; plots remain an explicit
+  editable option.
+- Corrected the TOML first run so its magnetic field and material properties
+  reproduce $Ha=20$. It converges in 17 steps with residual
+  `9.55e-9` and exits successfully. The README and first-run guide use a small
+  converged common-API solve, and all 24 root names are enforced in the API
+  reference.
+- Published current quantitative Hartmann and pinned B2 integration evidence,
+  including the external comparison limits and the explicit distinction
+  between the two-update harness and production-mesh acceptance. Corrected the
+  FreeMHD repository link and documented the pinned installer, FreeMHD, and
+  OpenFOAM inputs.
+- Added one reusable weekly/release external-validation workflow. It rebuilds
+  the pinned FreeMHD image, verifies both source commits, runs the independently
+  observed B2 Docker comparison, uploads its full evidence tree, and checks all
+  external documentation links. Release wheel smoke uses the common API and
+  release CI executes the separate curated-example lane.
+- The portable gate passes 504 tests in 85.1 seconds; the four-test curated
+  lane executes all seven examples in 69.0 seconds. Exact combined line/branch
+  coverage remains 95.089601% across 5,823 statements and 1,264 branches.
+  Ruff, formatting, byte compilation, architecture/import, current-state
+  prose, Sphinx warnings-as-errors, external links, and Actionlint pass.
+- Package source remains 14,934 lines across 15 modules; tests are 11,640 lines
+  across 13 files and the tracked checkout is 1,553,913 bytes. The wheel is
+  142,375 bytes with 29 members and the source distribution is 133,462 bytes
+  with 35 members; Twine and distribution-content audits pass.
+- The hosted documentation job and all Python 3.10 test shards pass. The prior
+  combined-coverage lane exposed a coverage-instrumented physics timeout on
+  the two-core runner. The coverage workflow now omits the subprocess-only
+  example shard, keeps all four source-covering shards, and gives instrumented
+  numerical tests an explicit 300-second per-test/900-second shard budget.
+- Next action: push this tranche and require the corrected hosted coverage,
+  docs, and external-workflow checks to pass before closing the documentation
+  phase. Production-mesh B1/B2 promotion remains a separate acceptance gate.

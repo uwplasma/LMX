@@ -6,9 +6,9 @@ $\phi(y,z)$ on a structured cross-section. Start with the named builders:
 ```python
 import lmx
 
-hartmann = lmx.make_hartmann_case(ha=20, ny=64, nz=64)
-shercliff = lmx.make_shercliff_case(ha=20, ny=64, nz=64)
-hunt = lmx.make_hunt_case(ha=20, ny=64, nz=64, wall_cells=4)
+hartmann = lmx.make_hartmann_case(ha=20, ny=32, nz=32)
+shercliff = lmx.make_shercliff_case(ha=20, ny=32, nz=32)
+hunt = lmx.make_hunt_case(ha=20, ny=32, nz=32, wall_cells=4)
 
 for case in (hartmann, shercliff, hunt):
     result = lmx.solve(case)

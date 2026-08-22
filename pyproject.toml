@@ -73,6 +73,7 @@ timeout = 120
 timeout_method = "signal"
 filterwarnings = ["error"]
 markers = [
+  "curated: executes the complete curated user workflows",
   "unit: isolated functionality; not a runtime classification",
   "numerical: discretization, solver, conservation, and convergence checks",
   "regression: deterministic golden-profile and serialized-output checks",

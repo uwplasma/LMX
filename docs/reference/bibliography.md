@@ -18,7 +18,7 @@ Core references used by the implemented models and validation contracts include:
 - ALEX results, “A comparison of measurements from a round and a rectangular
   duct with 3-D code predictions,” 1987 — Benchmark B1/B2 pressure and flow
   observables.
-- [FreeMHD](https://github.com/ukaea/FreeMHD) — independent finite-volume MHD
+- [FreeMHD](https://github.com/PlasmaControl/FreeMHD) — independent finite-volume MHD
   implementation used by the executable external comparison.
 
 Each numerical result should cite the LMX version/commit and the specific

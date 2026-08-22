@@ -15,7 +15,7 @@ path = "examples/hartmann_example.py"
 command = "python examples/hartmann_example.py"
 status = "stable"
 runtime = "portable"
-outputs = ["solution", "plots", "diagnostics"]
+outputs = ["solution", "diagnostics"]
 docs = "docs/getting_started/first_run.md"
 
 [[example]]
@@ -24,7 +24,7 @@ path = "examples/hunt_example.py"
 command = "python examples/hunt_example.py"
 status = "stable"
 runtime = "portable"
-outputs = ["solution", "plots", "diagnostics"]
+outputs = ["solution", "diagnostics"]
 docs = "docs/tutorials/fully_developed.md"
 
 [[example]]
@@ -34,7 +34,7 @@ command = "python examples/li_aln_wall_stack_example.py"
 status = "research-stage"
 runtime = "portable"
 outputs = ["wall-model comparison", "plots", "diagnostics"]
-docs = "docs/how_to/walls_and_fields.md"
+docs = "docs/tutorials/walls_and_fields.md"
 
 [[example]]
 id = "fringing-benchmark"
@@ -52,7 +52,7 @@ command = "python examples/variable_field_extruded_demo.py"
 status = "research-stage"
 runtime = "portable"
 outputs = ["field reconstruction", "solution summary"]
-docs = "docs/how_to/walls_and_fields.md"
+docs = "docs/tutorials/walls_and_fields.md"
 
 [[example]]
 id = "differentiable-design"

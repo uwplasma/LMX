@@ -5,7 +5,7 @@ Create one physical case, solve it, and inspect the explicit termination state:
 ```python
 import lmx
 
-case = lmx.make_hartmann_case(ha=20.0, ny=48, nz=48)
+case = lmx.make_hartmann_case(ha=5.0, ny=8, nz=8)
 result = lmx.solve(case)
 
 assert result.converged, result.status
@@ -20,7 +20,7 @@ dimensionless groups.
 The command line uses the same schema:
 
 ```console
-lmx examples/hartmann_case.toml --plots
+lmx examples/hartmann_case.toml
 ```
 
 LMX writes compact NPZ and JSON by default. VTK and plots are controlled by the
