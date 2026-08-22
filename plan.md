@@ -1193,5 +1193,11 @@ surface, measurements, validation, decision, and next action.
   with 34 members and the source distribution is 162,797 bytes with 40 members.
   Architecture regression ceilings are ratcheted to 21 modules, 18,200 package
   lines, and 12,600 test lines.
+- Repeated the pinned B2 Docker smoke on committed source `7b12a43`.
+  Execution, artifacts, contract, observation, and comparison passed with no
+  failed checks; pressure Linf is `0.0109172453` and RMS is `0.0045179771`.
+  The report is non-accepting only because the branch has the candidate role.
+  Its external record is
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-model-fusion-7b12a43/b2`.
 - Next action: decompose and consolidate the retained 3-D and FreeMHD paths
   toward the final source/module ceilings.
