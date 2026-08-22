@@ -1321,6 +1321,19 @@ surface, measurements, validation, decision, and next action.
   is 132,566 bytes with 34 members. Both pass Twine and the distribution audit.
   A fresh isolated environment installed the wheel and passed both the CLI and
   a converged Hartmann solve without importing the checkout.
-- Next action: commit this numerical/API checkpoint, run the canonical
-  performance comparison and pinned B2 Docker workflow from that commit, then
-  record and push the evidence before the remaining package/repository phases.
+- Committed the source checkpoint as `596ce26` and repeated the pinned B2
+  Docker workflow with FreeMHD `14b54a3` and the pinned image. Execution,
+  artifacts, contract, native-output observation, and comparison all pass with
+  no failed checks; pressure Linf is `0.0109172453` and RMS is `0.0045179771`.
+  Its untracked record is
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-final-source-596ce26/b2`.
+- Repeated same-host, same-environment performance comparisons against the
+  canonical baseline commit `c41bdd5`. Warm medians changed by +2.0% for
+  Hartmann 48x48, +1.2% for reduced B2, and +1.5% for reduced B1; peak RSS
+  changed by -2.1%, +0.5%, and -0.9%. All remain inside the 5% regression
+  guard with identical step counts, residuals, flow, and charge closure. The
+  external record is
+  `/Users/rogeriojorge/local/tests/lmx-audit/performance/lmx-slim-checkpoint-596ce26.json`.
+- Next action: push the evidenced checkpoint, then finish the package/API
+  completeness and portable-test-runtime items before requesting approval for
+  the separately gated history rewrite.
