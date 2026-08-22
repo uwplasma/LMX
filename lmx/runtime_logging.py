@@ -10,9 +10,8 @@ from typing import TextIO
 import jax.numpy as jnp
 
 from .config import LoggingSpec
-from .core import Solution
 from .physics import MaterialFields
-from .specs import CaseSpec
+from .specs import CaseSpec, Solution
 
 
 @dataclass(frozen=True)

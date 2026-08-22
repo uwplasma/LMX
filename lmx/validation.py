@@ -10,13 +10,12 @@ from pathlib import Path
 import jax.numpy as jnp
 import numpy as np
 
-from .core import Solution
 from .mesh import StructuredMesh
 from .reference_data import (
     ClosedChannelAnalyticalReference,
     load_closed_channel_analytical,
 )
-from .specs import CaseSpec
+from .specs import CaseSpec, Solution
 
 
 @dataclass(frozen=True)

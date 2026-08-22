@@ -32,5 +32,6 @@ compilation cache is useful for repeated cases:
 
 ```python
 import lmx
+
 lmx.enable_compilation_cache(".jax-cache")
 ```

@@ -8,7 +8,6 @@ import pytest
 
 import lmx.fringing as fringing_impl
 from lmx._fringing_types import ExtrudedFieldBundle, ExtrudedInductionlessSolution
-from lmx.core import NumericalFailure
 from lmx.field_models import (
     make_divergence_free_cross_section_field,
     make_localized_divergence_free_obstacle_field,
@@ -71,7 +70,7 @@ from lmx.fringing import (
     validate_variable_field_extruded_solution,
     validate_variable_field_pipe_solution,
 )
-from lmx.specs import GeometrySpec, MagneticFieldSpec, RegionSpec
+from lmx.specs import GeometrySpec, MagneticFieldSpec, NumericalFailure, RegionSpec
 
 pytestmark = pytest.mark.unit
 

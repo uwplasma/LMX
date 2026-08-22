@@ -47,7 +47,6 @@ from ._fringing_types import (
     FringingProfile,
 )
 from .cases import _ha_to_b, make_shercliff_case
-from .core import require_finite
 from .field_models import load_tabulated_field, sample_tabulated_field_volume
 from .mesh import (
     generate_bent_pipe_mesh,
@@ -65,6 +64,7 @@ from .specs import (
     RegionSpec,
     SolverConfig,
     TimeStepperConfig,
+    require_finite,
 )
 
 _EXTRUDED_NUMERICAL_RESULTS = (

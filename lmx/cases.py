@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .physics import magnetic_field_from_hartmann
 from .specs import (
     BoundaryCondition,
     CaseSpec,
@@ -10,7 +11,6 @@ from .specs import (
     SolverConfig,
     TimeStepperConfig,
 )
-from .units import magnetic_field_from_hartmann
 
 
 def _ha_to_b(ha: float, length_scale: float, conductivity: float, density: float, viscosity: float) -> float:

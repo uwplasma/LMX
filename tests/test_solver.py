@@ -8,7 +8,6 @@ import pytest
 
 import lmx.solvers as solvers
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
-from lmx.core import NumericalFailure
 from lmx.io import load_restart_bundle, write_solution_npz
 from lmx.mesh import (
     StructuredMesh,
@@ -22,7 +21,7 @@ from lmx.physics import (
     magnetic_ramp_scale,
 )
 from lmx.solvers import solve_steady, solve_transient
-from lmx.specs import BoundaryCondition, GeometrySpec
+from lmx.specs import BoundaryCondition, GeometrySpec, NumericalFailure
 
 
 def _fake_step_result(u, **overrides):

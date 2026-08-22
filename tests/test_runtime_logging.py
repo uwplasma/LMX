@@ -6,7 +6,6 @@ import pytest
 
 from lmx.cases import make_hartmann_case
 from lmx.config import LoggingSpec
-from lmx.core import Diagnostics, MHDState, Solution
 from lmx.physics import build_material_fields
 from lmx.runtime_logging import (
     RestartLogInfo,
@@ -15,6 +14,7 @@ from lmx.runtime_logging import (
     default_log_path,
 )
 from lmx.solvers import _build_mesh
+from lmx.specs import Diagnostics, MHDState, Solution
 
 pytestmark = pytest.mark.unit
 

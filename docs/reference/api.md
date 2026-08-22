@@ -60,9 +60,6 @@ live in the module that owns their concepts.
 ## Units and walls
 
 ```{eval-rst}
-.. automodule:: lmx.units
-   :members:
-
-.. automodule:: lmx.wall_models
+.. automodule:: lmx.physics
    :members:
 ```

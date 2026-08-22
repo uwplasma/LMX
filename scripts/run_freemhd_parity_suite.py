@@ -40,8 +40,8 @@ from lmx.freemhd import (
     observe_lmx_b2_output,
     validate_matched_b_record,
 )
+from lmx.physics import hartmann_number
 from lmx.reference_data import default_closed_channel_reference_root
-from lmx.units import hartmann_number
 
 DEFAULT_FREEMHD_INSTALL_DIR = Path("/Users/rogerio/local/tests/freemhd_install")
 DEFAULT_FREEMHD_SOURCE_REPO = Path("/Users/rogerio/local/tests/lmx_external_codes/FreeMHD")

@@ -13,8 +13,10 @@ from lmx.autodiff import (
 
 problem = build_hartmann_autodiff_problem(ny=24, nz=24)
 
+
 def response(ha):
     return hartmann_mean_velocity(problem, forcing=1.0, hartmann_number=ha)
+
 
 value, derivative = jax.value_and_grad(response)(20.0)
 print(value, derivative)

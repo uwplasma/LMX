@@ -9,7 +9,6 @@ import numpy as np
 import pytest
 
 from lmx.cases import make_hartmann_case
-from lmx.core import Diagnostics, MHDState, Solution, zeros_state
 from lmx.io import (
     load_extruded_restart_bundle,
     load_restart_bundle,
@@ -33,6 +32,7 @@ from lmx.plotting import (
     write_freemhd_observable_parity_plots,
 )
 from lmx.solvers import _build_mesh
+from lmx.specs import Diagnostics, MHDState, Solution, zeros_state
 
 pytestmark = pytest.mark.unit
 

@@ -14,7 +14,7 @@ print(f"steps={result.steps} residual={result.state.residual:.3e}")
 
 `CaseSpec` groups geometry, regions, magnetic field, boundary conditions,
 drive, solver controls, and output policy. All viscosities in a case are
-kinematic viscosities in m²/s; the helpers in `lmx.units` convert and form the
+kinematic viscosities in m²/s; the LMX helpers convert and form the
 dimensionless groups.
 
 The command line uses the same schema:

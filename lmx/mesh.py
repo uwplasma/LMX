@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import cos, pi, sin
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence
 
 import jax.numpy as jnp
 import numpy as np
 
-from .wall_models import WallLayer
+if TYPE_CHECKING:
+    from .physics import WallLayer
 
 
 @dataclass(frozen=True)

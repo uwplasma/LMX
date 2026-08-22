@@ -865,6 +865,7 @@ artifacts or release assets, not committed files.
 | D-017 | Keep the executed matched B2 Docker path and remove the private straight-pipe archive smoke | The private lane explicitly could not establish B1 equation/observable parity and duplicated the accepted B2 execution boundary; B1 remains protected by internal/manufactured gates until a genuinely matched external case exists. |
 | D-018 | Use Ruff with a 110-column limit for all maintained Python | The numerical expressions remain readable, every file has one formatter, and the format reduces line count without hand-compressed layouts. |
 | D-019 | Expose one SOLVAX PCG velocity path instead of naming identical `auto`, `cg`, and `solvax_pcg` choices | LMX assembles and certifies the physical system; a user-facing switch between aliases of the same released algorithm adds no flexibility. |
+| D-020 | Consolidate by stable concept: units and wall models into physics, and state/result schemas into specs | These types are small parts of the physical and public data contracts; separate modules added navigation and import boundaries without independent ownership. |
 
 ## Work log
 
@@ -1182,5 +1183,15 @@ surface, measurements, validation, decision, and next action.
   comparison passed with no failed checks and unchanged pressure errors. The
   external record is
   `/Users/rogeriojorge/local/tests/lmx-audit/lmx-solver-api-9ce2069/b2`.
+- Consolidated units and wall-layer models in `physics.py`, and the state,
+  diagnostics, solution, and numerical-failure schemas in `specs.py`. This
+  removes four narrow module boundaries while preserving the lazy root API.
+  The live package now contains 21 modules and 18,098 lines; tests contain
+  12,588 lines. All 550 tests passed with five optional external-data skips;
+  exact combined line/branch coverage is 95.117621%. Sphinx, Ruff, architecture,
+  build, Twine, and distribution-content gates pass. The wheel is 173,997 bytes
+  with 34 members and the source distribution is 162,797 bytes with 40 members.
+  Architecture regression ceilings are ratcheted to 21 modules, 18,200 package
+  lines, and 12,600 test lines.
 - Next action: decompose and consolidate the retained 3-D and FreeMHD paths
   toward the final source/module ceilings.

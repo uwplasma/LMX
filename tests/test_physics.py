@@ -18,7 +18,6 @@ from lmx.autodiff import (
     solve_differentiable_hartmann,
 )
 from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case
-from lmx.core import Diagnostics, MHDState, Solution
 from lmx.field_models import write_tabulated_field_npz
 from lmx.mesh import (
     generate_layered_duct_mesh,
@@ -26,6 +25,7 @@ from lmx.mesh import (
     generate_rect_duct_mesh,
 )
 from lmx.physics import (
+    WallLayer,
     _boundary_sides,
     build_material_fields,
     magnetic_field_components,
@@ -39,9 +39,12 @@ from lmx.solvers import _build_mesh, solve_steady, solve_transient
 from lmx.specs import (
     BoundaryCondition,
     CaseSpec,
+    Diagnostics,
     GeometrySpec,
     MagneticFieldSpec,
+    MHDState,
     RegionSpec,
+    Solution,
     TimeStepperConfig,
 )
 from lmx.validation import (
@@ -62,7 +65,6 @@ from lmx.validation import (
     write_metrics_json,
     write_profile_csv,
 )
-from lmx.wall_models import WallLayer
 
 _EXPECTED_HARTMANN_CENTERLINE = jnp.asarray(
     [

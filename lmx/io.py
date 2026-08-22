@@ -9,8 +9,8 @@ import jax.numpy as jnp
 import numpy as np
 
 from ._fringing_types import EXTRUDED_HISTORY_WIDTHS
-from .core import Diagnostics, MHDState, Solution
 from .mesh import StructuredMesh
+from .specs import Diagnostics, MHDState, Solution
 
 _DIAGNOSTIC_FIELDS = tuple(item.name for item in fields(Diagnostics))
 _EXTRUDED_STATE_SCHEMA = "extruded_state_v1"

@@ -16,7 +16,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
     import tomli as tomllib
 
-from .units import (
+from .physics import (
     dynamic_to_kinematic_viscosity,
     hartmann_number,
     interaction_parameter,

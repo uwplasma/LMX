@@ -7,7 +7,7 @@ from pathlib import Path
 import jax.numpy as jnp
 import numpy as np
 
-from .core import Solution
+from .specs import Solution
 from .validation import extract_midplane_profile
 
 

@@ -40,7 +40,7 @@ from lmx.operators import (
     gradient_scalar,
     laplacian_scalar,
 )
-from lmx.wall_models import WallLayer
+from lmx.physics import WallLayer
 
 pytestmark = pytest.mark.unit
 

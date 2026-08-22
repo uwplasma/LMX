@@ -15,7 +15,6 @@ from pathlib import Path
 import jax.numpy as jnp
 import numpy as np
 
-from lmx.core import MHDState
 from lmx.freemhd import load_benchmark_a_spec
 from lmx.mesh import generate_layered_duct_mesh, generate_rect_duct_mesh
 from lmx.plotting import write_freemhd_observable_parity_plots
@@ -32,6 +31,7 @@ from lmx.specs import (
     CaseSpec,
     GeometrySpec,
     MagneticFieldSpec,
+    MHDState,
     RegionSpec,
     SolverConfig,
     TimeStepperConfig,
