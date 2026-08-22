@@ -653,13 +653,13 @@ change, a numerical algorithm change, and a history rewrite in one commit.
 ### Phase 0 — lock scope, baselines, and safety
 
 - [x] Create a feature branch; do not refactor directly on `main`.
-- [ ] Restore required GitHub CI and branch protection. Workflow definitions
-  are present and hosted jobs now execute on the canonical `uwplasma/LMX`
-  repository. The stale unpublished SOLVAX compatibility pin was corrected to
-  0.13.0. The monolithic hosted lanes reached 69% without a test failure before
-  runner termination; the exact bounded-shard replacement and combined-coverage
-  gate are pending. Branch protection still requires a plan that supports it
-  for this private repo.
+- [x] Restore required GitHub CI. Bounded Python 3.10 shards, exact combined
+  line/branch coverage, documentation, external links, and the pinned FreeMHD
+  Docker comparison pass on the canonical `uwplasma/LMX` repository.
+- [ ] Enable branch protection when the repository is public or its GitHub plan
+  supports protection for private repositories. The GitHub API currently
+  rejects both branch-protection and ruleset configuration with that explicit
+  account-plan requirement.
 - [x] Record clean-clone, tracked-tree, wheel, module/file/line, import,
   runtime, memory, and test baselines using reproducible commands. The full
   canonical runtime/memory matrix is stored outside the checkout with its
@@ -738,14 +738,14 @@ purpose.
 
 ### Phase 4 — simplify and optimize the supported solver
 
-- [ ] Review every supported source function for ownership and necessity.
-- [ ] Reuse coefficients, factors, preconditioners, and initial guesses.
+- [x] Review every supported source function for ownership and necessity.
+- [x] Reuse coefficients, factors, preconditioners, and initial guesses.
 - [x] Make full histories opt-in and remove plot-only work from solves.
-- [ ] Consolidate JIT boundaries and eliminate hot-path host transfers.
-- [ ] Remove dense/intermediate allocations where matrix-free structure exists.
-- [ ] Benchmark 2-D and 3-D cold, warm, memory, iterations, and physical errors
+- [x] Consolidate JIT boundaries and eliminate hot-path host transfers.
+- [x] Remove dense/intermediate allocations where matrix-free structure exists.
+- [x] Benchmark 2-D and 3-D cold, warm, memory, iterations, and physical errors
   after each change.
-- [ ] Delete every rejected alternative immediately.
+- [x] Delete every rejected alternative immediately.
 
 Exit: performance gates pass, no canonical case regresses >5%, and the planned
 runtime/memory reduction is either achieved or its remaining bottleneck is
@@ -1475,3 +1475,61 @@ surface, measurements, validation, decision, and next action.
 - Next action: push this tranche and require the corrected hosted coverage,
   docs, and external-workflow checks to pass before closing the documentation
   phase. Production-mesh B1/B2 promotion remains a separate acceptance gate.
+
+### 2026-08-22 — invariant-system reuse and hosted validation repair
+
+- Reviewed the retained source definition inventory against the ownership map
+  and live call graph. Every private definition has a source call site; generic
+  Krylov, fixed-point, direct, and preconditioner algorithms remain owned by
+  released SOLVAX. The retained small response systems are physical fixed-flow
+  closures, and the 2-D/3-D elliptic paths remain matrix-free.
+- Bounded 2-D history retention during execution instead of collecting every
+  sample and slicing after the solve. Per-step diagnostics now cross the
+  device/host boundary as one compact vector. Full histories remain available
+  with `history_stride=1`, and restart/stride semantics are unchanged.
+- Separated invariant fully developed coefficient assembly from repeated
+  solves. Potential coefficients, face conductances, volume scaling,
+  preconditioners, velocity coefficients, and constant-field material terms
+  are built once and reused. This removed 17 equivalent static-preconditioner
+  recompilations in the standard Hartmann solve while retaining direct SOLVAX
+  calls and exact terminal numerics.
+- A fresh-process, same-environment comparison used one cold and five warm
+  repetitions per matrix at `b4c6431` and `46b5bf6`. Hartmann 48x48 improved
+  from 11.447 s to 6.399 s cold, 7.936 s to 2.956 s warm median, and 1.719 GB
+  to 0.765 GB peak RSS. Its 17 steps and residual `9.515209016541792e-9`
+  are exact. Reduced B2 warm/RSS changed by +4.18%/-0.13%; reduced B1 changed
+  by +3.78%/-3.47%. Their statuses, steps, residuals, flow, and charge closure
+  are identical. The external record is
+  `/Users/rogeriojorge/local/tests/lmx-audit/performance/lmx-system-reuse-46b5bf6.json`.
+- The portable gate passes 505 tests in 83.1 seconds. Exact combined
+  line/branch coverage is 95.019049% across 5,809 statements and 1,278
+  branches; the curated lane executes all seven examples in 51.0 seconds.
+  Package source is 14,991 measured lines across 15 modules, tests are 11,664
+  lines across 13 files, the tracked checkout is 1,556,867 bytes, and the root
+  API remains 24 names.
+- Ruff, formatting, Actionlint, architecture/import, Sphinx `-W`, build,
+  Twine, distribution inspection, and isolated wheel smoke pass. The wheel is
+  142,773 bytes with 29 members and the source distribution is 133,808 bytes
+  with 35 members. The benchmark command now reports a warm median and
+  coefficient of variation instead of selecting the fastest warm sample.
+- Repeated the pinned B2 Docker workflow on `46b5bf6` with FreeMHD `14b54a3`.
+  The oversubscription-safe two-rank invocation passes execution, artifact,
+  contract, independent-observation, and comparison gates with pressure Linf
+  `0.0109172453` and RMS `0.0045179771`. Its evidence is
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-optimized-46b5bf6/b2`.
+- Hosted coverage and examples now use explicit numerical budgets: the
+  optimized examples and compatibility benchmarks pass the Python 3.10 runner
+  with the proven 300-second per-test ceiling, and exact combined coverage
+  passes in 8 minutes 8 seconds. OpenMPI explicitly permits the declared
+  two-rank smoke inside constrained containers. PR evidence upload is
+  best-effort when the repository artifact quota is exhausted; scheduled and
+  release uploads remain mandatory.
+- Every latest source-bearing hosted gate is green: metadata/architecture,
+  core, validation, examples, benchmarks, physics, exact combined coverage,
+  warnings-as-errors documentation, external links, and the pinned FreeMHD B2
+  Docker comparison.
+- Next action: run production B2 on the declared 201x129x129 fine matrix using
+  a suitable high-memory/GPU runner and establish a genuinely matched external
+  executable for B1. Private branch protection remains unavailable under the
+  current GitHub plan, and no repository-history rewrite occurs without
+  separate explicit approval.
