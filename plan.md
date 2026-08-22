@@ -1253,6 +1253,32 @@ surface, measurements, validation, decision, and next action.
   The report is non-accepting only because the branch has the candidate role.
   Its external record is
   `/Users/rogeriojorge/local/tests/lmx-audit/lmx-fringing-ownership-1ca3735/b2`.
-- Next action: simplify the 3-D orchestration and FreeMHD evidence code toward
-  the 15,000-line and 1,800-line-largest-module targets without changing the
-  retained numerical contracts.
+- Extracted shared 3-D runtime, restart, timing, sharding, and history helpers
+  into one internal owner and moved the rectangular-duct momentum/coupling
+  kernels beside the duct discretization. Every installed source module is now
+  below the final 1,800-line ceiling; the orchestration module is 1,789 lines.
+- Moved Docker/FreeMHD execution and evidence machinery to the repository-only
+  `validation/` surface so it is available to maintainers without becoming
+  installed library API. Kept the stable benchmark-data loaders in
+  `lmx.validation`, including in clean wheels. The package now contains 15
+  modules and 16,669 lines; maintained core source is 6,333 lines, tests are
+  12,599 lines in 14 files, and the sole external validation module is 1,744
+  lines.
+- All 550 tests ran after the final ownership and packaging changes: 545 passed
+  and the same five optional external-data tests skipped. Exact combined
+  line/branch coverage is 95.098775%. Ruff check and format, architecture and
+  import checks, Sphinx warnings-as-errors, clean package build, Twine, and
+  distribution-content audits pass.
+- The clean wheel is 155,803 bytes with 28 members and the source distribution
+  is 146,959 bytes with 34 members. A fresh isolated environment installed the
+  wheel and passed the CLI and every packaged benchmark-data loader without
+  access to the source checkout.
+- Repeated the pinned B2 Docker smoke on committed source `1df69b9`.
+  Execution, artifacts, contract, observation, and comparison passed with no
+  failed checks; pressure Linf is `0.0109172453` and RMS is `0.0045179771`.
+  The report is non-accepting only because the branch has the candidate role.
+  Its external record is
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-owned-runtime-1df69b9/b2`.
+- Next action: reduce package source below 15,000 lines and tests below 12,000
+  lines while profiling the retained 3-D paths and preserving all numerical,
+  packaging, documentation, and independent FreeMHD gates.
