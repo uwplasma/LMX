@@ -1692,6 +1692,13 @@ surface, measurements, validation, decision, and next action.
   B1 ($Ha=6600$, $N=10700$, $c=0.027$), so the case is retained only as a
   distinct future pipe-fringe target. The untracked fail-closed contract is
   `/Users/rogeriojorge/local/tests/lmx-audit/freemhd-s3-buhler-contract-20260822.json`.
-- Next action: commit the immutable candidate, repeat the pinned B2 Docker
-  comparison, and open the LMX 1.2.0 pull request. Two-GPU strong scaling waits
-  for the unrelated office workloads to release both devices.
+- Committed the immutable candidate as `4e4bed3` and repeated the pinned B2
+  Docker comparison. Execution, artifact identity, contract, independent
+  native-output observation, and comparison all pass with no failed checks;
+  pressure $L_\infty=0.0109172453$ and RMS $=0.0045179771$. As required, the
+  harness remains non-accepting only because the branch has the candidate role.
+  Its evidence is
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-q2d-1.2.0-candidate/b2-4e4bed3`.
+- Next action: open the LMX 1.2.0 pull request and require every hosted gate
+  before merge. Two-GPU strong scaling waits for the unrelated office workloads
+  to release both devices.
