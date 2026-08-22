@@ -6416,6 +6416,15 @@ def _solve_extruded_projection(
                     pressure_history=pressure_residual_by_step,
                     electric_history=electric_linear_by_step,
                     potential_history=potential_residual_by_step,
+                    stopping_state=(
+                        step + 1,
+                        0,
+                        "converged"
+                        if converged
+                        else "step_limit"
+                        if step + 1 == outer_steps
+                        else "in_progress",
+                    ),
                 ),
             )
             if converged:
@@ -6471,6 +6480,11 @@ def _solve_extruded_projection(
             boundary_current_residual=boundary_current_residual,
             geometry_kind=case.geometry.kind,
             solver_kind=case.solver.kind,
+            stopping_state=(
+                len(residual_by_step),
+                0,
+                "converged" if converged else "step_limit",
+            ),
             axial_pressure_loss_gradient=axial_pressure_loss_gradient,
             transverse_pressure_difference=jnp.zeros((nx,), dtype=float),
             **_iteration_history_arrays(residual_by_step, component_residual_by_step,

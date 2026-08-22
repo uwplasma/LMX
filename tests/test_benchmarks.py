@@ -466,6 +466,10 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
         checkpoint_interval=1,
     )
 
+    assert solution.steps == 2
+    assert solution.status == "step_limit"
+    assert not solution.converged
+    assert progress[-1].checkpoint.stopping_state == (2, 0, "step_limit")
     assert [item.step for item in progress] == list(range(1, len(progress) + 1))
     assert all(isinstance(item.potential_residual, float) for item in progress)
     assert all(isinstance(value, float) for value in progress[-1].component_residuals)
@@ -493,6 +497,9 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
         progress_callback=restart_progress.append,
     )
     assert len(progress) + len(restart_progress) == 3
+    assert restarted.steps == 1
+    assert restarted.status == "step_limit"
+    assert not restarted.converged
     assert float(benchmarks.jnp.mean(restarted.bundle.mean_velocity)) == pytest.approx(
         1.0, abs=1.0e-8
     )
