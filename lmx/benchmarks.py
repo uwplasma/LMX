@@ -481,7 +481,6 @@ def build_benchmark_b_problem(
         ),
         solver=SolverConfig(
             kind="extruded_inductionless",
-            linear_solver="auto",
             coupling_iterations=64,
             coupling_tolerance=float(spec["solver"]["steady_residual_max"]),
             coupling_acceleration=str(spec["solver"]["coupling_acceleration"]),

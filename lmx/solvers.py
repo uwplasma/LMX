@@ -666,7 +666,7 @@ def _solve_velocity_coefficients(
         return apply_five_point_operator(*coefficients, field)
 
     tiny = jnp.asarray(jnp.finfo(rhs.dtype).tiny, dtype=rhs.dtype)
-    if preconditioner in {"jacobi", "block_jacobi"}:
+    if preconditioner == "jacobi":
         apply_preconditioner = _solvax_jacobi(jnp.maximum(coefficients[0], tiny))
     elif preconditioner == "none":
         apply_preconditioner = None
@@ -695,7 +695,6 @@ def _solve_velocity_system(
     reaction: jnp.ndarray,
     rhs: jnp.ndarray,
     active_mask: jnp.ndarray,
-    linear_solver: str,
     preconditioner: str,
     max_steps: int,
     tolerance: float,
@@ -712,8 +711,6 @@ def _solve_velocity_system(
         rhs_scaled,
         jnp.zeros_like(rhs_masked),
     )
-    if linear_solver.lower() not in {"auto", "cg", "solvax_pcg"}:
-        raise ValueError(f"Unsupported linear solver {linear_solver!r}")
     field, residual, iterations = _solve_velocity_coefficients(
         coefficients,
         rhs_scaled,
@@ -1491,7 +1488,6 @@ def _fully_developed_case_step(
     step_time: float,
     potential_solver: str,
     target_mean_velocity: float | None,
-    linear_solver: str,
     preconditioner: str,
     coupling_iterations: int,
     coupling_tolerance: float,
@@ -1644,7 +1640,6 @@ def _fully_developed_case_step(
                     reaction=reaction,
                     rhs=rhs,
                     active_mask=active_mask,
-                    linear_solver=linear_solver,
                     preconditioner=preconditioner,
                     max_steps=max(case.time_stepper.max_steps, case.solver.coupling_iterations * 25),
                     tolerance=velocity_linear_tolerance,
@@ -1660,7 +1655,6 @@ def _fully_developed_case_step(
                     reaction=reaction,
                     rhs=rhs_base,
                     active_mask=active_mask,
-                    linear_solver=linear_solver,
                     preconditioner=preconditioner,
                     max_steps=max(case.time_stepper.max_steps, case.solver.coupling_iterations * 25),
                     tolerance=velocity_linear_tolerance,
@@ -1672,7 +1666,6 @@ def _fully_developed_case_step(
                 reaction=reaction,
                 rhs=unit_rhs,
                 active_mask=active_mask,
-                linear_solver=linear_solver,
                 preconditioner=preconditioner,
                 max_steps=max(case.time_stepper.max_steps, case.solver.coupling_iterations * 25),
                 tolerance=velocity_linear_tolerance,
@@ -1855,7 +1848,6 @@ def _solve_fully_developed(
     potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
     if potential_solver == "cg" and not _has_uniform_spacing(mesh):
         potential_solver = "cg_volume"
-    linear_solver = "solvax_pcg" if case.solver.linear_solver == "auto" else case.solver.linear_solver
     if case.geometry.kind not in {"rect_duct", "layered_duct"}:
         raise NotImplementedError(
             f"Solver {case.solver.kind!r} does not yet support geometry {case.geometry.kind!r}"
@@ -1888,7 +1880,7 @@ def _solve_fully_developed(
         mesh=mesh,
         materials=materials,
         mode=case.solver.mode,
-        potential_solver=f"{potential_solver} / {linear_solver}",
+        potential_solver=f"{potential_solver} / solvax_pcg",
         target_mean_velocity=target_mean_velocity,
         reference_mean_velocity=reference_mean_velocity,
         restart=restart_info,
@@ -1962,7 +1954,6 @@ def _solve_fully_developed(
             step_time=step_time,
             potential_solver=potential_solver,
             target_mean_velocity=target_mean_velocity,
-            linear_solver=linear_solver,
             preconditioner=case.solver.preconditioner,
             coupling_iterations=step_coupling_iterations,
             coupling_tolerance=step_coupling_tolerance,

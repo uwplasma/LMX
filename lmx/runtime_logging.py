@@ -116,7 +116,7 @@ class StreamingSolverLogger:
         )
         if solver is not None:
             self._write(
-                f"Solver controls             : linearSolver={solver.linear_solver}, preconditioner={solver.preconditioner}, "
+                f"Solver controls             : linearSolver=solvax_pcg, preconditioner={solver.preconditioner}, "
                 f"timeScheme={solver.time_scheme}, couplingIterations={solver.coupling_iterations}, "
                 f"couplingTolerance={solver.coupling_tolerance:.6e}"
             )

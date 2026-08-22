@@ -4323,7 +4323,6 @@ def build_pipe_ogrid_extruded_problem(
         solver=SolverConfig(
             kind="extruded_inductionless",
             mode="steady",
-            linear_solver="auto",
             preconditioner="jacobi",
             time_scheme="implicit_euler",
             coupling_iterations=8,

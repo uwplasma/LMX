@@ -27,7 +27,6 @@ ramp_duration = 0.0
 [solver]
 kind = "fully_developed_inductionless"
 mode = "steady"
-linear_solver = "auto"
 preconditioner = "jacobi"
 time_scheme = "implicit_euler"
 coupling_iterations = 16

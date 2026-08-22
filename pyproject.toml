@@ -39,6 +39,7 @@ dev = [
   "pytest-cov",
   "pytest-timeout",
   "pytest-xdist",
+  "ruff>=0.16,<1",
 ]
 docs = [
   "sphinx",

@@ -258,7 +258,6 @@ def test_hunt_fully_developed_velocity_linear_solve_is_well_conditioned():
         reaction=reaction,
         rhs=rhs,
         active_mask=active_mask,
-        linear_solver="cg",
         preconditioner="jacobi",
         max_steps=40,
         tolerance=1e-8,
@@ -1011,7 +1010,6 @@ def test_solve_velocity_system_returns_zero_outside_active_mask():
         reaction=reaction,
         rhs=rhs,
         active_mask=active_mask,
-        linear_solver="cg",
         preconditioner="jacobi",
         max_steps=64,
         tolerance=1.0e-10,
@@ -1023,41 +1021,6 @@ def test_solve_velocity_system_returns_zero_outside_active_mask():
     assert float(residual) >= 0.0
     assert int(iterations) >= 0
     assert float(initial_residual) >= 0.0
-
-
-def test_velocity_solver_cg_alias_uses_solvax_and_preserves_mask():
-    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=6, nz=6)
-    diffusivity = jnp.ones(mesh.yz_shape) * 0.1
-    reaction = jnp.ones(mesh.yz_shape) * 0.05
-    rhs = jnp.arange(1.0, 37.0).reshape(mesh.yz_shape) / 36.0
-    active_mask = jnp.ones(mesh.yz_shape, dtype=bool)
-    active_mask = active_mask.at[[0, -1], :].set(False)
-    active_mask = active_mask.at[:, [0, -1]].set(False)
-
-    common = dict(
-        mesh=mesh,
-        diffusivity=diffusivity,
-        reaction=reaction,
-        rhs=rhs,
-        active_mask=active_mask,
-        preconditioner="jacobi",
-        max_steps=80,
-        tolerance=1.0e-10,
-    )
-    aliased = solvers._solve_velocity_system(linear_solver="cg", **common)
-    released = solvers._solve_velocity_system(linear_solver="solvax_pcg", **common)
-
-    aliased_field, aliased_residual, _, aliased_initial = aliased
-    solvax_field, solvax_residual, _, solvax_initial = released
-    assert jnp.all(solvax_field[~active_mask] == 0.0)
-    assert jnp.allclose(solvax_field, aliased_field, rtol=1.0e-9, atol=1.0e-10)
-    assert float(aliased_residual) <= 1.0e-10
-    assert float(solvax_residual) <= 1.0e-10
-    assert float(aliased_initial) == pytest.approx(float(solvax_initial))
-
-    for unsupported in ("gmres", "bicgstab", "bad"):
-        with pytest.raises(ValueError, match="Unsupported linear solver"):
-            solvers._solve_velocity_system(linear_solver=unsupported, **common)
 
 
 def test_velocity_system_coefficients_cover_connected_and_boundary_fallback_paths():
@@ -1259,7 +1222,6 @@ def test_fully_developed_case_step_rejects_non_implicit_transient_scheme():
             step_time=case.time_stepper.dt,
             potential_solver="jacobi",
             target_mean_velocity=None,
-            linear_solver="cg",
             preconditioner="jacobi",
             coupling_iterations=1,
             coupling_tolerance=1.0e-6,
@@ -1338,7 +1300,6 @@ def test_fully_developed_case_step_uses_explicit_forcing_when_no_target_velocity
         step_time=case.time_stepper.dt,
         potential_solver="jacobi",
         target_mean_velocity=None,
-        linear_solver="cg",
         preconditioner="jacobi",
         coupling_iterations=1,
         coupling_tolerance=1.0e-6,
@@ -1433,7 +1394,6 @@ def test_fully_developed_case_step_does_not_double_count_implicit_magnetic_react
         step_time=case.time_stepper.dt,
         potential_solver="jacobi",
         target_mean_velocity=None,
-        linear_solver="cg",
         preconditioner="jacobi",
         coupling_iterations=1,
         coupling_tolerance=1.0e-6,
@@ -1521,7 +1481,6 @@ def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity
         step_time=case.time_stepper.dt,
         potential_solver="jacobi",
         target_mean_velocity=0.7,
-        linear_solver="cg",
         preconditioner="jacobi",
         coupling_iterations=1,
         coupling_tolerance=1.0e-6,
@@ -2133,7 +2092,6 @@ def test_fully_developed_case_step_uses_direct_wall_interpolation_for_rectangula
         step_time=0.0,
         potential_solver="cg",
         target_mean_velocity=None,
-        linear_solver="cg",
         preconditioner="jacobi",
         coupling_iterations=1,
         coupling_tolerance=1.0e-8,
@@ -2353,7 +2311,6 @@ def test_fully_developed_case_step_covers_forcing_and_target_velocity_paths():
         step_time=forcing_case.time_stepper.dt,
         potential_solver="cg",
         target_mean_velocity=None,
-        linear_solver="cg",
         preconditioner="jacobi",
         coupling_iterations=2,
         coupling_tolerance=1e-6,
@@ -2376,7 +2333,6 @@ def test_fully_developed_case_step_covers_forcing_and_target_velocity_paths():
         step_time=flow_case.time_stepper.dt,
         potential_solver="cg",
         target_mean_velocity=solvers._target_mean_velocity(flow_case),
-        linear_solver="cg",
         preconditioner="jacobi",
         coupling_iterations=2,
         coupling_tolerance=1e-6,

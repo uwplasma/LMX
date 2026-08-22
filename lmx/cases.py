@@ -82,7 +82,6 @@ def _fully_developed_solver(mode: str = "steady") -> SolverConfig:
     return SolverConfig(
         kind="fully_developed_inductionless",
         mode=mode,
-        linear_solver="auto",
         preconditioner="jacobi",
         time_scheme="implicit_euler",
         coupling_iterations=16,

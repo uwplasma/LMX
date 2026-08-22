@@ -23,8 +23,7 @@ MagneticFieldKind = Literal["constant", "analytic", "tabulated"]
 PotentialSolverKind = Literal["auto", "jacobi", "cg", "cg_volume"]
 CurrentReconstructionKind = Literal["cell_centered", "face_averaged", "hybrid_face_lorentz"]
 VelocityUpdateLimiterKind = Literal["global_scale", "local_clip"]
-LinearSolverKind = Literal["auto", "cg", "solvax_pcg"]
-PreconditionerKind = Literal["none", "jacobi", "block_jacobi"]
+PreconditionerKind = Literal["none", "jacobi"]
 TimeSchemeKind = Literal["implicit_euler", "crank_nicolson"]
 CouplingAccelerationKind = Literal["none", "aitken", "anderson"]
 MagneticAxisKind = Literal["x", "y", "z"]
@@ -70,7 +69,6 @@ class MagneticFieldSpec:
 class SolverConfig:
     kind: SolverKind = "fully_developed_inductionless"
     mode: SolveMode = "steady"
-    linear_solver: LinearSolverKind = "auto"
     preconditioner: PreconditionerKind = "jacobi"
     time_scheme: TimeSchemeKind = "implicit_euler"
     coupling_iterations: int = 12

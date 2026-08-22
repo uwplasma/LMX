@@ -243,7 +243,6 @@ def load_run_config(path: str | Path) -> RunConfig:
     solver = SolverConfig(
         kind=solver_kind,
         mode=solver_mode,
-        linear_solver=str(solver_table.get("linear_solver", "auto")),
         preconditioner=str(solver_table.get("preconditioner", "jacobi")),
         time_scheme=str(solver_table.get("time_scheme", "implicit_euler")),
         coupling_iterations=int(solver_table.get("coupling_iterations", 12)),

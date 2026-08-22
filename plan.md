@@ -864,6 +864,7 @@ artifacts or release assets, not committed files.
 | D-016 | Use one explicit current restart-schema family for state, compact flux, Aitken, and Anderson checkpoints | A single fail-closed contract is easier to reason about, test, and document than internal format-version branches. |
 | D-017 | Keep the executed matched B2 Docker path and remove the private straight-pipe archive smoke | The private lane explicitly could not establish B1 equation/observable parity and duplicated the accepted B2 execution boundary; B1 remains protected by internal/manufactured gates until a genuinely matched external case exists. |
 | D-018 | Use Ruff with a 110-column limit for all maintained Python | The numerical expressions remain readable, every file has one formatter, and the format reduces line count without hand-compressed layouts. |
+| D-019 | Expose one SOLVAX PCG velocity path instead of naming identical `auto`, `cg`, and `solvax_pcg` choices | LMX assembles and certifies the physical system; a user-facing switch between aliases of the same released algorithm adds no flexibility. |
 
 ## Work log
 
@@ -1167,5 +1168,14 @@ surface, measurements, validation, decision, and next action.
   failed checks; pressure Linf is `0.0109172453` and RMS is `0.0045179771`.
   The external record is
   `/Users/rogeriojorge/local/tests/lmx-audit/lmx-capability-trim-5ed4c4b/b2`.
+- Removed the `linear_solver` configuration parameter and its three aliases;
+  the fully developed velocity system now has one direct SOLVAX PCG path.
+  Collapsed the identical `block_jacobi` name into `jacobi`, retaining the
+  deliberate `none`/`jacobi` preconditioner choice. All 550 tests passed with
+  five optional external-data skips and exact line/branch coverage of
+  95.144560%. Package source is 18,142 lines and tests are 12,589 lines.
+- Added Ruff to the declared development extra after the first hosted quality
+  job correctly reported that the executable was absent; local lint, format,
+  architecture, and test gates pass with the declared configuration.
 - Next action: decompose and consolidate the retained 3-D and FreeMHD paths
   toward the final source/module ceilings.
