@@ -1571,6 +1571,10 @@ surface, measurements, validation, decision, and next action.
   Manual benchmark JSON is always printed in the job log, while its
   convenience artifact copy is best-effort during GitHub's documented quota
   recalculation delay. Scheduled/release evidence remains fail-closed.
+- Updated the official GitHub actions to their current Node-runtime majors:
+  checkout and setup-python v7, upload-artifact v7, and download-artifact v8.
+  This removes forced deprecated-runtime execution without adding workflow
+  files or changing numerical gates.
 - Next action: obtain production hardware and a matched B1 executable, then
   require the complete production evidence before publication. Replacing live
   history with the reviewed root, deleting refs, force-pushing, and measuring

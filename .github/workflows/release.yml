@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-lmx
         with:
           extras: dev,docs
@@ -47,7 +47,7 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-lmx
         with:
           extras: release
@@ -81,7 +81,7 @@ jobs:
           solution = solve(make_hartmann_case(ha=5, ny=4, nz=4))
           assert solution.state.residual < 1e-7
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: python-distributions
           path: dist/
@@ -96,7 +96,7 @@ jobs:
       name: testpypi
       url: https://test.pypi.org/p/lmx
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: python-distributions
           path: dist/
@@ -114,7 +114,7 @@ jobs:
       name: pypi
       url: https://pypi.org/p/lmx
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: python-distributions
           path: dist/
