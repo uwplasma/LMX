@@ -1228,5 +1228,10 @@ surface, measurements, validation, decision, and next action.
   and distribution-content gates pass. The module regression ceiling is
   ratcheted to 13, leaving room for an owned decomposition of the 3-D solver
   while retaining the final 16-module ceiling.
+- Repeated the pinned B2 Docker smoke on committed source `99eac41`.
+  Execution, artifacts, contract, observation, and comparison passed with no
+  failed checks and unchanged pressure errors. The report is non-accepting only
+  because the branch has the candidate role. Its external record is
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-solver-ownership-99eac41/b2`.
 - Next action: decompose and consolidate the retained 3-D and FreeMHD paths
   toward the final source/module ceilings.
