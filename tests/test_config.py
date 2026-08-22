@@ -1,6 +1,7 @@
 import ast
 import inspect
 import json
+import os
 import subprocess
 import sys
 import tarfile
@@ -305,13 +306,14 @@ def test_shipped_example_toml_files_parse():
         assert config.case.regions
 
 
-def test_four_tutorials_map_to_ci_executed_examples():
+def test_tutorials_map_to_executable_examples_or_numerical_tests():
     root = Path(__file__).resolve().parents[1]
     tutorial_paths = sorted((root / "docs/tutorials").glob("*.md"))
     expected = {
         "differentiation.md",
         "fringing.md",
         "fully_developed.md",
+        "q2d.md",
         "walls_and_fields.md",
     }
     assert {path.name for path in tutorial_paths} == expected
@@ -320,7 +322,8 @@ def test_four_tutorials_map_to_ci_executed_examples():
     documented = {Path(item["docs"]).name for item in catalog["example"]}
     index = (root / "docs/index.md").read_text()
     for path in tutorial_paths:
-        assert path.name in documented
+        if path.name != "differentiation.md":
+            assert path.name in documented
         assert f"tutorials/{path.stem}" in index
         assert "```python" in path.read_text()
 
@@ -358,6 +361,8 @@ EXPECTED_ROOT_API = {
     "make_hartmann_case",
     "make_shercliff_case",
     "make_hunt_case",
+    "make_q2d_case",
+    "Q2DProblem",
     "solve",
     "generate_rect_duct_mesh",
     "generate_rect_duct_mesh_from_faces",
@@ -496,11 +501,11 @@ def test_curated_examples_use_submodules_and_linear_scripts_are_editable() -> No
         root_imports = {alias.name for node in imports for alias in node.names}
         assert root_imports <= stable, f"{path} imports unsupported root APIs: {root_imports - stable}"
         linear_limits = {
-            "autodiff_design_demo.py": 160,
             "fringing_benchmark_demo.py": 160,
             "hartmann_example.py": 160,
             "hunt_example.py": 160,
             "li_aln_wall_stack_example.py": 260,
+            "q2d_turbulence_demo.py": 140,
             "variable_field_extruded_demo.py": 160,
         }
         if path.name in linear_limits:
@@ -522,10 +527,19 @@ def test_curated_examples_declare_user_facing_contracts(tmp_path: Path) -> None:
         assert item["outputs"]
         assert item["runtime"] in {"portable", "accelerator-optional"}
         assert Path(item["docs"]).is_file()
-    autodiff = Path(__file__).resolve().parents[1] / "examples/autodiff_design_demo.py"
-    subprocess.run([sys.executable, autodiff], cwd=tmp_path, timeout=30, check=True)
-    design_path = next((tmp_path / "artifacts").rglob("autodiff_summary.json"))
-    design = json.loads(design_path.read_text())
-    assert design["recovered"]["forcing"] == pytest.approx(1.0, abs=0.02)
-    assert design["recovered"]["loss"] < design["optimization_history"][0]["loss"] * 1.0e-3
-    assert all((design_path.parent / name).is_file() for name in design["plots"])
+    q2d = Path(__file__).resolve().parents[1] / "examples/q2d_turbulence_demo.py"
+    root = q2d.parents[1]
+    environment = {
+        **os.environ,
+        "PATH": str(tmp_path),
+        "PYTHONPATH": os.pathsep.join((str(root / "src"), os.environ.get("PYTHONPATH", ""))),
+    }
+    subprocess.run([sys.executable, q2d], cwd=tmp_path, timeout=30, check=True, env=environment)
+    summary_path = next((tmp_path / "artifacts").rglob("q2d_vortex_decay.json"))
+    summary = json.loads(summary_path.read_text())
+    assert summary["status"] == "completed"
+    assert summary["frames"] == 41
+    assert summary["diagnostics"]["kinetic_energy_final"] < summary["diagnostics"]["kinetic_energy_initial"]
+    assert (summary_path.parent / summary["poster"]).is_file()
+    if summary["movie"] is not None:
+        assert (summary_path.parent / summary["movie"]).is_file()

@@ -5,8 +5,8 @@ type: software
 authors:
   - family-names: Jorge
     given-names: Rogerio
-version: 1.1.3
-date-released: 2026-05-01
+version: 1.2.0
+date-released: 2026-08-22
 repository-code: "https://github.com/uwplasma/LMX"
 url: "https://lmx.readthedocs.io/"
 license: MIT
@@ -18,6 +18,7 @@ keywords:
   - fusion engineering
 abstract: >-
   LMX solves incompressible, inductionless liquid-metal MHD in fully developed
-  duct cross-sections and three-dimensional extruded ducts and pipes with
-  spatially varying imposed magnetic fields. It provides JAX execution,
-  analytical and manufactured verification, and reproducible FreeMHD comparison.
+  duct cross-sections, periodic quasi-two-dimensional flow, and three-dimensional
+  extruded ducts and pipes with spatially varying imposed magnetic fields. It
+  provides JAX execution, analytical and manufactured verification, and
+  reproducible FreeMHD comparison.

@@ -6,6 +6,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
+import lmx
 import lmx.cases as cases_impl
 from lmx.cases import (
     build_hartmann_autodiff_problem,
@@ -30,6 +31,7 @@ from lmx.physics import (
     build_material_fields,
     magnetic_field_components,
 )
+from lmx.q2d import Q2DProblem, make_q2d_case, solve_q2d
 from lmx.solvers import _build_mesh
 from lmx.specs import (
     BoundaryCondition,
@@ -584,3 +586,93 @@ def test_mean_velocity_gradients_match_finite_difference(hartmann_problem):
     assert jnp.isfinite(autodiff["d_mean_velocity_d_ha"])
     assert float(jnp.abs(autodiff["d_mean_velocity_d_forcing"] - finite_forcing)) < 5.0e-2
     assert float(jnp.abs(autodiff["d_mean_velocity_d_ha"] - finite_ha)) < 5.0e-2
+
+
+@pytest.mark.physics
+def test_q2d_model_contract_refinement_and_failures():
+    case = make_q2d_case(
+        shape=(18, 18),
+        length=(2.0 * np.pi, 3.0 * np.pi),
+        mode=(2, 3),
+        viscosity=0.02,
+        hartmann_friction=0.3,
+        dt=0.01,
+        steps=4,
+        history_stride=2,
+    )
+    result = lmx.solve(case)
+    wave_number_squared = (2.0 * np.pi * 2 / case.length[0]) ** 2 + (2.0 * np.pi * 3 / case.length[1]) ** 2
+    expected = case.initial_vorticity * jnp.exp(
+        -(case.viscosity * wave_number_squared + case.hartmann_friction) * case.dt * case.steps
+    )
+
+    assert result.converged and result.status == "completed" and result.steps == 4
+    assert result.fields is result
+    assert result.vorticity == pytest.approx(expected, rel=2.0e-6, abs=2.0e-7)
+    assert result.vorticity_history.shape == (3, 18, 18)
+    assert result.frame_times == pytest.approx([0.0, 0.02, 0.04])
+    assert result.diagnostics.energy_budget_residual < 2.0e-6
+    assert result.diagnostics.max_divergence < 1.0e-6
+    assert result.residual < 2.0e-6
+
+    x = jnp.arange(18) * 2.0 * jnp.pi / 18
+    initial = (jnp.sin(x[:, None]) * jnp.cos(2.0 * x[None, :])).astype(jnp.float32)
+    forcing = 0.03 * jnp.cos(3.0 * x[:, None] - x[None, :])
+    forced = solve_q2d(
+        Q2DProblem(
+            initial,
+            forcing=forcing,
+            viscosity=0.01,
+            hartmann_friction=0.2,
+            dt=0.002,
+            steps=4,
+        )
+    )
+
+    assert forced.vorticity_history.shape == (0, 18, 18)
+    assert forced.vorticity.dtype == jnp.float32
+    assert forced.frame_times.size == 0
+    assert jnp.isfinite(forced.vorticity).all()
+    assert forced.diagnostics.kinetic_energy_final > 0.0
+    assert forced.diagnostics.enstrophy_final > 0.0
+
+    def solve_on_grid(size):
+        coordinate = jnp.arange(size) * 2.0 * jnp.pi / size
+        x, y = coordinate[:, None], coordinate[None, :]
+        vorticity = jnp.sin(x) * jnp.sin(y) + 0.4 * jnp.sin(2.0 * x + 0.2) * jnp.sin(3.0 * y)
+        return np.asarray(
+            solve_q2d(
+                Q2DProblem(
+                    vorticity,
+                    viscosity=0.003,
+                    hartmann_friction=0.04,
+                    dt=0.005,
+                    steps=4,
+                )
+            ).vorticity
+        )
+
+    coarse, medium, reference = (solve_on_grid(size) for size in (9, 18, 36))
+    coarse_error = np.linalg.norm(coarse - reference[::4, ::4]) / np.linalg.norm(reference[::4, ::4])
+    medium_error = np.linalg.norm(medium - reference[::2, ::2]) / np.linalg.norm(reference[::2, ::2])
+
+    assert coarse_error < 5.0e-3
+    assert medium_error < coarse_error * 0.1
+
+    unstable = solve_q2d(
+        make_q2d_case(shape=(18, 18), amplitude=20.0, viscosity=0.0, hartmann_friction=0.0, dt=0.1, steps=4)
+    )
+    assert unstable.status == "courant_limit_exceeded"
+    assert not unstable.converged
+
+    invalid = (
+        (lambda: Q2DProblem(jnp.zeros(4)), "2-D array"),
+        (lambda: Q2DProblem(jnp.zeros((4, 4)), forcing=jnp.zeros((3, 4))), "must match"),
+        (lambda: Q2DProblem(jnp.zeros((4, 4)), length=(0.0, 1.0)), "positive"),
+        (lambda: Q2DProblem(jnp.zeros((4, 4)), viscosity=-1.0), "non-negative"),
+        (lambda: Q2DProblem(jnp.zeros((4, 4)), dt=0.0), "dt and steps"),
+        (lambda: make_q2d_case(mode=(0, 1)), "describe two axes"),
+    )
+    for action, message in invalid:
+        with pytest.raises(ValueError, match=message):
+            action()

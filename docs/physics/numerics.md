@@ -33,6 +33,21 @@ LMX calls these algorithms with MHD-specific operator actions and then certifies
 the returned state in physical units. This keeps solver policy reusable without
 moving geometry or physics into SOLVAX.
 
+## Q2D spectral evolution
+
+The periodic Q2D path uses full complex Fourier transforms, the two-thirds
+dealiasing rule for the vorticity-advection product, and fourth-order
+integrating-factor Runge--Kutta time stepping. Viscous and Hartmann-friction
+terms are integrated exactly within each step. SOLVAX supplies the reusable
+periodic Poisson symbol and zero-mean spectral inversion for the streamfunction;
+LMX owns vorticity dynamics, velocity reconstruction, the energy identity, and
+physical acceptance.
+
+The largest stable integration segment is JIT compiled. A positive
+`history_stride` divides a run into compiled segments and transfers only the
+requested vorticity frames to the host; zero retains no field history. This
+keeps the default device-memory cost independent of the number of time steps.
+
 ## Accuracy and performance
 
 Analytical and manufactured tests check observed order on refined meshes.
