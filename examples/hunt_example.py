@@ -9,7 +9,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
-from lmx import make_hunt_case, solve_steady
+from lmx import make_hunt_case, solve
 from lmx.io import write_case_overview_plots, write_solution_outputs
 from lmx.validation import validation_summary
 
@@ -80,7 +80,7 @@ case = replace(
 )
 
 # Run the solve and write the standard solution products.
-solution = solve_steady(case)
+solution = solve(case)
 generated = write_solution_outputs(solution, case, OUTPUT_DIR)
 plots = (
     write_case_overview_plots(

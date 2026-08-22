@@ -309,6 +309,24 @@ class ExtrudedInductionlessSolution:
 
         return self.status == "converged"
 
+    @property
+    def residual(self) -> float:
+        """Terminal normalized outer residual."""
+
+        return float(self.validation.max_residual)
+
+    @property
+    def fields(self) -> ExtrudedFieldBundle:
+        """Final three-dimensional fields and restart state."""
+
+        return self.bundle
+
+    @property
+    def diagnostics(self) -> ExtrudedInductionlessValidation:
+        """Compact physical and numerical acceptance metrics."""
+
+        return self.validation
+
 
 class NumericalFailure(RuntimeError):
     """Raised when a solver produces nonfinite numerical state."""
@@ -369,6 +387,18 @@ class Solution:
     converged: bool | None = None
     status: str = "not_recorded"
     steps: int = 0
+
+    @property
+    def residual(self) -> float:
+        """Terminal normalized solver residual."""
+
+        return float(self.state.residual)
+
+    @property
+    def fields(self) -> MHDState:
+        """Final fully developed MHD state."""
+
+        return self.state
 
 
 def zeros_state(mesh: StructuredMesh) -> MHDState:

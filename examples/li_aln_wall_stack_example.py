@@ -24,9 +24,9 @@ from lmx import (
     magnetic_reynolds_number,
     normal_stack_leakage_ratio,
     reynolds_number,
-    solve_steady,
     tangential_stack_conductance_ratio,
 )
+from lmx.cases import solve_steady
 from lmx.specs import (
     BoundaryCondition,
     CaseSpec,

@@ -10,7 +10,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
-from lmx import make_hartmann_case, solve_steady
+from lmx import make_hartmann_case, solve
 from lmx.io import write_case_overview_plots, write_solution_outputs
 from lmx.validation import hartmann_validation, validation_summary
 
@@ -71,7 +71,7 @@ case = replace(
 )
 
 # Run, validate against the analytical profile, and save reusable fields.
-solution = solve_steady(case)
+solution = solve(case)
 comparison = hartmann_validation(solution, HARTMANN_NUMBER)
 generated = write_solution_outputs(solution, case, OUTPUT_DIR)
 plots = (

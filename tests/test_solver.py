@@ -21,7 +21,13 @@ from lmx.physics import (
     magnetic_field_components,
     magnetic_ramp_scale,
 )
-from lmx.specs import BoundaryCondition, GeometrySpec, NumericalFailure
+from lmx.specs import (
+    BoundaryCondition,
+    ExtrudedInductionlessProblem,
+    FringingProfile,
+    GeometrySpec,
+    NumericalFailure,
+)
 
 
 def _fake_step_result(u, **overrides):
@@ -441,6 +447,22 @@ def test_public_solvers_reject_unknown_solver_kind(solver, mode):
     bad = replace(case, solver=replace(case.solver, kind="definitely_missing"))
     with pytest.raises(NotImplementedError, match=f"not implemented for {mode} runs"):
         solver(bad)
+
+
+def test_common_solve_dispatches_configured_mode_and_fringing(monkeypatch: pytest.MonkeyPatch):
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    steady_result, transient_result, extruded_result = object(), object(), object()
+    monkeypatch.setattr(cases_impl, "solve_steady", lambda model: steady_result)
+    monkeypatch.setattr(cases_impl, "solve_transient", lambda model: transient_result)
+    assert cases_impl.solve(case) is steady_result
+    assert cases_impl.solve(replace(case, solver=replace(case.solver, mode="transient"))) is transient_result
+
+    profile = FringingProfile(x=jnp.ones(1), field_scale=jnp.ones(1), axis="z")
+    problem = ExtrudedInductionlessProblem(case=case, profile=profile)
+    monkeypatch.setattr("lmx.fringing.solve_extruded_inductionless", lambda model: extruded_result)
+    assert cases_impl.solve(problem) is extruded_result
+    with pytest.raises(TypeError, match="CaseSpec or ExtrudedInductionlessProblem"):
+        cases_impl.solve(SimpleNamespace())
 
 
 def test_transient_restart_can_append_diagnostics(
@@ -1477,6 +1499,8 @@ def test_fully_developed_steady_stops_once_residual_reaches_tolerance(
     assert solution.diagnostics.linear_residual_history.shape[0] == 3
     assert solution.state.time == pytest.approx(3 * case.time_stepper.dt)
     assert solution.state.residual == pytest.approx(1.0e-5)
+    assert solution.residual == pytest.approx(1.0e-5)
+    assert solution.fields is solution.state
     assert solution.converged is True
     assert solution.status == "converged"
     assert solution.steps == 3

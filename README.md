@@ -33,10 +33,10 @@ Plots are optional: `python -m pip install "lmx[visualization]"`.
 import lmx
 
 case = lmx.make_hartmann_case(ha=20.0, ny=48, nz=48)
-result = lmx.solve_steady(case)
+result = lmx.solve(case)
 
 print(result.converged, result.status)
-print(result.state.residual)
+print(result.residual)
 ```
 
 The case object contains the geometry, materials, imposed field, boundary
@@ -51,10 +51,8 @@ lmx examples/hartmann_case.toml --plots
 ## Solve a three-dimensional fringe
 
 ```python
-from lmx.fringing import (
-    build_square_duct_extruded_problem,
-    solve_extruded_inductionless,
-)
+import lmx
+from lmx.fringing import build_square_duct_extruded_problem
 
 problem = build_square_duct_extruded_problem(
     ha_peak=20.0,
@@ -65,7 +63,7 @@ problem = build_square_duct_extruded_problem(
     ny=24,
     nz=24,
 )
-result = solve_extruded_inductionless(problem)
+result = lmx.solve(problem)
 
 print(result.converged, result.validation.max_charge_balance_residual)
 ```
@@ -81,7 +79,7 @@ vector fields use the same problem interface.
 
 | Capability | Interface | Evidence |
 |---|---|---|
-| Hartmann, Shercliff, and Hunt flow | `lmx.make_*_case`, `solve_steady` | analytical profiles, conservation, power balance, mesh convergence |
+| Hartmann, Shercliff, and Hunt flow | `lmx.make_*_case`, `solve` | analytical profiles, conservation, power balance, mesh convergence |
 | Conducting and insulating wall layers | `WallLayer`, layered mesh builders | interface-current and layer-resolution gates |
 | 3-D rectangular fringing fields | `lmx.fringing` | manufactured operators, projection, restart, Benchmark B2 |
 | 3-D pipe fringing fields | `lmx.fringing` | mapped operators, current closure, fixed-flow and Benchmark B1 gates |

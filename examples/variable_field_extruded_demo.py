@@ -10,11 +10,11 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+from lmx import solve
 from lmx.cases import make_shercliff_case
 from lmx.fringing import (
     ExtrudedInductionlessProblem,
     smooth_fringing_profile,
-    solve_extruded_inductionless,
     validate_variable_field_extruded_solution,
 )
 from lmx.io import write_extruded_overview_plots
@@ -78,7 +78,7 @@ profile = smooth_fringing_profile(
     axis="z",
 )
 problem = ExtrudedInductionlessProblem(case=case, profile=profile)
-solution = solve_extruded_inductionless(problem)
+solution = solve(problem)
 
 # Save flow, field-scale, and conservation diagnostics from the solved state.
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

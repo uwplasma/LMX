@@ -89,12 +89,15 @@ def test_extruded_solution_reports_terminal_state():
         problem=SimpleNamespace(),
         bundle=SimpleNamespace(stopping_state=(7, 2, "step_limit")),
         station_history=(),
-        validation=SimpleNamespace(),
+        validation=SimpleNamespace(max_residual=1.0e-5),
     )
 
     assert solution.steps == 7
     assert solution.status == "step_limit"
     assert solution.converged is False
+    assert solution.residual == pytest.approx(1.0e-5)
+    assert solution.fields is solution.bundle
+    assert solution.diagnostics is solution.validation
 
 
 def test_extruded_solver_rejects_nonfinite_result(monkeypatch: pytest.MonkeyPatch):

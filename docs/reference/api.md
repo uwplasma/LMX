@@ -7,12 +7,17 @@ live in the module that owns their concepts.
 
 | Area | Names |
 |---|---|
-| Cases and solves | `make_hartmann_case`, `make_shercliff_case`, `make_hunt_case`, `solve_steady`, `solve_transient` |
+| Cases and solves | `make_hartmann_case`, `make_shercliff_case`, `make_hunt_case`, `solve` |
 | Meshes | `generate_rect_duct_mesh`, `generate_rect_duct_mesh_from_faces`, `generate_layered_duct_mesh`, `generate_layered_duct_mesh_from_fluid_faces`, `generate_multilayer_duct_mesh` |
 | Wall models | `WallLayer`, `wall_conductance_ratio`, `effective_pinhole_conductance_ratio`, `tangential_stack_conductance_ratio`, `normal_stack_leakage_ratio`, `equivalent_single_layer`, `nested_wall_layer_resolution_summary` |
 | Units | `dynamic_to_kinematic_viscosity`, `kinematic_to_dynamic_viscosity`, `hartmann_number`, `reynolds_number`, `interaction_parameter`, `magnetic_reynolds_number`, `magnetic_field_from_hartmann` |
-| Evidence | `fully_developed_power_balance` and the analytical, conservation, and packaged benchmark tools in `lmx.validation` |
+| Evidence | Power balance in `lmx.solvers` and the analytical, conservation, and packaged benchmark tools in `lmx.validation` |
 | Runtime | `enable_compilation_cache` |
+
+`solve(model)` accepts either a `CaseSpec` or an
+`ExtrudedInductionlessProblem`. Both result types expose `converged`, `status`,
+`steps`, `residual`, `fields`, and `diagnostics`; specialized solve functions
+provide restart, progress, logging, and timing hooks in their owning modules.
 
 ## Case schema
 

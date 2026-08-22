@@ -11,8 +11,8 @@ shercliff = lmx.make_shercliff_case(ha=20, ny=64, nz=64)
 hunt = lmx.make_hunt_case(ha=20, ny=64, nz=64, wall_cells=4)
 
 for case in (hartmann, shercliff, hunt):
-    result = lmx.solve_steady(case)
-    print(case.name, result.converged, result.state.residual)
+    result = lmx.solve(case)
+    print(case.name, result.converged, result.residual)
 ```
 
 Hartmann applies the field normal to insulating Hartmann walls. Shercliff
@@ -40,7 +40,7 @@ metrics = validation_summary(result, case.name, ha=20)
 print(comparison.l2_error, metrics["charge_balance_relative"])
 ```
 
-`fully_developed_power_balance(case, result)` reports applied, viscous,
+`lmx.solvers.fully_developed_power_balance(case, result)` reports applied, viscous,
 Lorentz, and residual power using the same discrete operators as the solve.
 Increase wall and fluid resolution together for high Hartmann number cases;
 the mesh-quality helpers report cells across Hartmann and side layers.

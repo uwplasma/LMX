@@ -14,11 +14,11 @@ from pathlib import Path
 
 import numpy as np
 
+from lmx import solve
 from lmx.cases import make_shercliff_case
 from lmx.fringing import (
     ExtrudedInductionlessProblem,
     smooth_fringing_profile,
-    solve_extruded_inductionless,
 )
 from lmx.io import write_extruded_overview_plots
 
@@ -88,7 +88,7 @@ profile = smooth_fringing_profile(
 problem = ExtrudedInductionlessProblem(case=case, profile=profile)
 
 # Run the bounded diagnostic, then save reusable plots and a compact JSON record.
-solution = solve_extruded_inductionless(problem)
+solution = solve(problem)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 plots = write_extruded_overview_plots(
     solution,

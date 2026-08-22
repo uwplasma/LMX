@@ -722,7 +722,7 @@ consolidation.
 ### Phase 3 — redesign the API and package
 
 - [x] Move to `src/lmx` layout.
-- [ ] Introduce the single case/options/result/convergence model.
+- [x] Introduce the single case/options/result/convergence model.
 - [x] Collapse duplicate config, cases, core, logging, units, output, and
   validation representations.
 - [x] Reduce `__all__` to the documented API.
@@ -1378,3 +1378,24 @@ surface, measurements, validation, decision, and next action.
 - Next action: push the evidenced checkpoint, complete the common
   case/options/result API and opt-in history work, then finish tutorials,
   scheduled/release validation, and the separately approved history gate.
+
+### 2026-08-22 — common solve and result contract
+
+- Added `lmx.solve(model)` as the 2-D/3-D first-run API. It follows the mode in
+  `CaseSpec` and accepts `ExtrudedInductionlessProblem`; specialized restart,
+  custom-mesh, progress, and timing hooks remain in their owning modules.
+- Both result types expose `converged`, `status`, `steps`, `residual`, `fields`,
+  and `diagnostics`. README, tutorials, and runnable examples use the common
+  call. The lazy root surface shrank from 26 to 24 names by moving specialized
+  solves and power balance to their documented modules.
+- The portable gate passes 501 tests with no skips in 78.9 seconds. Exact
+  combined line/branch coverage is 95.036268% across 5,787 statements and
+  1,244 branches. Ruff, architecture/import, current-state prose, and Sphinx
+  warnings-as-errors gates pass.
+- Package source is 14,977 lines across 15 modules. The wheel is 142,005 bytes
+  with 29 members and the source distribution is 133,054 bytes with 35
+  members; Twine and content audits pass. An isolated wheel environment used
+  the common API for a converged fully developed solve and a real 3-D solve.
+- Next action: make full diagnostic histories opt-in while preserving terminal
+  diagnostics, exact benchmark/restart evidence, and the common result
+  contract.

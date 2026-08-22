@@ -6,10 +6,10 @@ Create one physical case, solve it, and inspect the explicit termination state:
 import lmx
 
 case = lmx.make_hartmann_case(ha=20.0, ny=48, nz=48)
-result = lmx.solve_steady(case)
+result = lmx.solve(case)
 
 assert result.converged, result.status
-print(f"steps={result.steps} residual={result.state.residual:.3e}")
+print(f"steps={result.steps} residual={result.residual:.3e}")
 ```
 
 `CaseSpec` groups geometry, regions, magnetic field, boundary conditions,

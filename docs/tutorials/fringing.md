@@ -5,10 +5,8 @@ The convenience builder supplies a rectangular duct with a smooth entry and
 exit fringe:
 
 ```python
-from lmx.fringing import (
-    build_square_duct_extruded_problem,
-    solve_extruded_inductionless,
-)
+import lmx
+from lmx.fringing import build_square_duct_extruded_problem
 
 problem = build_square_duct_extruded_problem(
     ha_peak=20,
@@ -22,12 +20,12 @@ problem = build_square_duct_extruded_problem(
     exit_center=4.5,
     transition_width=0.35,
 )
-result = solve_extruded_inductionless(problem)
+result = lmx.solve(problem)
 ```
 
-The returned bundle contains velocity, pressure, potential, current, Lorentz
-force, face fluxes, station coordinates, the imposed field, and compact
-iteration histories. Always inspect termination and conservation together:
+The returned fields contain velocity, pressure, potential, current, Lorentz
+force, face fluxes, station coordinates, and the imposed field. Always inspect
+termination and conservation together:
 
 ```python
 gate = result.validation

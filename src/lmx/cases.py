@@ -56,6 +56,8 @@ from .specs import (
     BoundaryCondition,
     CaseSpec,
     Diagnostics,
+    ExtrudedInductionlessProblem,
+    ExtrudedInductionlessSolution,
     GeometrySpec,
     MagneticFieldSpec,
     MHDState,
@@ -1078,6 +1080,23 @@ def solve_steady(
             restart_info=restart_info,
         )
     raise NotImplementedError(f"Solver kind {solver_kind!r} is not implemented for steady runs")
+
+
+def solve(model: CaseSpec | ExtrudedInductionlessProblem) -> Solution | ExtrudedInductionlessSolution:
+    """Solve a fully developed case or a three-dimensional fringing problem.
+
+    The configured mode selects steady or transient execution for ``CaseSpec``.
+    Advanced restart, mesh, logging, progress, and timing hooks remain on the
+    specialized functions in :mod:`lmx.cases` and :mod:`lmx.fringing`.
+    """
+
+    if isinstance(model, CaseSpec):
+        return solve_transient(model) if model.solver.mode == "transient" else solve_steady(model)
+    if isinstance(model, ExtrudedInductionlessProblem):
+        from .fringing import solve_extruded_inductionless
+
+        return solve_extruded_inductionless(model)
+    raise TypeError(f"solve expects CaseSpec or ExtrudedInductionlessProblem, got {type(model).__name__}")
 
 
 @dataclass(frozen=True)
