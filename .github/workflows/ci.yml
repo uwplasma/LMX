@@ -53,7 +53,7 @@ jobs:
       - name: Run test shard
         run: >-
           python scripts/run_full_test_suite.py --budget-seconds 600
-          --shard ${{ matrix.shard }} --no-coverage
+          --test-timeout-seconds 300 --shard ${{ matrix.shard }} --no-coverage
 
   coverage:
     name: Combined branch coverage

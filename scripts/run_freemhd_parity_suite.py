@@ -1021,7 +1021,7 @@ done
 decomposePar -allRegions -force -fileHandler collated
 cp system/controlDict /output/controlDict.used
 export OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
-mpirun -np {nproc} epotMultiRegionInterFoam -parallel 2>&1 | tee /output/run.log
+mpirun --oversubscribe -np {nproc} epotMultiRegionInterFoam -parallel 2>&1 | tee /output/run.log
 mkdir /output/postProcessing
 for name in {objects}; do
   path="$(find postProcessing -type d -name "$name" -print -quit)"

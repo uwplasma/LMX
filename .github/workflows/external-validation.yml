@@ -87,8 +87,10 @@ jobs:
 
       - name: Upload evidence
         if: always()
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         uses: actions/upload-artifact@v4
         with:
           name: freemhd-b2-evidence
           path: artifacts/freemhd-b2
           if-no-files-found: error
+          retention-days: 7
