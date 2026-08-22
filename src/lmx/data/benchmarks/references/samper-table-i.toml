@@ -1,0 +1,79 @@
+schema_version = 1
+id = "samper-2014-table-i-benchmark-a"
+title = "Approach to validation and verification of MHD codes for fusion applications"
+source_file = "art042.pdf"
+source_sha256 = "9d0986bc912fc4b7ba9c3b79756db52319295c3b8c3c7304103523e5755f91b9"
+pdf_pages = [7, 8]
+table = "Table I"
+
+[definition]
+geometry = "square duct with dimensionless coordinates spanning [-1, 1]^2"
+flow_rate = "Q_tilde = integral_-1^1 integral_-1^1 U_tilde dy_tilde dz_tilde"
+velocity = "U_tilde = U / (b^2*(-dP/dx)/(rho*nu))"
+lm_x_conversion = "Q_tilde = Q*rho*nu/(a*b^3*(-dP/dx)); a=b for Table I"
+published_mesh = "99x99 stretched"
+published_convergence = "abs((Q_tilde[n+1]-Q_tilde[n])/Q_tilde[n]) < 1e-10"
+
+[[cases]]
+case_kind = "shercliff"
+hartmann_number = 500
+hartmann_wall_conductance = 0.0
+side_wall_conductance = 0.0
+analytical_flow_rate = 7.680e-3
+published_numerical_flow_rate = 7.679e-3
+
+[[cases]]
+case_kind = "shercliff"
+hartmann_number = 5000
+hartmann_wall_conductance = 0.0
+side_wall_conductance = 0.0
+analytical_flow_rate = 7.902e-4
+published_numerical_flow_rate = 7.902e-4
+
+[[cases]]
+case_kind = "shercliff"
+hartmann_number = 10000
+hartmann_wall_conductance = 0.0
+side_wall_conductance = 0.0
+analytical_flow_rate = 3.965e-4
+published_numerical_flow_rate = 3.965e-4
+
+[[cases]]
+case_kind = "shercliff"
+hartmann_number = 15000
+hartmann_wall_conductance = 0.0
+side_wall_conductance = 0.0
+analytical_flow_rate = 2.648e-4
+published_numerical_flow_rate = 2.648e-4
+
+[[cases]]
+case_kind = "hunt"
+hartmann_number = 500
+hartmann_wall_conductance = 0.01
+side_wall_conductance = 0.0
+analytical_flow_rate = 1.405e-3
+published_numerical_flow_rate = 1.401e-3
+
+[[cases]]
+case_kind = "hunt"
+hartmann_number = 5000
+hartmann_wall_conductance = 0.01
+side_wall_conductance = 0.0
+analytical_flow_rate = 1.907e-5
+published_numerical_flow_rate = 1.896e-5
+
+[[cases]]
+case_kind = "hunt"
+hartmann_number = 10000
+hartmann_wall_conductance = 0.01
+side_wall_conductance = 0.0
+analytical_flow_rate = 5.169e-6
+published_numerical_flow_rate = 5.139e-6
+
+[[cases]]
+case_kind = "hunt"
+hartmann_number = 15000
+hartmann_wall_conductance = 0.01
+side_wall_conductance = 0.0
+analytical_flow_rate = 2.425e-6
+published_numerical_flow_rate = 2.404e-6

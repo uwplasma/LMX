@@ -1,0 +1,121 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_target:
+        description: Optional package publish target
+        required: true
+        default: none
+        type: choice
+        options: [none, testpypi, pypi]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  external-validation:
+    uses: ./.github/workflows/external-validation.yml
+
+  validate:
+    needs: external-validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-lmx
+        with:
+          extras: dev,docs
+      - name: Check Python quality
+        run: |
+          python -m ruff check src/lmx validation tests examples scripts docs/conf.py
+          python -m ruff format --check src/lmx validation tests examples scripts docs/conf.py
+      - name: Enforce architecture budgets
+        run: python scripts/audit_architecture.py --check --measure-import
+      - name: Run portable quality gate
+        run: python scripts/run_full_test_suite.py --budget-seconds 600
+      - name: Run every curated example
+        run: >-
+          python scripts/run_full_test_suite.py --budget-seconds 600
+          --shard examples --no-coverage
+      - name: Build documentation
+        run: python -m sphinx -W -b html docs docs/_build/html
+
+  build:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-lmx
+        with:
+          extras: release
+      - name: Build and inspect distributions
+        run: |
+          python -m build
+          python -m twine check dist/*
+          python scripts/audit_architecture.py --check \
+            --wheel dist/*.whl --sdist dist/*.tar.gz
+      - name: Smoke-test the wheel
+        run: |
+          python -m venv /tmp/lmx-wheel-check
+          /tmp/lmx-wheel-check/bin/python -m pip install "$GITHUB_WORKSPACE"/dist/*.whl
+          cd /tmp
+          /tmp/lmx-wheel-check/bin/lmx --help >/dev/null
+          /tmp/lmx-wheel-check/bin/python - <<'PY'
+          from lmx import make_hartmann_case, solve
+          from lmx.validation import (
+              load_benchmark_a_spec,
+              load_benchmark_b_reference,
+              load_benchmark_b_spec,
+              load_samper_table_i,
+          )
+
+          for name in ("shercliff", "hunt"):
+              load_benchmark_a_spec(name)
+          for name in ("B1-fringing-pipe", "B2-fringing-square"):
+              load_benchmark_b_spec(name)
+              load_benchmark_b_reference(name)
+          load_samper_table_i()
+          solution = solve(make_hartmann_case(ha=5, ny=4, nz=4))
+          assert solution.state.residual < 1e-7
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: python-distributions
+          path: dist/
+
+  publish-testpypi:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_target == 'testpypi'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/lmx
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: python-distributions
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_target == 'pypi'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    environment:
+      name: pypi
+      url: https://pypi.org/p/lmx
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: python-distributions
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

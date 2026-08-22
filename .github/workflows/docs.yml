@@ -1,0 +1,21 @@
+name: docs
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-lmx
+        with:
+          extras: docs,dev
+
+      - name: Build documentation
+        run: python -m sphinx -W -b html docs docs/_build/html

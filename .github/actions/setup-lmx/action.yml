@@ -1,0 +1,46 @@
+name: Set up LMX environment
+description: Install a supported Python and resolve declared compatible dependencies
+
+inputs:
+  python-version:
+    description: Supported Python version to install
+    required: false
+    default: "3.11"
+  extras:
+    description: Comma-separated optional dependency groups to install
+    required: false
+    default: dev
+  solvax-version:
+    description: Optional exact SOLVAX compatibility endpoint
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v7
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install pinned uv
+      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      with:
+        version: "0.11.28"
+        enable-cache: true
+        cache-dependency-glob: pyproject.toml
+
+    - name: Install LMX
+      shell: bash
+      env:
+        UV_PYTHON: ${{ inputs.python-version }}
+      run: |
+        uv venv --python "${{ inputs.python-version }}" .venv
+        requirements=(-e .)
+        if [[ -n "${{ inputs.extras }}" ]]; then
+          requirements=(-e ".[${{ inputs.extras }}]")
+        fi
+        if [[ -n "${{ inputs.solvax-version }}" ]]; then
+          requirements+=("solvax==${{ inputs.solvax-version }}")
+        fi
+        uv pip install --python .venv/bin/python "${requirements[@]}"
+        echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"

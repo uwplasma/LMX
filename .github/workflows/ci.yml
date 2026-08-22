@@ -1,0 +1,79 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  MPLBACKEND: Agg
+  XLA_PYTHON_CLIENT_PREALLOCATE: "false"
+  XLA_FLAGS: --xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=1
+  OMP_NUM_THREADS: "1"
+  OPENBLAS_NUM_THREADS: "1"
+  MKL_NUM_THREADS: "1"
+  NUMEXPR_NUM_THREADS: "1"
+
+jobs:
+  quality:
+    name: Metadata and architecture
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-lmx
+        with:
+          python-version: "3.13"
+      - name: Check Python quality
+        run: |
+          python -m ruff check src/lmx validation tests examples scripts docs/conf.py
+          python -m ruff format --check src/lmx validation tests examples scripts docs/conf.py
+      - name: Enforce architecture budgets
+        run: python scripts/audit_architecture.py --check --measure-import
+
+  compatibility:
+    name: Python 3.10 (${{ matrix.shard }})
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [benchmarks, core, examples, physics, validation]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-lmx
+        with:
+          python-version: "3.10"
+          solvax-version: "0.14.0"
+      - name: Run test shard
+        run: >-
+          python scripts/run_full_test_suite.py --budget-seconds 600
+          --test-timeout-seconds 300 --shard ${{ matrix.shard }} --no-coverage
+
+  coverage:
+    name: Combined branch coverage
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-lmx
+        with:
+          python-version: "3.13"
+      - name: Run bounded coverage shards
+        run: |
+          for lmx_shard in benchmarks core physics validation; do
+            COVERAGE_FILE=".coverage.${lmx_shard}" python scripts/run_full_test_suite.py \
+              --budget-seconds 900 --test-timeout-seconds 300 \
+              --shard "${lmx_shard}" --coverage-fail-under 0
+          done
+      - name: Combine and enforce coverage
+        run: |
+          python -m coverage combine
+          python -m coverage report --fail-under=95
+          python -m coverage xml -o coverage.xml
