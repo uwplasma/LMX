@@ -10,25 +10,20 @@ import sys
 import time
 
 _TEST_SHARDS = {
-    "benchmarks": ("tests/test_benchmarks.py",),
-    "core": (
+    "support": (
         "tests/test_cli.py",
         "tests/test_config.py",
         "tests/test_io.py",
         "tests/test_mesh.py",
         "tests/test_runtime_logging.py",
         "tests/test_units_and_wall_models.py",
-    ),
-    "examples": ("tests/test_example_runner.py",),
-    "physics": (
-        "tests/test_fringing.py",
-        "tests/test_physics.py",
-        "tests/test_solver.py",
-    ),
-    "validation": (
         "tests/test_freemhd.py",
         "tests/test_run_benchmark_b_independence.py",
+        "tests/test_benchmarks.py",
+        "tests/test_example_runner.py",
     ),
+    "fringing": ("tests/test_fringing.py",),
+    "physics": ("tests/test_physics.py", "tests/test_solver.py"),
 }
 
 
@@ -52,7 +47,7 @@ def main(argv: list[str] | None = None) -> int:
 
     workers = args.workers
     if workers is None:
-        workers = 1 if args.shard in {"benchmarks", "examples"} else _default_workers()
+        workers = 1 if args.shard == "support" else _default_workers()
     if workers < 1:
         parser.error("--workers must be positive")
     if args.budget_seconds <= 0.0:
@@ -77,6 +72,7 @@ def main(argv: list[str] | None = None) -> int:
         str(workers),
         "--dist",
         "loadgroup",
+        "--durations=20",
         f"--junitxml={junit_path}",
     ]
     if args.test_timeout_seconds is not None:
