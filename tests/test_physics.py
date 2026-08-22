@@ -9,13 +9,10 @@ import pytest
 import lmx
 import lmx.cases as cases_impl
 from lmx.cases import (
-    build_hartmann_autodiff_problem,
-    hartmann_mean_velocity,
-    hartmann_mean_velocity_gradients,
     make_hartmann_case,
     make_hunt_case,
     make_shercliff_case,
-    solve_differentiable_hartmann,
+    solve_fully_developed_fields,
     solve_steady,
     solve_transient,
 )
@@ -525,67 +522,69 @@ def test_build_material_fields_uses_explicit_multilayer_mesh_sigma():
 
 
 @pytest.fixture(scope="module")
-def hartmann_problem():
-    return build_hartmann_autodiff_problem(
-        ny=12,
-        nz=12,
-        macro_iterations=3,
-        potential_iterations=12,
-        velocity_iterations=16,
+def differentiable_hartmann_case():
+    return make_hartmann_case(ha=5, ny=8, nz=8)
+
+
+def test_differentiable_fields_match_the_production_steady_solution(differentiable_hartmann_case):
+    fields = solve_fully_developed_fields(differentiable_hartmann_case)
+    production = solve_steady(differentiable_hartmann_case)
+
+    assert all(field.shape == (8, 8) and jnp.isfinite(field).all() for field in fields)
+    assert jnp.linalg.norm(fields[0] - production.state.u) / jnp.linalg.norm(production.state.u) < 2e-6
+    assert jnp.linalg.norm(fields[1] - production.state.phi) / jnp.linalg.norm(production.state.phi) < 2e-6
+    with pytest.raises(NotImplementedError, match="rect_duct"):
+        solve_fully_developed_fields(make_hunt_case(ha=5, ny=4, nz=4, wall_cells=1, insulator_cells=1))
+
+
+def test_fully_developed_implicit_gradients_match_independent_checks(differentiable_hartmann_case):
+    def objective(forcing, field_scale):
+        velocity, *_ = solve_fully_developed_fields(
+            differentiable_hartmann_case,
+            forcing=forcing,
+            magnetic_field_scale=field_scale,
+        )
+        return jnp.mean(velocity)
+
+    compiled = jax.jit(objective)
+    value, (forcing_gradient, field_gradient) = jax.jit(jax.value_and_grad(objective, argnums=(0, 1)))(
+        1.1, 1.0
+    )
+    delta = 1e-3
+    finite_field = (compiled(1.1, 1.0 + delta) - compiled(1.1, 1.0 - delta)) / (2.0 * delta)
+
+    assert forcing_gradient == pytest.approx(value / 1.1, rel=2e-7)
+    assert field_gradient == pytest.approx(finite_field, rel=2e-5, abs=1e-8)
+
+    def velocity(parameters):
+        return solve_fully_developed_fields(
+            differentiable_hartmann_case,
+            forcing=parameters[0],
+            magnetic_field_scale=parameters[1],
+        )[0]
+
+    parameters = jnp.asarray([1.1, 1.0])
+    direction = jnp.asarray([0.3, -0.2])
+    cotangent = jnp.cos(jnp.arange(64, dtype=float)).reshape(8, 8)
+    _, tangent = jax.jvp(velocity, (parameters,), (direction,))
+    _, pullback = jax.vjp(velocity, parameters)
+    assert jnp.vdot(cotangent, tangent) == pytest.approx(
+        jnp.vdot(direction, pullback(cotangent)[0]), rel=2e-8, abs=1e-10
     )
 
 
-def test_differentiable_hartmann_solution_returns_finite_fields(hartmann_problem):
-    u, phi = solve_differentiable_hartmann(hartmann_problem, forcing=1.0, hartmann_number=5.0)
+def test_shercliff_field_scale_gradient_matches_finite_difference():
+    case = make_shercliff_case(ha=5, ny=6, nz=6)
 
-    assert u.shape == (12, 12)
-    assert phi.shape == (12, 12)
-    assert jnp.isfinite(u).all()
-    assert jnp.isfinite(phi).all()
+    def response(scale):
+        return jnp.mean(solve_fully_developed_fields(case, magnetic_field_scale=scale)[0])
 
-
-def test_hartmann_mean_velocity_is_differentiable(hartmann_problem):
-    value, gradient = jax.value_and_grad(
-        lambda ha: hartmann_mean_velocity(hartmann_problem, forcing=1.0, hartmann_number=ha)
-    )(5.0)
-
+    compiled = jax.jit(response)
+    value, derivative = jax.jit(jax.value_and_grad(response))(1.0)
+    delta = 1e-3
+    finite = (compiled(1.0 + delta) - compiled(1.0 - delta)) / (2.0 * delta)
     assert jnp.isfinite(value)
-    assert jnp.isfinite(gradient)
-
-
-def test_profile_loss_gradient_step_reduces_objective(hartmann_problem):
-    target_u, _ = solve_differentiable_hartmann(hartmann_problem, forcing=1.0, hartmann_number=9.0)
-    target_profile = target_u[:, target_u.shape[1] // 2]
-
-    def objective(ha):
-        u, _ = solve_differentiable_hartmann(hartmann_problem, forcing=1.0, hartmann_number=ha)
-        profile = u[:, u.shape[1] // 2]
-        return jnp.mean(
-            (profile / jnp.max(jnp.abs(profile)) - target_profile / jnp.max(jnp.abs(target_profile))) ** 2
-        )
-
-    loss0, grad0 = jax.value_and_grad(objective)(4.0)
-    loss1 = objective(jnp.clip(4.0 - 2.0 * grad0, 0.5, 30.0))
-
-    assert jnp.isfinite(loss0)
-    assert jnp.isfinite(grad0)
-    assert float(loss1) <= float(loss0)
-
-
-def test_mean_velocity_gradients_match_finite_difference(hartmann_problem):
-    autodiff = hartmann_mean_velocity_gradients(hartmann_problem, forcing=1.1, hartmann_number=5.0)
-    delta = 1.0e-3
-
-    def objective(forcing, ha):
-        return hartmann_mean_velocity(hartmann_problem, forcing=forcing, hartmann_number=ha)
-
-    finite_forcing = (objective(1.1 + delta, 5.0) - objective(1.1 - delta, 5.0)) / (2.0 * delta)
-    finite_ha = (objective(1.1, 5.0 + delta) - objective(1.1, 5.0 - delta)) / (2.0 * delta)
-
-    assert jnp.isfinite(autodiff["d_mean_velocity_d_forcing"])
-    assert jnp.isfinite(autodiff["d_mean_velocity_d_ha"])
-    assert float(jnp.abs(autodiff["d_mean_velocity_d_forcing"] - finite_forcing)) < 5.0e-2
-    assert float(jnp.abs(autodiff["d_mean_velocity_d_ha"] - finite_ha)) < 5.0e-2
+    assert derivative == pytest.approx(finite, rel=2e-5, abs=1e-8)
 
 
 @pytest.mark.physics

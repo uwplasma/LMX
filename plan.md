@@ -881,11 +881,14 @@ purpose.
   SOLVAX exact checkpointed reverse pass. Gate analytical continuous-parameter
   gradients, forcing finite differences, JVP/VJP consistency, and compiled
   memory against a full trajectory tape.
-- [ ] Replace the fixed-iteration Hartmann-only differentiation wrapper with a
+- [x] Replace the fixed-iteration Hartmann-only differentiation wrapper with a
   field core shared by the retained fully developed solve. Its converged
   coupled equations must use a SOLVAX implicit linear/root derivative, with no
   Jacobi or coupling-iteration tape, and pass finite-difference, JVP/VJP,
-  residual, memory, and runtime checks.
+  residual, memory, and runtime checks. The accepted rectangular Hartmann and
+  Shercliff path uses `solve_fully_developed_fields`; the layered Hunt adjoint
+  remains in the next item after its transpose solve failed the independent
+  finite-difference gate.
 - [ ] Expose the retained fully developed Shercliff/Hunt and 3-D rectangular/
   pipe production equations as field-level traced cores. The current 3-D host
   loop materializes geometry/scales and convergence decisions with Python
@@ -1025,6 +1028,7 @@ artifacts or release assets, not committed files.
 | D-028 | Treat FreeMHD's public `S3_Buhler_Ha616` archive as a distinct candidate validation target, not ALEX B1 | The executed archive uses a 48.59 mm-radius pipe, a mirrored 0.21 T MEKKA-style fringe, and a thick copper wall; ALEX B1 uses a 54.1 mm radius, 2.1 T field, and different nondimensional groups and wall conductance. Similar geometry does not satisfy the matched-contract gate. |
 | D-029 | Make differentiability a release invariant and choose the derivative algorithm with the primal algorithm | JAX traceability alone does not control gradient meaning, accuracy, runtime, or memory. Linear/steady solves use implicit transpose solves; long finite trajectories use exact checkpointed discrete reverse mode; host diagnostics and discrete controls stay outside the traced core. |
 | D-030 | Differentiate the mathematical result, not incidental solver work | Implicit adjoints are the default for converged steady equations; checkpointed discrete adjoints are the default for finite trajectories. This matches established Optimistix, PETSc TSAdjoint/Revolve, and JAX scientific-computing practice while preserving one LMX production equation path. |
+| D-031 | Fail closed when a production adjoint does not converge | The layered Hunt trial produced a finite primal but its transposed coupled FGMRES solve diverged (`3.70e22` residual) and returned a false `-1.76e21` field-scale gradient versus the stable centered-difference value `-9.973e-3`. The public field API therefore accepts only rectangular Hartmann/Shercliff cases until a block or physics-aware transpose preconditioner passes the same gate. |
 
 ## Work log
 
@@ -1861,3 +1865,60 @@ surface, measurements, validation, decision, and next action.
   `/Users/rogeriojorge/local/tests/lmx-audit/lmx-q2d-adjoint-6225e3c/b2`.
 - Next action: push the evidenced candidate, require every hosted PR gate, and
   merge PR #2 only when the latest source-bearing checks are green.
+
+### 2026-08-22 — implicit fully developed field tranche
+
+- Merged SOLVAX solver PR #84 and release PR #85, then published 0.17.0 from
+  merge `d42b728` after
+  every hosted minimum/current/optional JAX, Linux, macOS, build, lint, typing,
+  and coverage gate passed. `affine_fixed_point_gmres` now uses one implicit
+  tangent or transposed FGMRES solve and never records Krylov iterations. The
+  public wheel is 145,489 bytes with SHA-256
+  `9ad8d4c0e145131ec594d736f20e88fe16c435364f6d6d6e3fdd8ffa15e266cb`;
+  a fresh public install compiled and ran its value-and-gradient example.
+- Deleted the Hartmann-only fixed-Jacobi differentiation problem, solver,
+  objective, and gradient helpers. One `solve_fully_developed_fields` API now
+  composes the retained mesh/material assembly, potential equation, momentum
+  equation, wall interpolation, current recovery, and Lorentz force with the
+  SOLVAX implicit coupled solve. This removes a shadow discretization while
+  increasing the stable root API by one name.
+- Rectangular Hartmann field parity against `solve_steady` is `1.51e-6`
+  relative on the acceptance mesh. Forcing sensitivity satisfies the exact
+  linear response identity; the magnetic-scale reverse derivative agrees with
+  a centered difference to `3.91e-7` relative on a `16 x 16`, Ha=20 case, and
+  the field JVP/VJP bilinear identity passes. A separate Shercliff
+  magnetic-scale finite-difference gate passes.
+- On that `16 x 16` float64 objective, the compiled primal warm median is
+  1.305 ms with 343,472 temporary bytes. Value-and-gradient is 2.812 ms with
+  376,984 temporary bytes, a 2.15x marginal runtime and only 9.76% more
+  compiler-reported temporary storage. Compile times are 2.56 and 2.42 seconds.
+- Upgraded the flexible volume-potential FGMRES path to
+  `solvax.linear_solve`, including a deliberately transposed preconditioner,
+  so its iterations are not taped. The focused conducting-rectangle solve and
+  analytical RHS-scale gradient gate pass.
+- Rejected the first layered Hunt end-to-end adjoint after the transpose
+  coupled solve diverged despite a converged primal. The centered field-scale
+  derivative is `-9.973377e-3`; the failed adjoint returned values between
+  `5.52e11` and `-1.76e21`, with a measured transposed FGMRES residual of
+  `3.70e22`. The public API now fails immediately on layered geometry instead
+  of returning a plausible-looking false gradient. A block formulation or
+  physics-aware transpose preconditioner is required before enabling Hunt.
+- LMX now requires the public `solvax>=0.17,<1` release and pins 0.17.0 in its
+  minimum-dependency lane. The architecture audit passes at 16 modules, 15,279
+  package lines, 6,016 maintained-core lines, and 28 root exports: the accepted
+  field API and tests reduce total source by 77 lines versus the preceding
+  candidate. The complete public-wheel gate passes 505 tests in 109.5 seconds
+  at 95.11% exact combined line/branch coverage; all curated examples, Ruff,
+  formatting, architecture/import, warning-free HTML docs, linkcheck, build,
+  Twine, distribution-content, and fresh-wheel value-and-gradient checks pass.
+- The LMX 1.2.0 tagged release workflow independently completed the pinned
+  FreeMHD run with no failed physics checks, but the workflow failed afterward
+  because GitHub artifact storage quota was exhausted; the link checker also
+  received bot-only HTTP 403 responses from three valid DOI resolvers. The next
+  release treats artifact upload as non-verdict infrastructure and ignores
+  only those exact persistent DOI URLs while continuing to check their
+  associated software/preprint links.
+- Next action: open the implicit-field PR and require every hosted gate. Then
+  implement and validate the layered block/transpose preconditioner before
+  making any Hunt differentiability claim; GPU derivative parity waits for an
+  unoccupied office device.

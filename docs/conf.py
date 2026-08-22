@@ -21,6 +21,15 @@ source_suffix = {
 
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
+# These DOI resolvers return 403 to GitHub's link checker while remaining valid
+# in browsers. The bibliography retains the persistent identifiers; executable
+# links for the associated software and preprints are checked separately.
+linkcheck_ignore = [
+    r"https://doi\.org/10\.1063/5\.0230242",
+    r"https://doi\.org/10\.1145/347837\.347846",
+    r"https://doi\.org/10\.1073/pnas\.2101784118",
+]
+
 myst_enable_extensions = [
     "colon_fence",
     "deflist",

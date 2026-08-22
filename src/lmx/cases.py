@@ -2,23 +2,19 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import jax
 import jax.numpy as jnp
+from solvax import affine_fixed_point_gmres
 from solvax import (
     aitken_relaxation as _solvax_aitken_relaxation,
 )
 from solvax import (
     anderson_mixing as _solvax_anderson_mixing,
 )
-from solvax import fixed_point_iteration
 
-from .mesh import (
-    StructuredMesh,
-    generate_rect_duct_mesh,
-)
+from .mesh import StructuredMesh
 from .physics import build_material_fields, magnetic_field_components, magnetic_field_from_hartmann
 from .solvers import (
     _LINEAR_RESIDUAL_FLOOR,
@@ -35,14 +31,12 @@ from .solvers import (
     _enforce_target_mean_velocity,
     _enforce_velocity_bc,
     _face_current_emf_and_lorentz_max,
-    _face_emf,
     _fully_developed_rhs,
     _has_uniform_spacing,
     _initial_solver_state,
     _integral_diagnostics,
     _limited_velocity_update,
     _nested_velocity_tolerance,
-    _potential_coefficients,
     _PotentialSystem,
     _prepare_potential_system,
     _reference_mean_velocity,
@@ -51,7 +45,6 @@ from .solvers import (
     _solve_velocity_system,
     _target_mean_velocity,
     _velocity_system_coefficients,
-    solve_poisson_jacobi_state,
 )
 from .specs import (
     BoundaryCondition,
@@ -687,6 +680,20 @@ def _fully_developed_converged(
     )
 
 
+def _prepare_fully_developed_case(case: CaseSpec, mesh: StructuredMesh | None = None):
+    """Prepare shared mesh, materials, and potential algebra for field solves."""
+
+    mesh = _build_mesh(case) if mesh is None else mesh
+    materials = build_material_fields(case, mesh)
+    potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
+    if potential_solver == "cg" and not _has_uniform_spacing(mesh):
+        potential_solver = "cg_volume"
+    potential_system = _prepare_potential_system(
+        mesh, materials.conductivity, case.reference_phi_cell, potential_solver
+    )
+    return mesh, materials, potential_solver, potential_system
+
+
 def _solve_fully_developed(
     case: CaseSpec,
     logger: StreamingSolverLogger | None = None,
@@ -699,16 +706,9 @@ def _solve_fully_developed(
 ) -> Solution:
     if case.output.history_stride < 0:
         raise ValueError("history_stride must be non-negative")
-    mesh = _build_mesh(case) if mesh is None else mesh
-    materials = build_material_fields(case, mesh)
+    mesh, materials, potential_solver, potential_system = _prepare_fully_developed_case(case, mesh)
     target_mean_velocity = _target_mean_velocity(case)
     reference_mean_velocity = _reference_mean_velocity(case)
-    potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
-    if potential_solver == "cg" and not _has_uniform_spacing(mesh):
-        potential_solver = "cg_volume"
-    potential_system = _prepare_potential_system(
-        mesh, materials.conductivity, case.reference_phi_cell, potential_solver
-    )
     if case.geometry.kind not in {"rect_duct", "layered_duct"}:
         raise NotImplementedError(
             f"Solver {case.solver.kind!r} does not yet support geometry {case.geometry.kind!r}"
@@ -1049,210 +1049,107 @@ def solve(
     )
 
 
-@dataclass(frozen=True)
-class HartmannAutodiffProblem:
-    mesh: StructuredMesh
-    sigma: jnp.ndarray
-    rho: jnp.ndarray
-    nu: jnp.ndarray
-    fluid_mask: jnp.ndarray
-    anchor: tuple[int, int] = (0, 0)
-    potential_iterations: int = 80
-    velocity_iterations: int = 120
-    macro_iterations: int = 8
-    relaxation: float = 0.9
-
-
-def build_hartmann_autodiff_problem(
+def solve_fully_developed_fields(
+    case: CaseSpec,
     *,
-    ny: int = 48,
-    nz: int = 48,
-    width: float = 2.0,
-    height: float = 2.0,
-    conductivity: float = 1.0,
-    density: float = 1.0,
-    viscosity: float = 0.01,
-    potential_iterations: int = 80,
-    velocity_iterations: int = 120,
-    macro_iterations: int = 8,
-    relaxation: float = 0.9,
-) -> HartmannAutodiffProblem:
-    mesh = generate_rect_duct_mesh(width=width, height=height, ny=ny, nz=nz)
-    yz_shape = mesh.yz_shape
-    return HartmannAutodiffProblem(
-        mesh=mesh,
-        sigma=jnp.full(yz_shape, conductivity),
-        rho=jnp.full(yz_shape, density),
-        nu=jnp.full(yz_shape, viscosity),
-        fluid_mask=jnp.ones(yz_shape, dtype=bool),
-        potential_iterations=potential_iterations,
-        velocity_iterations=velocity_iterations,
-        macro_iterations=macro_iterations,
-        relaxation=relaxation,
+    forcing: float | jax.Array | None = None,
+    magnetic_field_scale: float | jax.Array = 1.0,
+) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array]:
+    """Return steady duct fields through the production discretization.
+
+    ``forcing`` and ``magnetic_field_scale`` are continuous design inputs.
+    The coupled affine state uses a SOLVAX implicit tangent/transpose solve,
+    so reverse mode does not retain potential, momentum, or coupling
+    iterations. Meshes, material regions, boundary kinds, and solver controls
+    are static; construct or close over ``case`` outside ``jit``.
+    """
+
+    if case.solver.kind != "fully_developed_inductionless":
+        raise ValueError("case must select the fully developed inductionless solver")
+    if case.geometry.kind != "rect_duct":
+        raise NotImplementedError("differentiable fully developed fields currently require rect_duct")
+    if case.magnetic_field.ramp_duration > 0.0:
+        raise ValueError("steady differentiable fields require an unramped magnetic field")
+    if _target_mean_velocity(case) is not None:
+        raise NotImplementedError("fixed-flow differentiation is not yet supported")
+    with jax.ensure_compile_time_eval():
+        mesh, materials, potential_solver, potential_system = _prepare_fully_developed_case(case)
+        _, by, bz = magnetic_field_components(case.magnetic_field, mesh)
+    field_scale = jnp.asarray(magnetic_field_scale, dtype=by.dtype)
+    by, bz = field_scale * by, field_scale * bz
+    fluid_mask = materials.fluid_mask
+    reaction = jnp.where(
+        fluid_mask,
+        materials.conductivity * (by**2 + bz**2) / materials.density,
+        0.0,
     )
-
-
-def _solve_velocity_jacobi_state(
-    *,
-    mesh: StructuredMesh,
-    diffusivity: jnp.ndarray,
-    reaction: jnp.ndarray,
-    rhs: jnp.ndarray,
-    active_mask: jnp.ndarray,
-    iterations: int,
-    relaxation: float,
-) -> jnp.ndarray:
-    diagonal, west, east, south, north = _velocity_system_coefficients(
-        mesh, diffusivity, reaction, active_mask
+    cell_metric = _cell_metric(mesh).astype(by.dtype)
+    coefficients = tuple(
+        coefficient * cell_metric
+        for coefficient in _velocity_system_coefficients(mesh, materials.viscosity, reaction, fluid_mask)
     )
-    diagonal = jnp.maximum(diagonal, 1.0e-12)
-    field0 = jnp.zeros_like(rhs)
+    tolerance = _nested_velocity_tolerance(case.solver.coupling_tolerance, by.dtype)
+    source = jnp.asarray(case.forcing if forcing is None else forcing, dtype=by.dtype)
+    max_steps = max(case.time_stepper.max_steps, case.solver.coupling_iterations * 25)
 
-    def update(field):
-        west_field = jnp.pad(field[:-1, :], ((1, 0), (0, 0)))
-        east_field = jnp.pad(field[1:, :], ((0, 1), (0, 0)))
-        south_field = jnp.pad(field[:, :-1], ((0, 0), (1, 0)))
-        north_field = jnp.pad(field[:, 1:], ((0, 0), (0, 1)))
-        updated = (
-            rhs + west * west_field + east * east_field + south * south_field + north * north_field
-        ) / diagonal
-        return jnp.where(active_mask, updated, 0.0)
+    def potential(velocity):
+        return _solve_potential(
+            mesh,
+            materials.conductivity,
+            fluid_mask,
+            velocity,
+            by,
+            bz,
+            case.reference_phi_cell,
+            case.time_stepper.potential_iterations,
+            tolerance=tolerance,
+            solver=potential_solver,
+            system=potential_system,
+        )[0]
 
-    return fixed_point_iteration(
-        update,
-        field0,
-        relaxation=relaxation,
-        rtol=0.0,
-        atol=0.0,
-        max_steps=iterations,
-        fixed_steps=True,
-    ).x
-
-
-def solve_differentiable_hartmann(
-    problem: HartmannAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    hartmann_number: float | jnp.ndarray,
-) -> tuple[jnp.ndarray, jnp.ndarray]:
-    mesh = problem.mesh
-    sigma = problem.sigma
-    rho = problem.rho
-    nu = problem.nu
-    fluid_mask = problem.fluid_mask
-    by = jnp.zeros(mesh.yz_shape, dtype=sigma.dtype)
-    bz = jnp.full(mesh.yz_shape, hartmann_number, dtype=sigma.dtype)
-    forcing_value = jnp.asarray(forcing, dtype=sigma.dtype)
-
-    def macro_body(_, u_iter):
-        uxb_y = jnp.where(fluid_mask, -u_iter * bz, 0.0)
-        uxb_z = jnp.where(fluid_mask, u_iter * by, 0.0)
-        conv_y = _face_emf(mesh, sigma, uxb_y, axis=0)
-        conv_z = _face_emf(mesh, sigma, uxb_z, axis=1)
-        face_conv_y = jnp.pad(conv_y, ((1, 1), (0, 0)))
-        face_conv_z = jnp.pad(conv_z, ((0, 0), (1, 1)))
-        rhs_phi = -(
-            (face_conv_y[1:, :] - face_conv_y[:-1, :]) / mesh.dy[:, None]
-            + (face_conv_z[:, 1:] - face_conv_z[:, :-1]) / mesh.dz[None, :]
-        )
-        diagonal, west, east, south, north = _potential_coefficients(mesh, sigma)
-        phi, _, _ = solve_poisson_jacobi_state(
-            diagonal,
-            west,
-            east,
-            south,
-            north,
-            rhs_phi,
-            problem.anchor,
-            problem.potential_iterations,
-            tolerance=None,
-            relaxation=problem.relaxation,
-        )
-        reaction = sigma * (bz**2 + by**2) / rho
-        rhs_u, _ = _fully_developed_rhs(
+    def mapping(velocity):
+        phi = potential(velocity)
+        rhs, _ = _fully_developed_rhs(
             mesh=mesh,
-            sigma=sigma,
-            rho=rho,
+            sigma=materials.conductivity,
+            rho=materials.density,
             fluid_mask=fluid_mask,
-            u=u_iter,
+            u=velocity,
             phi=phi,
             by=by,
             bz=bz,
-            forcing=forcing_value,
+            forcing=source,
         )
-        u_next = _solve_velocity_jacobi_state(
-            mesh=mesh,
-            diffusivity=nu,
-            reaction=reaction,
-            rhs=rhs_u,
+        velocity, _, _, _ = _solve_velocity_system(
+            coefficients=coefficients,
+            cell_metric=cell_metric,
+            rhs=rhs + reaction * jnp.where(fluid_mask, velocity, 0.0),
             active_mask=fluid_mask,
-            iterations=problem.velocity_iterations,
-            relaxation=problem.relaxation,
+            preconditioner=case.solver.preconditioner,
+            max_steps=max_steps,
+            tolerance=tolerance,
         )
-        return _enforce_velocity_bc(u_next, mesh, fluid_mask, interpolate_direct_fluid_walls=False)
-
-    u = jax.lax.fori_loop(
-        0,
-        problem.macro_iterations,
-        macro_body,
-        jnp.zeros(mesh.yz_shape, dtype=sigma.dtype),
-    )
-
-    uxb_y = jnp.where(fluid_mask, -u * bz, 0.0)
-    uxb_z = jnp.where(fluid_mask, u * by, 0.0)
-    conv_y = _face_emf(mesh, sigma, uxb_y, axis=0)
-    conv_z = _face_emf(mesh, sigma, uxb_z, axis=1)
-    face_conv_y = jnp.pad(conv_y, ((1, 1), (0, 0)))
-    face_conv_z = jnp.pad(conv_z, ((0, 0), (1, 1)))
-    rhs_phi = -(
-        (face_conv_y[1:, :] - face_conv_y[:-1, :]) / mesh.dy[:, None]
-        + (face_conv_z[:, 1:] - face_conv_z[:, :-1]) / mesh.dz[None, :]
-    )
-    diagonal, west, east, south, north = _potential_coefficients(mesh, sigma)
-    phi, _, _ = solve_poisson_jacobi_state(
-        diagonal,
-        west,
-        east,
-        south,
-        north,
-        rhs_phi,
-        problem.anchor,
-        problem.potential_iterations,
-        tolerance=None,
-        relaxation=problem.relaxation,
-    )
-    return u, phi
-
-
-def hartmann_mean_velocity(
-    problem: HartmannAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    hartmann_number: float | jnp.ndarray,
-) -> jnp.ndarray:
-    u, _ = solve_differentiable_hartmann(problem, forcing=forcing, hartmann_number=hartmann_number)
-    return jnp.mean(u)
-
-
-def hartmann_mean_velocity_gradients(
-    problem: HartmannAutodiffProblem,
-    *,
-    forcing: float | jnp.ndarray,
-    hartmann_number: float | jnp.ndarray,
-) -> dict[str, jnp.ndarray]:
-    def objective(force_value, ha_value):
-        return hartmann_mean_velocity(
-            problem,
-            forcing=force_value,
-            hartmann_number=ha_value,
+        return _enforce_velocity_bc(
+            velocity,
+            mesh,
+            fluid_mask,
+            interpolate_direct_fluid_walls=case.geometry.kind == "rect_duct",
         )
 
-    mean_velocity = objective(forcing, hartmann_number)
-    d_mean_velocity_d_forcing, d_mean_velocity_d_ha = jax.grad(objective, argnums=(0, 1))(
-        forcing, hartmann_number
+    zero = jnp.zeros(mesh.yz_shape, dtype=by.dtype)
+    restart = min(30, max(2, mesh.ny * mesh.nz))
+    max_restarts = 50
+    coupled = affine_fixed_point_gmres(
+        mapping,
+        zero,
+        restart=restart,
+        rtol=case.solver.coupling_tolerance,
+        max_restarts=max_restarts,
+        transpose_rtol=case.solver.coupling_tolerance,
+        transpose_max_restarts=max_restarts,
     )
-    return {
-        "mean_velocity": mean_velocity,
-        "d_mean_velocity_d_forcing": d_mean_velocity_d_forcing,
-        "d_mean_velocity_d_ha": d_mean_velocity_d_ha,
-    }
+    phi = potential(coupled.x)
+    jy, jz, lorentz = _compute_current_and_lorentz(
+        mesh, materials.conductivity, fluid_mask, coupled.x, phi, by, bz
+    )
+    return coupled.x, phi, jy, jz, lorentz
