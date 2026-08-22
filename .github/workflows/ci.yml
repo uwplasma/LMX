@@ -8,7 +8,7 @@ on:
   workflow_call:
 
 concurrency:
-  group: lmx-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: lmx-ci-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 permissions:
