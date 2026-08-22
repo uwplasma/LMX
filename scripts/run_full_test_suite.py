@@ -71,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
         "-n",
         str(workers),
         "--dist",
-        "loadgroup",
+        "worksteal",
         "--durations=20",
         f"--junitxml={junit_path}",
     ]
