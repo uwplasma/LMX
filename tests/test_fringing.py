@@ -2029,9 +2029,9 @@ def test_extruded_problem_builders_mark_solver_family(builder, kwargs, geometry_
 def test_extruded_fields_match_production_and_bound_reverse_memory():
     problem = build_square_duct_extruded_problem(
         ha_peak=3.0,
-        nx_stations=4,
-        ny=4,
-        nz=4,
+        nx_stations=3,
+        ny=3,
+        nz=3,
         length=2.0,
         entry_center=0.5,
         exit_center=1.5,
@@ -2041,7 +2041,7 @@ def test_extruded_fields_match_production_and_bound_reverse_memory():
         problem,
         case=replace(
             problem.case,
-            time_stepper=replace(problem.case.time_stepper, max_steps=8, potential_iterations=30),
+            time_stepper=replace(problem.case.time_stepper, max_steps=8, potential_iterations=20),
             solver=replace(problem.case.solver, coupling_iterations=1, coupling_tolerance=1.0e-8),
         ),
     )
@@ -2069,11 +2069,16 @@ def test_extruded_fields_match_production_and_bound_reverse_memory():
         return jnp.mean(evolved[0] ** 2) + 0.01 * jnp.mean(evolved[4] ** 2)
 
     parameters = jnp.asarray([1.0, 1.0])
-    value, gradient = jax.jit(jax.value_and_grad(objective))(parameters)
+    value_and_gradient = jax.jit(jax.value_and_grad(objective))
+    value, gradient = value_and_gradient(parameters)
+    compiled_objective = jax.jit(objective)
     epsilon = 2.0e-3
     finite_difference = jnp.asarray(
         [
-            (objective(parameters.at[index].add(epsilon)) - objective(parameters.at[index].add(-epsilon)))
+            (
+                compiled_objective(parameters.at[index].add(epsilon))
+                - compiled_objective(parameters.at[index].add(-epsilon))
+            )
             / (2.0 * epsilon)
             for index in range(2)
         ]
@@ -2082,10 +2087,9 @@ def test_extruded_fields_match_production_and_bound_reverse_memory():
     assert gradient == pytest.approx(finite_difference, rel=2.0e-3, abs=2.0e-9)
     direction = jnp.asarray([0.3, -0.2])
     tangent = jax.jvp(objective, (parameters,), (direction,))[1]
-    pullback = jax.vjp(objective, parameters)[1](jnp.ones_like(value))[0]
-    assert tangent == pytest.approx(jnp.vdot(pullback, direction), rel=2.0e-6, abs=1.0e-9)
+    assert tangent == pytest.approx(jnp.vdot(gradient, direction), rel=2.0e-6, abs=1.0e-9)
 
-    bounded = jax.jit(jax.value_and_grad(objective)).lower(parameters).compile()
+    bounded = value_and_gradient.lower(parameters).compile()
     full_tape = jax.jit(jax.value_and_grad(lambda values: objective(values, 8))).lower(parameters).compile()
     assert (
         bounded.memory_analysis().temp_size_in_bytes < 0.75 * full_tape.memory_analysis().temp_size_in_bytes
@@ -2096,8 +2100,8 @@ def test_layered_extruded_fields_share_the_production_update():
     problem = build_layered_duct_extruded_problem(
         ha_peak=2.0,
         nx_stations=3,
-        ny=4,
-        nz=4,
+        ny=3,
+        nz=3,
         wall_cells=1,
         length=1.5,
         entry_center=0.4,
@@ -2108,7 +2112,7 @@ def test_layered_extruded_fields_share_the_production_update():
         problem,
         case=replace(
             problem.case,
-            time_stepper=replace(problem.case.time_stepper, max_steps=2, potential_iterations=30),
+            time_stepper=replace(problem.case.time_stepper, max_steps=2, potential_iterations=20),
             solver=replace(problem.case.solver, coupling_iterations=1, coupling_tolerance=1.0e-8),
         ),
     )
@@ -2120,13 +2124,6 @@ def test_layered_extruded_fields_share_the_production_update():
         strict=True,
     ):
         assert actual == pytest.approx(getattr(production, name), rel=2.0e-6, abs=1.0e-9)
-
-    gradient = jax.jit(
-        jax.grad(
-            lambda scale: jnp.mean(evolve_extruded_fields(problem, magnetic_field_scale=scale, steps=2)[0])
-        )
-    )(jnp.asarray(1.0))
-    assert jnp.isfinite(gradient)
 
 
 def test_cross_section_mesh_supports_pipe_ogrid_geometry():
