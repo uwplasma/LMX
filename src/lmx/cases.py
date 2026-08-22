@@ -1067,7 +1067,7 @@ def solve_fully_developed_fields(
     if case.solver.kind != "fully_developed_inductionless":
         raise ValueError("case must select the fully developed inductionless solver")
     if case.geometry.kind not in {"rect_duct", "layered_duct"}:
-        raise NotImplementedError(f"differentiable fully developed fields do not support {case.geometry.kind!r}")
+        raise NotImplementedError(f"unsupported differentiable duct geometry {case.geometry.kind!r}")
     if case.magnetic_field.ramp_duration > 0.0:
         raise ValueError("steady differentiable fields require an unramped magnetic field")
     if _target_mean_velocity(case) is not None:
