@@ -793,10 +793,9 @@ def _prepare_potential_system(
     """Assemble invariant potential coefficients and preconditioning once."""
 
     coefficients = _potential_coefficients(mesh, sigma)
-    _, _, east, _, north = coefficients
     face_conductance = (
-        east[:-1, :] * mesh.dy[:-1, None],
-        north[:, :-1] * mesh.dz[None, :-1],
+        _interface_conductance(mesh, sigma, axis=0),
+        _interface_conductance(mesh, sigma, axis=1),
     )
     residual_scale = _cell_metric(mesh)
     residual_scale_min = float(np.min(np.asarray(residual_scale)))
