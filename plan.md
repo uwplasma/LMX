@@ -870,6 +870,7 @@ artifacts or release assets, not committed files.
 | D-022 | Separate reusable fully developed assembly from case-level solve workflows | `solvers.py` owns the physical systems delegated to SOLVAX; `cases.py` owns factories, orchestration, and differentiable case objectives. This keeps both files below 1,500 lines and removes a one-workflow autodiff module. |
 | D-023 | Keep one public fringing module over four private 3-D owners, and consolidate run configuration with result schemas | Users retain one `lmx.fringing` surface; generic kernels, duct kernels, pipe kernels, and solve orchestration have explicit internal ownership. Configuration and result schemas share one typed input/output contract in `specs.py`. |
 | D-024 | Keep FreeMHD execution, observation, and comparison in one repository-only validation module | Docker/reference tooling remains fully tested and executable from a checkout but is not installed with the runtime wheel. Shipped analytical and benchmark-data loaders remain in `lmx.validation`. |
+| D-025 | Remove the unbundled ClosedChannel/processed-slice adapter and example | A default clone and installed wheel cannot run this private-directory workflow; the packaged analytical and ALEX data plus the pinned, independently observed B2 Docker comparison provide standalone validation without silent optional-data skips. |
 
 ## Work log
 
