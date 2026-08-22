@@ -21,6 +21,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "src"))
 
 import jax
 import numpy as np
@@ -72,8 +73,8 @@ def _summarize_pressure_linear_history(
 def _source_fingerprint(root: Path = ROOT) -> str:
     digest = hashlib.sha256()
     paths = (
-        sorted((root / "lmx").glob("*.py"))
-        + sorted((root / "lmx/data/benchmarks/specs").glob("alex-b*.toml"))
+        sorted((root / "src/lmx").glob("*.py"))
+        + sorted((root / "src/lmx/data/benchmarks/specs").glob("alex-b*.toml"))
         + [root / "scripts" / "run_benchmark_b_independence.py"]
     )
     for path in paths:
@@ -1018,7 +1019,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--plot-reference-csv",
         type=Path,
-        default=ROOT / "lmx/data/benchmarks/references/alex-b2-square.csv",
+        default=ROOT / "src/lmx/data/benchmarks/references/alex-b2-square.csv",
         help=argparse.SUPPRESS,
     )
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)

@@ -577,22 +577,7 @@ def validate_magnetic_obstacle_baseline(
 ) -> dict[str, float | bool | str]:
     if solution.problem.case.geometry.kind != "rect_duct":
         raise ValueError("Magnetic-obstacle baseline currently supports rectangular ducts only")
-    if (
-        solution.problem.case.magnetic_field.kind != "analytic"
-        or solution.problem.case.magnetic_field.fn is None
-    ):
-        raise ValueError("Magnetic-obstacle baseline requires an analytic magnetic field")
-
-    from .mesh import cross_section_divergence_metrics
-
-    geometry = solution.problem.case.geometry
-    field_metrics = cross_section_divergence_metrics(
-        solution.problem.case.magnetic_field.fn,
-        width=geometry.width,
-        height=geometry.height,
-        ny=field_ny,
-        nz=field_nz,
-    )
+    field_metrics = _variable_field_metrics(solution, field_ny=field_ny, field_nz=field_nz)
     bundle = solution.bundle
     validation = solution.validation
     field_scale = np.asarray(bundle.field_scale, dtype=float)

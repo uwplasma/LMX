@@ -1,3 +1,5 @@
+# ruff: noqa: E402 -- repository bootstrap must precede project imports.
+
 from __future__ import annotations
 
 import argparse
@@ -17,7 +19,9 @@ from typing import Any
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "src"))
 
 from lmx.physics import hartmann_number
 from lmx.validation import (
@@ -261,7 +265,7 @@ def materialize_lmx_source_snapshot(output_dir: str | Path) -> dict[str, object]
     repo, destination = Path(__file__).resolve().parents[1], Path(output_dir)
     if destination.exists():
         raise FileExistsError(f"Refusing to overwrite existing LMX source snapshot {destination}")
-    scope = ("lmx", "pyproject.toml", "scripts/run_freemhd_parity_suite.py")
+    scope = ("src/lmx", "pyproject.toml", "scripts/run_freemhd_parity_suite.py")
     status = subprocess.run(
         ("git", "-C", str(repo), "status", "--porcelain", "--", *scope),
         check=True,
@@ -1126,7 +1130,7 @@ def run_matched_b2_smoke_bundle(
             "kind": kind,
             "sha256": artifact_sha256(path, kind),
         }
-    spec_path = Path(__file__).resolve().parents[1] / "lmx/data/benchmarks/specs/alex-b2-square.toml"
+    spec_path = Path(__file__).resolve().parents[1] / "src/lmx/data/benchmarks/specs/alex-b2-square.toml"
     record = {
         "schema_version": 3,
         "case_id": "B2-fringing-square",

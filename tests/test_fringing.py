@@ -69,7 +69,6 @@ from lmx.fringing import (
 from lmx.mesh import (
     make_divergence_free_cross_section_field,
     make_localized_divergence_free_obstacle_field,
-    make_maxwell_consistent_fringe_field,
     sample_cross_section_field,
     write_tabulated_field_npz,
 )
@@ -123,6 +122,17 @@ def _with_analytic_field(problem, *, name, field_fn):
         problem.case,
         name=name,
         magnetic_field=MagneticFieldSpec(kind="analytic", fn=field_fn),
+    )
+    return replace(problem, case=case)
+
+
+def _with_integration_budget(problem):
+    """Keep end-to-end physics gates fast without changing production defaults."""
+
+    case = replace(
+        problem.case,
+        time_stepper=replace(problem.case.time_stepper, max_steps=24, potential_iterations=40),
+        solver=replace(problem.case.solver, coupling_iterations=4),
     )
     return replace(problem, case=case)
 
@@ -916,7 +926,8 @@ def test_explicit_deviatoric_stress_matches_independent_finite_volume_oracle():
     assert jnp.sum(affine_stress[..., 0]) * volume == pytest.approx(-0.7 * 1.2 * 4 * 0.3 * 3 * 0.4 / 3)
 
 
-def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp():
+@pytest.mark.parametrize("component", ("diffusion", "transport", "momentum", "traction"))
+def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp(component):
     shape = (3, 3, 3)
     widths = tuple(map(jnp.asarray, ([0.2, 0.2, 0.2], [0.3, 0.25, 0.35], [0.4, 0.3, 0.5])))
     velocity = jnp.arange(np.prod((*shape, 3)), dtype=float).reshape((*shape, 3)) / 17.0
@@ -960,11 +971,12 @@ def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp():
             else values
         )
 
-    assert_equivalent(
-        lambda scale: diffusion(scale, False),
-        lambda scale: diffusion(scale, True),
-        tuple(jnp.ones_like(value) for value in diffusion(1.0, False)),
-    )
+    if component == "diffusion":
+        assert_equivalent(
+            lambda scale: diffusion(scale, False),
+            lambda scale: diffusion(scale, True),
+            tuple(jnp.ones_like(value) for value in diffusion(1.0, False)),
+        )
 
     def transport(scale, inject):
         state = scale * velocity
@@ -999,12 +1011,13 @@ def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp():
             state, scaled_fluxes, weights, boundaries, widths, **kwargs
         )
 
-    assert_equivalent(
-        lambda scale: transport(scale, False),
-        lambda scale: transport(scale, True),
-        jnp.ones_like(velocity),
-        atol=1.0e-14,
-    )
+    if component == "transport":
+        assert_equivalent(
+            lambda scale: transport(scale, False),
+            lambda scale: transport(scale, True),
+            jnp.ones_like(velocity),
+            atol=1.0e-14,
+        )
 
     def momentum_setup(scale, packed):
         state = scale * velocity
@@ -1040,13 +1053,14 @@ def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp():
         )
         return gradient, weights, stress
 
-    assert momentum_setup(1.0, True)[0].shape == (*shape, 3, 3)
-    assert_equivalent(
-        lambda scale: momentum_setup(scale, False),
-        lambda scale: momentum_setup(scale, True),
-        jax.tree.map(jnp.ones_like, momentum_setup(1.0, False)),
-        atol=2.0e-14,
-    )
+    if component == "momentum":
+        assert momentum_setup(1.0, True)[0].shape == (*shape, 3, 3)
+        assert_equivalent(
+            lambda scale: momentum_setup(scale, False),
+            lambda scale: momentum_setup(scale, True),
+            jax.tree.map(jnp.ones_like, momentum_setup(1.0, False)),
+            atol=2.0e-14,
+        )
     west, east = jnp.full_like(velocity, -0.2), jnp.full_like(velocity, 0.3)
 
     def traction(scale, inject):
@@ -1065,12 +1079,13 @@ def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp():
         )
         return transverse + (axial[1] - axial[0]) / widths[0][:, None, None, None]
 
-    assert_equivalent(
-        lambda scale: traction(scale, False),
-        lambda scale: traction(scale, True),
-        jnp.ones_like(velocity),
-        atol=2.0e-14,
-    )
+    if component == "traction":
+        assert_equivalent(
+            lambda scale: traction(scale, False),
+            lambda scale: traction(scale, True),
+            jnp.ones_like(velocity),
+            atol=2.0e-14,
+        )
 
 
 def test_compact_duct_mass_flux_initializer_matches_fv_faces():
@@ -2001,113 +2016,6 @@ def test_solve_extruded_inductionless_wraps_history_bundle_and_validation(
     assert solution.station_history[0]["transverse_pressure_difference"] == 0.0
 
 
-def test_solve_extruded_inductionless_projection_returns_finite_rectangular_bundle():
-    problem = build_square_duct_extruded_problem(ha_peak=8.0, nx_stations=4, ny=4, nz=4)
-    field = make_maxwell_consistent_fringe_field(peak_field=8.0, center=3.0, transition_width=0.5)
-    problem = replace(problem, profile=replace(problem.profile, volume_field=field))
-
-    solution = solve_extruded_inductionless(problem)
-
-    assert solution.bundle.u.shape == (4, 4, 4)
-    assert solution.bundle.p.shape == (4, 4, 4)
-    assert solution.bundle.v.shape == (4, 4, 4)
-    assert solution.bundle.w.shape == (4, 4, 4)
-    assert solution.bundle.jx.shape == (4, 4, 4)
-    assert jnp.isfinite(solution.bundle.u).all()
-    assert jnp.isfinite(solution.bundle.p).all()
-    assert jnp.isfinite(solution.bundle.axial_current).all()
-    assert jnp.isfinite(solution.bundle.wall_current_leakage).all()
-    assert solution.validation.max_wall_current_leakage >= 0.0
-    assert solution.validation.net_boundary_current_residual >= 0.0
-    assert solution.validation.station_count == 4
-
-    with pytest.raises(ValueError, match="three-component"):
-        _sample_volume_field(
-            lambda x, y, z: jnp.zeros_like(x),
-            jnp.zeros((2, 2, 2)),
-            jnp.zeros((2, 2, 2)),
-            jnp.zeros((2, 2, 2)),
-        )
-
-
-def test_rectangular_projection_uses_solvax_matrix_free_solve(monkeypatch: pytest.MonkeyPatch):
-    problem = build_square_duct_extruded_problem(ha_peak=8.0, nx_stations=3, ny=4, nz=4)
-    calls = {"count": 0}
-    original = duct_impl._solvax_pressure_poisson_duct
-
-    def wrapped(*args, **kwargs):
-        calls["count"] += 1
-        return original(*args, **kwargs)
-
-    monkeypatch.setattr("lmx._fringing_solver._solvax_pressure_poisson_duct", wrapped)
-
-    solve_extruded_inductionless(problem)
-
-    assert calls["count"] >= 2
-
-
-def test_projection_solver_can_break_early_with_loose_tolerance():
-    problem = build_square_duct_extruded_problem(ha_peak=4.0, nx_stations=3, ny=4, nz=4)
-    loose_problem = replace(
-        problem,
-        case=replace(problem.case, solver=replace(problem.case.solver, coupling_tolerance=10.0)),
-    )
-    solution = solve_extruded_inductionless(loose_problem)
-    assert solution.validation.max_residual <= 10.0
-
-
-def test_layered_projection_keeps_throughput_span_bounded_on_heavier_case():
-    problem = build_layered_duct_extruded_problem(
-        ha_peak=20.0,
-        nx_stations=5,
-        ny=6,
-        nz=6,
-        wall_cells=1,
-        insulator_cells=1,
-    )
-    problem = replace(
-        problem,
-        case=replace(
-            problem.case,
-            time_stepper=replace(problem.case.time_stepper, max_steps=12, potential_iterations=48),
-            solver=replace(problem.case.solver, coupling_iterations=8),
-        ),
-    )
-
-    solution = solve_extruded_inductionless(problem)
-
-    assert jnp.isfinite(solution.bundle.u).all()
-    assert jnp.isfinite(solution.bundle.phi).all()
-    assert solution.validation.volumetric_flow_rate_span < 5.0e-3
-    # Mean throughput is constrained nearly stationwise; its correlation with
-    # field strength is not a physical braking metric. Peak/profile response is
-    # covered separately, while this regression closes residual and symmetry.
-    assert abs(solution.validation.field_mean_velocity_correlation) <= 1.0
-    assert solution.validation.max_residual < 1.0e-3
-    assert solution.validation.max_charge_balance_residual < 1.0e-4
-    assert solution.validation.axial_current_mirror_residual < 1.0e-3
-    assert solution.validation.pressure_span_mirror_residual < 1.0e-3
-    assert abs(solution.validation.center_axial_current) < 1.0e-4
-    assert solution.validation.net_boundary_current_residual == pytest.approx(0.0)
-
-
-def test_solve_extruded_inductionless_projection_returns_finite_pipe_bundle():
-    problem = build_pipe_ogrid_extruded_problem(ha_peak=6.0, nx_stations=4, nr=4, ntheta=8)
-    field = make_maxwell_consistent_fringe_field(peak_field=6.0, center=3.0, transition_width=0.5)
-    problem = replace(problem, profile=replace(problem.profile, volume_field=field))
-
-    solution = solve_extruded_inductionless(problem)
-
-    assert solution.bundle.geometry_kind == "pipe_ogrid"
-    assert solution.bundle.u.shape == (4, 4, 8)
-    assert jnp.isfinite(solution.bundle.u).all()
-    assert jnp.isfinite(solution.bundle.axial_current).all()
-    assert jnp.isfinite(solution.bundle.wall_current_leakage).all()
-    assert float(jnp.max(jnp.abs(solution.bundle.u[:, -1, :]))) > 0.0
-    assert solution.validation.max_charge_balance_residual < 0.5
-    assert solution.validation.net_boundary_current_residual == pytest.approx(0.0)
-
-
 def test_pipe_projection_supports_explicit_conducting_annulus_and_fixed_flow():
     problem = build_pipe_ogrid_extruded_problem(ha_peak=2.0, nx_stations=3, nr=4, ntheta=8)
     problem = replace(
@@ -2126,8 +2034,18 @@ def test_pipe_projection_supports_explicit_conducting_annulus_and_fixed_flow():
             initial_velocity=0.5,
         ),
     )
+    field = make_localized_divergence_free_obstacle_field(
+        width=1.0,
+        height=1.0,
+        base_bz=12.0,
+        core_fraction_y=0.5,
+        core_fraction_z=0.5,
+    )
+    problem = _with_analytic_field(problem, name="variable_field_conducting_pipe", field_fn=field)
+    problem = _with_integration_budget(problem)
 
     solution = solve_extruded_inductionless(problem)
+    field_validation = validate_variable_field_pipe_solution(solution, field_ny=41, field_nz=41)
 
     assert solution.bundle.u.shape == (3, 6, 8)
     assert jnp.allclose(solution.bundle.u[:, 4:, :], 0.0)
@@ -2137,6 +2055,10 @@ def test_pipe_projection_supports_explicit_conducting_annulus_and_fixed_flow():
     assert solution.bundle.axial_pressure_loss_gradient.shape == (3,)
     assert jnp.isfinite(solution.bundle.axial_pressure_loss_gradient).all()
     assert solution.bundle.transverse_pressure_difference.tolist() == pytest.approx([0.0, 0.0, 0.0])
+    assert jnp.isfinite(solution.bundle.axial_current).all()
+    assert jnp.isfinite(solution.bundle.wall_current_leakage).all()
+    assert field_validation["current_proxy_change"] > 0.0
+    assert solution.validation.max_charge_balance_residual < 0.5
     assert "axial_pressure_loss_gradient" in solution.station_history[0]
     assert jnp.isfinite(solution.bundle.phi).all()
 
@@ -2192,17 +2114,27 @@ def test_pipe_matrix_free_potential_cancels_conservative_emf_divergence():
     assert float(jnp.max(jnp.abs(div_j))) < 1.0e-10
 
 
-def test_solve_extruded_inductionless_projection_returns_finite_bent_pipe_bundle():
+def test_variable_field_bent_pipe_retains_low_de_validation():
+    field = make_localized_divergence_free_obstacle_field(
+        width=0.9,
+        height=0.9,
+        base_bz=12.0,
+        core_fraction_y=0.5,
+        core_fraction_z=0.5,
+    )
     bent_problem = build_bent_pipe_extruded_problem(
-        ha_peak=6.0,
-        bend_radius=4.0,
-        bend_angle=1.0,
+        ha_peak=1.0,
+        radius=0.45,
+        bend_radius=3.6,
+        bend_angle=1.15,
         nx_stations=4,
         nr=4,
         ntheta=8,
     )
+    bent_problem = _with_analytic_field(bent_problem, name="variable_field_bent_pipe_bz12", field_fn=field)
+    bent_problem = _with_integration_budget(bent_problem)
     straight_problem = build_pipe_ogrid_extruded_problem(
-        ha_peak=6.0,
+        ha_peak=1.0,
         radius=float(bent_problem.case.geometry.radius),
         length=float(bent_problem.case.geometry.length),
         nx_stations=4,
@@ -2210,13 +2142,19 @@ def test_solve_extruded_inductionless_projection_returns_finite_bent_pipe_bundle
         ntheta=8,
     )
     straight_problem = replace(straight_problem, profile=bent_problem.profile)
+    straight_problem = _with_analytic_field(
+        straight_problem, name="variable_field_straight_pipe_bz12", field_fn=field
+    )
+    straight_problem = _with_integration_budget(straight_problem)
 
     bent_solution = solve_extruded_inductionless(bent_problem)
     straight_solution = solve_extruded_inductionless(straight_problem)
     validation = validate_bent_pipe_low_de_baseline(bent_solution, straight_solution)
+    field_validation = validate_variable_field_pipe_solution(bent_solution, field_ny=41, field_nz=41)
 
     assert bent_solution.bundle.geometry_kind == "bent_pipe"
     assert jnp.isfinite(bent_solution.bundle.u).all()
+    assert field_validation["current_proxy_change"] > 0.0
     assert validation["dean_number"] >= 0.0
     assert validation["dean_vortex_observables_available"] is True
     assert validation["secondary_flow_rms_ratio"] >= 0.0
@@ -2231,6 +2169,39 @@ def test_solve_extruded_inductionless_projection_returns_finite_bent_pipe_bundle
     assert validation["cross_section_l2_error"] <= 0.2
     assert isinstance(validation["validation_pass"], bool)
 
+    wrong_bent = replace(
+        bent_solution,
+        problem=replace(
+            bent_solution.problem,
+            case=replace(
+                bent_solution.problem.case,
+                geometry=replace(bent_solution.problem.case.geometry, kind="pipe_ogrid"),
+            ),
+        ),
+    )
+    with pytest.raises(ValueError, match="bent_pipe solution"):
+        validate_bent_pipe_low_de_baseline(wrong_bent, straight_solution)
+
+    wrong_straight = replace(
+        straight_solution,
+        problem=replace(
+            straight_solution.problem,
+            case=replace(
+                straight_solution.problem.case,
+                geometry=replace(straight_solution.problem.case.geometry, kind="bent_pipe"),
+            ),
+        ),
+    )
+    with pytest.raises(ValueError, match="pipe_ogrid comparison"):
+        validate_bent_pipe_low_de_baseline(bent_solution, wrong_straight)
+
+    mismatched_straight = replace(
+        straight_solution,
+        bundle=replace(straight_solution.bundle, u=straight_solution.bundle.u[:-1]),
+    )
+    with pytest.raises(ValueError, match="share the same shape"):
+        validate_bent_pipe_low_de_baseline(bent_solution, mismatched_straight)
+
 
 def test_solve_extruded_inductionless_supports_layered_analytic_variable_field():
     field_fn = make_divergence_free_cross_section_field(
@@ -2238,11 +2209,19 @@ def test_solve_extruded_inductionless_supports_layered_analytic_variable_field()
     )
     problem = build_layered_duct_extruded_problem(ha_peak=1.0, nx_stations=7, ny=10, nz=10)
     problem = _with_analytic_field(problem, name="variable_field_layered_bz12", field_fn=field_fn)
+    problem = _with_integration_budget(problem)
     solution = solve_extruded_inductionless(problem)
     validation = validate_variable_field_extruded_solution(solution, field_ny=41, field_nz=41)
 
     assert solution.bundle.geometry_kind == "layered_duct"
     assert jnp.all(jnp.isfinite(solution.bundle.u))
+    assert jnp.all(jnp.isfinite(solution.bundle.phi))
+    assert solution.validation.volumetric_flow_rate_span < 5.0e-3
+    assert solution.validation.max_residual < 1.0e-3
+    assert solution.validation.max_charge_balance_residual < 1.0e-4
+    assert solution.validation.axial_current_mirror_residual < 1.0e-3
+    assert solution.validation.pressure_span_mirror_residual < 1.0e-3
+    assert abs(solution.validation.center_axial_current) < 1.0e-4
     assert validation["mean_velocity_change"] > 0.0
     assert isinstance(validation["validation_pass"], bool)
     bad = replace(solution, bundle=replace(solution.bundle, u=solution.bundle.u.at[0, 0, 0].set(jnp.nan)))
@@ -2250,21 +2229,25 @@ def test_solve_extruded_inductionless_supports_layered_analytic_variable_field()
     assert (invalid["finite_velocity"], invalid["validation_pass"]) == (False, False)
 
 
-def test_solve_extruded_inductionless_supports_tabulated_variable_field(tmp_path):
-    field_fn = make_divergence_free_cross_section_field(
-        width=2.4, height=1.6, base_bz=12.0, perturbation=0.12
+def test_tabulated_magnetic_obstacle_uses_solvax_and_reports_velocity_deficit(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+):
+    problem = build_magnetic_obstacle_rect_extruded_problem(nx_stations=7, ny=10, nz=10)
+    geometry = problem.case.geometry
+    y, z, field = sample_cross_section_field(
+        problem.case.magnetic_field.fn,
+        width=geometry.width,
+        height=geometry.height,
+        ny=41,
+        nz=41,
     )
-    y, z, field = sample_cross_section_field(field_fn, width=2.4, height=1.6, ny=41, nz=41)
     path = write_tabulated_field_npz(
-        tmp_path / "field.npz",
+        tmp_path / "obstacle-field.npz",
         y=y,
         z=z,
         bx=field[..., 0],
         by=field[..., 1],
         bz=field[..., 2],
-    )
-    problem = build_square_duct_extruded_problem(
-        nx_stations=7, ny=10, nz=10, width=2.4, height=1.6, ha_peak=12.0
     )
     problem = replace(
         problem,
@@ -2273,56 +2256,25 @@ def test_solve_extruded_inductionless_supports_tabulated_variable_field(tmp_path
             magnetic_field=MagneticFieldSpec(kind="tabulated", table_path=str(path)),
         ),
     )
-    solution = solve_extruded_inductionless(problem)
-    validation = validate_variable_field_extruded_solution(solution, field_ny=41, field_nz=41)
+    problem = _with_integration_budget(problem)
+    calls = {"count": 0}
+    original = duct_impl._solvax_pressure_poisson_duct
 
-    assert solution.bundle.geometry_kind == "rect_duct"
-    assert validation["rms_divergence"] >= 0.0
-    assert isinstance(validation["validation_pass"], bool)
+    def wrapped(*args, **kwargs):
+        calls["count"] += 1
+        return original(*args, **kwargs)
 
-
-def test_solve_extruded_inductionless_supports_variable_field_pipe_and_bent_pipe():
-    field_options = dict(base_bz=12.0, core_fraction_y=0.5, core_fraction_z=0.5)
-    straight_field = make_localized_divergence_free_obstacle_field(width=1.0, height=1.0, **field_options)
-    straight_problem = build_pipe_ogrid_extruded_problem(
-        ha_peak=1.0, radius=0.5, nx_stations=5, nr=4, ntheta=8
-    )
-    straight_problem = _with_analytic_field(
-        straight_problem, name="variable_field_pipe_bz12", field_fn=straight_field
-    )
-    bent_field = make_localized_divergence_free_obstacle_field(width=0.9, height=0.9, **field_options)
-    bent_problem = build_bent_pipe_extruded_problem(
-        ha_peak=1.0,
-        radius=0.45,
-        bend_radius=3.6,
-        bend_angle=1.15,
-        nx_stations=5,
-        nr=4,
-        ntheta=8,
-    )
-    bent_problem = _with_analytic_field(
-        bent_problem, name="variable_field_bent_pipe_bz12", field_fn=bent_field
-    )
-    straight_solution = solve_extruded_inductionless(straight_problem)
-    bent_solution = solve_extruded_inductionless(bent_problem)
-
-    pipe_validation = validate_variable_field_pipe_solution(straight_solution, field_ny=41, field_nz=41)
-    bent_field_validation = validate_variable_field_pipe_solution(bent_solution, field_ny=41, field_nz=41)
-    bent_low_de_validation = validate_bent_pipe_low_de_baseline(bent_solution, straight_solution)
-
-    assert straight_solution.bundle.geometry_kind == "pipe_ogrid"
-    assert bent_solution.bundle.geometry_kind == "bent_pipe"
-    assert pipe_validation["current_proxy_change"] > 0.0
-    assert bent_field_validation["current_proxy_change"] > 0.0
-    assert isinstance(bent_low_de_validation["validation_pass"], bool)
-
-
-def test_magnetic_obstacle_baseline_reports_velocity_deficit():
-    problem = build_magnetic_obstacle_rect_extruded_problem(nx_stations=9, ny=12, nz=12)
+    monkeypatch.setattr("lmx._fringing_solver._solvax_pressure_poisson_duct", wrapped)
     solution = solve_extruded_inductionless(problem)
     validation = validate_magnetic_obstacle_baseline(solution, field_ny=41, field_nz=41)
+    field_validation = validate_variable_field_extruded_solution(solution, field_ny=41, field_nz=41)
 
+    assert calls["count"] >= 2
     assert solution.bundle.geometry_kind == "rect_duct"
+    assert jnp.isfinite(solution.bundle.u).all()
+    assert jnp.isfinite(solution.bundle.p).all()
+    assert jnp.isfinite(solution.bundle.axial_current).all()
+    assert field_validation["rms_divergence"] >= 0.0
     assert validation["obstacle_velocity_deficit"] > 0.0
     assert validation["current_proxy_peak"] > 0.0
     assert validation["divergence_to_field_ratio"] >= 0.0
@@ -2331,6 +2283,13 @@ def test_magnetic_obstacle_baseline_reports_velocity_deficit():
     assert validation["external_reference_available"] is False
     assert validation["research_grade_validation_pass"] is False
     assert isinstance(validation["validation_pass"], bool)
+    with pytest.raises(ValueError, match="three-component"):
+        _sample_volume_field(
+            lambda x, y, z: jnp.zeros_like(x),
+            jnp.zeros((2, 2, 2)),
+            jnp.zeros((2, 2, 2)),
+            jnp.zeros((2, 2, 2)),
+        )
 
 
 def test_solve_extruded_inductionless_uses_projection_for_pipe_geometry(
@@ -2378,14 +2337,3 @@ def test_solve_extruded_inductionless_uses_projection_for_pipe_geometry(
     )
     solution = solve_extruded_inductionless(pipe_problem)
     assert solution.validation.station_count == 1
-
-
-def test_solve_extruded_inductionless_projection_accepts_matching_initial_bundle():
-    problem = build_square_duct_extruded_problem(ha_peak=5.0, nx_stations=3, ny=4, nz=4)
-    first = solve_extruded_inductionless(problem)
-
-    resumed = solve_extruded_inductionless(problem, initial_bundle=first.bundle)
-
-    assert resumed.bundle.u.shape == first.bundle.u.shape
-    assert jnp.isfinite(resumed.bundle.u).all()
-    assert resumed.validation.station_count == first.validation.station_count

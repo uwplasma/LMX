@@ -22,7 +22,7 @@ charge-balance and divergence residuals, boundary-current closure, stationwise
 flow variation, pressure variation, and response correlations. Mesh and solver
 independence remain separate required checks.
 
-The benchmark specifications and reference arrays under `lmx/data/benchmarks`
+The benchmark specifications and reference arrays shipped under `src/lmx/data/benchmarks`
 are versioned package data. `benchmarks/provenance.json` records bibliographic
 sources and executable test/workflow links.
 

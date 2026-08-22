@@ -59,11 +59,11 @@ visualization = [
 lmx = "lmx.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["src"]
 include = ["lmx*"]
 
 [tool.setuptools.package-data]
-lmx = ["data/benchmarks/specs/*.toml", "data/benchmarks/references/*"]
+lmx = ["py.typed", "data/benchmarks/specs/*.toml", "data/benchmarks/references/*"]
 
 [tool.pytest.ini_options]
 addopts = "-ra -q --strict-markers"

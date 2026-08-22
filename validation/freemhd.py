@@ -19,7 +19,7 @@ from lmx.physics import (
     wall_conductance_ratio,
 )
 
-_PACKAGE_DATA = Path(__file__).resolve().parents[1] / "lmx" / "data"
+_PACKAGE_DATA = Path(__file__).resolve().parents[1] / "src" / "lmx" / "data"
 BENCHMARK_A_SPEC_DIR = _PACKAGE_DATA / "benchmarks" / "specs"
 _MATCHED_B_ARTIFACT_NAMES = (
     "lmx_source",

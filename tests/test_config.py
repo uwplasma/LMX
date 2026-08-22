@@ -421,10 +421,26 @@ def test_wheel_audit_rejects_nonpackage_payload(tmp_path: Path) -> None:
     wheel = tmp_path / "lmx-test.whl"
     with zipfile.ZipFile(wheel, "w") as archive:
         archive.writestr("lmx/__init__.py", "")
+        archive.writestr("lmx/py.typed", "")
         archive.writestr("lmx-1.dist-info/METADATA", "")
         archive.writestr("benchmarks/raw.bin", b"large output")
     assert inspect_wheel(wheel)["forbidden_members"] == ["benchmarks/raw.bin"]
     assert "outside lmx/" in architecture_budget_errors(build_inventory(), wheel=wheel)[0]
+
+
+def test_root_api_is_pep561_marked_and_fully_annotated() -> None:
+    assert (Path("src/lmx") / "py.typed").is_file()
+    for name in lmx.__all__:
+        value = getattr(lmx, name)
+        if not (inspect.isfunction(value) or inspect.isclass(value)):
+            continue
+        signature = inspect.signature(value)
+        assert signature.return_annotation is not inspect.Signature.empty, name
+        assert all(
+            parameter.annotation is not inspect.Parameter.empty
+            for parameter in signature.parameters.values()
+            if parameter.name not in {"self", "cls"}
+        ), name
 
 
 def test_sdist_audit_rejects_repository_tests(tmp_path: Path) -> None:

@@ -24,15 +24,15 @@ from lmx.specs import CaseSpec, MagneticFieldSpec
 # Inputs: geometry, field variation, axial profile, solver effort, and outputs.
 OUTPUT_DIR = Path("artifacts/examples/variable_field_extruded")
 WIDTH, HEIGHT, LENGTH = 2.4, 1.6, 6.0
-NY = NZ = 16  # Increase together to refine the rectangular cross-section.
-NX_STATIONS = 9
+NY = NZ = 8  # Increase together to refine the rectangular cross-section.
+NX_STATIONS = 5
 BASE_BZ = 12.0
 PERTURBATION = 0.12  # Set to zero for a cross-sectionally uniform field.
 ENTRY_CENTER, EXIT_CENTER = 1.5, 4.5
 TRANSITION_WIDTH = 0.35
-MAX_STEPS = 80
-POTENTIAL_ITERATIONS = 80
-COUPLING_ITERATIONS = 8
+MAX_STEPS = 24
+POTENTIAL_ITERATIONS = 40
+COUPLING_ITERATIONS = 4
 STEADY_TOLERANCE = 1.0e-6
 
 

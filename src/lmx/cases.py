@@ -64,6 +64,7 @@ from .specs import (
     RestartLogInfo,
     Solution,
     SolverConfig,
+    StreamingSolverLogger,
     TimeStepperConfig,
     require_finite,
 )
@@ -641,7 +642,7 @@ def _fully_developed_converged(
 
 def _solve_fully_developed(
     case: CaseSpec,
-    logger=None,
+    logger: StreamingSolverLogger | None = None,
     *,
     mesh: StructuredMesh | None = None,
     initial_state: MHDState | None = None,
@@ -1009,7 +1010,7 @@ def _solve_fully_developed(
 
 def solve_transient(
     case: CaseSpec,
-    logger=None,
+    logger: StreamingSolverLogger | None = None,
     *,
     mesh: StructuredMesh | None = None,
     initial_state: MHDState | None = None,
@@ -1045,7 +1046,7 @@ def solve_transient(
 
 def solve_steady(
     case: CaseSpec,
-    logger=None,
+    logger: StreamingSolverLogger | None = None,
     *,
     mesh: StructuredMesh | None = None,
     initial_state: MHDState | None = None,

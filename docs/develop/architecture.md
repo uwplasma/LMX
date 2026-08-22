@@ -16,6 +16,11 @@ modules. Imports remain one-way: specifications and data containers do not
 depend on solvers; plotting dependencies load only when an output function
 requests them.
 
+Package sources live under `src/lmx`, so an editable installation and a wheel
+resolve the same module tree. The wheel includes `lmx/py.typed`; every root API
+callable has an explicit signature, and distribution audits require the typing
+marker and reject files outside the package and metadata roots.
+
 Reusable algebra belongs in SOLVAX when it is independent of LMX geometry,
 units, boundaries, and terminology and has its own correctness, gradient,
 convergence, documentation, and performance tests. LMX retains coefficient

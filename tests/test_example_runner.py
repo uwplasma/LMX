@@ -15,10 +15,10 @@ def test_fringing_benchmark_demo_runs_real_bounded_diagnostic(tmp_path: Path):
     summary = json.loads(summary_path.read_text())
     assert summary["status"] == "research-stage internal diagnostic"
     assert summary["geometry_kind"] == "rect_duct"
-    assert summary["shape"] == [7, 8, 8]
-    assert summary["validation"]["station_count"] == 7
+    assert summary["shape"] == [5, 6, 6]
+    assert summary["validation"]["station_count"] == 5
     assert summary["validation"]["max_charge_balance_residual"] < 1.0e-10
-    assert len(summary["mean_velocity"]) == len(summary["field_scale"]) == 7
+    assert len(summary["mean_velocity"]) == len(summary["field_scale"]) == 5
     assert all((summary_path.parent / name).is_file() for name in summary["plots"])
 
 

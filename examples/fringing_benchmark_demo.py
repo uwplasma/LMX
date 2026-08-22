@@ -3,7 +3,7 @@
 Edit the inputs below, then run ``python examples/fringing_benchmark_demo.py``.
 This research-stage workflow checks response and conservation trends; it is not
 an ALEX/FreeMHD comparison or a mesh-converged validation result.
-The portable default takes about seven seconds and writes PNG/PDF plots plus JSON.
+The portable default writes PNG/PDF plots plus JSON.
 """
 
 from __future__ import annotations
@@ -26,8 +26,8 @@ from lmx.io import write_extruded_overview_plots
 OUTPUT_DIR = Path("artifacts/examples/fringing_benchmark")
 HARTMANN_NUMBER = 20.0
 WIDTH, HEIGHT, LENGTH = 2.0, 2.0, 6.0
-NY = NZ = 8  # Increase together for a cross-section mesh study.
-NX_STATIONS = 7  # Increase independently to refine the axial field transition.
+NY = NZ = 6  # Increase together for a cross-section mesh study.
+NX_STATIONS = 5  # Increase independently to refine the axial field transition.
 CONDUCTIVITY, DENSITY, VISCOSITY = 1.0, 1.0, 1.0
 ENTRY_CENTER, EXIT_CENTER = 1.5, 4.5
 TRANSITION_WIDTH = 0.35

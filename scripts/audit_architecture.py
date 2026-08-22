@@ -23,6 +23,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
 
 
 ROOT = Path(__file__).resolve().parents[1]
+PACKAGE_ROOT = Path("src/lmx")
 EXCLUDED_PARTS = {
     ".git",
     ".venv",
@@ -61,7 +62,7 @@ def _role(name: str) -> str:
 
 
 def _root_exports(root: Path) -> list[str]:
-    tree = ast.parse((root / "lmx" / "__init__.py").read_text(encoding="utf-8"))
+    tree = ast.parse((root / PACKAGE_ROOT / "__init__.py").read_text(encoding="utf-8"))
     for node in tree.body:
         if isinstance(node, ast.Assign) and any(
             isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets
@@ -110,7 +111,7 @@ def _checkout_size(root: Path) -> int:
 def _current_state_violations(root: Path) -> list[str]:
     paths = [root / name for name in ("README.md", "CONTRIBUTING.md", "CITATION.cff")]
     for directory, patterns in (
-        ("lmx", ("*.py",)),
+        ("src/lmx", ("*.py",)),
         ("validation", ("*.py",)),
         ("docs", ("*.md", "*.py")),
         ("examples", ("*.py", "*.toml")),
@@ -119,7 +120,7 @@ def _current_state_violations(root: Path) -> list[str]:
         paths.extend(path for pattern in patterns for path in (root / directory).rglob(pattern))
     violations = []
     for path in paths:
-        if not path.is_file() or path == Path(__file__) or "lmx/data" in path.as_posix():
+        if not path.is_file() or path == Path(__file__) or "src/lmx/data" in path.as_posix():
             continue
         for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             if any(term in line.casefold() for term in CURRENT_STATE_TERMS):
@@ -149,7 +150,7 @@ def _release_asset_candidates(root: Path) -> list[dict[str, Any]]:
 
 def build_inventory(root: Path = ROOT) -> dict[str, Any]:
     modules = []
-    for path in sorted((root / "lmx").glob("*.py")):
+    for path in sorted((root / PACKAGE_ROOT).glob("*.py")):
         text = path.read_text(encoding="utf-8")
         role = _role(path.name)
         modules.append(
@@ -301,6 +302,7 @@ def inspect_wheel(path: str | Path) -> dict[str, Any]:
         "bytes": wheel.stat().st_size,
         "member_count": len(members),
         "forbidden_members": forbidden,
+        "typed_marker_present": "lmx/py.typed" in members,
     }
 
 
@@ -319,7 +321,7 @@ def inspect_sdist(path: str | Path) -> dict[str, Any]:
         "pyproject.toml",
         "setup.cfg",
     }
-    allowed_roots = ("lmx/", "lmx.egg-info/")
+    allowed_roots = ("src/lmx/", "src/lmx.egg-info/")
     forbidden = [
         name for name in relative if name not in allowed_files and not name.startswith(allowed_roots)
     ]
@@ -386,6 +388,8 @@ def architecture_budget_errors(
                 "wheel contains files outside lmx/ and dist-info/: "
                 + ", ".join(wheel_record["forbidden_members"])
             )
+        if not wheel_record["typed_marker_present"]:
+            errors.append("wheel must contain the lmx/py.typed PEP 561 marker")
     if sdist is not None:
         sdist_record = inspect_sdist(sdist)
         if sdist_record["bytes"] > targets["sdist_bytes_max"]:

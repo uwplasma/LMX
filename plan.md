@@ -687,11 +687,11 @@ and supported behavior has explicit gates.
 ### Phase 1 — establish the SOLVAX boundary
 
 - [x] Map every LMX algebraic function to keep, replace, upstream, or delete.
-- [ ] Replace wrappers with existing released SOLVAX APIs first.
-- [ ] Propose only the projected/nullspace and separable structured APIs that
+- [x] Replace wrappers with existing released SOLVAX APIs first.
+- [x] Propose only the projected/nullspace and separable structured APIs that
   pass the upstream criteria.
-- [ ] Implement, benchmark, document, and release accepted SOLVAX additions.
-- [ ] Bump LMX's SOLVAX lower bound and remove copied implementations/tests.
+- [x] Implement, benchmark, document, and release accepted SOLVAX additions.
+- [x] Bump LMX's SOLVAX lower bound and remove copied implementations/tests.
 - [x] Delete `lmx/linear.py` when no unique owner remains. Boundary-aware
   stencil actions and physical residuals live with LMX operators; the remaining
   adapters compose released SOLVAX APIs inside the physical solver module.
@@ -701,16 +701,16 @@ fixed-point algebra, direct structured solve, or generic preconditioner.
 
 ### Phase 2 — refactor retained capabilities and trim audited lanes
 
-- [ ] Decompose the 3-D/fringing monolith by mathematical ownership while
+- [x] Decompose the 3-D/fringing monolith by mathematical ownership while
   preserving one end-to-end path and the frozen gates at every tranche.
-- [ ] Consolidate FreeMHD code into a minimal case contract, Docker runner,
+- [x] Consolidate FreeMHD code into a minimal case contract, Docker runner,
   native-output observer, and comparison layer outside the runtime wheel.
 - [x] Remove duplicated reports, plots, fingerprints, frozen-output trees, and
   campaign adapters that do not contribute to a numerical gate.
 - [x] For each research lane rejected in Phase 0, remove its implementation,
   exports, configuration, dependencies, tests, examples, scripts, docs, data,
   and claims together; preserve selected material in the verified archive.
-- [ ] For each retained research lane, give it the same compact API/result
+- [x] For each retained research lane, give it the same compact API/result
   semantics and an explicit validation roadmap.
 - [x] Verify installed-package discovery and wheel contents against the
   capability matrix.
@@ -721,16 +721,16 @@ consolidation.
 
 ### Phase 3 — redesign the API and package
 
-- [ ] Move to `src/lmx` layout.
+- [x] Move to `src/lmx` layout.
 - [ ] Introduce the single case/options/result/convergence model.
-- [ ] Collapse duplicate config, cases, core, logging, units, output, and
+- [x] Collapse duplicate config, cases, core, logging, units, output, and
   validation representations.
-- [ ] Reduce `__all__` to the documented API.
-- [ ] Remove aliases, pass-through wrappers, redundant parameters, and boolean
+- [x] Reduce `__all__` to the documented API.
+- [x] Remove aliases, pass-through wrappers, redundant parameters, and boolean
   feature matrices.
-- [ ] Merge files according to the target ownership map without creating a
+- [x] Merge files according to the target ownership map without creating a
   mega-module.
-- [ ] Add `py.typed` and public type-completeness verification.
+- [x] Add `py.typed` and public type-completeness verification.
 
 Exit: the 2-D first-run, 3-D fringing, and advanced API examples work; package
 is <= 16 implementation modules and every public symbol has one documented
@@ -754,14 +754,14 @@ demonstrated with a profile.
 ### Phase 5 — consolidate tests, examples, and tools
 
 - [x] Build the target <= 14-file behavior-oriented test tree.
-- [ ] Parameterize duplicated case setup and retain physical assertions.
+- [x] Parameterize duplicated case setup and retain physical assertions.
 - [x] Replace maintenance scripts with `lmx validate`, tests, or deletion.
 - [ ] Implement the three-layer FreeMHD contract, local Docker smoke, and
   scheduled/release production validation workflow.
 - [x] Keep no more than seven Python examples plus one TOML case, including one
   3-D fringing example and one external-validation example.
 - [x] Make all examples fast, self-contained, editable, and CI-executed.
-- [ ] Enforce source/file/size/media/API budgets in package tests.
+- [x] Enforce source/file/size/media/API budgets in package tests.
 
 Exit: default suite is <= 90 seconds, coverage >=95%, Docker smoke passes when
 requested, scheduled/release parity is reproducible, all examples run, and
@@ -1337,3 +1337,37 @@ surface, measurements, validation, decision, and next action.
 - Next action: push the evidenced checkpoint, then finish the package/API
   completeness and portable-test-runtime items before requesting approval for
   the separately gated history rewrite.
+
+### 2026-08-22 — typed source layout and portable-runtime tranche
+
+- Moved the installable package to the PyPA `src/lmx` layout and updated build,
+  coverage, CI, release, architecture, provenance, validation, documentation,
+  and fixture paths together. The wheel contains `lmx/py.typed`, and a package
+  test verifies complete annotations on the 26-name root API. Repository-only
+  runners bootstrap both the checkout and `src` roots, with direct CLI tests.
+- Consolidated repeated full 3-D solves into shared physical integration cases.
+  The retained suite still executes rectangular and layered ducts, straight
+  and conducting-wall pipes, bent-pipe/low-De comparisons, analytic and
+  tabulated variable fields, magnetic obstacles, SOLVAX composition, restart,
+  differentiation, benchmark B1/B2, and FreeMHD contracts. Smaller example and
+  test meshes preserve their stated acceptance checks while leaving production
+  defaults unchanged.
+- The canonical six-worker work-stealing gate passes 500 tests with no skips in
+  82.2 seconds, below the 90-second audit-host target. All five release shards
+  pass; exact combined line/branch coverage is 95.017844% across 5,765
+  statements and 1,240 branches. Three explicit bent-pipe input-contract checks
+  supply real branch evidence; no coverage exclusion was added.
+- The live package contains 15 modules and 14,932 lines; tests contain 11,469
+  lines across 13 files; every package and external-validation source remains
+  below 1,800 lines. The checkout is 1,534,604 bytes, root import median is
+  0.0156 seconds without eager JAX import, and the current-state prose scan is
+  clean.
+- Ruff check/format, byte compilation, architecture/import, and Sphinx
+  warnings-as-errors gates pass. The source-layout wheel is 141,629 bytes with
+  29 members and the source distribution is 132,735 bytes with 35 members;
+  Twine and distribution-content audits pass, including the typing marker. A
+  clean environment explicitly installed released SOLVAX 0.14.0 and the LMX
+  wheel, then passed the CLI and a converged Hartmann solve from `/tmp`.
+- Next action: commit this source checkpoint and repeat the pinned B2 Docker
+  execution, native-output observation, and comparison against the committed
+  source snapshot.
