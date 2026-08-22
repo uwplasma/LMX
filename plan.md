@@ -1083,5 +1083,12 @@ surface, measurements, validation, decision, and next action.
   the same 5 optional external-data tests skipped, and combined line/branch
   coverage is 95.25%. Provenance, architecture, Sphinx warnings-as-errors,
   wheel/sdist build, and Twine checks pass; the wheel is 284 KiB.
-- Next action: run the pinned B2 Docker smoke from the committed tranche, then
-  continue the Phase 1 wrapper/structured-algebra audit.
+- Repeated the pinned B2 Docker smoke from committed source `1305790` with
+  FreeMHD `14b54a3` and image
+  `sha256:44e9c9c1cc9d69aa4e50ca773aef7971010905a529462273bf913e6bc5b2c238`.
+  Execution, artifacts, contract, observation, and comparison passed with no
+  failed checks and unchanged pressure Linf `0.0109172453` and RMS
+  `0.0045179771`. Its harness role remains deliberately non-accepting. The
+  complete external record is
+  `/Users/rogeriojorge/local/tests/lmx-audit/lmx-phase1-fixedpoint-1305790/b2`.
+- Next action: continue the Phase 1 wrapper/structured-algebra audit.
