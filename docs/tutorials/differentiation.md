@@ -78,6 +78,13 @@ def objective(parameters):
 
 
 value, gradient = jax.jit(jax.value_and_grad(objective))(jnp.ones(9))
+
+# Evaluate independent designs in bounded vectorized chunks.
+designs = jnp.stack((jnp.ones(9), jnp.linspace(0.9, 1.1, 9)))
+batched = jax.jit(
+    lambda batch: jax.lax.map(jax.value_and_grad(objective), batch, batch_size=2)
+)
+values, gradients = batched(designs)
 ```
 
 Electric closure uses an implicit SOLVAX VJP. The finite collocated projection
@@ -87,6 +94,9 @@ with the ordinary production solve, independent finite differences, JVP/VJP
 duality, and lower compiled reverse temporary memory than a full tape.
 The material coefficients are ``(fluid, solid)`` multipliers, so a layered
 case exposes wall conductance without rebuilding its mesh or region topology.
+`jax.vmap` and bounded `jax.lax.map` compose directly, so LMX needs no ensemble
+API. Choose the chunk size from measured accelerator memory; each row retains
+its own exact production derivative.
 Geometry, material layout, step count, and checkpoint width are static. Choose
 the case timestep for the largest field and conductivity scales in the design
 domain so every differentiated evaluation uses the same stable recurrence.
