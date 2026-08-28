@@ -46,7 +46,11 @@ generic rectangular or layered problem. It returns only traced fields and
 accepts continuous pressure forcing and imposed-field scale. Electric closure
 is implicit while finite projection and outer iterations are
 checkpointed, so reverse memory does not grow as a full trajectory tape. Mesh
-and step controls remain static. The specialized ALEX B2 and pipe lanes fail
+and step controls remain static. The scale may be a scalar or one coefficient
+per axial station. `extruded_engineering_objectives` reduces the fields to
+pressure drop, flow rate, pumping power, outlet nonuniformity, wall-current RMS,
+and recirculation without leaving the differentiated program. The specialized
+ALEX B2 and pipe lanes fail
 closed in this API pending their own coupled-adjoint validation; see the
 [differentiation tutorial](differentiation.md).
 

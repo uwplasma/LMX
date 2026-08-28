@@ -23,6 +23,7 @@ from .cases import _ha_to_b, make_shercliff_case
 from .mesh import (
     sample_tabulated_field_volume,
 )
+from .physics import build_material_fields
 from .specs import (
     BoundaryCondition,
     CaseSpec,
@@ -765,8 +766,9 @@ def evolve_extruded_fields(
     """Return differentiable 3-D duct fields through the production recurrence.
 
     Returns velocity, pressure, potential, current, and Lorentz-force fields.
-    Pressure forcing and imposed-field scale are continuous; other controls are
-    static. SOLVAX supplies implicit elliptic VJPs and exact checkpointing.
+    Pressure forcing and imposed-field scale are continuous; the field scale
+    may be scalar or contain one coefficient per axial station. Other controls
+    are static. SOLVAX supplies implicit elliptic VJPs and exact checkpointing.
     """
 
     steps = (
@@ -788,3 +790,58 @@ def evolve_extruded_fields(
             checkpoint_size,
         ),
     )
+
+
+def extruded_engineering_objectives(
+    problem: ExtrudedInductionlessProblem,
+    fields: tuple[jnp.ndarray, ...],
+    *,
+    smoothing: float = 1.0e-8,
+) -> dict[str, jnp.ndarray]:
+    """Reduce differentiable 3-D fields to scalar design objectives.
+
+    Values retain the units of ``problem``. Lower is better except for flow
+    rate; wall current is a cell-centered design proxy, not a validation flux.
+    """
+    if problem.case.geometry.kind not in {"rect_duct", "layered_duct"}:
+        raise NotImplementedError("engineering objectives require a rectangular or layered duct")
+    if len(fields) < 8:
+        raise ValueError("fields must contain velocity, pressure, potential, and current")
+    if smoothing <= 0.0:
+        raise ValueError("smoothing must be positive")
+    u, _, _, pressure, _, jx, jy, jz = fields[:8]
+    mesh = _cross_section_mesh(problem.case)
+    expected_shape = (len(mesh.x_centers), *mesh.yz_shape)
+    if any(value.shape != expected_shape for value in (u, pressure, jx, jy, jz)):
+        raise ValueError(f"field arrays must share the problem shape {expected_shape}")
+    fluid = np.asarray(build_material_fields(problem.case, mesh).fluid_mask)
+    area = jnp.asarray(mesh.dy)[:, None] * jnp.asarray(mesh.dz)[None, :]
+    weights, area_sum = jnp.asarray(fluid) * area, jnp.sum(fluid * area)
+    flow = jnp.sum(weights * u, axis=(1, 2))
+    mean_u = flow / area_sum
+    mean_pressure = jnp.sum(weights * pressure, axis=(1, 2)) / area_sum
+    pressure_drop = mean_pressure[0] - mean_pressure[-1]
+    outlet_variance = jnp.sum(weights * (u[-1] - mean_u[-1]) ** 2) / area_sum
+    flow_nonuniformity = outlet_variance / (mean_u[-1] ** 2 + smoothing**2)
+    wall = ~fluid
+    if not wall.any():
+        wall[[0, -1], :] = True
+        wall[:, [0, -1]] = True
+    wall_weights = jnp.asarray(wall) * area
+    current_squared = jx**2 + jy**2 + jz**2
+    wall_current_rms = (
+        jnp.sqrt(
+            jnp.sum(wall_weights * current_squared) / (u.shape[0] * jnp.sum(wall_weights)) + smoothing**2
+        )
+        - smoothing
+    )
+    speed = jnp.sqrt(u**2 + smoothing**2)
+    recirculation_fraction = 0.5 * jnp.sum(weights * (speed - u)) / jnp.sum(weights * speed)
+    return {
+        "pressure_drop": pressure_drop,
+        "flow_rate": flow[-1],
+        "pumping_power": pressure_drop * flow[-1],
+        "flow_nonuniformity": flow_nonuniformity,
+        "wall_current_density_rms": wall_current_rms,
+        "recirculation_fraction": recirculation_fraction,
+    }
