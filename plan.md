@@ -2279,3 +2279,48 @@ surface, measurements, validation, decision, and next action.
 - Next action: add continuous wall/material conductance controls through the
   accepted layered operator, then gate batched design throughput and CPU/GPU
   derivative parity before presenting an optimization result.
+
+### 2026-08-28 — differentiated material conductance controls
+
+- Candidate `52889caef94c76a4dd0712c278f63e756b2ecd83` extends the accepted
+  rectangular/layered production recurrence with one continuous
+  `material_conductivity_scale`: a scalar scales every material, while two
+  coefficients independently scale fluid and explicit solid-wall regions.
+  Unit coefficients reproduce the ordinary production solve. Geometry,
+  region topology, timestep, and checkpoint policy remain static so one
+  optimization uses a fixed discrete recurrence.
+- The layered acceptance gate differentiates the cell-centered wall-current
+  objective with respect to both material coefficients. Reverse gradients
+  agree with independent centered differences within `5e-4`, JVP/VJP duality
+  passes, and the electric closure retains the SOLVAX implicit adjoint rather
+  than tracing PCG iterations. This work also found and fixed a static-assembly
+  leak in `extruded_engineering_objectives`; the README's complete layered
+  value-and-gradient example now executes under `jax.jit`.
+- The exact-commit local gate passed 509 tests in 116.05 seconds (117.6 seconds
+  including evidence assembly) with 95.12% combined branch coverage. Coverage
+  and JUnit SHA-256 digests are
+  `29374a96b2d59731219b31e7943ac4d186cdc738db4f75e4b26a426aea410f35`
+  and `7da6e19740aaf11db749efe61798f3e03fbb3648e134f8513f9f9e7d56a50f92`.
+  Ruff, all curated examples, Sphinx HTML/linkcheck with warnings as errors,
+  architecture/import budgets, isolated build, Twine, and distribution-content
+  inspection passed.
+- The wheel and sdist are 149,791 and 141,601 bytes with SHA-256 digests
+  `f6018c81955df2242de9d4436ffea74d265572181e53dae78be05255e014ba8b`
+  and `8163a034f83361755e67b4151cd16db0b27c18065ff7eae762a73e9ae7aa0361`.
+  A fresh non-editable wheel environment passed the CLI and an end-to-end JIT
+  layered material gradient. The pinned FreeMHD B2 preflight passed from a
+  temporary detached source clone with unchanged contract SHA-256
+  `e30650045508cab8fce34a421e733591ff9f7503e322b54468dfdd300e11588a`.
+- No module, root export, example, or runtime dependency was added. The narrow
+  capability budget is 15,440 package lines and 12,030 test lines; the
+  candidate uses 15,437 and 12,026, with 6,009 core lines, 16 modules, 28
+  exports, and seven curated examples.
+- SOLVAX pseudo-transient continuation PR 87 merged at
+  `8ce026c036a6779d88b02e790ddf771e6c8233bf` after 750 local tests at 98.33%
+  coverage plus green minimum/current/advanced/macOS, docs, lint, type, and
+  Codecov checks. Its hosted current/advanced jobs took more than 14 minutes;
+  the next SOLVAX infrastructure audit must preserve evidence while splitting
+  or parallelizing that work below the ten-minute development target.
+- Next action: merge this LMX tranche, then gate batched design throughput and
+  CPU/GPU material-gradient parity before the first constrained wall/field
+  optimization result.
