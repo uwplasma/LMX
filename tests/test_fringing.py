@@ -2128,25 +2128,29 @@ def test_layered_extruded_fields_share_the_production_update():
         assert actual == pytest.approx(getattr(production, name), rel=2.0e-6, abs=1.0e-9)
     assert all(jnp.isfinite(value) for value in extruded_engineering_objectives(problem, fields).values())
 
-    def objective(conductivity_scale):
+    def objective(parameters):
         evolved = evolve_extruded_fields(
             problem,
-            material_conductivity_scale=conductivity_scale,
+            forcing=parameters[0],
+            magnetic_field_scale=parameters[1],
+            material_conductivity_scale=parameters[2:],
             steps=1,
         )
         return extruded_engineering_objectives(problem, evolved)["wall_current_density_rms"]
 
-    scale = jnp.ones(2)
-    compiled_objective = jax.jit(objective)
-    value, gradient = jax.jit(jax.value_and_grad(objective))(scale)
-    epsilon = 2.0e-3
-    finite_difference = _centered_gradient(compiled_objective, scale, epsilon)
-    direction = jnp.asarray([0.25, -0.5])
+    scale = jnp.ones(4)
+    value_and_gradient = jax.jit(jax.value_and_grad(objective))
+    value, gradient = value_and_gradient(scale)
+    finite_difference = _centered_gradient(jax.jit(objective), scale, 2.0e-3)
+    direction = jnp.asarray([0.1, -0.2, 0.25, -0.5])
     tangent = jax.jvp(objective, (scale,), (direction,))[1]
-    assert jnp.isfinite(value)
-    assert jnp.all(jnp.isfinite(gradient))
     assert gradient == pytest.approx(finite_difference, rel=5.0e-4, abs=2.0e-9)
     assert tangent == pytest.approx(jnp.vdot(gradient, direction), rel=2.0e-6, abs=1.0e-9)
+    points = jnp.stack((scale, jnp.asarray([1.1, 0.9, 0.95, 1.2])))
+    batched = jax.jit(jax.vmap(jax.value_and_grad(objective)))(points)
+    second = value_and_gradient(points[1])
+    assert batched[0] == pytest.approx(jnp.stack((value, second[0])))
+    assert batched[1] == pytest.approx(jnp.stack((gradient, second[1])))
     with pytest.raises(ValueError, match="fluid, solid"):
         evolve_extruded_fields(problem, material_conductivity_scale=jnp.ones(3), steps=2)
 
