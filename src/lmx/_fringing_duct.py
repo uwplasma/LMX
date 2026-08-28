@@ -996,7 +996,6 @@ def _sample_station_magnetic_field(
             jnp.broadcast_to(y[None, :, :], shape),
             jnp.broadcast_to(z[None, :, :], shape),
         )
-    x_coords = np.asarray(case.geometry.length * jnp.linspace(0.0, 1.0, nx), dtype=float)
     if case.magnetic_field.kind == "constant":
         base_field = case.magnetic_field.value or (0.0, 0.0, 0.0)
         shape = (nx, ny, nz)
@@ -1015,6 +1014,7 @@ def _sample_station_magnetic_field(
     if case.magnetic_field.kind == "tabulated":
         if case.magnetic_field.table_path is None:
             raise ValueError("Tabulated magnetic field requires table_path")
+        x_coords = np.asarray(case.geometry.length * jnp.linspace(0.0, 1.0, nx), dtype=float)
         table = load_tabulated_field(case.magnetic_field.table_path)
         shape = (nx, ny, nz)
         sampled = sample_tabulated_field_volume(

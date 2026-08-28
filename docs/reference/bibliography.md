@@ -27,11 +27,28 @@ Core references used by the implemented models and validation contracts include:
 - ALEX results, “A comparison of measurements from a round and a rectangular
   duct with 3-D code predictions,” 1987 — Benchmark B1/B2 pressure and flow
   observables.
-- S. Benavides and C. Gissinger, “FreeMHD: Validation and application of a new
-  open-source MHD solver for OpenFOAM,” *Physics of Plasmas* 32, 2025,
+- B. Wynne et al., “FreeMHD: Validation and verification of the open-source,
+  multi-domain, multi-phase solver for electrically conductive flows,”
+  *Physics of Plasmas* 32, 2025,
   [doi:10.1063/5.0230242](https://doi.org/10.1063/5.0230242) — the
   [FreeMHD source](https://github.com/PlasmaControl/FreeMHD) supplies the
   independent finite-volume implementation used by the executable comparison.
+- T. Hua et al., “MHD capabilities in SAM and NekRS for fusion liquid metal
+  blanket applications,” *Fusion Engineering and Design* 230, 2026,
+  [doi:10.1016/j.fusengdes.2026.115888](https://doi.org/10.1016/j.fusengdes.2026.115888)
+  — reduced system models, high-order GPU CFD, and ALEX square/round-duct
+  validation define important independent comparison targets.
+- C. Moreno, A. Bader, and P. Wilson, “ParaStell: parametric modeling and
+  neutronics support for stellarator fusion power plants,” *Frontiers in
+  Nuclear Engineering* 3, 2024,
+  [doi:10.3389/fnuen.2024.1384788](https://doi.org/10.3389/fnuen.2024.1384788)
+  — the external CAD/neutronics boundary for future stellarator blanket-design
+  coupling.
+- P. Fischer et al., “NekRS, a GPU-accelerated spectral element Navier--Stokes
+  solver,” *Parallel Computing* 114, 2022,
+  [doi:10.1016/j.parco.2022.102982](https://doi.org/10.1016/j.parco.2022.102982)
+  — the reference for production GPU-resident high-order CFD and strong-scaling
+  evidence.
 - A. Griewank and A. Walther, “Algorithm 799: Revolve: An implementation of
   checkpointing for the reverse or adjoint mode of computational
   differentiation,” *ACM Transactions on Mathematical Software* 26, 2000,
@@ -48,6 +65,21 @@ Core references used by the implemented models and validation contracts include:
   dynamics,” *PNAS* 118, 2021,
   [doi:10.1073/pnas.2101784118](https://doi.org/10.1073/pnas.2101784118) —
   traceable finite-volume and pseudospectral CFD kernels on accelerators.
+- D. Bezgin, A. Buhendwa, and N. Adams, “JAX-Fluids 2.0: Towards HPC for
+  differentiable CFD of compressible two-phase flows,” *Computer Physics
+  Communications* 308, 2025,
+  [doi:10.1016/j.cpc.2024.109433](https://doi.org/10.1016/j.cpc.2024.109433)
+  — multi-accelerator differentiation and scaling evidence for a broader CFD
+  class.
+- I. Yashchuk, “Bringing PDEs to JAX with forward and reverse modes automatic
+  differentiation,” [arXiv:2309.07137](https://arxiv.org/abs/2309.07137) —
+  implicit tangent and adjoint equations for composing converged PDE solves
+  with JAX programs.
+- The JAX documentation on
+  [gradient checkpointing](https://docs.jax.dev/en/latest/301/remat.html),
+  [distributed arrays](https://docs.jax.dev/en/latest/201/sharding.html), and
+  [autodiff with sharding](https://docs.jax.dev/en/latest/301/sharding-ad.html)
+  — current memory/parallel semantics used to design LMX acceptance tests.
 
 Each numerical result should cite the LMX version/commit and the specific
 benchmark source used for its physical claim.
