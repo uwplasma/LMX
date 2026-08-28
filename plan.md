@@ -2324,3 +2324,40 @@ surface, measurements, validation, decision, and next action.
 - Next action: merge this LMX tranche, then gate batched design throughput and
   CPU/GPU material-gradient parity before the first constrained wall/field
   optimization result.
+
+### 2026-08-28 — bounded batched design gradients
+
+- Candidate `e6f4081c1b583981daad1d0d565dbe0a492cd1a1` extends the existing
+  layered acceptance gate to one combined forcing, imposed-field, fluid-
+  conductivity, and wall-conductivity vector. All four reverse derivatives
+  match independent centered differences; JVP/VJP duality and direct `vmap`
+  parity with separate compiled evaluations pass.
+- The user workflow uses JAX composition instead of an LMX ensemble layer.
+  `jax.vmap` is accepted, while the tutorial recommends bounded
+  `jax.lax.map(..., batch_size=k)` chunks so design throughput does not imply
+  unbounded device memory. The executable two-design tutorial passes under
+  `jax.jit` and returns finite values and a `(2, 9)` gradient array.
+- On the local arm64 CPU, eight full value-and-gradient evaluations took
+  1.840 ms sequentially, 1.569 ms in chunks of two, 1.587 ms in chunks of
+  four, and 1.535 ms under full vectorization after compilation. Compiled
+  temporary storage was 59,584, 115,256, 216,632, and 408,200 bytes,
+  respectively. The evidence therefore supports chunks of two as the current
+  CPU throughput/memory default; it does not support an accelerator claim.
+- The exact-commit local gate passed 509 tests in 114.60 seconds (115.8 seconds
+  including evidence assembly) with 95.12% combined branch coverage. Coverage
+  and JUnit SHA-256 digests are
+  `d00407c0c0dd4016d33835a8fd10f2a0d33c5a63fa3e6f0d6f17fed0ed682832`
+  and `a34a34f39728cc7d7d3d7442fc2a7173cb5cda34db24084b46b5f3aa6a64611d`.
+  Ruff, formatting, architecture/import budgets, and Sphinx HTML/linkcheck
+  with warnings as errors also pass. No package source, public API, file,
+  dependency, or architecture budget changed in this tranche.
+- A fresh authenticated clone of merged material-control commit
+  `96b7f0b1cdbba19d805ec3cd477b4cfdbebb6407` is 2,736 KiB total with 872 KiB
+  of Git data, 88 tracked files, a 749.92 KiB pack, and a 518,181-byte source
+  archive. The live repository remains far below its 9,766 KiB limit.
+- `ssh office` timed out at the configured endpoint before authentication, so
+  no GPU parity, speedup, memory, or scaling claim is made. Retry the real
+  A4000 gate when the host is reachable; local emulation is not a substitute.
+- Next action: obtain one- and two-A4000 primal/gradient evidence, then run the
+  first bounded wall/field optimization. In parallel, split or parallelize the
+  SOLVAX current/advanced jobs that exceeded fourteen hosted minutes.
