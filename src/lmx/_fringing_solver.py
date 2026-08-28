@@ -83,7 +83,7 @@ def _solve_extruded_projection(
     progress_callback: Callable[[ExtrudedIterationProgress], None] | None = None,
     phase_timing_callback: Callable[[str, float], None] | None = None,
     checkpoint_interval: int | None = None,
-    field_parameters: tuple[jnp.ndarray, jnp.ndarray, int, int | None] | None = None,
+    design_parameters: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, int, int | None] | None = None,
 ) -> ExtrudedFieldBundle | tuple[jnp.ndarray, ...]:
     case = problem.case
     with jax.ensure_compile_time_eval():
@@ -95,7 +95,7 @@ def _solve_extruded_projection(
         case.name.startswith("alex_b1-fringing-pipe_") and case.geometry.kind == "pipe_ogrid"
     )
     use_compatible_steady_b1 = use_alex_b1_finite_volume
-    if field_parameters is not None and (
+    if design_parameters is not None and (
         case.geometry.kind not in {"rect_duct", "layered_duct"} or use_alex_b2_finite_volume
     ):
         raise NotImplementedError(
@@ -961,9 +961,10 @@ def _solve_extruded_projection(
             sheet_conductance / ALEX_B2_CANONICAL_SHELL_THICKNESS,
         )
     cell_area = _broadcast_cross_section(dy[:, None] * dz[None, :], nx)
-    forcing = (
-        float(case.forcing) if field_parameters is None else jnp.asarray(field_parameters[0], dtype=float)
-    )
+    if design_parameters is None:
+        forcing, magnetic_scale, conductivity_scale = case.forcing, 1.0, 1.0
+    else:
+        forcing, magnetic_scale, conductivity_scale, outer_steps, checkpoint_size = design_parameters
     with jax.ensure_compile_time_eval():
         field_scale = jnp.asarray(problem.profile.field_scale, dtype=float)
         field_y, field_z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
@@ -975,7 +976,7 @@ def _solve_extruded_projection(
             z=field_z,
             volume_field=problem.profile.volume_field,
         )
-    magnetic_scale = jnp.asarray(1.0 if field_parameters is None else field_parameters[1], dtype=float)
+    magnetic_scale = jnp.asarray(magnetic_scale, dtype=float)
     if magnetic_scale.ndim:
         if magnetic_scale.shape != (nx,):
             raise ValueError(
@@ -983,6 +984,12 @@ def _solve_extruded_projection(
             )
         magnetic_scale = magnetic_scale[:, None, None]
     bx, by, bz = (magnetic_scale * value for value in base_field)
+    conductivity_scale = jnp.asarray(conductivity_scale, dtype=float)
+    if conductivity_scale.ndim:
+        if conductivity_scale.shape != (2,):
+            raise ValueError("material_conductivity_scale must be scalar or (fluid, solid)")
+        conductivity_scale = jnp.where(fluid_mask, conductivity_scale[0], conductivity_scale[1])
+    sigma = sigma * conductivity_scale
 
     if initial_bundle is not None:
         if initial_bundle.u.shape != (nx, ny, nz):
@@ -1036,7 +1043,7 @@ def _solve_extruded_projection(
         num_devices=num_devices,
     )
 
-    stability_field = (bx, by, bz) if field_parameters is None else base_field
+    stability_field = (bx, by, bz) if design_parameters is None else base_field
     with jax.ensure_compile_time_eval():
         static_sigma = _broadcast_cross_section(materials.conductivity, nx)
         static_rho = _broadcast_cross_section(materials.density, nx)
@@ -1089,11 +1096,8 @@ def _solve_extruded_projection(
                 if initial_bundle is not None or case.initial_velocity != 0.0
                 else None
             )
-    outer_steps = (
-        min(case.time_stepper.max_steps, max(6, case.solver.coupling_iterations * 2))
-        if field_parameters is None
-        else field_parameters[2]
-    )
+    if design_parameters is None:
+        outer_steps = min(case.time_stepper.max_steps, max(6, case.solver.coupling_iterations * 2))
     poisson_iterations = (
         case.time_stepper.potential_iterations
         if use_alex_b2_finite_volume
@@ -1140,7 +1144,7 @@ def _solve_extruded_projection(
                 ),
             )
 
-    if field_parameters is not None:
+    if design_parameters is not None:
         assert generic_step is not None
 
         def advance(_, current):
@@ -1152,7 +1156,7 @@ def _solve_extruded_projection(
             outer_steps - 1,
             advance,
             state,
-            checkpoint_size=field_parameters[3],
+            checkpoint_size=checkpoint_size,
         )
         state, observables = generic_step(state)
         return (*state, *observables[:6])

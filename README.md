@@ -83,20 +83,30 @@ checkpoints both projection iterations and the outer recurrence:
 ```python
 import jax
 import jax.numpy as jnp
-from lmx.fringing import evolve_extruded_fields, extruded_engineering_objectives
+from lmx.fringing import (
+    build_layered_duct_extruded_problem,
+    evolve_extruded_fields,
+    extruded_engineering_objectives,
+)
+
+design_problem = build_layered_duct_extruded_problem(
+    nx_stations=7, ny=6, nz=6, wall_cells=1
+)
 
 
-def fringe_response(field_coefficients):
+def fringe_response(parameters):
+    field_coefficients, material_scale = parameters[:-2], parameters[-2:]
     fields = evolve_extruded_fields(
-        problem,
+        design_problem,
         magnetic_field_scale=field_coefficients,
-        steps=40,
+        material_conductivity_scale=material_scale,
+        steps=8,
     )
-    objectives = extruded_engineering_objectives(problem, fields)
+    objectives = extruded_engineering_objectives(design_problem, fields)
     return objectives["pumping_power"] + 0.1 * objectives["flow_nonuniformity"]
 
 
-value, gradient = jax.jit(jax.value_and_grad(fringe_response))(jnp.ones(21))
+value, gradient = jax.jit(jax.value_and_grad(fringe_response))(jnp.ones(9))
 ```
 
 ![Three-dimensional fringing-field result](docs/_static/fringing_solver_family.webp)

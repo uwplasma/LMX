@@ -47,33 +47,37 @@ cases remain outside this API until their own gates pass.
 
 `evolve_extruded_fields` returns the production generic-duct velocity,
 pressure, potential, current, and Lorentz-force fields after a static number of
-steps. Pressure forcing and either a scalar or one coefficient per axial
-station for the imposed field are continuous. The accompanying reducer keeps
-engineering objectives in the same traced program:
+steps. Pressure forcing, material conductivity, and either a scalar or one
+coefficient per axial station for the imposed field are continuous. The
+accompanying reducer keeps engineering objectives in the same traced program:
 
 ```python
 import jax
 import jax.numpy as jnp
 from lmx.fringing import (
-    build_square_duct_extruded_problem,
+    build_layered_duct_extruded_problem,
     evolve_extruded_fields,
     extruded_engineering_objectives,
 )
 
-problem = build_square_duct_extruded_problem(nx_stations=12, ny=16, nz=16)
+problem = build_layered_duct_extruded_problem(
+    nx_stations=7, ny=6, nz=6, wall_cells=1
+)
 
 
-def objective(field_coefficients):
+def objective(parameters):
+    field_coefficients, material_scale = parameters[:-2], parameters[-2:]
     fields = evolve_extruded_fields(
         problem,
         magnetic_field_scale=field_coefficients,
-        steps=40,
+        material_conductivity_scale=material_scale,
+        steps=8,
     )
     metrics = extruded_engineering_objectives(problem, fields)
     return metrics["pumping_power"] + 0.1 * metrics["flow_nonuniformity"]
 
 
-value, gradient = jax.jit(jax.value_and_grad(objective))(jnp.ones(12))
+value, gradient = jax.jit(jax.value_and_grad(objective))(jnp.ones(9))
 ```
 
 Electric closure uses an implicit SOLVAX VJP. The finite collocated projection
@@ -81,7 +85,11 @@ and outer recurrence use exact two-level checkpoint schedules with
 `O(N/C + C)` retained states and square-root defaults. Tests require parity
 with the ordinary production solve, independent finite differences, JVP/VJP
 duality, and lower compiled reverse temporary memory than a full tape.
-Geometry, material layout, step count, and checkpoint width are static.
+The material coefficients are ``(fluid, solid)`` multipliers, so a layered
+case exposes wall conductance without rebuilding its mesh or region topology.
+Geometry, material layout, step count, and checkpoint width are static. Choose
+the case timestep for the largest field and conductivity scales in the design
+domain so every differentiated evaluation uses the same stable recurrence.
 Specialized ALEX B2 and pipe paths fail closed until their coupled operators
 have independent derivative gates. `extruded_engineering_objectives` also
 reports signed pressure drop, outlet flow rate, wall-current-density RMS, and a
