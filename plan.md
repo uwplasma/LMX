@@ -2,7 +2,7 @@
 
 **Status:** active
 
-**Last updated:** 2026-08-22
+**Last updated:** 2026-08-28
 
 **Purpose:** product goal, executable roadmap, decision register, and work log
 
@@ -68,6 +68,103 @@ matched equations, geometry, wall conductivity, forcing, controls, and
 observables. FreeMHD and OpenFOAM source may inform discretization and case
 construction, but copied algorithms enter LMX only when their license,
 mathematical contract, numerical benefit, and maintenance cost are explicit.
+
+## Research position and publication program
+
+LMX will lead in a deliberately narrower space than a general CFD code:
+
+> **LMX is the compact, accelerator-native, differentiable inductionless
+> liquid-metal MHD solver for duct, access-channel, and fringing-field design
+> loops in fusion blankets and stellarators.**
+
+The distinguishing deliverable is not merely that JAX can trace the code. It
+is a verified map from continuous field, forcing, material, wall, and supported
+geometry parameters to conservative production fields, engineering observables,
+and gradients, with explicit primal/adjoint residuals, bounded reverse memory,
+and independent physics validation. This supports thousands of design points
+and gradient-based optimization while retaining a path to selected 3-D
+high-fidelity comparisons.
+
+### Landscape boundary
+
+| Code or ecosystem | Established strength | Boundary for LMX | Useful relationship |
+|---|---|---|---|
+| ParaStell | Parametric stellarator in-vessel CAD, VMEC/first-wall input, radial builds, DAGMC/OpenMC neutronics | LMX does not own CAD, meshing arbitrary blanket solids, or neutronics | Consume versioned field/centerline/cross-section samples and return hydraulic, electromagnetic, and sensitivity observables to a device-design workflow |
+| NekRS and SAM | NekRS provides massively scalable high-order GPU CFD; SAM provides fast system models and MHD closures | LMX does not claim exascale arbitrary-geometry CFD or plant transients | Use matched duct/fringe cases for code comparison; publish when LMX gradients and design throughput add information not supplied by a primal CFD solve |
+| FreeMHD / FreeMHD2 | OpenFOAM finite-volume free-surface, multi-region, and now full-induction liquid-MHD physics | LMX remains inductionless and internal-flow focused; it does not chase free surfaces or full induction without a fusion design requirement | Maintain a pinned inductionless oracle, add a separately pinned current-source comparison, and exchange common dimensional observables |
+| JAX-Fluids, XLB, and JAX-CFD | Differentiable accelerator CFD, compressible/multiphase or lattice-Boltzmann methods, and scientific-ML workflows | LMX does not become a general differentiable CFD framework | Adopt evidence standards for multi-device execution, end-to-end gradients, profiling, and reproducible examples while keeping liquid-MHD equations and validation unique |
+| OpenFOAM MHD solvers and legacy HIMAG/MTC-H/ALEX codes | Broad finite-volume precedent and historical high-Hartmann validation | LMX does not copy solver families or inherit claims through similar equations | Use manufactured, analytical, experimental, and independently executed case contracts as external oracles |
+
+The public literature already covers scalable primal CFD, differentiable
+general CFD, free-surface liquid MHD, and parametric stellarator neutronics.
+LMX therefore must not claim novelty from Python, GPUs, automatic
+differentiation, or inductionless equations alone. A defensible contribution
+requires the combination below and quantitative evidence against the relevant
+alternative.
+
+### Research-grade claims and gates
+
+| Research claim | Evidence required before publication |
+|---|---|
+| A production liquid-MHD discrete adjoint is accurate and memory efficient | Component and end-to-end Taylor tests; centered differences; JVP/VJP duality; primal and transpose residuals; iteration-independent implicit memory; checkpoint scaling over at least four trajectory lengths; float64 CPU/GPU parity |
+| High-Hartmann wall and fringing physics are resolved deliberately | Hartmann/Shercliff/Hunt layer-aware refinement; observed order away from singular corners; charge, mass, momentum, and energy closure; monotone convergence of pressure loss and jets; declared limits for under-resolved layers |
+| Gradients improve a fusion-relevant design rather than a toy loss | At least one bounded pressure-loss/flow-uniformity/wall-current optimization over an imposed-field profile, wall conductance, or smooth duct geometry; independent finite-difference checkpoints; baseline/Pareto comparison; physical constraints and uncertainty bands |
+| Accelerator execution enables useful design throughput | Cold compilation, warm primal, warm gradient, peak device/host memory, and transfer time reported separately; one-GPU speedup on an amortized production problem; two-device strong scaling and gradient communication counts; batched-design throughput |
+| LMX predicts a measured or independent 3-D liquid-MHD response | Matched equations and dimensional inputs; mesh and solver convergence; native-output observation; B2 production comparison and a genuinely matched B1 or modern equivalent; discrepancies carried into the conclusion rather than tuned away |
+
+Every derivative claim includes the derivative of the accepted discretization,
+not merely the continuous equations or a shadow approximation. Every
+performance claim fixes hardware, precision, software versions, compilation
+policy, repetitions, and physical residuals. Every validation figure is
+generated from a manifest containing source commits, inputs, checksums, and the
+command that produced it.
+
+### Publication ladder
+
+1. **JCP methods paper — differentiable high-Hartmann liquid MHD.** Complete
+   rectangular/layered/pipe discrete adjoints, profile/material/geometry design
+   variables, primal and adjoint verification, checkpoint-memory theory,
+   convergence, and CPU/GPU performance. Compare algorithms and observables
+   with FreeMHD and, where executable, NekRS/SAM. The paper contribution is a
+   validated differentiation and performance methodology for constrained
+   inductionless MHD, not a broad multiphysics claim.
+2. **JPP or Physics of Plasmas physics paper — fringing-field sensitivity and
+   topology of recirculation/current paths.** Use verified gradients and
+   continuation across $Ha$, $N$, wall conductance, and field-gradient length
+   to explain pressure loss, jets, stagnant zones, and current closure. Anchor
+   the regime map to ALEX B1/B2 or another matched experiment/code.
+3. **Nuclear Fusion or Fusion Engineering and Design application paper —
+   optimization-ready blanket access ducts.** Couple versioned magnetic-field
+   and geometry samples from VMEC/ParaStell-style workflows to LMX; optimize a
+   manufacturable duct/field/wall parameterization for pressure drop, flow
+   distribution, wall current, and pumping power; validate selected Pareto
+   points with an independent high-fidelity solver.
+
+These papers are sequential evidence products, not simultaneous feature
+promises. The methods paper comes first because later physical and design
+conclusions depend on its gradient and discretization credibility.
+
+### Academic and industry adoption gates
+
+- one dimensional SI-unit case schema with explicit material-temperature
+  provenance and no silent nondimensional defaults;
+- stable Python field/objective API plus TOML/CLI workflow and semantic
+  deprecation policy after the public release;
+- deterministic restart, machine-readable convergence/failure reasons, and
+  compact VTK-compatible or XDMF-compatible field export without adding a
+  visualization framework to the runtime;
+- versioned validation matrix linking every capability to analytical,
+  manufactured, experimental, or external-code evidence;
+- ensemble and batched-design interface that composes with JAX optimization
+  libraries without LMX owning an optimizer;
+- uncertainty and robustness examples for field/material tolerances;
+- archived release evidence sufficient to reproduce every quantitative claim
+  from a clean environment.
+
+Near-term exclusions are equally important: free surfaces, full induction,
+turbulence/LES, conjugate heat transfer, tritium transport, corrosion, CAD,
+neutronics, and plant systems remain external until a validated coupling study
+shows that adding one is necessary and can preserve the compact product.
 
 ## Product definition
 
@@ -892,9 +989,13 @@ purpose.
   loop materializes geometry/scales and convergence decisions with Python
   `float`/`bool`; those boundaries must move outside a fixed-step or implicit
   differentiable core rather than being bypassed by a shadow solver.
-- [ ] Add blanket/stellarator objective callbacks over the production fields,
-  then gate batched design points, CPU/GPU derivative parity, adjoint memory and
-  warm runtime, and one-/two-device collective counts.
+- [ ] Add blanket/stellarator objective callbacks over the production fields
+  without adding an optimizer framework. First accept station-wise imposed-field
+  coefficients, wall/material conductance, and smooth coordinate values as
+  continuous inputs; provide pressure-loss, flow-uniformity, pumping-power,
+  wall-current, and recirculation objectives as small composable functions.
+  Gate batched design points, CPU/GPU derivative parity, adjoint memory and warm
+  runtime, and one-/two-device collective counts.
 
 Exit: primal and derivative performance gates pass, no canonical case regresses
 >5%, every retained solver family has an independently checked field/objective
@@ -972,6 +1073,21 @@ source all describe the same standalone API and commit.
 
 ## CI gates
 
+Until GitHub Actions billing is restored, the same gates run locally and are
+the merge authority. A local merge candidate must record the commit, Python,
+JAX/JAXLIB, SOLVAX, platform, commands, elapsed time, combined branch coverage,
+and generated evidence checksums in this log. At minimum it runs Ruff check and
+format, the architecture/import audit, the complete non-curated test suite with
+branch coverage and per-test timeouts, all curated examples, Sphinx with
+warnings as errors, package build/Twine inspection, a fresh non-editable wheel
+smoke, external links, and the pinned FreeMHD Docker comparison when Docker is
+available. A local failure is handled exactly like a required hosted failure;
+no check is waived because the hosted runner is unavailable.
+
+PyPI and the public GitHub release are deliberately deferred until the final
+public-repository phase. Local version tags before then identify immutable
+release candidates, not published distributions.
+
 Every pull request must pass:
 
 ```console
@@ -1028,7 +1144,9 @@ artifacts or release assets, not committed files.
 | D-030 | Differentiate the mathematical result, not incidental solver work | Implicit adjoints are the default for converged steady equations; checkpointed discrete adjoints are the default for finite trajectories. This matches established Optimistix, PETSc TSAdjoint/Revolve, and JAX scientific-computing practice while preserving one LMX production equation path. |
 | D-031 | Fail closed when a production adjoint does not converge | A finite primal is insufficient evidence: unsupported geometry remains unavailable until its transpose solve passes an independent derivative gate. |
 | D-032 | Eliminate inactive degrees of freedom from SPD off-diagonals | A fluid boundary contribution belongs on the diagonal, not as a coupling to an identity-constrained solid cell. Keeping the volume-scaled momentum operator symmetric makes primal PCG mathematically valid and gives its implicit transpose solve the same conditioning. |
+| D-033 | Differentiate one production 3-D recurrence with bounded nested derivatives | Generic rectangular/layered ducts expose pressure forcing and imposed-field scale through the retained field update. SOLVAX uses an implicit VJP for converged electric closure and exact checkpointing for finite projection and outer iterations. Specialized B2 and pipe lanes remain unavailable until their distinct coupled operators pass the same gates. |
 | D-034 | Execute each PR test once and aggregate its evidence | Three duration-balanced shards run concurrently with branch coverage and save run-scoped JUnit/coverage caches. A report-only job enforces the repository threshold; release reuses the same workflow in parallel with docs and external validation. This preserves fail-closed evidence while targeting a sub-10-minute critical path. |
+| D-035 | Lead with differentiable inductionless blanket-design physics, not general CFD breadth | ParaStell owns parametric stellarator CAD/neutronics, NekRS owns exascale high-order CFD, and FreeMHD owns free-surface/multi-region/full-induction development. LMX earns a distinct role through compact high-Hartmann duct/fringe equations, verified bounded-memory derivatives, accelerator design throughput, and matched external evidence. New multiphysics enters through versioned coupling data before it enters the runtime. |
 
 ## Work log
 
@@ -1959,6 +2077,40 @@ surface, measurements, validation, decision, and next action.
   then expose a differentiated 3-D field core. GPU parity remains queued until
   an office device is unoccupied.
 
+### 2026-08-22 — differentiated production 3-D field recurrence
+
+- Merged the layered-Hunt formulation as PR #5 at `3748653` after every hosted
+  metadata, architecture, Python 3.10, physics, benchmark, combined-coverage,
+  documentation, and package-build gate passed.
+- Added `lmx.fringing.evolve_extruded_fields` without adding a root export or
+  source file. Generic rectangular and layered ducts now return velocity,
+  pressure, potential, current, and Lorentz-force fields through the same
+  finite update used by `solve_extruded_inductionless`. Specialized ALEX B2
+  and pipe formulations fail closed rather than borrowing an unvalidated
+  derivative contract.
+- Preserved the validated finite collocated pressure projection and routed its
+  reverse pass through SOLVAX checkpointing. A converged nearest-neighbor PCG
+  replacement was rejected because the collocated central divergence/gradient
+  pair is not that Poisson operator and it regressed mass conservation.
+  Electric closure remains implicit; the outer recurrence uses the same exact
+  `checkpointed_fori_loop` with a square-root storage default.
+- All 11 field outputs match the ordinary production solve to numerical
+  precision on the acceptance problem. Pressure-forcing and magnetic-scale
+  VJPs agree with centered differences; JVP/VJP duality passes. On the
+  eight-step `4 x 4 x 4` float64 gate, checkpointing reduces compiled reverse
+  temporary storage from 354,456 to 228,824 bytes (35.4%) with identical value
+  and gradient.
+- The implementation preserves the existing architecture ceiling at 16
+  modules, 28 root exports, and 15,363 package lines. It removes the duplicated
+  generic production update and groups immutable step inputs once; no solver,
+  proxy discretization, test file, or experimental lane was added.
+- The complete local gate passes 508 tests in 158.2 seconds at 95.07% combined
+  line/branch coverage. Ruff, formatting, architecture/import, all curated
+  examples, warning-free HTML documentation, and external link checks pass.
+- Next action: complete hosted CI, package, and FreeMHD gates, then merge the
+  3-D tranche. Measure CPU/GPU parity and strong scaling as soon as an office
+  GPU is available.
+
 ### 2026-08-22 — sub-10-minute evidence architecture
 
 - Measured the hosted PR critical path rather than reducing test scope:
@@ -2007,3 +2159,89 @@ surface, measurements, validation, decision, and next action.
   redundant push run.
 - Next action: require the quota-independent release PR to pass, publish 1.3.0,
   then revalidate and merge the pending differentiated production 3-D tranche.
+- The integrated 3-D cold-cache run kept metadata (16s), physics (4m30s),
+  support (5m26s), documentation (25s), links (23s), and pinned FreeMHD
+  (7m06s) within budget. Its 56-test fringing lane passed in 7m57s, but
+  two-worker `loadgroup` scheduling left a long-tail imbalance after a 151s
+  derivative test. The runner now uses xdist work stealing; the exact covered
+  two-worker lane passes locally in 2m35s. The small derivative acceptance
+  problem also uses ten converged electric-closure updates instead of twenty,
+  while retaining production parity, two-parameter finite differences,
+  JVP/VJP duality, and the compiled reverse-memory bound.
+- The integrated run's report-only coverage job never started: GitHub marked
+  it failed because the organization currently reports failed payment or an
+  exhausted Actions spending limit. PyPI likewise rejected the release OIDC
+  exchange because this first publication has no pending trusted publisher.
+  These are external account settings; no evidence gate was bypassed.
+- Next action: restore GitHub Actions billing, register the exact pending PyPI
+  publisher, rerun the warm-cache gate, publish 1.3.0, and merge the 3-D
+  tranche only after every required check is green.
+
+### 2026-08-28 — research position and local evidence authority
+
+- Reviewed the live capabilities, APIs, and publications of ParaStell, NekRS,
+  SAM MHD, FreeMHD/FreeMHD2, JAX-Fluids, XLB, JAX-CFD, JAX sharding and
+  checkpointing, and Firedrake/JAX implicit differentiation, together with
+  liquid-metal blanket and ALEX validation literature. General GPU CFD,
+  differentiable CFD, stellarator CAD/neutronics, and free-surface/full-
+  induction MHD are already active fields; none alone is a defensible LMX
+  novelty claim.
+- Fixed the product position in D-035: LMX leads through the combined evidence
+  of compact high-Hartmann duct/fringe physics, exact production derivatives,
+  bounded adjoint memory, accelerator design throughput, and matched external
+  validation. It exchanges sampled geometry/field and engineering observables
+  with ParaStell-style workflows instead of absorbing CAD or neutronics.
+- Added sequential JCP methods, JPP/Physics of Plasmas physics, and Nuclear
+  Fusion/Fusion Engineering and Design application programs. Each has
+  falsifiable numerical, derivative, performance, physical, and reproducibility
+  gates; no paper claim depends only on JAX compatibility or qualitative plots.
+- GitHub Actions billing may remain unavailable until the next billing cycle,
+  and PyPI/public GitHub release work is deferred to the final public phase.
+  Complete recorded local evidence is therefore the temporary merge authority;
+  hosted gates are not deleted or weakened.
+- Next action: execute the complete local evidence gate on the optimized
+  differentiated 3-D branch, merge it only if every check passes, then expose
+  station-wise field coefficients and engineering objectives as the first
+  optimization-grade design tranche.
+
+### 2026-08-28 — differentiated 3-D local merge evidence
+
+- Candidate `fb1937ec82f2005deaceee32779b65246626ab5e` was tested on macOS
+  14.4.1 arm64 with Python 3.11.14, JAX/JAXLIB 0.9.2, SOLVAX 0.17.0, and the
+  CPU backend. The later evidence-log commit changes only this Markdown file.
+- `PYTHONPATH="$PWD/src" COVERAGE_FILE=/tmp/lmx-pr7-full-absolute.coverage
+  python scripts/run_full_test_suite.py --budget-seconds 1200
+  --warning-seconds 600 --test-timeout-seconds 300 --coverage-fail-under 95
+  --coverage-xml /tmp/lmx-pr7-full-absolute.xml --junit-xml
+  /tmp/lmx-pr7-full-absolute-junit.xml` passed 508 tests in 108.6 s with
+  95.07% combined branch coverage. The coverage and JUnit SHA-256 digests are
+  `5283ef2a04931c2e5020c306a25807d3a820380936339d54bcd390d00638dcf3`
+  and `caee36623d53280d73f0fdf450339632ec5867786580474314e4e3486d8cb1b6`.
+- Ruff check/format and `scripts/audit_architecture.py` passed: 16 modules,
+  6,009 core lines, 15,363 total lines, 28 exports, and seven curated
+  examples. The curated first-run test passed independently. Sphinx HTML and
+  linkcheck both passed with warnings as errors when pointed at the absolute
+  candidate source path.
+- The isolated sdist/wheel build and Twine inspection passed. The wheel and
+  sdist are 145 KiB and 137 KiB with SHA-256 digests
+  `d4cf5dc1f79b3065b8c4971aabc38621bcc32c0622ff94e23df4f2479a9e9de4`
+  and `67ce0c229d73ee310818211906d8a351fdd979e22e17a57beef0792bd9190706`.
+  A fresh non-editable wheel environment passed the CLI smoke and a real 3-D
+  value-and-gradient calculation.
+- The matched-B2 preflight passed against FreeMHD
+  `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5` and installer
+  `36f409d294ba3170d64d4073378d5ef68401072f`; contract SHA-256 is
+  `e30650045508cab8fce34a421e733591ff9f7503e322b54468dfdd300e11588a`.
+  A redundant local OpenFOAM execution could not start because Docker's
+  62-GiB virtual filesystem had zero free bytes, causing `apt` index writes to
+  surface as signature errors. No unrelated Docker data was deleted. The
+  source-bearing revision had already passed the pinned hosted FreeMHD solver
+  comparison, and subsequent commits do not change an MHD operator.
+- The first aggregate invocation used relative `PYTHONPATH=src`; subprocess
+  examples changed working directory and imported an older checkout, producing
+  three import failures while 505 tests passed. The authoritative command uses
+  the absolute source path above and passed completely.
+- Verdict: the differentiated generic rectangular/layered 3-D field path is
+  accepted for merge. Specialized B2 and pipe derivatives, genuinely matched
+  B1 validation, field-profile design variables, and multi-device derivative
+  evidence remain explicitly open.

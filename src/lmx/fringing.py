@@ -752,3 +752,39 @@ def solve_extruded_inductionless(
         station_history=tuple(station_history),
         validation=validation,
     )
+
+
+def evolve_extruded_fields(
+    problem: ExtrudedInductionlessProblem,
+    *,
+    forcing: float | jnp.ndarray | None = None,
+    magnetic_field_scale: float | jnp.ndarray = 1.0,
+    steps: int | None = None,
+    checkpoint_size: int | None = None,
+) -> tuple[jnp.ndarray, ...]:
+    """Return differentiable 3-D duct fields through the production recurrence.
+
+    Returns velocity, pressure, potential, current, and Lorentz-force fields.
+    Pressure forcing and imposed-field scale are continuous; other controls are
+    static. SOLVAX supplies implicit elliptic VJPs and exact checkpointing.
+    """
+
+    steps = (
+        min(problem.case.time_stepper.max_steps, max(6, problem.case.solver.coupling_iterations * 2))
+        if steps is None
+        else steps
+    )
+    if steps < 1:
+        raise ValueError("steps must be positive")
+    if checkpoint_size is not None and checkpoint_size < 1:
+        raise ValueError("checkpoint_size must be positive")
+    source = problem.case.forcing if forcing is None else forcing
+    return _solve_extruded_projection(
+        problem,
+        field_parameters=(
+            jnp.asarray(source),
+            jnp.asarray(magnetic_field_scale),
+            steps,
+            checkpoint_size,
+        ),
+    )

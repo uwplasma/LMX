@@ -55,8 +55,10 @@ The derivative algorithm is part of each numerical method. Converged linear or
 steady nonlinear equations use an implicit tangent/adjoint system, so reverse
 cost is one additional transposed solve and does not depend on the number of
 primal iterations. Finite transient models differentiate the discrete update.
-Q2D uses an exact two-level checkpoint schedule whose retained trajectory state
-is $O(N/C+C)$ for $N$ steps and width $C$, with a square-root default.
+Generic 3-D ducts use an implicit electric VJP and exact checkpointed
+projection and outer recurrences. Q2D uses the same two-level schedule;
+retained trajectory state is $O(N/C+C)$ for $N$ steps and width $C$, with a
+square-root default.
 
 Field arrays and continuous physical coefficients are traced. Mesh topology,
 array shapes, iteration limits, checkpoint widths, convergence strings,

@@ -13,6 +13,7 @@ from jax.sharding import PartitionSpec as P
 from solvax import (
     aitken_relaxation,
     anderson_mixing,
+    checkpointed_fori_loop,
 )
 
 from ._fringing_common import (
@@ -30,12 +31,10 @@ from ._fringing_common import (
     _enforce_stationwise_flow_rate_3d,
     _enforce_velocity_bc_3d,
     _gauge_invariant_scalar_update,
-    _gradient_3d,
+    _generic_duct_step,
     _iteration_checkpoint_bundle,
     _iteration_history_arrays,
-    _laplacian_3d,
     _normalized_pressure_observable_update,
-    _projection_pressure_correction_3d,
     _rectangular_fluid_bounds,
     _restore_duct_iteration_state,
     _reuse_fringing_jit,
@@ -84,9 +83,11 @@ def _solve_extruded_projection(
     progress_callback: Callable[[ExtrudedIterationProgress], None] | None = None,
     phase_timing_callback: Callable[[str, float], None] | None = None,
     checkpoint_interval: int | None = None,
-) -> ExtrudedFieldBundle:
+    field_parameters: tuple[jnp.ndarray, jnp.ndarray, int, int | None] | None = None,
+) -> ExtrudedFieldBundle | tuple[jnp.ndarray, ...]:
     case = problem.case
-    mesh = _cross_section_mesh(case)
+    with jax.ensure_compile_time_eval():
+        mesh = _cross_section_mesh(case)
     use_alex_b2_finite_volume = (
         case.name.startswith("alex_b2-fringing-square_") and case.geometry.kind == "layered_duct"
     )
@@ -94,6 +95,12 @@ def _solve_extruded_projection(
         case.name.startswith("alex_b1-fringing-pipe_") and case.geometry.kind == "pipe_ogrid"
     )
     use_compatible_steady_b1 = use_alex_b1_finite_volume
+    if field_parameters is not None and (
+        case.geometry.kind not in {"rect_duct", "layered_duct"} or use_alex_b2_finite_volume
+    ):
+        raise NotImplementedError(
+            "differentiable extruded fields require a generic rectangular or layered duct"
+        )
     if case.name.startswith("alex_") and not (use_alex_b1_finite_volume or use_alex_b2_finite_volume):
         raise NotImplementedError(
             "Unsupported ALEX production case; only the frozen B1 pipe and B2 square "
@@ -925,16 +932,18 @@ def _solve_extruded_projection(
                 stride=case.output.history_stride,
             ),
         )
-    materials = build_material_fields(case, mesh)
+    with jax.ensure_compile_time_eval():
+        materials = build_material_fields(case, mesh)
     x = jnp.asarray(mesh.x_centers, dtype=float)
     y = jnp.asarray(mesh.y_centers, dtype=float)
     z = jnp.asarray(mesh.z_centers, dtype=float)
     nx, ny, nz = len(x), len(y), len(z)
-    dx = float(jnp.mean(mesh.dx))
     dy = jnp.asarray(mesh.dy, dtype=float)
     dz = jnp.asarray(mesh.dz, dtype=float)
-    dy_momentum = float(jnp.mean(dy))
-    dz_momentum = float(jnp.mean(dz))
+    walls = case.geometry.wall_thickness
+    dx = case.geometry.length / nx
+    dy_momentum = (case.geometry.width + walls[0] + walls[1]) / ny
+    dz_momentum = (case.geometry.height + walls[2] + walls[3]) / nz
     sigma = _broadcast_cross_section(materials.conductivity, nx)
     rho = _broadcast_cross_section(materials.density, nx)
     nu = _broadcast_cross_section(materials.viscosity, nx)
@@ -952,17 +961,22 @@ def _solve_extruded_projection(
             sheet_conductance / ALEX_B2_CANONICAL_SHELL_THICKNESS,
         )
     cell_area = _broadcast_cross_section(dy[:, None] * dz[None, :], nx)
-    forcing = float(case.forcing)
-    field_scale = jnp.asarray(problem.profile.field_scale, dtype=float)
-    field_y, field_z = jnp.meshgrid(y, z, indexing="ij")
-    bx, by, bz = _sample_station_magnetic_field(
-        case,
-        field_scale=field_scale,
-        x=x,
-        y=field_y,
-        z=field_z,
-        volume_field=problem.profile.volume_field,
+    forcing = (
+        float(case.forcing) if field_parameters is None else jnp.asarray(field_parameters[0], dtype=float)
     )
+    with jax.ensure_compile_time_eval():
+        field_scale = jnp.asarray(problem.profile.field_scale, dtype=float)
+        field_y, field_z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
+        base_field = _sample_station_magnetic_field(
+            case,
+            field_scale=field_scale,
+            x=mesh.x_centers,
+            y=field_y,
+            z=field_z,
+            volume_field=problem.profile.volume_field,
+        )
+    magnetic_scale = 1.0 if field_parameters is None else field_parameters[1]
+    bx, by, bz = (jnp.asarray(magnetic_scale, dtype=float) * value for value in base_field)
 
     if initial_bundle is not None:
         if initial_bundle.u.shape != (nx, ny, nz):
@@ -1016,23 +1030,29 @@ def _solve_extruded_projection(
         num_devices=num_devices,
     )
 
-    inverse_diffusive_scale = float(
-        jnp.max(nu)
-        * (
-            1.0 / max(dx**2, 1.0e-12)
-            + 1.0 / max(float(jnp.min(dy)) ** 2, 1.0e-12)
-            + 1.0 / max(float(jnp.min(dz)) ** 2, 1.0e-12)
-        )
-    )
-    inverse_electromagnetic_scale = float(
-        jnp.max(
-            jnp.where(
-                fluid_mask,
-                sigma * (bx**2 + by**2 + bz**2) / rho,
-                0.0,
+    stability_field = (bx, by, bz) if field_parameters is None else base_field
+    with jax.ensure_compile_time_eval():
+        static_sigma = _broadcast_cross_section(materials.conductivity, nx)
+        static_rho = _broadcast_cross_section(materials.density, nx)
+        static_nu = _broadcast_cross_section(materials.viscosity, nx)
+        static_mask = _broadcast_cross_section(materials.fluid_mask.astype(float), nx) > 0.5
+        inverse_diffusive_scale = float(
+            jnp.max(static_nu)
+            * (
+                1.0 / max(dx**2, 1.0e-12)
+                + 1.0 / max(float(jnp.min(mesh.dy)) ** 2, 1.0e-12)
+                + 1.0 / max(float(jnp.min(mesh.dz)) ** 2, 1.0e-12)
             )
         )
-    )
+        inverse_electromagnetic_scale = float(
+            jnp.max(
+                jnp.where(
+                    static_mask,
+                    static_sigma * sum(component**2 for component in stability_field) / static_rho,
+                    0.0,
+                )
+            )
+        )
     stability_safety = (
         ALEX_B2_MAGNETIC_STABILITY_SAFETY
         if use_alex_b2_finite_volume
@@ -1057,12 +1077,17 @@ def _solve_extruded_projection(
             raise ValueError("ALEX B2 requires one inlet flow rate and zero outlet pressure")
         target_flow_rate = float(inlet[0].value)
     else:
-        target_flow_rate = (
-            float(jnp.mean(jnp.sum(jnp.where(fluid_mask, u * cell_area, 0.0), axis=(1, 2))))
-            if initial_bundle is not None or case.initial_velocity != 0.0
-            else None
-        )
-    outer_steps = min(case.time_stepper.max_steps, max(6, case.solver.coupling_iterations * 2))
+        with jax.ensure_compile_time_eval():
+            target_flow_rate = (
+                float(jnp.mean(jnp.sum(jnp.where(fluid_mask, u * cell_area, 0.0), axis=(1, 2))))
+                if initial_bundle is not None or case.initial_velocity != 0.0
+                else None
+            )
+    outer_steps = (
+        min(case.time_stepper.max_steps, max(6, case.solver.coupling_iterations * 2))
+        if field_parameters is None
+        else field_parameters[2]
+    )
     poisson_iterations = (
         case.time_stepper.potential_iterations
         if use_alex_b2_finite_volume
@@ -1076,11 +1101,55 @@ def _solve_extruded_projection(
     momentum_iterations = max(poisson_iterations, 400)
     momentum_tolerance = min(poisson_tolerance, 1.0e-10)
     velocity_limit = max(5.0, 2.0 * math.sqrt(float(case.geometry.target_ha or 1.0)))
-    scalar_limit = max(
-        20.0,
-        2.0 * float(jnp.max(bx**2 + by**2 + bz**2)),
-    )
-    electric_potential_scale = max(1.0, math.sqrt(float(jnp.max(bx**2 + by**2 + bz**2))))
+    with jax.ensure_compile_time_eval():
+        stability_energy = sum(component**2 for component in stability_field)
+        scalar_limit = max(20.0, 2.0 * float(jnp.max(stability_energy)))
+        electric_potential_scale = max(1.0, math.sqrt(float(jnp.max(stability_energy))))
+    generic_step = None
+    if not use_alex_b2_finite_volume:
+        unit_response = _enforce_velocity_bc_3d(jnp.where(fluid_mask, dt / rho, 0.0), fluid_mask)
+
+        def generic_step(current):
+            return _generic_duct_step(
+                current,
+                material=(sigma, rho, nu, fluid_mask, cell_area),
+                field=(bx, by, bz),
+                forcing=forcing,
+                spacing=(dt, dx, dy, dz, dy_momentum, dz_momentum),
+                solves=(
+                    poisson_iterations,
+                    electric_iterations,
+                    electric_tolerance,
+                ),
+                limits=(velocity_limit, scalar_limit),
+                flow=(
+                    target_flow_rate,
+                    unit_response,
+                    0.6 if case.geometry.kind == "layered_duct" else 0.0,
+                ),
+                operators=(
+                    _solvax_pressure_poisson_duct,
+                    _conservative_emf_rhs_3d,
+                    _conservative_current_diagnostics_3d,
+                ),
+            )
+
+    if field_parameters is not None:
+        assert generic_step is not None
+
+        def advance(_, current):
+            return generic_step(current)[0]
+
+        state = (u, v, w, p, phi)
+        state = checkpointed_fori_loop(
+            0,
+            outer_steps - 1,
+            advance,
+            state,
+            checkpoint_size=field_parameters[3],
+        )
+        state, observables = generic_step(state)
+        return (*state, *observables[:6])
     (
         residual_by_step,
         component_residual_by_step,
@@ -1153,10 +1222,6 @@ def _solve_extruded_projection(
             previous_anderson_flux=previous_anderson_flux,
             previous_anderson_inlet=previous_anderson_inlet,
         )
-
-    else:
-        unit_pressure_response = _enforce_velocity_bc_3d(jnp.where(fluid_mask, dt / rho, 0.0), fluid_mask)
-
     if use_alex_b2_finite_volume:
         # The strict corner bound oversolves PCG; the local residual gates physics.
         electric_volume_min = 4.0 * float(jnp.min(dy) * jnp.min(dz))
@@ -1240,24 +1305,32 @@ def _solve_extruded_projection(
         pressure_linear_converged = jnp.asarray(False)
         pressure_linear_status = jnp.asarray(-1)
         momentum_linear_converged = jnp.asarray(True)
+        if not use_alex_b2_finite_volume:
+            assert generic_step is not None
+            (u_next, v_next, w_next, p, phi), generic = generic_step((u, v, w, p, phi))
+            (
+                jx,
+                jy,
+                jz,
+                lorentz_x,
+                lorentz_y,
+                lorentz_z,
+                div_j,
+                projected_divergence_max,
+                axial_pressure_loss_gradient,
+                electric_residual,
+                electric_converged,
+                electric_relative_residual,
+                electric_iteration_count,
+                electric_status,
+                electric_local_residual,
+            ) = generic
+            fixed_flow_error = jnp.asarray(0.0)
+            momentum_defect_components = jnp.full((4,), jnp.nan)
         if use_alex_b2_finite_volume:
             jx, jy, jz, lorentz_x, lorentz_y, lorentz_z = lorentz_operator(
                 phi, sigma, uxb_x, uxb_y, uxb_z, bx, by, bz
             )
-        else:
-            dphi_dx, dphi_dy, dphi_dz = _gradient_3d(phi, dx=dx, dy=dy, dz=dz)
-            jx = sigma * (-dphi_dx + uxb_x)
-            jy = sigma * (-dphi_dy + uxb_y)
-            jz = sigma * (-dphi_dz + uxb_z)
-            lorentz_x = jy * bz - jz * by
-            lorentz_y = jz * bx - jx * bz
-            lorentz_z = jx * by - jy * bx
-
-        if not use_alex_b2_finite_volume:
-            dp_dx, dp_dy, dp_dz = _gradient_3d(p, dx=dx, dy=dy_momentum, dz=dz_momentum)
-            laplacian_u = _laplacian_3d(u, dx=dx, dy=dy_momentum, dz=dz_momentum)
-            laplacian_v = _laplacian_3d(v, dx=dx, dy=dy_momentum, dz=dz_momentum)
-            laplacian_w = _laplacian_3d(w, dx=dx, dy=dy_momentum, dz=dz_momentum)
         if use_alex_b2_finite_volume:
             velocity = pack_vector(u, v, w)
             momentum_force = pack_vector(lorentz_x + forcing, lorentz_y, lorentz_z)
@@ -1265,17 +1338,6 @@ def _solve_extruded_projection(
                 velocity, momentum_force, rho, nu, current_rho_phi_plus, current_rho_phi_inlet
             )
             u_star, v_star, w_star = embed_velocity(velocity_fluid, fluid_mask)
-        else:
-            u_star = u + dt * (nu * laplacian_u + forcing / rho + lorentz_x / rho - dp_dx / rho)
-            v_star = v + dt * (nu * laplacian_v + lorentz_y / rho - dp_dy / rho)
-            w_star = w + dt * (nu * laplacian_w + lorentz_z / rho - dp_dz / rho)
-        if not use_alex_b2_finite_volume:
-            u_star = _clip_state(u_star, velocity_limit)
-            v_star = _clip_state(v_star, velocity_limit)
-            w_star = _clip_state(w_star, velocity_limit)
-            u_star = _enforce_velocity_bc_3d(u_star, fluid_mask)
-            v_star = _enforce_velocity_bc_3d(v_star, fluid_mask)
-            w_star = _enforce_velocity_bc_3d(w_star, fluid_mask)
 
         if use_alex_b2_finite_volume:
             (
@@ -1307,70 +1369,13 @@ def _solve_extruded_projection(
                     for name, field in zip(("u", "v", "w", "p"), (u_next, v_next, w_next, p_corr))
                 )
                 raise FloatingPointError(f"ALEX B2 projection inactive guard: {state}")
-        else:
-            du_dx, _, _ = _gradient_3d(u_star, dx=dx, dy=dy_momentum, dz=dz_momentum)
-            _, dv_dy, _ = _gradient_3d(v_star, dx=dx, dy=dy_momentum, dz=dz_momentum)
-            _, _, dw_dz = _gradient_3d(w_star, dx=dx, dy=dy_momentum, dz=dz_momentum)
-            divergence = jnp.where(fluid_mask, du_dx + dv_dy + dw_dz, 0.0)
-            p_corr = _projection_pressure_correction_3d(
-                (rho / max(dt, 1.0e-12)) * divergence,
-                dx=dx,
-                dy=dy_momentum,
-                dz=dz_momentum,
-                iterations=poisson_iterations,
-                tolerance=poisson_tolerance,
-            )
-            p_corr = _clip_state(jnp.where(fluid_mask, p_corr, 0.0), scalar_limit)
-            dpc_dx, dpc_dy, dpc_dz = _gradient_3d(p_corr, dx=dx, dy=dy_momentum, dz=dz_momentum)
-            u_next = _enforce_velocity_bc_3d(u_star - (dt / rho) * dpc_dx, fluid_mask)
-            v_next = _enforce_velocity_bc_3d(v_star - (dt / rho) * dpc_dy, fluid_mask)
-            w_next = _enforce_velocity_bc_3d(w_star - (dt / rho) * dpc_dz, fluid_mask)
-            u_next = _clip_state(u_next, velocity_limit)
-            v_next = _clip_state(v_next, velocity_limit)
-            w_next = _clip_state(w_next, velocity_limit)
-            if target_flow_rate is None:
-                u_next = _enforce_stationwise_flow_rate_3d(
-                    u_next,
-                    active_mask=fluid_mask,
-                    cell_area=cell_area,
-                    relaxation=0.6 if case.geometry.kind == "layered_duct" else 0.0,
-                )
-                axial_pressure_loss_gradient = jnp.full((nx,), forcing, dtype=float)
-            else:
-                u_next, axial_pressure_loss_gradient = _apply_fixed_flow_pressure_constraint(
-                    u_next,
-                    unit_pressure_response=unit_pressure_response,
-                    active_mask=fluid_mask,
-                    cell_area=cell_area,
-                    target_flow_rate=target_flow_rate,
-                    base_pressure_loss_gradient=forcing,
-                )
-            u_next = _enforce_velocity_bc_3d(u_next, fluid_mask)
-            projected_divergence_norm = float("nan")
-            fixed_flow_error = 0.0
-        p = jnp.where(
-            fluid_mask,
-            p_corr if use_alex_b2_finite_volume else _clip_state(p + p_corr, scalar_limit),
-            0.0,
-        )
+            p = jnp.where(fluid_mask, p_corr, 0.0)
 
         uxb_x = v_next * bz - w_next * by
         uxb_y = w_next * bx - u_next * bz
         uxb_z = u_next * by - v_next * bx
-        emf_rhs = (
-            emf_operator(sigma, uxb_x, uxb_y, uxb_z, fluid_mask)
-            if use_alex_b2_finite_volume
-            else _conservative_emf_rhs_3d(
-                sigma,
-                uxb_x,
-                uxb_y,
-                uxb_z,
-                dx=dx,
-                dy=dy,
-                dz=dz,
-            )
-        )
         if use_alex_b2_finite_volume:
+            emf_rhs = emf_operator(sigma, uxb_x, uxb_y, uxb_z, fluid_mask)
             (
                 phi,
                 electric_residual,
@@ -1380,28 +1385,8 @@ def _solve_extruded_projection(
                 electric_status,
                 electric_local_residual,
             ) = electric_solve(emf_rhs, phi, sigma, fluid_mask)
-        else:
-            (
-                phi,
-                electric_residual,
-                electric_converged,
-                electric_relative_residual,
-                electric_iteration_count,
-                electric_status,
-                electric_local_residual,
-            ) = _solvax_pressure_poisson_duct(
-                emf_rhs,
-                sigma,
-                dx=dx,
-                dy=dy,
-                dz=dz,
-                iterations=electric_iterations,
-                tolerance=electric_tolerance,
-                initial_field=phi,
-            )
-        if use_alex_b2_finite_volume and not bool(jnp.all(jnp.isfinite(phi))):
-            raise FloatingPointError("ALEX B2 electric solve produced non-finite potential")
-        phi = phi if use_alex_b2_finite_volume else _clip_state(phi, scalar_limit)
+            if not bool(jnp.all(jnp.isfinite(phi))):
+                raise FloatingPointError("ALEX B2 electric solve produced non-finite potential")
         potential_update = _gauge_invariant_scalar_update(
             phi,
             phi_previous,
@@ -1422,34 +1407,9 @@ def _solve_extruded_projection(
                 mapped_rho_phi_inlet,
                 p_corr,
             )
-        else:
-            dphi_dx, dphi_dy, dphi_dz = _gradient_3d(phi, dx=dx, dy=dy, dz=dz)
-            jx = _clip_state(sigma * (-dphi_dx + uxb_x), scalar_limit)
-            jy = _clip_state(sigma * (-dphi_dy + uxb_y), scalar_limit)
-            jz = _clip_state(sigma * (-dphi_dz + uxb_z), scalar_limit)
-            div_j, _, _ = _conservative_current_diagnostics_3d(
-                sigma,
-                phi,
-                uxb_x,
-                uxb_y,
-                uxb_z,
-                dx=dx,
-                dy=dy,
-                dz=dz,
-            )
-            lorentz_x = jy * bz - jz * by
-            lorentz_y = jz * bx - jx * bz
-            lorentz_z = jx * by - jy * bx
-            momentum_defect_components = jnp.full((4,), jnp.nan)
 
         if use_alex_b2_finite_volume:
             projected_divergence_max = projected_divergence_norm
-        else:
-            du_dx, _, _ = _gradient_3d(u_next, dx=dx, dy=dy_momentum, dz=dz_momentum)
-            _, dv_dy, _ = _gradient_3d(v_next, dx=dx, dy=dy_momentum, dz=dz_momentum)
-            _, _, dw_dz = _gradient_3d(w_next, dx=dx, dy=dy_momentum, dz=dz_momentum)
-            projected_divergence = jnp.where(fluid_mask, du_dx + dv_dy + dw_dz, 0.0)
-            projected_divergence_max = jnp.max(jnp.abs(projected_divergence))
 
         pressure_update = (
             _normalized_pressure_observable_update(
