@@ -62,6 +62,7 @@ from lmx.fringing import (
     build_pipe_ogrid_extruded_problem,
     build_square_duct_extruded_problem,
     evolve_extruded_fields,
+    extruded_engineering_objectives,
     smooth_fringing_profile,
     solve_extruded_inductionless,
     validate_bent_pipe_low_de_baseline,
@@ -2050,7 +2051,7 @@ def test_extruded_fields_match_production_and_bound_reverse_memory():
             problem, case=replace(problem.case, time_stepper=replace(problem.case.time_stepper, max_steps=3))
         )
     ).bundle
-    fields = evolve_extruded_fields(problem, steps=3)
+    fields = evolve_extruded_fields(problem, magnetic_field_scale=jnp.ones(3), steps=3)
     for actual, name in zip(
         fields,
         ("u", "v", "w", "p", "phi", "jx", "jy", "jz", "lorentz_x", "lorentz_y", "lorentz_z"),
@@ -2062,13 +2063,13 @@ def test_extruded_fields_match_production_and_bound_reverse_memory():
         evolved = evolve_extruded_fields(
             problem,
             forcing=parameters[0],
-            magnetic_field_scale=parameters[1],
+            magnetic_field_scale=parameters[1:],
             steps=8,
             checkpoint_size=checkpoint_size,
         )
         return jnp.mean(evolved[0] ** 2) + 0.01 * jnp.mean(evolved[4] ** 2)
 
-    parameters = jnp.asarray([1.0, 1.0])
+    parameters = jnp.ones(4)
     value_and_gradient = jax.jit(jax.value_and_grad(objective))
     value, gradient = value_and_gradient(parameters)
     compiled_objective = jax.jit(objective)
@@ -2080,20 +2081,21 @@ def test_extruded_fields_match_production_and_bound_reverse_memory():
                 - compiled_objective(parameters.at[index].add(-epsilon))
             )
             / (2.0 * epsilon)
-            for index in range(2)
+            for index in range(len(parameters))
         ]
     )
     assert jnp.isfinite(value)
     assert gradient == pytest.approx(finite_difference, rel=2.0e-3, abs=2.0e-9)
-    direction = jnp.asarray([0.3, -0.2])
+    direction = jnp.asarray([0.3, -0.2, 0.1, -0.1])
     tangent = jax.jvp(objective, (parameters,), (direction,))[1]
     assert tangent == pytest.approx(jnp.vdot(gradient, direction), rel=2.0e-6, abs=1.0e-9)
-
     bounded = value_and_gradient.lower(parameters).compile()
     full_tape = jax.jit(jax.value_and_grad(lambda values: objective(values, 8))).lower(parameters).compile()
     assert (
         bounded.memory_analysis().temp_size_in_bytes < 0.75 * full_tape.memory_analysis().temp_size_in_bytes
     )
+    with pytest.raises(ValueError, match="one value per axial station"):
+        evolve_extruded_fields(problem, magnetic_field_scale=jnp.ones(2), steps=2)
 
 
 def test_layered_extruded_fields_share_the_production_update():
@@ -2124,6 +2126,41 @@ def test_layered_extruded_fields_share_the_production_update():
         strict=True,
     ):
         assert actual == pytest.approx(getattr(production, name), rel=2.0e-6, abs=1.0e-9)
+    assert all(jnp.isfinite(value) for value in extruded_engineering_objectives(problem, fields).values())
+
+
+def test_extruded_engineering_objectives_have_physical_conventions_and_gradients():
+    problem = build_square_duct_extruded_problem(nx_stations=3, ny=3, nz=3)
+    shape = (3, 3, 3)
+    zeros = jnp.zeros(shape)
+    pressure = jnp.broadcast_to(jnp.asarray([3.0, 2.0, 1.0])[:, None, None], shape)
+
+    def objectives(speed):
+        fields = (
+            jnp.full(shape, speed),
+            zeros,
+            zeros,
+            pressure,
+            zeros,
+            jnp.full(shape, 3.0),
+            *(zeros,) * 5,
+        )
+        return extruded_engineering_objectives(problem, fields, smoothing=1.0e-6)
+
+    values = objectives(1.0)
+    assert values["pressure_drop"] == pytest.approx(2.0)
+    assert values["flow_rate"] == pytest.approx(4.0)
+    assert values["pumping_power"] == pytest.approx(8.0)
+    assert values["flow_nonuniformity"] == pytest.approx(0.0, abs=1.0e-12)
+    assert values["wall_current_density_rms"] == pytest.approx(3.0, abs=2.0e-6)
+    assert values["recirculation_fraction"] == pytest.approx(0.0, abs=1.0e-12)
+    assert jax.grad(lambda speed: objectives(speed)["pumping_power"])(1.0) == pytest.approx(8.0)
+    with pytest.raises(ValueError, match="velocity, pressure"):
+        extruded_engineering_objectives(problem, ())
+    with pytest.raises(ValueError, match="problem shape"):
+        extruded_engineering_objectives(problem, (jnp.zeros((2, 2, 2)),) * 11)
+    with pytest.raises(ValueError, match="smoothing"):
+        extruded_engineering_objectives(problem, (zeros,) * 11, smoothing=0.0)
 
 
 def test_cross_section_mesh_supports_pipe_ogrid_geometry():
