@@ -2203,3 +2203,45 @@ surface, measurements, validation, decision, and next action.
   differentiated 3-D branch, merge it only if every check passes, then expose
   station-wise field coefficients and engineering objectives as the first
   optimization-grade design tranche.
+
+### 2026-08-28 — differentiated 3-D local merge evidence
+
+- Candidate `fb1937ec82f2005deaceee32779b65246626ab5e` was tested on macOS
+  14.4.1 arm64 with Python 3.11.14, JAX/JAXLIB 0.9.2, SOLVAX 0.17.0, and the
+  CPU backend. The later evidence-log commit changes only this Markdown file.
+- `PYTHONPATH="$PWD/src" COVERAGE_FILE=/tmp/lmx-pr7-full-absolute.coverage
+  python scripts/run_full_test_suite.py --budget-seconds 1200
+  --warning-seconds 600 --test-timeout-seconds 300 --coverage-fail-under 95
+  --coverage-xml /tmp/lmx-pr7-full-absolute.xml --junit-xml
+  /tmp/lmx-pr7-full-absolute-junit.xml` passed 508 tests in 108.6 s with
+  95.07% combined branch coverage. The coverage and JUnit SHA-256 digests are
+  `5283ef2a04931c2e5020c306a25807d3a820380936339d54bcd390d00638dcf3`
+  and `caee36623d53280d73f0fdf450339632ec5867786580474314e4e3486d8cb1b6`.
+- Ruff check/format and `scripts/audit_architecture.py` passed: 16 modules,
+  6,009 core lines, 15,363 total lines, 28 exports, and seven curated
+  examples. The curated first-run test passed independently. Sphinx HTML and
+  linkcheck both passed with warnings as errors when pointed at the absolute
+  candidate source path.
+- The isolated sdist/wheel build and Twine inspection passed. The wheel and
+  sdist are 145 KiB and 137 KiB with SHA-256 digests
+  `d4cf5dc1f79b3065b8c4971aabc38621bcc32c0622ff94e23df4f2479a9e9de4`
+  and `67ce0c229d73ee310818211906d8a351fdd979e22e17a57beef0792bd9190706`.
+  A fresh non-editable wheel environment passed the CLI smoke and a real 3-D
+  value-and-gradient calculation.
+- The matched-B2 preflight passed against FreeMHD
+  `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5` and installer
+  `36f409d294ba3170d64d4073378d5ef68401072f`; contract SHA-256 is
+  `e30650045508cab8fce34a421e733591ff9f7503e322b54468dfdd300e11588a`.
+  A redundant local OpenFOAM execution could not start because Docker's
+  62-GiB virtual filesystem had zero free bytes, causing `apt` index writes to
+  surface as signature errors. No unrelated Docker data was deleted. The
+  source-bearing revision had already passed the pinned hosted FreeMHD solver
+  comparison, and subsequent commits do not change an MHD operator.
+- The first aggregate invocation used relative `PYTHONPATH=src`; subprocess
+  examples changed working directory and imported an older checkout, producing
+  three import failures while 505 tests passed. The authoritative command uses
+  the absolute source path above and passed completely.
+- Verdict: the differentiated generic rectangular/layered 3-D field path is
+  accepted for merge. Specialized B2 and pipe derivatives, genuinely matched
+  B1 validation, field-profile design variables, and multi-device derivative
+  evidence remain explicitly open.
