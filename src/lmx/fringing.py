@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import replace
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 
@@ -760,15 +761,18 @@ def evolve_extruded_fields(
     *,
     forcing: float | jnp.ndarray | None = None,
     magnetic_field_scale: float | jnp.ndarray = 1.0,
+    material_conductivity_scale: float | jnp.ndarray = 1.0,
     steps: int | None = None,
     checkpoint_size: int | None = None,
 ) -> tuple[jnp.ndarray, ...]:
     """Return differentiable 3-D duct fields through the production recurrence.
 
     Returns velocity, pressure, potential, current, and Lorentz-force fields.
-    Pressure forcing and imposed-field scale are continuous; the field scale
-    may be scalar or contain one coefficient per axial station. Other controls
-    are static. SOLVAX supplies implicit elliptic VJPs and exact checkpointing.
+    Pressure forcing, imposed-field scale, and material conductivity are
+    continuous. Field scale may contain one coefficient per axial station;
+    conductivity scale may be scalar or ``(fluid, solid)``. Geometry, material
+    topology, and step controls are static. SOLVAX supplies implicit elliptic
+    VJPs and exact checkpointing.
     """
 
     steps = (
@@ -783,9 +787,10 @@ def evolve_extruded_fields(
     source = problem.case.forcing if forcing is None else forcing
     return _solve_extruded_projection(
         problem,
-        field_parameters=(
+        design_parameters=(
             jnp.asarray(source),
             jnp.asarray(magnetic_field_scale),
+            jnp.asarray(material_conductivity_scale),
             steps,
             checkpoint_size,
         ),
@@ -810,13 +815,15 @@ def extruded_engineering_objectives(
     if smoothing <= 0.0:
         raise ValueError("smoothing must be positive")
     u, _, _, pressure, _, jx, jy, jz = fields[:8]
-    mesh = _cross_section_mesh(problem.case)
+    with jax.ensure_compile_time_eval():
+        mesh = _cross_section_mesh(problem.case)
+        fluid = np.asarray(build_material_fields(problem.case, mesh).fluid_mask)
+        area = np.asarray(mesh.dy)[:, None] * np.asarray(mesh.dz)[None, :]
     expected_shape = (len(mesh.x_centers), *mesh.yz_shape)
     if any(value.shape != expected_shape for value in (u, pressure, jx, jy, jz)):
         raise ValueError(f"field arrays must share the problem shape {expected_shape}")
-    fluid = np.asarray(build_material_fields(problem.case, mesh).fluid_mask)
-    area = jnp.asarray(mesh.dy)[:, None] * jnp.asarray(mesh.dz)[None, :]
-    weights, area_sum = jnp.asarray(fluid) * area, jnp.sum(fluid * area)
+    weights = jnp.asarray(fluid * area)
+    area_sum = jnp.sum(weights)
     flow = jnp.sum(weights * u, axis=(1, 2))
     mean_u = flow / area_sum
     mean_pressure = jnp.sum(weights * pressure, axis=(1, 2)) / area_sum

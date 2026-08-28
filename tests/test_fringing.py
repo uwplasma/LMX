@@ -88,6 +88,15 @@ from lmx.specs import (
 pytestmark = pytest.mark.unit
 
 
+def _centered_gradient(function, point, step):
+    return jnp.asarray(
+        [
+            (function(point.at[i].add(step)) - function(point.at[i].add(-step))) / (2.0 * step)
+            for i in range(len(point))
+        ]
+    )
+
+
 def test_extruded_solution_reports_terminal_state():
     solution = ExtrudedInductionlessSolution(
         problem=SimpleNamespace(),
@@ -2074,16 +2083,7 @@ def test_extruded_fields_match_production_and_bound_reverse_memory():
     value, gradient = value_and_gradient(parameters)
     compiled_objective = jax.jit(objective)
     epsilon = 2.0e-3
-    finite_difference = jnp.asarray(
-        [
-            (
-                compiled_objective(parameters.at[index].add(epsilon))
-                - compiled_objective(parameters.at[index].add(-epsilon))
-            )
-            / (2.0 * epsilon)
-            for index in range(len(parameters))
-        ]
-    )
+    finite_difference = _centered_gradient(compiled_objective, parameters, epsilon)
     assert jnp.isfinite(value)
     assert gradient == pytest.approx(finite_difference, rel=2.0e-3, abs=2.0e-9)
     direction = jnp.asarray([0.3, -0.2, 0.1, -0.1])
@@ -2119,7 +2119,7 @@ def test_layered_extruded_fields_share_the_production_update():
         ),
     )
     production = solve_extruded_inductionless(problem).bundle
-    fields = evolve_extruded_fields(problem, steps=2)
+    fields = evolve_extruded_fields(problem, material_conductivity_scale=jnp.ones(2), steps=2)
     for actual, name in zip(
         fields,
         ("u", "v", "w", "p", "phi", "jx", "jy", "jz", "lorentz_x", "lorentz_y", "lorentz_z"),
@@ -2127,6 +2127,28 @@ def test_layered_extruded_fields_share_the_production_update():
     ):
         assert actual == pytest.approx(getattr(production, name), rel=2.0e-6, abs=1.0e-9)
     assert all(jnp.isfinite(value) for value in extruded_engineering_objectives(problem, fields).values())
+
+    def objective(conductivity_scale):
+        evolved = evolve_extruded_fields(
+            problem,
+            material_conductivity_scale=conductivity_scale,
+            steps=1,
+        )
+        return extruded_engineering_objectives(problem, evolved)["wall_current_density_rms"]
+
+    scale = jnp.ones(2)
+    compiled_objective = jax.jit(objective)
+    value, gradient = jax.jit(jax.value_and_grad(objective))(scale)
+    epsilon = 2.0e-3
+    finite_difference = _centered_gradient(compiled_objective, scale, epsilon)
+    direction = jnp.asarray([0.25, -0.5])
+    tangent = jax.jvp(objective, (scale,), (direction,))[1]
+    assert jnp.isfinite(value)
+    assert jnp.all(jnp.isfinite(gradient))
+    assert gradient == pytest.approx(finite_difference, rel=5.0e-4, abs=2.0e-9)
+    assert tangent == pytest.approx(jnp.vdot(gradient, direction), rel=2.0e-6, abs=1.0e-9)
+    with pytest.raises(ValueError, match="fluid, solid"):
+        evolve_extruded_fields(problem, material_conductivity_scale=jnp.ones(3), steps=2)
 
 
 def test_extruded_engineering_objectives_have_physical_conventions_and_gradients():
