@@ -975,8 +975,14 @@ def _solve_extruded_projection(
             z=field_z,
             volume_field=problem.profile.volume_field,
         )
-    magnetic_scale = 1.0 if field_parameters is None else field_parameters[1]
-    bx, by, bz = (jnp.asarray(magnetic_scale, dtype=float) * value for value in base_field)
+    magnetic_scale = jnp.asarray(1.0 if field_parameters is None else field_parameters[1], dtype=float)
+    if magnetic_scale.ndim:
+        if magnetic_scale.shape != (nx,):
+            raise ValueError(
+                f"magnetic_field_scale must be scalar or have one value per axial station ({nx},)"
+            )
+        magnetic_scale = magnetic_scale[:, None, None]
+    bx, by, bz = (magnetic_scale * value for value in base_field)
 
     if initial_bundle is not None:
         if initial_bundle.u.shape != (nx, ny, nz):
