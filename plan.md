@@ -2245,3 +2245,37 @@ surface, measurements, validation, decision, and next action.
   accepted for merge. Specialized B2 and pipe derivatives, genuinely matched
   B1 validation, field-profile design variables, and multi-device derivative
   evidence remain explicitly open.
+
+### 2026-08-28 — axial field controls and engineering objectives
+
+- Candidate `d4feb0e470a2c5ee212096b77224a05935e725d2` accepts either one
+  imposed-field multiplier or one continuous coefficient per axial station in
+  the production rectangular/layered 3-D recurrence. The existing acceptance
+  test now differentiates forcing plus all three station coefficients, checks
+  centered differences and JVP/VJP duality, compares the vector-of-ones path
+  with the ordinary production solve, and retains the bounded-memory gate.
+- Added `extruded_engineering_objectives` in the existing `lmx.fringing`
+  module. It returns a JAX PyTree of signed pressure drop, outlet flow rate,
+  pumping power, squared outlet coefficient of variation, wall-current-density
+  RMS proxy, and smooth recirculation fraction. It adds no optimizer, source
+  file, root export, or data container; documented units and validation limits
+  remain explicit.
+- The exact-commit local gate passed 509 tests in 111.6 s with 95.10% combined
+  branch coverage. Coverage and JUnit SHA-256 digests are
+  `6f7b60278a7e73e2629842689868552b1a19c03768092676f5e3c8ac429dc6fe`
+  and `efbe21555d2a9b36a311e6348f8bee81e6f3768c4377613c7bbf0948c179e653`.
+  Ruff, all seven curated examples, Sphinx HTML/linkcheck, architecture audit,
+  isolated build/Twine inspection, and a fresh-wheel end-to-end profile-gradient
+  smoke also passed.
+- The wheel and sdist remain 146 KiB and 138 KiB, with SHA-256 digests
+  `6eda66f7ae19eb4288644fa314067bf1876ddebf3443340187134ea265b1aa82`
+  and `977cd375ca322256098988e048490839e74ff1113ab94556ff3a0372726d72fb`.
+  The pinned matched-B2 preflight retains contract SHA-256
+  `e30650045508cab8fce34a421e733591ff9f7503e322b54468dfdd300e11588a`.
+- Compactness remains fail-closed: 16 modules, 28 root exports, 6,009 core
+  lines, and 15,426 total package lines. The source ceiling increased by only
+  60 lines and the test ceiling by five after consolidating derivative tests;
+  no new file was introduced.
+- Next action: add continuous wall/material conductance controls through the
+  accepted layered operator, then gate batched design throughput and CPU/GPU
+  derivative parity before presenting an optimization result.
