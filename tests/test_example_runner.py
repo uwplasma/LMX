@@ -54,6 +54,10 @@ def test_variable_field_extruded_demo_optimizes_with_checked_gradients(tmp_path:
     assert summary["controls"]["field_mean"] == pytest.approx(1.0, abs=1.0e-12)
     assert all(0.8 < value < 1.2 for value in summary["controls"]["field_scale"])
     assert 0.5 < summary["controls"]["wall_conductivity_scale"] < 1.5
+    assert all(
+        1.0 - half_range < value < 1.0 + half_range
+        for value, half_range in zip(summary["controls"]["geometry_scale"], (0.10, 0.05, 0.05), strict=True)
+    )
     assert summary["optimization"]["final_loss"] < 0.8 * summary["optimization"]["initial_loss"]
     assert summary["gradient_check"]["relative_l2_error"] < 2.0e-3
     assert (

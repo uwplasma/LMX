@@ -68,6 +68,7 @@ _MIXED_AXIAL_PRESSURE_MODE = "inlet_neumann_outlet_dirichlet_zero"
 def _reuse_fringing_jit(key: tuple[object, ...], function: Callable) -> Callable:
     """Reuse an identical compiled production kernel across repeated solves."""
 
+    key = tuple(float(value) if isinstance(value, jax.Array) and value.ndim == 0 else value for value in key)
     return _FRINGING_JIT_CACHE.setdefault(key, function)
 
 
@@ -430,6 +431,17 @@ def _broadcast_cross_section(values: jnp.ndarray, nx: int) -> jnp.ndarray:
     return jnp.broadcast_to(jnp.asarray(values, dtype=float)[None, :, :], (nx,) + tuple(values.shape))
 
 
+def _coordinate_scale(values: float | jnp.ndarray) -> jnp.ndarray:
+    """Return axial, transverse-y, and transverse-z fixed-topology scales."""
+
+    scale = jnp.asarray(values, dtype=float)
+    if scale.ndim == 0:
+        return jnp.broadcast_to(scale, (3,))
+    if scale.shape != (3,):
+        raise ValueError("geometry_scale must be scalar or (axial, transverse_y, transverse_z)")
+    return scale
+
+
 def _harmonic_mean(a: jnp.ndarray, b: jnp.ndarray) -> jnp.ndarray:
     denom = jnp.maximum(a + b, 1.0e-20)
     return 2.0 * a * b / denom
@@ -579,7 +591,7 @@ def _laplacian_3d(
         mode_y=mode_y,
         mode_z=mode_z,
     )
-    x_term = (x_west - 2.0 * field + x_east) / max(dx**2, 1.0e-12)
+    x_term = (x_west - 2.0 * field + x_east) / jnp.maximum(dx**2, 1.0e-12)
     dy_values = jnp.asarray(dy)
     dz_values = jnp.asarray(dz)
     y_term = (
@@ -618,7 +630,7 @@ def _gradient_3d(
         mode_y="neumann",
         mode_z="neumann",
     )
-    d_dx = (x_east - x_west) / max(2.0 * dx, 1.0e-12)
+    d_dx = (x_east - x_west) / jnp.maximum(2.0 * dx, 1.0e-12)
     dy_values = jnp.asarray(dy)
     dz_values = jnp.asarray(dz)
     d_dy = (
@@ -836,7 +848,7 @@ def _variable_diffusion_coefficients_3d(
     dz_widths = spacing(dz, nz, dtype=conductivity.dtype)
     if axial_coefficients is None:
         sigma_x = _harmonic_mean(conductivity[1:], conductivity[:-1])
-        scaled = sigma_x / max(dx**2, 1.0e-12)
+        scaled = sigma_x / jnp.maximum(dx**2, 1.0e-12)
         coef_x_w = jnp.concatenate([jnp.zeros_like(conductivity[:1]), scaled], axis=0)
         coef_x_e = jnp.concatenate([scaled, jnp.zeros_like(conductivity[-1:])], axis=0)
     else:

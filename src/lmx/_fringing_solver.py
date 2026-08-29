@@ -27,6 +27,7 @@ from ._fringing_common import (
     _array_fingerprint,
     _broadcast_cross_section,
     _canonical_shell_widths,
+    _coordinate_scale,
     _cross_duct_pressure_difference,
     _emit_iteration_progress,
     _enforce_stationwise_flow_rate_3d,
@@ -84,7 +85,8 @@ def _solve_extruded_projection(
     progress_callback: Callable[[ExtrudedIterationProgress], None] | None = None,
     phase_timing_callback: Callable[[str, float], None] | None = None,
     checkpoint_interval: int | None = None,
-    design_parameters: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, int, int | None] | None = None,
+    design_parameters: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, int, int | None]
+    | None = None,
 ) -> ExtrudedFieldBundle | tuple[jnp.ndarray, ...]:
     case = problem.case
     with jax.ensure_compile_time_eval():
@@ -935,16 +937,24 @@ def _solve_extruded_projection(
         )
     with jax.ensure_compile_time_eval():
         materials = build_material_fields(case, mesh)
-    x = jnp.asarray(mesh.x_centers, dtype=float)
-    y = jnp.asarray(mesh.y_centers, dtype=float)
-    z = jnp.asarray(mesh.z_centers, dtype=float)
+    if design_parameters is None:
+        forcing, magnetic_scale, conductivity_scale, geometry_scale = case.forcing, 1.0, 1.0, 1.0
+    else:
+        forcing, magnetic_scale, conductivity_scale, geometry_scale, outer_steps, checkpoint_size = (
+            design_parameters
+        )
+    axial_scale, transverse_y_scale, transverse_z_scale = _coordinate_scale(geometry_scale)
+    x = axial_scale * jnp.asarray(mesh.x_centers, dtype=float)
+    y = transverse_y_scale * jnp.asarray(mesh.y_centers, dtype=float)
+    z = transverse_z_scale * jnp.asarray(mesh.z_centers, dtype=float)
     nx, ny, nz = len(x), len(y), len(z)
-    dy = jnp.asarray(mesh.dy, dtype=float)
-    dz = jnp.asarray(mesh.dz, dtype=float)
+    dy = transverse_y_scale * jnp.asarray(mesh.dy, dtype=float)
+    dz = transverse_z_scale * jnp.asarray(mesh.dz, dtype=float)
     walls = case.geometry.wall_thickness
-    dx = case.geometry.length / nx
-    dy_momentum = (case.geometry.width + walls[0] + walls[1]) / ny
-    dz_momentum = (case.geometry.height + walls[2] + walls[3]) / nz
+    base_dx = case.geometry.length / nx
+    dx = axial_scale * base_dx
+    dy_momentum = transverse_y_scale * (case.geometry.width + walls[0] + walls[1]) / ny
+    dz_momentum = transverse_z_scale * (case.geometry.height + walls[2] + walls[3]) / nz
     sigma = _broadcast_cross_section(materials.conductivity, nx)
     rho = _broadcast_cross_section(materials.density, nx)
     nu = _broadcast_cross_section(materials.viscosity, nx)
@@ -968,10 +978,6 @@ def _solve_extruded_projection(
             sheet_conductance / ALEX_B2_CANONICAL_SHELL_THICKNESS,
         )
     cell_area = _broadcast_cross_section(dy[:, None] * dz[None, :], nx)
-    if design_parameters is None:
-        forcing, magnetic_scale, conductivity_scale = case.forcing, 1.0, 1.0
-    else:
-        forcing, magnetic_scale, conductivity_scale, outer_steps, checkpoint_size = design_parameters
     with jax.ensure_compile_time_eval():
         field_scale = jnp.asarray(problem.profile.field_scale, dtype=float)
         field_y, field_z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
@@ -1059,7 +1065,7 @@ def _solve_extruded_projection(
         inverse_diffusive_scale = float(
             jnp.max(static_nu)
             * (
-                1.0 / max(dx**2, 1.0e-12)
+                1.0 / max(base_dx**2, 1.0e-12)
                 + 1.0 / max(float(jnp.min(mesh.dy)) ** 2, 1.0e-12)
                 + 1.0 / max(float(jnp.min(mesh.dz)) ** 2, 1.0e-12)
             )

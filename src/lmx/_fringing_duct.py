@@ -107,7 +107,7 @@ def _solvax_pressure_poisson_duct(
     coef_x_w, coef_x_e, coef_y_s, coef_y_n, coef_z_b, coef_z_t = coefficients
     if mixed_axial_pressure:
         outlet = jnp.arange(rhs.shape[0])[:, None, None] == rhs.shape[0] - 1
-        coef_x_e = jnp.where(outlet, 2.0 * mobility[-1] / max(dx**2, 1.0e-12), coef_x_e)
+        coef_x_e = jnp.where(outlet, 2.0 * mobility[-1] / jnp.maximum(dx**2, 1.0e-12), coef_x_e)
         coefficients = (
             coef_x_w,
             coef_x_e,
@@ -651,9 +651,11 @@ def _duct_pressure_face_corrections(
         )[:2]
 
     pressure_east, mobility_east = (axial_neighbors(value)[1] for value in (pressure, mobility))
-    correction_x = -_harmonic_mean(mobility_east, mobility) * (pressure_east - pressure) / max(dx, 1.0e-12)
+    correction_x = (
+        -_harmonic_mean(mobility_east, mobility) * (pressure_east - pressure) / jnp.maximum(dx, 1.0e-12)
+    )
     if mixed_axial_pressure:
-        outlet_correction = mobility[-1] * pressure[-1] / max(0.5 * dx, 1.0e-12)
+        outlet_correction = mobility[-1] * pressure[-1] / jnp.maximum(0.5 * dx, 1.0e-12)
         outlet_cells = jnp.arange(pressure.shape[0])[:, None, None] == pressure.shape[0] - 1
         correction_x = jnp.where(outlet_cells, outlet_correction, correction_x)
 
@@ -728,7 +730,7 @@ def _face_flux_pressure_projection_duct(
         return jnp.where(inlet_cells, inlet, axial_neighbors(plus)[0])
 
     divergence = (
-        (uf_plus - axial_minus(uf_plus, uf_inlet)) / max(dx, 1.0e-12)
+        (uf_plus - axial_minus(uf_plus, uf_inlet)) / jnp.maximum(dx, 1.0e-12)
         + (vf[:, 1:, :] - vf[:, :-1, :]) / dys[None, :, None]
         + (wf[:, :, 1:] - wf[:, :, :-1]) / dzs[None, None, :]
     )
@@ -762,7 +764,7 @@ def _face_flux_pressure_projection_duct(
     vf += correction_y
     wf += correction_z
     divergence_after = (
-        (uf_plus - axial_minus(uf_plus, uf_inlet)) / max(dx, 1.0e-12)
+        (uf_plus - axial_minus(uf_plus, uf_inlet)) / jnp.maximum(dx, 1.0e-12)
         + (vf[:, 1:, :] - vf[:, :-1, :]) / dys[None, :, None]
         + (wf[:, :, 1:] - wf[:, :, :-1]) / dzs[None, None, :]
     )
@@ -788,9 +790,9 @@ def _face_flux_pressure_projection_duct(
     active_area = jnp.sum(jnp.where(active_mask, area, 0.0), axis=(1, 2))
     mean_pressure = jnp.sum(jnp.where(active_mask, pressure * area, 0.0), axis=(1, 2)) / active_area
     mean_pressure_east = axial_neighbors(mean_pressure[:, None, None])[1][:, 0, 0]
-    pressure_loss_plus = -(mean_pressure_east - mean_pressure) / max(dx, 1.0e-12)
+    pressure_loss_plus = -(mean_pressure_east - mean_pressure) / jnp.maximum(dx, 1.0e-12)
     pressure_loss_plus = jnp.where(
-        outlet_cells[:, 0, 0], mean_pressure[-1] / max(0.5 * dx, 1.0e-12), pressure_loss_plus
+        outlet_cells[:, 0, 0], mean_pressure[-1] / jnp.maximum(0.5 * dx, 1.0e-12), pressure_loss_plus
     )
     pressure_loss = 0.5 * (
         jnp.concatenate((jnp.zeros((1,), dtype=pressure.dtype), pressure_loss_plus[:-1])) + pressure_loss_plus
@@ -1176,7 +1178,7 @@ def _conservative_current_diagnostics_3d(
     dy_widths = _spacing_vector(dy, phi.shape[1], dtype=phi.dtype)
     dz_widths = _spacing_vector(dz, phi.shape[2], dtype=phi.dtype)
     div_j = (
-        (fx[1:] - fx[:-1]) / max(dx, 1.0e-12)
+        (fx[1:] - fx[:-1]) / jnp.maximum(dx, 1.0e-12)
         + (fy[:, 1:, :] - fy[:, :-1, :]) / dy_widths[None, :, None]
         + (fz[:, :, 1:] - fz[:, :, :-1]) / dz_widths[None, None, :]
     )
@@ -1220,7 +1222,7 @@ def _conservative_emf_rhs_3d(
     dy_widths = _spacing_vector(dy, sigma.shape[1], dtype=sigma.dtype)
     dz_widths = _spacing_vector(dz, sigma.shape[2], dtype=sigma.dtype)
     return (
-        (fx[1:] - fx[:-1]) / max(dx, 1.0e-12)
+        (fx[1:] - fx[:-1]) / jnp.maximum(dx, 1.0e-12)
         + (fy[:, 1:, :] - fy[:, :-1, :]) / dy_widths[None, :, None]
         + (fz[:, :, 1:] - fz[:, :, :-1]) / dz_widths[None, None, :]
     )

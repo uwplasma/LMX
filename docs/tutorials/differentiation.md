@@ -47,9 +47,10 @@ cases remain outside this API until their own gates pass.
 
 `evolve_extruded_fields` returns the production generic-duct velocity,
 pressure, potential, current, and Lorentz-force fields after a static number of
-steps. Pressure forcing, material conductivity, and either a scalar or one
-coefficient per axial station for the imposed field are continuous. The
-accompanying reducer keeps engineering objectives in the same traced program:
+steps. Pressure forcing, material conductivity, fixed-topology axial/width/
+height scales, and either a scalar or one coefficient per axial station for the
+imposed field are continuous. The accompanying reducer keeps engineering
+objectives in the same traced program:
 
 ```python
 import jax
@@ -66,21 +67,23 @@ problem = build_layered_duct_extruded_problem(
 
 
 def objective(parameters):
-    field_coefficients, material_scale = parameters[:-2], parameters[-2:]
+    field_coefficients = parameters[:7]
+    material_scale, geometry_scale = parameters[7:9], parameters[9:]
     fields = evolve_extruded_fields(
         problem,
         magnetic_field_scale=field_coefficients,
         material_conductivity_scale=material_scale,
+        geometry_scale=geometry_scale,
         steps=8,
     )
-    metrics = extruded_engineering_objectives(problem, fields)
+    metrics = extruded_engineering_objectives(problem, fields, geometry_scale=geometry_scale)
     return metrics["pumping_power"] + 0.1 * metrics["flow_nonuniformity"]
 
 
-value, gradient = jax.jit(jax.value_and_grad(objective))(jnp.ones(9))
+value, gradient = jax.jit(jax.value_and_grad(objective))(jnp.ones(12))
 
 # Evaluate independent designs in bounded vectorized chunks.
-designs = jnp.stack((jnp.ones(9), jnp.linspace(0.9, 1.1, 9)))
+designs = jnp.stack((jnp.ones(12), jnp.linspace(0.9, 1.1, 12)))
 batched = jax.jit(
     lambda batch: jax.lax.map(jax.value_and_grad(objective), batch, batch_size=2)
 )
@@ -106,27 +109,29 @@ reports signed pressure drop, outlet flow rate, wall-current-density RMS, and a
 smooth recirculation fraction. Its wall-current quantity is a cell-centered
 design proxy; use the conservative boundary-flux diagnostics for validation.
 
-## Reproduce a bounded field and wall design
+## Reproduce a bounded field, wall, and geometry design
 
 ```console
 python examples/variable_field_extruded_demo.py
 ```
 
 The executable study uses seven axial field coefficients with an exactly fixed
-mean and one wall-conductivity scale constrained to 0.5–1.5. Its normalized
-loss balances pumping-power magnitude, outlet nonuniformity, wall-current RMS,
-and a flow-preservation penalty. The example runs 40 compiled gradient steps
-and independently checks every design derivative with centered differences.
+mean, one wall-conductivity scale constrained to 0.5–1.5, and axial/width/height
+scales constrained to ±10%/±5%/±5%. Geometry maps the fixed reference mesh;
+topology and imposed-field samples remain separate static/continuous controls.
+Its normalized loss balances pumping-power magnitude, outlet nonuniformity,
+wall-current RMS, and a flow-preservation penalty. The example runs 40 compiled
+gradient steps and independently checks every design derivative with centered
+differences.
 
-On the portable 7×6×6 demonstration mesh, the loss falls from 0.900 to 0.611,
-pumping-power magnitude falls by 55%, wall-current RMS falls by 46%, and flow
-changes by 0.067%; outlet nonuniformity rises by about 6%, making the tradeoff
-visible rather than hiding it in the aggregate loss. This is workflow and
-derivative evidence, not a resolution-independent blanket optimum. A physical
+On the portable 7×6×6 demonstration mesh, the loss falls from 0.900 to 0.554,
+pumping-power magnitude falls by 68%, wall-current RMS falls by 47%, and flow
+changes by 0.34%. This is workflow and derivative evidence, not a
+resolution-independent blanket optimum. A physical
 claim requires mesh refinement, uncertainty bands, production GPU evidence,
 and independent B1/B2 validation.
 
-![Bounded field and wall design](../_static/blanket_design_optimization.webp)
+![Bounded field, wall, and geometry design](../_static/blanket_design_optimization.webp)
 
 ## Transient Q2D response
 

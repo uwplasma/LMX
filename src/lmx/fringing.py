@@ -11,6 +11,7 @@ import numpy as np
 
 from ._fringing_common import (
     _EXTRUDED_NUMERICAL_RESULTS,
+    _coordinate_scale,
 )
 from ._fringing_duct import (
     _bundle_station_history,
@@ -762,6 +763,7 @@ def evolve_extruded_fields(
     forcing: float | jnp.ndarray | None = None,
     magnetic_field_scale: float | jnp.ndarray = 1.0,
     material_conductivity_scale: float | jnp.ndarray = 1.0,
+    geometry_scale: float | jnp.ndarray = 1.0,
     steps: int | None = None,
     checkpoint_size: int | None = None,
 ) -> tuple[jnp.ndarray, ...]:
@@ -770,9 +772,11 @@ def evolve_extruded_fields(
     Returns velocity, pressure, potential, current, and Lorentz-force fields.
     Pressure forcing, imposed-field scale, and material conductivity are
     continuous. Field scale may contain one coefficient per axial station;
-    conductivity scale may be scalar or ``(fluid, solid)``. Geometry, material
-    topology, and step controls are static. SOLVAX supplies implicit elliptic
-    VJPs and exact checkpointing.
+    conductivity scale may be scalar or ``(fluid, solid)``. Geometry scale may
+    be scalar or ``(axial, transverse_y, transverse_z)`` and maps the fixed
+    reference mesh without changing topology or imposed-field samples; callers
+    keep these scale factors positive. Step controls are static. SOLVAX supplies
+    implicit elliptic VJPs and exact checkpointing.
     """
 
     steps = (
@@ -791,6 +795,7 @@ def evolve_extruded_fields(
             jnp.asarray(source),
             jnp.asarray(magnetic_field_scale),
             jnp.asarray(material_conductivity_scale),
+            jnp.asarray(geometry_scale),
             steps,
             checkpoint_size,
         ),
@@ -801,12 +806,15 @@ def extruded_engineering_objectives(
     problem: ExtrudedInductionlessProblem,
     fields: tuple[jnp.ndarray, ...],
     *,
+    geometry_scale: float | jnp.ndarray = 1.0,
     smoothing: float = 1.0e-8,
 ) -> dict[str, jnp.ndarray]:
     """Reduce differentiable 3-D fields to scalar design objectives.
 
-    Values retain the units of ``problem``. Lower is better except for flow
-    rate; wall current is a cell-centered design proxy, not a validation flux.
+    Values retain the units of ``problem``. Pass the same fixed-topology
+    ``geometry_scale`` used to evolve the fields. Lower is better except for
+    flow rate; wall current is a cell-centered design proxy, not a validation
+    flux.
     """
     if problem.case.geometry.kind not in {"rect_duct", "layered_duct"}:
         raise NotImplementedError("engineering objectives require a rectangular or layered duct")
@@ -822,7 +830,8 @@ def extruded_engineering_objectives(
     expected_shape = (len(mesh.x_centers), *mesh.yz_shape)
     if any(value.shape != expected_shape for value in (u, pressure, jx, jy, jz)):
         raise ValueError(f"field arrays must share the problem shape {expected_shape}")
-    weights = jnp.asarray(fluid * area)
+    _, transverse_y_scale, transverse_z_scale = _coordinate_scale(geometry_scale)
+    weights = transverse_y_scale * transverse_z_scale * jnp.asarray(fluid * area)
     area_sum = jnp.sum(weights)
     flow = jnp.sum(weights * u, axis=(1, 2))
     mean_u = flow / area_sum
