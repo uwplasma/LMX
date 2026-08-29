@@ -38,7 +38,6 @@ from ._fringing_common import (
     _variable_diffusion_coefficients_3d,
 )
 from .mesh import (
-    generate_bent_pipe_mesh,
     generate_layered_duct_mesh,
     generate_pipe_ogrid_mesh,
     generate_rect_duct_mesh,
@@ -946,16 +945,7 @@ def _cross_section_mesh(case: CaseSpec):
             target_ha=geometry.target_ha,
             hartmann_layer_cells=geometry.hartmann_layer_cells,
         )
-    if geometry.kind == "bent_pipe":
-        mesh = generate_bent_pipe_mesh(
-            tube_radius=geometry.radius or (0.5 * geometry.width),
-            bend_radius=geometry.bend_radius or max(geometry.length, geometry.width),
-            bend_angle=geometry.bend_angle or 0.5 * jnp.pi,
-            nx=geometry.nx,
-            nr=geometry.nr or geometry.ny,
-            ntheta=geometry.ntheta or geometry.nz,
-        )
-    if geometry.kind not in {"rect_duct", "layered_duct", "pipe_ogrid", "bent_pipe"}:
+    if geometry.kind not in {"rect_duct", "layered_duct", "pipe_ogrid"}:
         raise ValueError(f"Unsupported extruded geometry {geometry.kind!r}")
     if geometry.axial_origin != 0.0:
         points = mesh.point_coordinates

@@ -52,7 +52,6 @@ from lmx._fringing_pipe import (
     _steady_stokes_projection_pipe,
 )
 from lmx.fringing import (
-    build_bent_pipe_extruded_problem,
     build_extruded_problem_from_case,
     build_layered_duct_extruded_problem,
     build_magnetic_obstacle_rect_extruded_problem,
@@ -62,7 +61,6 @@ from lmx.fringing import (
     extruded_engineering_objectives,
     smooth_fringing_profile,
     solve_extruded_inductionless,
-    validate_bent_pipe_low_de_baseline,
     validate_magnetic_obstacle_baseline,
     validate_variable_field_extruded_solution,
     validate_variable_field_pipe_solution,
@@ -1884,7 +1882,6 @@ def test_fringing_profile_and_constant_field_builders():
             "layered_duct",
         ),
         (build_pipe_ogrid_extruded_problem, {"nr": 6, "ntheta": 12}, "pipe_ogrid"),
-        (build_bent_pipe_extruded_problem, {"nr": 6, "ntheta": 12}, "bent_pipe"),
     ),
 )
 def test_extruded_problem_builders_mark_solver_family(builder, kwargs, geometry_kind):
@@ -2308,95 +2305,6 @@ def test_pipe_matrix_free_potential_cancels_conservative_emf_divergence():
 
     assert local_residual < 1.0e-10
     assert float(jnp.max(jnp.abs(div_j))) < 1.0e-10
-
-
-def test_variable_field_bent_pipe_retains_low_de_validation():
-    field = make_localized_divergence_free_obstacle_field(
-        width=0.9,
-        height=0.9,
-        base_bz=12.0,
-        core_fraction_y=0.5,
-        core_fraction_z=0.5,
-    )
-    bent_problem = build_bent_pipe_extruded_problem(
-        ha_peak=1.0,
-        radius=0.45,
-        bend_radius=3.6,
-        bend_angle=1.15,
-        nx_stations=4,
-        nr=4,
-        ntheta=8,
-    )
-    bent_problem = _with_analytic_field(bent_problem, name="variable_field_bent_pipe_bz12", field_fn=field)
-    bent_problem = _with_integration_budget(bent_problem)
-    straight_problem = build_pipe_ogrid_extruded_problem(
-        ha_peak=1.0,
-        radius=float(bent_problem.case.geometry.radius),
-        length=float(bent_problem.case.geometry.length),
-        nx_stations=4,
-        nr=4,
-        ntheta=8,
-    )
-    straight_problem = replace(straight_problem, profile=bent_problem.profile)
-    straight_problem = _with_analytic_field(
-        straight_problem, name="variable_field_straight_pipe_bz12", field_fn=field
-    )
-    straight_problem = _with_integration_budget(straight_problem)
-
-    bent_solution = solve_extruded_inductionless(bent_problem)
-    straight_solution = solve_extruded_inductionless(straight_problem)
-    validation = validate_bent_pipe_low_de_baseline(bent_solution, straight_solution)
-    field_validation = validate_variable_field_pipe_solution(bent_solution, field_ny=41, field_nz=41)
-
-    assert bent_solution.bundle.geometry_kind == "bent_pipe"
-    assert jnp.isfinite(bent_solution.bundle.u).all()
-    assert field_validation["current_proxy_change"] > 0.0
-    assert validation["dean_number"] >= 0.0
-    assert validation["dean_vortex_observables_available"] is True
-    assert validation["secondary_flow_rms_ratio"] >= 0.0
-    assert validation["secondary_flow_peak_ratio"] >= 0.0
-    assert np.isfinite(validation["normalized_velocity_centroid_shift"])
-    assert np.isfinite(validation["inner_outer_velocity_ratio"])
-    assert validation["research_grade_dean_validation_pass"] is False
-    assert isinstance(validation["research_grade_charge_balance_pass"], bool)
-    assert (
-        validation["research_grade_charge_balance_tolerance"] < validation["bounded_charge_balance_tolerance"]
-    )
-    assert validation["cross_section_l2_error"] <= 0.2
-    assert isinstance(validation["validation_pass"], bool)
-
-    wrong_bent = replace(
-        bent_solution,
-        problem=replace(
-            bent_solution.problem,
-            case=replace(
-                bent_solution.problem.case,
-                geometry=replace(bent_solution.problem.case.geometry, kind="pipe_ogrid"),
-            ),
-        ),
-    )
-    with pytest.raises(ValueError, match="bent_pipe solution"):
-        validate_bent_pipe_low_de_baseline(wrong_bent, straight_solution)
-
-    wrong_straight = replace(
-        straight_solution,
-        problem=replace(
-            straight_solution.problem,
-            case=replace(
-                straight_solution.problem.case,
-                geometry=replace(straight_solution.problem.case.geometry, kind="bent_pipe"),
-            ),
-        ),
-    )
-    with pytest.raises(ValueError, match="pipe_ogrid comparison"):
-        validate_bent_pipe_low_de_baseline(bent_solution, wrong_straight)
-
-    mismatched_straight = replace(
-        straight_solution,
-        bundle=replace(straight_solution.bundle, u=straight_solution.bundle.u[:-1]),
-    )
-    with pytest.raises(ValueError, match="share the same shape"):
-        validate_bent_pipe_low_de_baseline(bent_solution, mismatched_straight)
 
 
 def test_solve_extruded_inductionless_supports_layered_analytic_variable_field():

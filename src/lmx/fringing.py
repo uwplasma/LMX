@@ -281,169 +281,6 @@ def build_pipe_ogrid_extruded_problem(
     return ExtrudedInductionlessProblem(case=case, profile=profile)
 
 
-def build_bent_pipe_extruded_problem(
-    *,
-    ha_peak: float = 20.0,
-    radius: float = 1.0,
-    bend_radius: float = 6.0,
-    bend_angle: float = 0.75 * jnp.pi,
-    nr: int = 24,
-    ntheta: int = 64,
-    nx_stations: int = 25,
-    entry_center_fraction: float = 0.25,
-    exit_center_fraction: float = 0.75,
-    transition_width_fraction: float = 0.08,
-    conductivity: float = 1.0,
-    density: float = 1.0,
-    viscosity: float = 1.0,
-) -> ExtrudedInductionlessProblem:
-    arc_length = float(bend_radius * bend_angle)
-    problem = build_pipe_ogrid_extruded_problem(
-        ha_peak=ha_peak,
-        radius=radius,
-        nr=nr,
-        ntheta=ntheta,
-        length=arc_length,
-        nx_stations=nx_stations,
-        entry_center=entry_center_fraction * arc_length,
-        exit_center=exit_center_fraction * arc_length,
-        transition_width=transition_width_fraction * arc_length,
-        conductivity=conductivity,
-        density=density,
-        viscosity=viscosity,
-    )
-    case = replace(
-        problem.case,
-        name=f"bent_pipe_fringing_ha{int(ha_peak)}",
-        geometry=replace(
-            problem.case.geometry,
-            kind="bent_pipe",
-            bend_radius=bend_radius,
-            bend_angle=bend_angle,
-        ),
-        notes=(
-            "Curved-centerline inductionless baseline for low-De bent-pipe MHD. "
-            "Secondary Dean vortices are not modeled in this lane."
-        ),
-    )
-    return replace(problem, case=case)
-
-
-def _signed_pipe_cut(
-    values: jnp.ndarray, r: jnp.ndarray, *, theta_index: int
-) -> tuple[jnp.ndarray, jnp.ndarray]:
-    ntheta = int(values.shape[1])
-    opposite = (theta_index + ntheta // 2) % ntheta
-    negative = values[:, opposite][::-1]
-    positive = values[1:, theta_index]
-    positions = jnp.concatenate([-r[::-1], r[1:]])
-    cut = jnp.concatenate([negative, positive])
-    return positions, cut
-
-
-def validate_bent_pipe_low_de_baseline(
-    bent_solution: ExtrudedInductionlessSolution,
-    straight_solution: ExtrudedInductionlessSolution,
-) -> dict[str, float | bool]:
-    bent_geometry = bent_solution.problem.case.geometry
-    if bent_geometry.kind != "bent_pipe":
-        raise ValueError("Bent-pipe validation requires a bent_pipe solution")
-    if straight_solution.problem.case.geometry.kind != "pipe_ogrid":
-        raise ValueError("Bent-pipe validation requires a straight pipe_ogrid comparison solution")
-    if bent_solution.bundle.u.shape != straight_solution.bundle.u.shape:
-        raise ValueError("Bent and straight comparison bundles must share the same shape")
-
-    bent_bundle = bent_solution.bundle
-    straight_bundle = straight_solution.bundle
-    mid_index = int(bent_bundle.u.shape[0] // 2)
-    bent_mid = bent_bundle.u[mid_index]
-    straight_mid = straight_bundle.u[mid_index]
-    bent_secondary_mid = jnp.sqrt(bent_bundle.v[mid_index] ** 2 + bent_bundle.w[mid_index] ** 2)
-    reference_norm = jnp.maximum(jnp.linalg.norm(straight_mid), 1.0e-12)
-    cross_section_l2_error = float(jnp.linalg.norm(bent_mid - straight_mid) / reference_norm)
-
-    r = jnp.asarray(bent_bundle.y, dtype=float)
-    signed_r, bent_cut = _signed_pipe_cut(bent_mid, r, theta_index=0)
-    _, straight_cut = _signed_pipe_cut(straight_mid, r, theta_index=0)
-    cut_norm = jnp.maximum(jnp.linalg.norm(straight_cut), 1.0e-12)
-    centerline_l2_error = float(jnp.linalg.norm(bent_cut - straight_cut) / cut_norm)
-    axial_scale = float(jnp.maximum(jnp.mean(jnp.abs(bent_mid)), 1.0e-12))
-    peak_axial_scale = float(jnp.maximum(jnp.max(jnp.abs(bent_mid)), 1.0e-12))
-    secondary_flow_rms_ratio = float(jnp.sqrt(jnp.mean(bent_secondary_mid**2)) / axial_scale)
-    secondary_flow_peak_ratio = float(jnp.max(bent_secondary_mid) / peak_axial_scale)
-    bent_cut_abs = jnp.abs(bent_cut)
-    straight_cut_abs = jnp.abs(straight_cut)
-    bent_weight = jnp.maximum(jnp.sum(bent_cut_abs), 1.0e-12)
-    straight_weight = jnp.maximum(jnp.sum(straight_cut_abs), 1.0e-12)
-    bent_velocity_centroid = float(jnp.sum(signed_r * bent_cut_abs) / bent_weight)
-    straight_velocity_centroid = float(jnp.sum(signed_r * straight_cut_abs) / straight_weight)
-    velocity_centroid_shift = bent_velocity_centroid - straight_velocity_centroid
-    radius_scale = float(jnp.maximum(jnp.max(jnp.abs(signed_r)), 1.0e-12))
-    normalized_velocity_centroid_shift = float(velocity_centroid_shift / radius_scale)
-    inner_outer_velocity_ratio = float(
-        jnp.max(jnp.abs(bent_cut[signed_r >= 0.0]))
-        / jnp.maximum(jnp.max(jnp.abs(bent_cut[signed_r <= 0.0])), 1.0e-12)
-    )
-
-    region = bent_solution.problem.case.regions[0]
-    mean_velocity = float(jnp.mean(jnp.abs(bent_bundle.mean_velocity)))
-    diameter = 2.0 * float(bent_geometry.radius or 0.5 * bent_geometry.width)
-    reynolds_number = float(
-        (region.density or 1.0) * mean_velocity * diameter / max(region.viscosity or 1.0, 1.0e-12)
-    )
-    curvature_ratio = float(
-        (bent_geometry.radius or 0.5 * bent_geometry.width) / max(bent_geometry.bend_radius or 1.0, 1.0e-12)
-    )
-    dean_number = float(reynolds_number * np.sqrt(max(curvature_ratio, 0.0)))
-    throughput_span = float(bent_solution.validation.volumetric_flow_rate_span)
-    max_charge_balance_residual = float(bent_solution.validation.max_charge_balance_residual)
-    max_wall_current_leakage = float(bent_solution.validation.max_wall_current_leakage)
-    net_boundary_current_residual = float(bent_solution.validation.net_boundary_current_residual)
-    bounded_charge_balance_tolerance = 5.0e-2
-    research_grade_charge_balance_tolerance = 1.0e-3
-    research_grade_charge_balance_pass = bool(
-        max_charge_balance_residual <= research_grade_charge_balance_tolerance
-    )
-    validation_pass = bool(
-        dean_number <= 10.0
-        and cross_section_l2_error <= 0.08
-        and centerline_l2_error <= 0.08
-        and throughput_span <= 1.0e-3
-        and max_charge_balance_residual <= bounded_charge_balance_tolerance
-        and max_wall_current_leakage <= 1.0e-8
-        and net_boundary_current_residual <= 1.0e-8
-    )
-    return {
-        "curvature_ratio": curvature_ratio,
-        "reynolds_number": reynolds_number,
-        "dean_number": dean_number,
-        "dean_vortex_observables_available": True,
-        "secondary_flow_rms_ratio": secondary_flow_rms_ratio,
-        "secondary_flow_peak_ratio": secondary_flow_peak_ratio,
-        "bent_velocity_centroid": bent_velocity_centroid,
-        "straight_velocity_centroid": straight_velocity_centroid,
-        "velocity_centroid_shift": velocity_centroid_shift,
-        "normalized_velocity_centroid_shift": normalized_velocity_centroid_shift,
-        "inner_outer_velocity_ratio": inner_outer_velocity_ratio,
-        "cross_section_l2_error": cross_section_l2_error,
-        "centerline_l2_error": centerline_l2_error,
-        "throughput_span": throughput_span,
-        "max_charge_balance_residual": max_charge_balance_residual,
-        "bounded_charge_balance_tolerance": bounded_charge_balance_tolerance,
-        "research_grade_charge_balance_tolerance": research_grade_charge_balance_tolerance,
-        "research_grade_charge_balance_pass": research_grade_charge_balance_pass,
-        "max_wall_current_leakage": max_wall_current_leakage,
-        "net_boundary_current_residual": net_boundary_current_residual,
-        "validation_pass": validation_pass,
-        "signed_radius": np.asarray(signed_r, dtype=float).tolist(),
-        "bent_centerline_cut": np.asarray(bent_cut, dtype=float).tolist(),
-        "straight_centerline_cut": np.asarray(straight_cut, dtype=float).tolist(),
-        "literature_target": "Dean curved-pipe secondary-flow and curvature-response observables",
-        "validation_status": "low_de_straight_pipe_limit_passes_full_dean_vortex_reference_open",
-        "research_grade_dean_validation_pass": False,
-    }
-
-
 def validate_variable_field_extruded_solution(
     solution: ExtrudedInductionlessSolution,
     *,
@@ -495,8 +332,8 @@ def validate_variable_field_pipe_solution(
     field_ny: int = 81,
     field_nz: int = 81,
 ) -> dict[str, float | bool]:
-    if solution.problem.case.geometry.kind not in {"pipe_ogrid", "bent_pipe"}:
-        raise ValueError("Variable-field pipe validation currently supports pipe_ogrid and bent_pipe only")
+    if solution.problem.case.geometry.kind != "pipe_ogrid":
+        raise ValueError("Variable-field pipe validation requires pipe_ogrid geometry")
     field_metrics = _variable_field_metrics(solution, field_ny=field_ny, field_nz=field_nz)
     validation = solution.validation
     mean_velocity = np.asarray(solution.bundle.mean_velocity, dtype=float)
@@ -777,7 +614,7 @@ def evolve_extruded_fields(
     ``(axial, radial)`` for a pipe. It maps the fixed reference mesh without
     changing topology or imposed-field samples; callers keep scale factors
     positive. Step controls are static. SOLVAX supplies implicit elliptic VJPs
-    and exact checkpointing. Bent-pipe and specialized ALEX paths fail closed.
+    and exact checkpointing. Specialized ALEX paths fail closed.
     """
 
     steps = (

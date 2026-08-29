@@ -109,7 +109,7 @@ def _solve_extruded_projection(
         and case.solver.coupling_history_depth != 2
     ):
         raise ValueError("B2 conservative Anderson mixing requires history depth 2")
-    if case.geometry.kind in {"pipe_ogrid", "bent_pipe"}:
+    if case.geometry.kind == "pipe_ogrid":
         with jax.ensure_compile_time_eval():
             materials = build_material_fields(case, mesh)
         if design_parameters is None:
