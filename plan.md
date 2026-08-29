@@ -2565,3 +2565,53 @@ surface, measurements, validation, decision, and next action.
   retained bent-pipe coordinate map, establish matched production B1/B2
   refinement evidence, and obtain one-/two-A4000 primal, gradient, memory, and
   strong-scaling measurements. No GPU or production B1/B2 claim is made yet.
+
+### 2026-08-28 — remove the label-only curved-pipe proxy
+
+- LMX PR 17 merged the differentiable straight-pipe core at
+  `82da45862ea8f7b07cbe11f54ed5501be4378e41`. The follow-on candidate
+  `88582c3` removes the separate bent-pipe builder, display-only mesh generator,
+  pseudo-Dean validator, two schema parameters, documentation claim, and their
+  duplicate tests. It retains the production straight-pipe/annulus/B1 path,
+  rectangular/layered 3-D fringing, magnetic-obstacle application, and pinned
+  FreeMHD boundary.
+- The audit found no curvilinear physics to protect: curved Cartesian point
+  coordinates were not consumed by momentum, pressure projection, electric
+  closure, current, or Lorentz operators. The solve used straight cylindrical
+  metrics, while the validator labeled generic MHD transverse velocity as Dean
+  curvature observables. Removing the name is more accurate than exposing a
+  differentiable gradient of the wrong equations. A future curved-pipe lane
+  must begin with coherent curvilinear operators and an independent target.
+- The change adds 29 lines and removes 359. Package source falls from 15,435 to
+  15,215 lines, maintained core from 6,009 to 5,962, tests from 12,007 to
+  11,898 lines, and the wheel from 150,564 to 148,562 bytes. Package and test
+  ceilings tighten to 15,220 and 11,900 so the proxy cannot return unnoticed.
+  The remaining inventory is 16 modules, 13 test files, 28 root exports, seven
+  examples, a 1,761-line largest module, and 1,771,727 tracked checkout bytes.
+- The exact source passed 505 tests in 160.65 seconds on macOS 14.4.1 arm64,
+  Python 3.11.14, JAX/JAXLIB 0.9.2, SOLVAX 0.18.0, and CPU, with 95.25% combined
+  branch coverage. Coverage and JUnit SHA-256 digests are
+  `8406d85140d5ed7597df8f95c21e0f74bb175dacd8c7f6c431e384c641a2073e`
+  and `b5e1a623e44de64a47b9ef3ad6f739894f4f62ecb5a3187ec0007ebf2ea1d83b`.
+  Complete Python 3.10.21/JAX 0.6.2 and Python 3.13.9/JAX 0.11.1 runs passed all
+  505 tests in 145.4 and 113.26 seconds; their JUnit digests are
+  `a548d51640abf92215e0b4cac89f45c86e1f61260738abb0d663f0942b299fd4`
+  and `3562d83a58c8e583092353437105550c64d5552090a20cd5703b085107a2dc52`.
+- Ruff check/format, architecture/prose/import checks, Sphinx HTML and external
+  links with warnings as errors, isolated build, Twine, distribution
+  inspection, CLI, and a fresh non-editable-wheel straight-pipe solve passed.
+  The 148,562-byte wheel and 140,496-byte sdist SHA-256 digests are
+  `e4cb66e459a8de24e7e183751660c8cbe1e13e0ab8a9d66b37f2527ac31e7425`
+  and `85f6e1f22a195b7f04ca8f020187730775390580d9631efb50f1e2ff44964ad3`.
+- The clean pinned FreeMHD Docker rerun passed contract, artifact, execution,
+  observation, comparison, and schema checks with zero failed checks and
+  pressure L-infinity/RMS discrepancies `0.0109172`/`0.00451798`. Report and
+  external-record SHA-256 digests are
+  `c75c883a6a81d34a331c033912c206bd0dcd97275092191caa09b2f5e7a0dd65`
+  and `4d0a923491fef48e7839b114d43cd9439a1fc6416e691d3e68e3f040ad39e3c8`.
+  `acceptance_pass=false` remains correct for the two-update smoke role.
+- The office A4000 host again timed out before connection, so no GPU or scaling
+  claim is made. Next action: merge this correction, then focus the 3-D work on
+  specialized ALEX derivative gates and production-resolution matched B1/B2;
+  retry one-/two-device primal, gradient, memory, and scaling evidence when the
+  registered GPU host is reachable.
