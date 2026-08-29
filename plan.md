@@ -984,18 +984,19 @@ purpose.
   Jacobi or coupling-iteration tape, and pass finite-difference, JVP/VJP,
   residual, memory, and runtime checks. The accepted rectangular Hartmann,
   Shercliff, and layered Hunt path uses `solve_fully_developed_fields`.
-- [ ] Expose the retained 3-D rectangular/pipe production equations as
-  field-level traced cores. The current 3-D host
-  loop materializes geometry/scales and convergence decisions with Python
+- [ ] Complete field-level traced cores for every retained 3-D geometry. The
+  rectangular and layered production recurrence accepts continuous forcing,
+  station-wise field, and material controls with implicit electric derivatives
+  and bounded reverse storage. The straight- and mapped-pipe host paths still
+  materialize geometry/scales and convergence decisions with Python
   `float`/`bool`; those boundaries must move outside a fixed-step or implicit
   differentiable core rather than being bypassed by a shadow solver.
-- [ ] Add blanket/stellarator objective callbacks over the production fields
-  without adding an optimizer framework. First accept station-wise imposed-field
-  coefficients, wall/material conductance, and smooth coordinate values as
-  continuous inputs; provide pressure-loss, flow-uniformity, pumping-power,
-  wall-current, and recirculation objectives as small composable functions.
-  Gate batched design points, CPU/GPU derivative parity, adjoint memory and warm
-  runtime, and one-/two-device collective counts.
+- [ ] Complete blanket/stellarator design evidence without adding an optimizer
+  framework. Pressure-loss, flow-uniformity, pumping-power, wall-current, and
+  recirculation objectives, bounded field/material controls, and chunked batched
+  design points are accepted. Smooth coordinate controls, CPU/GPU derivative
+  parity, production adjoint memory and warm runtime, uncertainty/Pareto gates,
+  and one-/two-device collective counts remain open.
 
 Exit: primal and derivative performance gates pass, no canonical case regresses
 >5%, every retained solver family has an independently checked field/objective
@@ -2361,3 +2362,78 @@ surface, measurements, validation, decision, and next action.
 - Next action: obtain one- and two-A4000 primal/gradient evidence, then run the
   first bounded wall/field optimization. In parallel, split or parallelize the
   SOLVAX current/advanced jobs that exceeded fourteen hosted minutes.
+
+### 2026-08-28 — branch-covered CI and bounded wall/field design
+
+- SOLVAX PR 88 merged at `b46affe36be04a6a15c0a8d1231f854662c203f4`.
+  The exhaustive current stack is split into two timing-balanced shards that
+  execute all 40 test files exactly once; focused Python 3.10/macOS and advanced
+  lanes retain their distinct contracts. The final hosted run reached combined
+  coverage in 9 minutes 21 seconds, with no job exceeding 8 minutes 3 seconds.
+  The exact local aggregate passed 750 tests plus six optional skips in 135.0
+  seconds at 97.45% branch coverage. The combined hosted report covered 3,663
+  statements and 696 branches and rounded to 98%; project and patch coverage
+  checks passed.
+- LMX candidate `b59018b1e6122d7563ea4d8b4f06f9bcada7feac` replaces the
+  former variable-field demonstration with a bounded layered-duct design over
+  seven axial imposed-field coefficients and wall conductivity. It adds no
+  package module, public export, optimizer dependency, or example file. Forty
+  compiled application-level updates reduce normalized loss from 0.900000 to
+  0.611054 while preserving the imposed-field mean exactly and constraining
+  field coefficients to 0.8–1.2 and wall scale to 0.5–1.5.
+- The optimized portable case reduces pumping-power magnitude by 54.97% and
+  wall-current-density RMS by 45.80% while changing flow by +0.0667%.
+  Nonuniformity increases by about 6%, and the published plot exposes that
+  tradeoff. This is workflow and derivative evidence on a 7x6x6 mesh, not a
+  resolution-independent physical optimum. The JSON and retained WebP hashes
+  are `b59d3460a7ef84534bf67c47151541e7bce9296ceea262724dffea3d8cdbc02e`
+  and `df201c9655e8666bc71ab98f38bfdccf1bb201481d10af2725115cfe19356f77`.
+- The study exposed a numerical derivative defect rather than masking it with
+  a loose example tolerance. A `1e-12` electric-potential primal tolerance left
+  parameter-dependent solve error large enough that the complete implicit VJP
+  disagreed with centered differences at order one. Solving the primal to a
+  float64 roundoff-level tolerance and reusing the existing transverse modal
+  coarse operator reduces the complete eight-control relative gradient error
+  to `1.40995e-6`. The transpose solve keeps its independently sufficient
+  `1e-12` tolerance, avoiding unnecessary adjoint iterations.
+- On the same local 7x6x6 eight-step engineering objective, the accepted
+  value-and-gradient median is 67.45 ms versus 71.04 ms on merged main, a 5.1%
+  improvement. Compiled temporary storage is 2,324,032 versus 2,274,048 bytes,
+  a 2.2% increase. The comparison reports accuracy and memory together; it does
+  not trade the corrected derivative for a misleading speed claim.
+- The exact candidate content passed 509 tests in 146.3 seconds on macOS
+  14.4.1 arm64, Python 3.11.14, JAX/JAXLIB 0.9.2, SOLVAX 0.17.0, and the CPU
+  backend, with 95.12% combined branch coverage. Coverage and JUnit SHA-256
+  digests are `770c8c372c81652d176bda63176c1d8a4dac9daf33634d4c1eb7d572c2c6840e`
+  and `3f4c42b8fc024b2a2e8870f98c5daffdb6abd6e2efcc134b2578a4e5a7c5f586`.
+  Independent complete compatibility runs passed all 509 tests on Python
+  3.10.21/JAX 0.6.2 in 127.9 seconds and Python 3.13.9/JAX 0.11.1 in 119.3
+  seconds; their JUnit hashes are
+  `c1faebf9790462d5f478a5a4980ec229775cacaff3aab0bd64cbbae731b8445f`
+  and `3c4a27e43f9a0d902f56e77cee251d9cee6ea02eade456e6222a4a0032dceb7a`.
+- Ruff check/format, the architecture/current-prose/import audit, every curated
+  example, Sphinx HTML and external links with warnings as errors, isolated
+  build, Twine, distribution inspection, CLI, and a fresh non-editable-wheel
+  3-D JIT gradient smoke passed. The 150,211-byte wheel and 142,125-byte sdist
+  have SHA-256 digests
+  `e4495d6ac0e4ad66aac18b83a77c1cac001310f756d49bbebbad43883cd873e0`
+  and `cac052427670f27cb2360be430d7a12dc65e658cd5ea89eb360fd96a61cf57c4`.
+- Compactness remains fail-closed at 16 modules, 6,009 maintained-core lines,
+  15,447 package lines, 13 test files, 12,034 test lines, 28 root exports,
+  seven examples, and 1,759,613 checkout bytes. The two narrow ceilings moved
+  only to 15,450 package and 12,035 test lines; the added lines buy a corrected
+  production derivative and end-to-end physical optimization assertions.
+- The pinned B2 preflight passed against FreeMHD
+  `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5` and installer
+  `36f409d294ba3170d64d4073378d5ef68401072f`, retaining contract SHA-256
+  `e30650045508cab8fce34a421e733591ff9f7503e322b54468dfdd300e11588a`.
+  A newly built amd64 Docker image then executed both LMX and FreeMHD: contract,
+  artifacts, execution, observation, and comparison passed with pressure
+  L-infinity/RMS discrepancies 0.01092/0.004518. The report intentionally leaves
+  `acceptance_pass=false` because the two-update candidate role cannot establish
+  production-mesh B2 validation; its report SHA-256 is
+  `839ffc7ccad567e9f99caf5368277fbaf063b9463a64c9d7331db60b69c8ae18`.
+- No GPU claim is added: the office A4000 host remains unreachable. Next action:
+  merge this locally evidenced tranche, then obtain one-/two-A4000 primal and
+  gradient evidence, add smooth-coordinate and pipe derivatives, and promote
+  B2/B1 only through production-resolution matched external comparisons.
