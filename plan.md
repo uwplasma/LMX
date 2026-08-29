@@ -3787,7 +3787,19 @@ surface, measurements, validation, decision, and next action.
   every local gate rather than only by the Docker integration.
 - Package source is 14,796 audit lines across 15 modules; fringing source is
   6,004 lines and this tranche removes four net fringing lines while correcting
-  the accepted-state algorithm. Next action: commit the immutable candidate,
-  repeat the pinned FreeMHD Docker smoke, merge locally, then start the
+  the accepted-state algorithm. The immutable source candidate is
+  `c4866ac5af50ed5217e5be676b04577adb266f7e`.
+- The pinned two-rank Docker comparison passes against FreeMHD
+  `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5` and image
+  `sha256:535e995d557d2a73f5ab997380cb47ee3b044af8d2871bdadd570cff4cf175a8`.
+  Contract, artifacts, execution, independent observation, comparison, and
+  schema pass with zero failed checks. Pressure L-infinity/RMS differences are
+  `0.006838504934992036`/`0.0030649109539923614`, unchanged at the smoke scale;
+  report and record SHA-256 digests are
+  `a99597286452f6f8fc6b5ca539f50303d4fee41c5fa95ed6c882abdfffe38f8b`
+  and `02667bf4ff9ca1d8ed065a8e81571c1ab28da3f7d6f58ca87d19df286a83da7a`.
+  `acceptance_pass=false` remains correct because this two-update harness is an
+  integration smoke, not production-mesh acceptance. Next action: merge this
+  candidate locally, then start the
   recurrence/private-test-coupling trim without removing 3-D, B1/B2, pipe,
   layered-wall, restart, sharding, or differentiation capability.
