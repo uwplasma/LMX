@@ -3606,6 +3606,30 @@ surface, measurements, validation, decision, and next action.
   jitted array/PyTree regression tests pass the complete local SOLVAX gate:
   753 tests, 97.50% combined coverage, types, docs, build, and distribution
   checks. PR 93 is merged; no package publication was performed.
-- Next action: finish the complete LMX local gate and pinned FreeMHD comparison,
-  merge this qualified tranche, then resume operator-level convergence of the
-  generic and ALEX B1/B2 paths rather than deleting private files by name.
+- The complete six-worker LMX gate passes all 500 tests in 155.25 seconds
+  (156.5 seconds end to end) with 95.44% combined line/branch coverage.
+  Coverage and JUnit SHA-256 digests are
+  `c7c47c879928b071a63a99862a8fb2d5d5aef25d864b9f97fe93ce78a7922b0b`
+  and `56c922f91dc6a2fd2dbac6ea013c85c72d21f6f73b4e36b5095abf32e2ecccf8`.
+  Ruff, formatting, byte compilation, architecture/import budgets, all seven
+  curated workflows, Sphinx HTML and external links with warnings as errors,
+  isolated build, Twine, distribution inspection, and clean-wheel primal and
+  gradient smoke pass. The wheel is 146,323 bytes and the sdist is 139,033
+  bytes, with SHA-256 digests
+  `d747d9673e48a4b2604c46c8746394829ea38b379ec84f693b483109bcbfab00`
+  and `0d5392d1f2eaff171d8ebf55a85acb84faed7776c3aa70717d1426232d1e8af7`.
+- Committed the immutable source candidate as `a2d4b1e` and repeated the pinned
+  Docker comparison against FreeMHD `14b54a3` and image
+  `sha256:535e995d557d2a73f5ab997380cb47ee3b044af8d2871bdadd570cff4cf175a8`.
+  Contract, artifacts, execution, independent observation, comparison, and
+  schema pass with zero failed checks. Pressure L-infinity/RMS differences are
+  `0.006838504934991994`/`0.0030649109539924494`, within the smoke contract and
+  effectively unchanged at the validation scale. Report and record SHA-256
+  digests are
+  `4e7402e4531782130d19ffbb6961ae0078cdd4d788a06ae95e07432e78bc1aae`
+  and `ffd1073e6e1963d5ce61de8b1bcd5b33d597aa29a365932f260531f85a469073`.
+  `acceptance_pass=false` remains correct for the smoke-only role.
+- Next action: merge this qualified tranche, then resume operator-level
+  convergence of the generic and ALEX B1/B2 paths rather than deleting private
+  files by name. Terminal B2 convergence and specialized derivatives remain
+  open evidence gates.
