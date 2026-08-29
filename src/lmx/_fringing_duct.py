@@ -233,13 +233,16 @@ def _solvax_implicit_momentum_duct(
     tolerance: float,
     reaction: jnp.ndarray,
     frozen_setup=None,
+    linear_rhs: jnp.ndarray | None = None,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Solve one frozen, conservative three-component momentum system.
 
     ``force`` includes explicit deviatoric stresses and body forces. The
     positive ``reaction`` is added to both sides at the old velocity, changing
     pseudo-time conditioning without changing a fixed point. The inlet is
-    prescribed, the outlet is zero-gradient, and affine terms stay outside GMRES.
+    prescribed, the outlet is zero-gradient, and affine terms stay outside
+    GMRES. ``linear_rhs`` applies the same frozen inverse to an already scaled
+    algebraic right-hand side, as required by coupled block preconditioners.
     """
 
     shape = velocity.shape
@@ -261,12 +264,7 @@ def _solvax_implicit_momentum_duct(
         dx=dx,
     )
     _, coefficients, diffusion_sink, inlet_sink, weights, _ = setup
-    inlet_cells = jnp.arange(shape[0])[:, None, None] == 0
     zero_patches = tuple(jnp.zeros_like(value) for value in boundary_velocity)
-    prescribed_patches = (boundary_velocity[0], zero_patches[1], *boundary_velocity[2:])
-    boundary_action, _ = _duct_momentum_transport(
-        jnp.zeros_like(velocity), rho_phi, weights, prescribed_patches, widths, coefficients, diffusion_sink
-    )
 
     def matvec(field: jnp.ndarray) -> jnp.ndarray:
         homogeneous_patches = (zero_patches[0], field[-1], *zero_patches[2:])
@@ -284,9 +282,25 @@ def _solvax_implicit_momentum_duct(
         # avoids thousands of GPU line solves while GMRES certifies the result.
         return (flat.reshape(shape) / diagonal[..., None]).reshape(-1)
 
-    inlet_velocity = jnp.where(inlet_cells[..., None], boundary_velocity[0], 0.0)
-    source = force - boundary_action + inlet_sink[..., None] * inlet_velocity + reaction[..., None] * velocity
-    linear_rhs = volume[..., None] * (density[..., None] * velocity + dt * source)
+    if linear_rhs is None:
+        prescribed_patches = (boundary_velocity[0], zero_patches[1], *boundary_velocity[2:])
+        boundary_action, _ = _duct_momentum_transport(
+            jnp.zeros_like(velocity),
+            rho_phi,
+            weights,
+            prescribed_patches,
+            widths,
+            coefficients,
+            diffusion_sink,
+        )
+        inlet_cells = jnp.arange(shape[0])[:, None, None] == 0
+        inlet_velocity = jnp.where(inlet_cells[..., None], boundary_velocity[0], 0.0)
+        source = (
+            force - boundary_action + inlet_sink[..., None] * inlet_velocity + reaction[..., None] * velocity
+        )
+        linear_rhs = volume[..., None] * (density[..., None] * velocity + dt * source)
+    elif linear_rhs.shape != shape:
+        raise ValueError("Momentum algebraic right-hand side must match velocity")
     flat_rhs = linear_rhs.reshape(-1)
 
     def flat_matvec(flat: jnp.ndarray) -> jnp.ndarray:

@@ -4104,3 +4104,34 @@ surface, measurements, validation, decision, and next action.
   downstream job was skipped. The complete local covered gate is therefore
   merge authority under the active temporary policy. No unrelated package,
   documentation, Docker, FreeMHD, or GPU gate is repeated.
+
+### 2026-08-29 — expose the frozen B2 momentum response
+
+- PR #48 merged the reduced Schur contract at
+  `35910e67bf77d578950d6fce5e90da8c6dbaa8b5`. The production momentum solve
+  now also accepts an already scaled algebraic right-hand side, applying the
+  identical frozen nonsymmetric operator, diagonal preconditioner, bounded
+  GMRES policy, and implicit linear derivative. This is private assembly for
+  the coupled block method; it adds no solver, public option, export, or file.
+- The response path deliberately skips affine inlet and boundary-source work.
+  On the maintained nonuniform 4x2x2 fixture its primal result matches a
+  direct dense solve of the production matrix to `2e-7`; the existing
+  implicit JVP/VJP gate remains green, while the stricter `D A^-1 G` block
+  identity remains at `2e-12`.
+- This primitive is not a production-method promotion. The next bounded
+  experiment will combine a small fixed number of these response applications
+  with the retained diagonal pressure solve as a Schur defect correction, then
+  compare runtime, peak memory, accepted update, and momentum defect on the
+  exact checksummed step-152 restart. A full momentum Krylov solve inside each
+  pressure Krylov iteration remains prohibited by decision D-038; a failed
+  experiment leaves the public recurrence unchanged.
+- The conservative change gate selected the 211 owning fringing, Benchmark-B,
+  FreeMHD-contract, and example tests and passed in 83.65 seconds (84.0 seconds
+  end to end). Ruff and the architecture audit pass at the enforced ceiling:
+  15 modules, 14,793 package lines, 11,950 test lines, 28 root exports, and
+  seven curated examples. No unrelated full-suite, documentation, package,
+  Docker, or GPU job was repeated.
+- PR #49's three entry jobs ended after 21--25 seconds with zero executed
+  steps. Each check-run annotation reports the same account payment/spending-
+  limit condition, and all downstream jobs were skipped. The targeted local
+  evidence is therefore merge authority under the active temporary policy.
