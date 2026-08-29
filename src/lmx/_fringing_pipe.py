@@ -22,7 +22,7 @@ from solvax import (
 from ._fringing_common import (
     _apply_fixed_flow_pressure_constraint,
     _cross,
-    _enforce_stationwise_flow_rate_3d,
+    _equalize_stationwise_flow_rate_3d,
     _finalize_local_pressure_solve,
     _harmonic_mean,
     _nonuniform_axis_gradient,
@@ -75,7 +75,6 @@ def _pipe_laplacian_3d(
     dr: float | jnp.ndarray,
     dtheta: float,
     r: jnp.ndarray,
-    outer_dirichlet: bool = True,
 ) -> jnp.ndarray:
     dr_values = jnp.asarray(dr)
     if dr_values.ndim:
@@ -90,8 +89,7 @@ def _pipe_laplacian_3d(
     x_west = jnp.concatenate([field[:1], field[:-1]], axis=0)
     x_east = jnp.concatenate([field[1:], field[-1:]], axis=0)
     r_inner = jnp.concatenate([field[:, :1, :], field[:, :-1, :]], axis=1)
-    outer_ghost = jnp.zeros_like(field[:, -1:, :]) if outer_dirichlet else field[:, -1:, :]
-    r_outer = jnp.concatenate([field[:, 1:, :], outer_ghost], axis=1)
+    r_outer = jnp.concatenate([field[:, 1:, :], jnp.zeros_like(field[:, -1:, :])], axis=1)
     theta_prev, theta_next = _pipe_theta_neighbors(field)
     dxx = (x_west - 2.0 * field + x_east) / jnp.maximum(dx**2, 1.0e-12)
     radial_step = dr_values if widths is None else jnp.asarray(1.0)
@@ -108,8 +106,7 @@ def _pipe_laplacian_3d(
     radial_flux = radial_flux.at[:, 1:-1, :].set(
         r_faces[None, 1:-1, None] * (field[:, 1:, :] - field[:, :-1, :]) / center_distance[None, :, None]
     )
-    if outer_dirichlet:
-        radial_flux = radial_flux.at[:, -1, :].set(r_faces[-1] * (-field[:, -1, :]) / (0.5 * widths[-1]))
+    radial_flux = radial_flux.at[:, -1, :].set(r_faces[-1] * (-field[:, -1, :]) / (0.5 * widths[-1]))
     radial_term = (radial_flux[:, 1:, :] - radial_flux[:, :-1, :]) / jnp.maximum(
         r_centers[None, :, None] * widths[None, :, None], 1.0e-20
     )
@@ -483,15 +480,12 @@ def _solvax_diffusion_pipe(
     tolerance: float,
     initial_field: jnp.ndarray | None = None,
     reaction: jnp.ndarray | None = None,
-    decouple_axial: bool = False,
     _system_solve: Callable | None = None,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Solve steady or implicit cylindrical no-slip diffusion.
 
     ``dt=None`` solves ``-div(viscosity grad(field)) = rhs``. A positive
     ``dt`` solves the implicit update ``field - dt * div(...) = rhs``.
-    ``decouple_axial`` retains the axial diagonal while dropping neighboring
-    station couplings, providing a cross-section block-Jacobi inverse.
     """
 
     radial_widths = jnp.diff(r_faces)
@@ -506,11 +500,6 @@ def _solvax_diffusion_pipe(
         r_centers=r_centers,
         dtheta=dtheta,
     )
-    axial_sink = jnp.zeros_like(rhs)
-    if decouple_axial:
-        axial_sink = coefficients[0] + coefficients[1]
-        zero = jnp.zeros_like(coefficients[0])
-        coefficients = (zero, zero, *coefficients[2:])
     wall_sink = (
         jnp.zeros_like(rhs)
         .at[:, -1, :]
@@ -522,7 +511,7 @@ def _solvax_diffusion_pipe(
                 1.0e-20,
             )
         )
-    ) + axial_sink
+    )
     if reaction is not None:
         wall_sink = wall_sink + reaction
     system = (volume * rhs, volume, coefficients, wall_sink, initial_field)
@@ -612,7 +601,7 @@ def _generic_pipe_step(
     velocity = enforce(*velocity)
     if target_flow_rate is None:
         velocity = (
-            _enforce_stationwise_flow_rate_3d(
+            _equalize_stationwise_flow_rate_3d(
                 velocity[0], active_mask=fluid_mask, cell_area=cell_area, relaxation=0.25
             ),
             velocity[1],
@@ -933,7 +922,6 @@ def _steady_stokes_projection_pipe(
     max_restarts: int = 8,
     flow_response_matrix: jnp.ndarray | None = None,
     pressure_preconditioner_mobility: jnp.ndarray | None = None,
-    apply_momentum_inverse_components: Callable[[jnp.ndarray], jnp.ndarray] | None = None,
     modal_momentum_coefficients: tuple[jnp.ndarray, ...] | None = None,
     modal_momentum_sink: jnp.ndarray | None = None,
     modal_stabilization: bool = False,
@@ -995,11 +983,7 @@ def _steady_stokes_projection_pipe(
         force_u, force_v, force_w = _pipe_face_velocity_cells(*face_force)
         force_u = force_u + pressure_loss[:, None, None] * mobility
         forces = jnp.stack((force_u, force_v, force_w))
-        responses = (
-            jnp.stack(tuple(apply_momentum_inverse(force) for force in forces))
-            if apply_momentum_inverse_components is None
-            else apply_momentum_inverse_components(forces)
-        )
+        responses = jnp.stack(tuple(apply_momentum_inverse(force) for force in forces))
         return tuple(responses)
 
     def rhie_chow_faces(pressure, response):

@@ -13,7 +13,7 @@ from lmx._fringing_common import (
     _apply_fixed_flow_pressure_constraint,
     _cross_duct_pressure_difference,
     _distance_weighted_harmonic_mean,
-    _enforce_stationwise_flow_rate_3d,
+    _equalize_stationwise_flow_rate_3d,
     _gauge_invariant_scalar_update,
     _gradient_3d,
     _iteration_history_arrays,
@@ -89,6 +89,43 @@ def _centered_gradient(function, point, step):
             (function(point.at[i].add(step)) - function(point.at[i].add(-step))) / (2.0 * step)
             for i in range(len(point))
         ]
+    )
+
+
+def _mock_extruded_bundle(*, geometry_kind: str, stations: int) -> ExtrudedFieldBundle:
+    """Return the smallest complete bundle needed by public-solver wrapper tests."""
+    x = jnp.linspace(0.0, 1.0, stations)
+    shape = (stations, 1, 1)
+    zeros = jnp.zeros(shape)
+    station_zeros = jnp.zeros(stations)
+    return ExtrudedFieldBundle(
+        x=x,
+        y=jnp.zeros(1),
+        z=jnp.zeros(1),
+        field_scale=1.0 - jnp.abs(2.0 * x - 1.0),
+        u=jnp.ones(shape),
+        v=zeros,
+        w=zeros,
+        p=zeros,
+        phi=zeros,
+        geometry_kind=geometry_kind,
+        solver_kind="extruded_inductionless",
+        jx=zeros,
+        jy=zeros,
+        jz=zeros,
+        lorentz_x=zeros,
+        lorentz_y=zeros,
+        lorentz_z=zeros,
+        residual=jnp.full(stations, 1.0e-5),
+        volumetric_flow_rate=jnp.linspace(0.2, 0.4, stations),
+        mean_velocity=jnp.linspace(0.1, 0.3, stations),
+        axial_current=jnp.linspace(0.01, 0.02, stations),
+        wall_current_leakage=jnp.full(stations, 1.0e-6),
+        current_scaled_pressure_proxy=jnp.linspace(0.1, 0.15, stations),
+        charge_balance_residual=jnp.full(stations, 1.0e-8),
+        boundary_current_residual=jnp.full(stations, 1.0e-7),
+        axial_pressure_loss_gradient=station_zeros,
+        transverse_pressure_difference=station_zeros,
     )
 
 
@@ -478,11 +515,10 @@ def test_fixed_flow_pressure_constraint_and_stationwise_correction():
     assert pressure_loss.tolist() == pytest.approx([5.0, 5.0])
 
     u = jnp.asarray([[[1.0, 1.0]], [[3.0, 3.0]]])
-    corrected = _enforce_stationwise_flow_rate_3d(
+    corrected = _equalize_stationwise_flow_rate_3d(
         u,
         active_mask=jnp.ones_like(u, dtype=bool),
         cell_area=jnp.ones_like(u),
-        target_flow_rate=4.0,
         relaxation=1.0,
     )
     assert jnp.sum(corrected, axis=(1, 2)).tolist() == pytest.approx([4.0, 4.0])
@@ -516,8 +552,6 @@ def test_nonuniform_operators_and_spacing_contract():
             dx=0.25,
             dy=jnp.diff(faces),
             dz=jnp.diff(faces),
-            mode_y="neumann",
-            mode_z="neumann",
         )
         errors.append(float(jnp.max(jnp.abs(laplacian[:, 2:-2, 2:-2] - 4.0))))
     assert errors[1] < errors[0] / 2.5
@@ -529,8 +563,6 @@ def test_nonuniform_operators_and_spacing_contract():
         dx=0.5,
         dy=jnp.asarray([0.2, 0.3, 0.4, 0.5]),
         dz=jnp.asarray([0.25, 0.35, 0.4]),
-        mode_y="dirichlet",
-        mode_z="dirichlet",
     )
     assert jnp.allclose(wall_laplacian[:, 1:-1, 1:-1], 0.0)
     for wall in (
@@ -741,7 +773,7 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
 
     monkeypatch.setattr(duct_impl, "linear_solve", capture)
 
-    def solve(applied_force, flux=rho_phi, patches=boundary, rho=density, prescribed=True):
+    def solve(applied_force, flux=rho_phi, patches=boundary, rho=density):
         return _solvax_implicit_momentum_duct(
             velocity,
             applied_force,
@@ -755,7 +787,6 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
             dz=dz,
             iterations=240,
             tolerance=1.0e-10,
-            prescribed_inlet=prescribed,
         )
 
     solved, residual, converged = solve(force)
@@ -800,20 +831,6 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
     gradient = jax.grad(lambda alpha: jnp.sum(solve_alpha(alpha) * probe))(1.0)
     adjoint = np.linalg.solve(matrix_alpha.T, np.asarray(probe).reshape(-1))
     assert gradient == pytest.approx(-adjoint @ convection @ np.asarray(primal).reshape(-1), rel=2e-6)
-    zero_flux = tuple(jnp.zeros_like(value) for value in rho_phi)
-    diffused, *_ = solve(jnp.zeros_like(force), zero_flux, neutral, jnp.ones(shape), False)
-    coefficients = common_impl._variable_diffusion_coefficients_3d(viscosity, dx=dx, dy=dy, dz=dz)
-    neighbours = common_impl._neighbor_fields(diffused, mode_x="neumann", mode_y="neumann", mode_z="neumann")
-    wall = jnp.zeros(shape).at[:, 0, :].add(viscosity[:, 0, :] / (0.5 * dy[0] ** 2))
-    wall = wall.at[:, -1, :].add(viscosity[:, -1, :] / (0.5 * dy[-1] ** 2))
-    wall = wall.at[:, :, 0].add(viscosity[:, :, 0] / (0.5 * dz[0] ** 2))
-    wall = wall.at[:, :, -1].add(viscosity[:, :, -1] / (0.5 * dz[-1] ** 2))
-    diffusion = (
-        sum(c[..., None] * (n - diffused) for c, n in zip(coefficients, neighbours, strict=True))
-        - wall[..., None] * diffused
-    )
-    assert diffused - dt * diffusion == pytest.approx(velocity, abs=2e-7)
-
     zero_velocity = jnp.zeros_like(velocity)
     compact_flux = jnp.zeros((3, *shape))
     lorentz = jnp.broadcast_to(jnp.asarray([1.0, 2.0, 3.0]), velocity.shape)
@@ -1052,8 +1069,7 @@ def test_explicit_deviatoric_stress_matches_independent_finite_volume_oracle():
     assert jnp.sum(affine_stress[..., 0]) * volume == pytest.approx(-0.7 * 1.2 * 4 * 0.3 * 3 * 0.4 / 3)
 
 
-@pytest.mark.parametrize("component", ("diffusion", "transport", "momentum", "traction"))
-def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp(component):
+def test_frozen_momentum_setup_preserves_primal_jvp_and_vjp():
     shape = (3, 3, 3)
     widths = tuple(map(jnp.asarray, ([0.2, 0.2, 0.2], [0.3, 0.25, 0.35], [0.4, 0.3, 0.5])))
     velocity = jnp.arange(np.prod((*shape, 3)), dtype=float).reshape((*shape, 3)) / 17.0
@@ -1078,72 +1094,6 @@ def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp(component):
             jax.tree.map(
                 lambda a, b: np.testing.assert_allclose(a, b, rtol=3.0e-14, atol=atol), observed, expected
             )
-
-    def diffusion(scale, inject):
-        conductivity = scale * (1.0 + jnp.arange(np.prod(shape)).reshape(shape) / 20.0)
-        values = common_impl._variable_diffusion_coefficients_3d(
-            conductivity, dx=0.2, dy=widths[1], dz=widths[2], validated_spacing=True
-        )
-        return (
-            common_impl._variable_diffusion_coefficients_3d(
-                conductivity,
-                dx=0.2,
-                dy=widths[1],
-                dz=widths[2],
-                validated_spacing=True,
-                axial_coefficients=values[:2],
-            )
-            if inject
-            else values
-        )
-
-    if component == "diffusion":
-        assert_equivalent(
-            lambda scale: diffusion(scale, False),
-            lambda scale: diffusion(scale, True),
-            tuple(jnp.ones_like(value) for value in diffusion(1.0, False)),
-        )
-
-    def transport(scale, inject):
-        state = scale * velocity
-        boundaries = tuple(scale * value for value in patches)
-        scaled_fluxes = tuple(scale * value for value in fluxes)
-        q = jnp.sum(state**2, axis=-1)
-        q_patches = tuple(jnp.sum(value**2, axis=-1) for value in boundaries)
-        axial_q = (
-            jnp.concatenate((q_patches[0][None], q[:-1])),
-            jnp.concatenate((q[1:], q_patches[1][None])),
-        )
-        gradient = duct_impl._cell_limited_least_squares_gradient_duct(
-            q, q_patches, widths, axial_neighbours=axial_q if inject else None
-        )
-        weights = duct_impl._limited_linear_vector_face_weights_duct(
-            state, scaled_fluxes, boundaries, widths, gradient=gradient if inject else None
-        )
-        kwargs = {}
-        if inject:
-            kwargs = {
-                "neighbours": (
-                    jnp.concatenate((boundaries[0][None], state[:-1])),
-                    jnp.concatenate((state[1:], boundaries[1][None])),
-                ),
-                "axial_fluxes": (scaled_fluxes[0][:-1], scaled_fluxes[0][1:]),
-                "axial_weights": (
-                    jnp.concatenate((jnp.ones_like(weights[0][:1]), weights[0])),
-                    jnp.concatenate((weights[0], jnp.zeros_like(weights[0][:1]))),
-                ),
-            }
-        return duct_impl._limited_linear_convection_matrix_action_duct(
-            state, scaled_fluxes, weights, boundaries, widths, **kwargs
-        )
-
-    if component == "transport":
-        assert_equivalent(
-            lambda scale: transport(scale, False),
-            lambda scale: transport(scale, True),
-            jnp.ones_like(velocity),
-            atol=1.0e-14,
-        )
 
     def momentum_setup(scale, packed):
         state = scale * velocity
@@ -1179,39 +1129,13 @@ def test_axial_injection_interfaces_preserve_primal_jvp_and_vjp(component):
         )
         return gradient, weights, stress
 
-    if component == "momentum":
-        assert momentum_setup(1.0, True)[0].shape == (*shape, 3, 3)
-        assert_equivalent(
-            lambda scale: momentum_setup(scale, False),
-            lambda scale: momentum_setup(scale, True),
-            jax.tree.map(jnp.ones_like, momentum_setup(1.0, False)),
-            atol=2.0e-14,
-        )
-    west, east = jnp.full_like(velocity, -0.2), jnp.full_like(velocity, 0.3)
-
-    def traction(scale, inject):
-        boundaries = tuple(scale * value for value in patches)
-        axial = (scale * west, scale * east)
-        if inject:
-            return duct_impl._explicit_deviatoric_stress_duct(
-                scale * velocity, jnp.full(shape, 0.7), boundaries, widths, axial_tractions=axial
-            )
-        transverse = duct_impl._explicit_deviatoric_stress_duct(
-            scale * velocity,
-            jnp.full(shape, 0.7),
-            boundaries,
-            widths,
-            axial_tractions=(jnp.zeros_like(west), jnp.zeros_like(east)),
-        )
-        return transverse + (axial[1] - axial[0]) / widths[0][:, None, None, None]
-
-    if component == "traction":
-        assert_equivalent(
-            lambda scale: traction(scale, False),
-            lambda scale: traction(scale, True),
-            jnp.ones_like(velocity),
-            atol=2.0e-14,
-        )
+    assert momentum_setup(1.0, True)[0].shape == (*shape, 3, 3)
+    assert_equivalent(
+        lambda scale: momentum_setup(scale, False),
+        lambda scale: momentum_setup(scale, True),
+        jax.tree.map(jnp.ones_like, momentum_setup(1.0, False)),
+        atol=2.0e-14,
+    )
 
 
 def test_compact_duct_mass_flux_initializer_matches_fv_faces():
@@ -1450,7 +1374,6 @@ def test_nonuniform_pipe_radial_metrics_pass_manufactured_convergence():
             dr=widths,
             dtheta=2.0 * jnp.pi / 8,
             r=rr,
-            outer_dirichlet=False,
         )
         errors.append(float(jnp.max(jnp.abs(laplacian[:, 2:-2, :] - 4.0))))
     assert errors[1] < errors[0] / 2.0
@@ -1613,34 +1536,6 @@ def test_pipe_diffusion_reconstructs_manufactured_field(steady):
     assert solved == pytest.approx(manufactured, abs=1.0e-8)
 
 
-def test_pipe_block_jacobi_diffusion_decouples_axial_stations():
-    r_faces = jnp.asarray([0.0, 0.2, 0.5, 0.75, 1.0])
-    r_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
-    dx, viscosity = 0.4, 0.07
-    rhs = jnp.zeros((3, 4, 8)).at[1].set(1.0)
-    common = dict(
-        dt=None,
-        dx=dx,
-        r_faces=r_faces,
-        r_centers=r_centers,
-        dtheta=2.0 * jnp.pi / 8,
-        iterations=300,
-        tolerance=1.0e-10,
-    )
-    solved, _, converged = _solvax_diffusion_pipe(
-        rhs, jnp.full(rhs.shape, viscosity), decouple_axial=True, **common
-    )
-    local, _, local_converged = _solvax_diffusion_pipe(
-        rhs[1:2],
-        jnp.full(rhs[1:2].shape, viscosity),
-        reaction=jnp.full(rhs[1:2].shape, 2.0 * viscosity / dx**2),
-        **common,
-    )
-    assert bool(converged) and bool(local_converged)
-    assert solved[jnp.asarray([0, 2])] == pytest.approx(0.0, abs=1.0e-12)
-    assert solved[1] == pytest.approx(local[0], abs=1.0e-8)
-
-
 def test_pipe_face_gradient_divergence_is_compatible_symmetric_and_jittable():
     nx, ntheta = 4, 8
     r_faces = jnp.asarray([0.0, 0.12, 0.3, 0.55, 0.78, 1.0])
@@ -1747,9 +1642,6 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow():
             pressure_tolerance=1.0e-10,
             restart=12,
             max_restarts=3,
-            apply_momentum_inverse_components=lambda forces: jnp.stack(
-                tuple(inverse(force) for force in forces)
-            ),
             physical_tolerance=1.0e-9,
             **kwargs,
         )
@@ -2215,37 +2107,7 @@ def test_solve_extruded_inductionless_wraps_history_bundle_and_validation(
     monkeypatch: pytest.MonkeyPatch,
 ):
     problem = build_square_duct_extruded_problem(nx_stations=3, ny=6, nz=6)
-    fake_bundle = type(
-        "Bundle",
-        (),
-        {
-            "x": jnp.asarray([0.0, 0.5, 1.0]),
-            "field_scale": jnp.asarray([0.0, 1.0, 0.0]),
-            "mean_velocity": jnp.asarray([0.1, 0.3, 0.12]),
-            "volumetric_flow_rate": jnp.asarray([0.2, 0.4, 0.25]),
-            "axial_current": jnp.asarray([0.01, 0.02, 0.015]),
-            "wall_current_leakage": jnp.asarray([1.0e-6, 2.0e-6, 1.5e-6]),
-            "boundary_current_residual": jnp.asarray([1.0e-7, 2.0e-7, 1.5e-7]),
-            "residual": jnp.asarray([1.0e-4, 1.0e-5, 1.0e-5]),
-            "charge_balance_residual": jnp.asarray([1.0e-8, 2.0e-8, 1.5e-8]),
-            "y": jnp.asarray([0.0]),
-            "z": jnp.asarray([0.0]),
-            "u": jnp.ones((3, 1, 1)),
-            "v": jnp.zeros((3, 1, 1)),
-            "w": jnp.zeros((3, 1, 1)),
-            "p": jnp.zeros((3, 1, 1)),
-            "phi": jnp.zeros((3, 1, 1)),
-            "jx": jnp.zeros((3, 1, 1)),
-            "jy": jnp.zeros((3, 1, 1)),
-            "jz": jnp.zeros((3, 1, 1)),
-            "lorentz_x": jnp.zeros((3, 1, 1)),
-            "lorentz_y": jnp.zeros((3, 1, 1)),
-            "lorentz_z": jnp.zeros((3, 1, 1)),
-            "current_scaled_pressure_proxy": jnp.asarray([0.1, 0.15, 0.1]),
-            "geometry_kind": "rect_duct",
-            "solver_kind": "extruded_inductionless",
-        },
-    )()
+    fake_bundle = _mock_extruded_bundle(geometry_kind="rect_duct", stations=3)
     monkeypatch.setattr(
         "lmx.fringing._solve_extruded_projection",
         lambda problem, **kwargs: fake_bundle,
@@ -2463,37 +2325,7 @@ def test_solve_extruded_inductionless_uses_projection_for_pipe_geometry(
     pipe_problem = replace(problem, case=pipe_case)
     monkeypatch.setattr(
         "lmx.fringing._solve_extruded_projection",
-        lambda problem, **kwargs: type(
-            "Bundle",
-            (),
-            {
-                "x": jnp.asarray([0.0]),
-                "field_scale": jnp.asarray([1.0]),
-                "mean_velocity": jnp.asarray([0.1]),
-                "volumetric_flow_rate": jnp.asarray([0.2]),
-                "axial_current": jnp.asarray([0.0]),
-                "wall_current_leakage": jnp.asarray([0.0]),
-                "boundary_current_residual": jnp.asarray([0.0]),
-                "residual": jnp.asarray([1.0e-4]),
-                "charge_balance_residual": jnp.asarray([1.0e-6]),
-                "y": jnp.asarray([0.0]),
-                "z": jnp.asarray([0.0]),
-                "u": jnp.zeros((1, 1, 1)),
-                "v": jnp.zeros((1, 1, 1)),
-                "w": jnp.zeros((1, 1, 1)),
-                "p": jnp.zeros((1, 1, 1)),
-                "phi": jnp.zeros((1, 1, 1)),
-                "jx": jnp.zeros((1, 1, 1)),
-                "jy": jnp.zeros((1, 1, 1)),
-                "jz": jnp.zeros((1, 1, 1)),
-                "lorentz_x": jnp.zeros((1, 1, 1)),
-                "lorentz_y": jnp.zeros((1, 1, 1)),
-                "lorentz_z": jnp.zeros((1, 1, 1)),
-                "current_scaled_pressure_proxy": jnp.asarray([0.0]),
-                "geometry_kind": "pipe_ogrid",
-                "solver_kind": "extruded_inductionless",
-            },
-        )(),
+        lambda problem, **kwargs: _mock_extruded_bundle(geometry_kind="pipe_ogrid", stations=1),
     )
     solution = solve_extruded_inductionless(pipe_problem)
     assert solution.validation.station_count == 1

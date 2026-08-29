@@ -75,9 +75,8 @@ def _initial_projection_fields(case, fluid_mask, initial_bundle):
     if initial_bundle is not None:
         if initial_bundle.u.shape != fluid_mask.shape:
             raise ValueError("Extruded restart bundle shape does not match the current problem")
-        return tuple(
-            jnp.asarray(getattr(initial_bundle, name), dtype=float) for name in ("u", "v", "w", "p", "phi")
-        )
+        fields = initial_bundle.u, initial_bundle.v, initial_bundle.w, initial_bundle.p, initial_bundle.phi
+        return tuple(jnp.asarray(value, dtype=float) for value in fields)
     u = jnp.where(fluid_mask, jnp.asarray(case.initial_velocity, dtype=float), 0.0)
     zeros = jnp.zeros_like(u)
     return u, zeros, zeros, zeros, zeros
@@ -346,17 +345,12 @@ def _restore_duct_iteration_state(
         "iteration_potential_residual_history",
     )
     histories = tuple(
-        [] if initial is None else np.asarray(getattr(initial, name, jnp.zeros((0,)))).tolist()
-        for name in history_names
+        [] if initial is None else np.asarray(getattr(initial, name)).tolist() for name in history_names
     )
     if len({len(history) for history in histories}) != 1:
         raise ValueError("B2 restart iteration histories have inconsistent lengths")
     stored_steps = len(histories[0])
-    restart_stopping = (
-        (0, 0, "not_recorded")
-        if initial is None
-        else getattr(initial, "stopping_state", (0, 0, "not_recorded"))
-    )
+    restart_stopping = (0, 0, "not_recorded") if initial is None else initial.stopping_state
     completed_steps = int(restart_stopping[0])
     if stored_steps > completed_steps or bool(stored_steps) != bool(completed_steps):
         raise ValueError("B2 restart stopping state has inconsistent step count")
@@ -364,24 +358,14 @@ def _restore_duct_iteration_state(
         [] if initial is None else np.asarray(initial.iteration_momentum_defect_history).tolist()
     )
     if use_b2 and len(momentum_defect) != stored_steps:
-        raise ValueError("B2 restart predates the electromagnetic momentum-defect contract")
+        raise ValueError("B2 restart requires complete momentum-defect history")
     pressure_linear = (
-        []
-        if initial is None
-        else np.asarray(getattr(initial, "iteration_pressure_linear_history", jnp.zeros((0, 5)))).tolist()
+        [] if initial is None else np.asarray(initial.iteration_pressure_linear_history).tolist()
     )
-    if stored_steps and not pressure_linear:
-        pressure_linear = [[math.nan, math.nan, 0.0, 0.0, -1.0]] * stored_steps
-    if len(pressure_linear) != stored_steps:
+    if use_b2 and len(pressure_linear) != stored_steps:
         raise ValueError("B2 restart pressure-linear history has inconsistent length")
-    courant = (
-        []
-        if initial is None
-        else np.asarray(getattr(initial, "iteration_courant_history", jnp.zeros((0, 3)))).tolist()
-    )
-    if stored_steps and not courant:
-        courant = [[-1.0, -1.0, -1.0]] * stored_steps
-    if len(courant) != stored_steps:
+    courant = [] if initial is None else np.asarray(initial.iteration_courant_history).tolist()
+    if use_b2 and len(courant) != stored_steps:
         raise ValueError("B2 restart CFL histories have inconsistent lengths")
 
     fixed_aitken = (
@@ -394,12 +378,10 @@ def _restore_duct_iteration_state(
     steady_streak = int(restart_stopping[1])
     fixed_relaxation = jnp.asarray(1.0, dtype=velocity.dtype)
     previous_fixed_residual = None
-    restart_aitken = None if initial is None else getattr(initial, "aitken_state", None)
+    restart_aitken = None if initial is None else initial.aitken_state
     if use_b2 and restart_aitken is not None:
         previous_fixed_residual, fixed_relaxation, stored_streak = restart_aitken
-        if restart_stopping[2] == "not_recorded":
-            steady_streak = stored_streak
-        elif steady_streak != stored_streak:
+        if steady_streak != stored_streak:
             raise ValueError("B2 restart stopping and Aitken streaks disagree")
         fixed_relaxation = jnp.asarray(fixed_relaxation, dtype=velocity.dtype)
         if fixed_aitken is not None:
@@ -411,7 +393,7 @@ def _restore_duct_iteration_state(
 
     previous_mapped = previous_anderson_residual = None
     previous_flux = previous_inlet = None
-    restart_anderson = None if initial is None else getattr(initial, "anderson_state", None)
+    restart_anderson = None if initial is None else initial.anderson_state
     if use_b2 and case.solver.coupling_acceleration == "anderson":
         if completed_steps and restart_anderson is None:
             raise ValueError("B2 Anderson restart is missing accelerator state")
@@ -611,15 +593,12 @@ def _laplacian_3d(
     dx: float,
     dy: float | jnp.ndarray,
     dz: float | jnp.ndarray,
-    mode_x: str = "neumann",
-    mode_y: str = "dirichlet",
-    mode_z: str = "dirichlet",
 ) -> jnp.ndarray:
     x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
         field,
-        mode_x=mode_x,
-        mode_y=mode_y,
-        mode_z=mode_z,
+        mode_x="neumann",
+        mode_y="dirichlet",
+        mode_z="dirichlet",
     )
     x_term = (x_west - 2.0 * field + x_east) / jnp.maximum(dx**2, 1.0e-12)
     dy_values = jnp.asarray(dy)
@@ -631,7 +610,7 @@ def _laplacian_3d(
             field,
             _spacing_vector(dy_values, field.shape[1], dtype=field.dtype),
             axis=1,
-            mode=mode_y,
+            mode="dirichlet",
         )
     )
     z_term = (
@@ -641,7 +620,7 @@ def _laplacian_3d(
             field,
             _spacing_vector(dz_values, field.shape[2], dtype=field.dtype),
             axis=2,
-            mode=mode_z,
+            mode="dirichlet",
         )
     )
     return x_term + y_term + z_term
@@ -697,20 +676,16 @@ def _enforce_velocity_bc_3d(field: jnp.ndarray, active_mask: jnp.ndarray | None 
     return bounded
 
 
-def _enforce_stationwise_flow_rate_3d(
+def _equalize_stationwise_flow_rate_3d(
     u: jnp.ndarray,
     *,
     active_mask: jnp.ndarray,
     cell_area: jnp.ndarray,
-    target_flow_rate: float | None = None,
     relaxation: float = 1.0,
 ) -> jnp.ndarray:
     active_area = jnp.maximum(jnp.sum(jnp.where(active_mask, cell_area, 0.0), axis=(1, 2)), 1.0e-20)
     station_flow_rate = jnp.sum(jnp.where(active_mask, u * cell_area, 0.0), axis=(1, 2))
-    if target_flow_rate is None:
-        target = jnp.mean(station_flow_rate)
-    else:
-        target = jnp.asarray(target_flow_rate, dtype=u.dtype)
+    target = jnp.mean(station_flow_rate)
     correction = (relaxation * (station_flow_rate - target) / active_area)[:, None, None]
     corrected = jnp.where(active_mask, u - correction, 0.0)
     return corrected
@@ -839,21 +814,17 @@ def _variable_diffusion_coefficients_3d(
     dz: float | jnp.ndarray,
     validated_spacing: bool = False,
     thin_wall_fluid_mask: jnp.ndarray | None = None,
-    axial_coefficients: tuple[jnp.ndarray, jnp.ndarray] | None = None,
 ) -> tuple[jnp.ndarray, ...]:
-    """Return normalized diffusion coefficients; axial pairs are cell-aligned."""
+    """Return normalized diffusion coefficients."""
 
     nx, ny, nz = conductivity.shape
     spacing = _coerce_spacing_vector if validated_spacing else _spacing_vector
     dy_widths = spacing(dy, ny, dtype=conductivity.dtype)
     dz_widths = spacing(dz, nz, dtype=conductivity.dtype)
-    if axial_coefficients is None:
-        sigma_x = _harmonic_mean(conductivity[1:], conductivity[:-1])
-        scaled = sigma_x / jnp.maximum(dx**2, 1.0e-12)
-        coef_x_w = jnp.concatenate([jnp.zeros_like(conductivity[:1]), scaled], axis=0)
-        coef_x_e = jnp.concatenate([scaled, jnp.zeros_like(conductivity[-1:])], axis=0)
-    else:
-        coef_x_w, coef_x_e = axial_coefficients
+    sigma_x = _harmonic_mean(conductivity[1:], conductivity[:-1])
+    scaled = sigma_x / jnp.maximum(dx**2, 1.0e-12)
+    coef_x_w = jnp.concatenate([jnp.zeros_like(conductivity[:1]), scaled], axis=0)
+    coef_x_e = jnp.concatenate([scaled, jnp.zeros_like(conductivity[-1:])], axis=0)
 
     sigma_y = _distance_weighted_harmonic_mean(
         conductivity[:, 1:, :],
@@ -1007,7 +978,7 @@ def _generic_duct_step(
     )
     if target_flow_rate is None:
         velocity = (
-            _enforce_stationwise_flow_rate_3d(
+            _equalize_stationwise_flow_rate_3d(
                 velocity[0], active_mask=fluid_mask, cell_area=cell_area, relaxation=flow_relaxation
             ),
             velocity[1],
