@@ -77,12 +77,15 @@ def _root_exports(root: Path) -> list[str]:
 def _repository_files(root: Path) -> list[Path] | None:
     """Return tracked and untracked Git files, or ``None`` outside a worktree."""
 
-    completed = subprocess.run(
-        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
-        cwd=root,
-        capture_output=True,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+            cwd=root,
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return None
     if completed.returncode != 0:
         return None
     return [
@@ -246,11 +249,11 @@ def build_inventory(root: Path = ROOT) -> dict[str, Any]:
         },
         "targets": {
             "package_module_count_max": 16,
-            "total_package_lines_max": 15480,
+            "total_package_lines_max": 15440,
             "largest_package_module_lines_max": 1800,
             "maintained_core_lines_max": 10000,
             "test_file_count_max": 14,
-            "test_lines_max": 12050,
+            "test_lines_max": 12010,
             "external_validation_file_count_max": 1,
             "largest_external_validation_lines_max": 1800,
             "maintenance_script_count_max": 4,

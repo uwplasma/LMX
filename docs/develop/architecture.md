@@ -17,6 +17,13 @@ modules. Imports remain one-way: specifications and data containers do not
 depend on solvers; plotting dependencies load only when an output function
 requests them.
 
+`lmx.fringing` is the public 3-D interface. Its private implementation is
+partitioned by mathematical ownership: `_fringing_common` holds shared mapped
+operators, `_fringing_duct` rectangular operators, `_fringing_pipe`
+cylindrical operators, and `_fringing_solver` host orchestration. These modules
+are not separate user APIs, and architecture gates prevent them from becoming
+an undifferentiated mega-module.
+
 Package sources live under `src/lmx`, so an editable installation and a wheel
 resolve the same module tree. The wheel includes `lmx/py.typed`; every root API
 callable has an explicit signature, and distribution audits require the typing

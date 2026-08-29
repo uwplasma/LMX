@@ -10,7 +10,7 @@ validation result.
 | Shercliff and Hunt ducts | packaged benchmark values, symmetry, wall/interface current, mesh trends | validated within documented mesh/tolerance gates |
 | High-$Ha$ fully developed flow | layer resolution, Richardson trend, integral balances | bounded accepted campaign cases |
 | Rectangular 3-D fringe | manufactured operators, projection, restart, refinement, FreeMHD B2 | active validation; each artifact states the gates it passes |
-| Straight-pipe 3-D fringe | mapped operators, fixed flow, annular current, Benchmark B1 data | active validation; production parity requires the complete matched gate |
+| Straight-pipe 3-D fringe | production-field and derivative parity, mapped operators, fixed flow, annular current, Benchmark B1 data | differentiable generic core accepted; external production validation requires the complete matched gate |
 | Periodic Q2D | analytical decay, energy identity, spectral incompressibility, spatial refinement, CPU/GPU parity | verified for the documented SM82 model and numerical gates |
 | Bent pipe and magnetic obstacle | mapped/conservation tests and internal observables | development applications, not externally validated benchmarks |
 
