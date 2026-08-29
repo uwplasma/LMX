@@ -26,16 +26,18 @@ Work proceeds in this order:
    that reaches the declared steady gate on the production mesh, then implement
    its implicit tangent/transpose solve in SOLVAX and verify Taylor, JVP/VJP,
    residual, runtime, and memory contracts. This is the methods-paper blocker.
-2. **P0 — real accelerator evidence.** Restore the office execution path and
-   measure cold compile, warm primal, warm gradient, transfer, and peak memory
-   on one A4000; then measure one-to-two-GPU strong scaling on the same accepted
-   workload. Emulated CPU devices remain correctness tests only.
-3. **P1 — matched B1 external validation.** Run an independently matched pipe
+2. **P0 — matched B1 external validation.** Run an independently matched pipe
    case with the same equations, annulus, drive, controls, and observable. Do
    not expand the solver family while this validation contract is incomplete.
-4. **P1 — fusion-design demonstration.** Use the verified 3-D adjoint in one
+3. **P1 — fusion-design demonstration.** Use the verified 3-D adjoint in one
    bounded field/wall/geometry optimization and validate selected gradients and
    Pareto points independently.
+4. **P1 — deferred accelerator evidence.** After the CPU physics and derivative
+   contracts pass, restore the office execution path and measure cold compile,
+   warm primal, warm gradient, transfer, peak memory, and one-to-two-GPU strong
+   scaling on the same accepted workload. Emulated CPU devices remain
+   correctness tests only; GPU evidence is not a blocker for the current CPU
+   tranche and no GPU-performance claim is made before these measurements.
 5. **P2 — publication evidence and final release.** Generate the final plots,
    movie, performance tables, validation matrix, and concise current-state
    documentation; then perform the one final history rewrite and public release.
@@ -3993,6 +3995,61 @@ surface, measurements, validation, decision, and next action.
   `5e1ebd7d7c00a47a124590be5998d413cce2168c46eb3e848f2417dc54104843`
   and `b1dc7438ce96807f6793b45b52ec132baa9b2f3b0c6eddddb0d913dcd59421fd`.
   `acceptance_pass=false` remains correct for the two-update smoke role. Next
-  action: resume the conditioned step-88 state on available accelerator
-  hardware to establish terminal primal convergence before constructing the
+  action: resume the conditioned step-88 state in bounded, checkpointed CPU
+  segments to establish terminal primal convergence before constructing the
   specialized implicit transpose solve.
+
+### 2026-08-29 — defer GPU work behind CPU scientific acceptance
+
+- Decision D-051 moves accelerator performance and scaling evidence behind the
+  terminal B2 primal/adjoint, matched B1 validation, and fusion-design
+  demonstration. This is an ordering decision, not a reduced capability goal:
+  GPU parity, speed, memory, and strong-scaling claims remain release gates.
+- The current tranche therefore uses bounded CPU continuations with durable
+  restarts and evaluates physical defect, accepted-state contraction, mass and
+  charge closure at each boundary. It does not rerun unrelated unit, package,
+  documentation, Docker, or GPU gates for evidence-only campaign checkpoints.
+
+### 2026-08-29 — bound CPU campaigns and reject brute-force B2 continuation
+
+- Decision D-052 adds one campaign-only `--additional-steps` control to bound
+  newly executed outer updates. It propagates through isolated workers, leaves
+  frozen variant controls and acceptance thresholds unchanged, and records the
+  effective bound in each run. This closes the failure mode in which resuming a
+  valid checkpoint silently launches the full 1,000-update production horizon.
+- The checksummed guarded state advanced from step 88 to 120 in 87.2 seconds.
+  At the step-96/104/112/120 boundaries the momentum defect was
+  `0.16247107`/`0.15814175`/`0.15476510`/`0.14901404`; the terminal accepted
+  update was `0.00158914`, maximum divergence `2.88e-5`, and maximum charge
+  residual `2.42e-4`. Restart SHA-256 is
+  `462946eb7d1fb3a3d6f85d80de4742aae6b72774ff3a0a8e24bcdaf362032208`.
+- The official bounded runner then advanced exactly 32 more updates. At steps
+  128/136/144/152 the defect was
+  `0.14717852`/`0.14367309`/`0.14068780`/`0.13780740`; the update contracted
+  from `0.00155001` to `0.00144850`. Mass, current, boundary-current, pressure
+  diagnostics, and pressure convergence gates pass; steady residual,
+  sustained stopping, and the declared `1e-3` momentum gate remain open. The
+  complete recorded run, including four 59-MB-class atomic checkpoints, took
+  221.1 seconds. Final restart SHA-256 is
+  `3aa1c4626889b056ef601867320d80c6b5a2eab5d3fe1ae1c3d4198a43dc23f5`.
+- Sustained contraction establishes that the condition guard is sound, but
+  linear extrapolation would spend many more production segments before
+  physical acceptance. Further unmodified recurrence is therefore rejected as
+  the active strategy. The next numerical change returns to the previously
+  localized blocker: expose and verify the coupled pressure response
+  `D A^-1 G` for a consistent SOLVAX block preconditioner, first with a dense
+  reduced identity and then on this exact step-152 state. The accepted
+  recurrence remains the fallback and specialized B2 differentiation remains
+  unavailable until the primal gate passes.
+- The change-aware gate selected only the owning campaign tests and passed all
+  21 on the final deduplicated candidate in 5.71 seconds (6.1 seconds end to
+  end). Ruff check/format and the
+  architecture audit also pass: 15 modules, 14,754 package lines, 11,950 test
+  lines, and 28 root exports. No unrelated physics, documentation, package,
+  Docker, FreeMHD, or GPU gate was rerun.
+- PR #47's docs, external-validation, and CI entry jobs each ended before their
+  first step in 2--3 seconds. Every check-run annotation reports the account
+  payment/spending-limit condition; all downstream jobs were consequently
+  skipped. This is hosted-service unavailability, not contrary test evidence,
+  so the recorded local gate remains merge authority under the active
+  temporary policy.

@@ -143,12 +143,13 @@ def test_dry_run_writes_deterministic_campaign_plan(tmp_path: Path):
             "--variants",
             "baseline",
             "--dry-run",
+            "--additional-steps=7",
         ]
     )
     payload = json.loads((output / "benchmark-b-independence.json").read_text())
-    case = payload["cases"][0]
+    case, run = payload["cases"][0], payload["cases"][0]["runs"][0]
     assert exit_code == 0 and not payload["pass"] and case["case_id"] == "B1-fringing-pipe"
-    assert case["runs"][0]["mesh"]["physics_cell_count"] == 827392
+    assert (run["mesh"]["physics_cell_count"], run["controls"]["max_steps"]) == (827392, 7)
 
 
 def test_resume_rejects_checkpoint_from_another_fingerprint(tmp_path: Path):

@@ -333,7 +333,14 @@ def _evaluate_acceptance(
     }
 
 
-def _variant_problem(case_id: str, mesh_level: str, variant: str, *, num_devices: int | None = None):
+def _variant_problem(
+    case_id: str,
+    mesh_level: str,
+    variant: str,
+    *,
+    num_devices: int | None = None,
+    additional_steps: int | None = None,
+):
     wall = "confirmation" if variant == "thin_wall" else "nominal"
     problem = build_benchmark_b_problem(
         case_id,
@@ -360,6 +367,7 @@ def _variant_problem(case_id: str, mesh_level: str, variant: str, *, num_devices
         max_steps = int(round(max_steps * factor))
     elif variant not in {"baseline", "thin_wall"}:
         raise ValueError(f"Unsupported independence variant {variant!r}")
+    max_steps = additional_steps if additional_steps is not None else max_steps
     case = replace(
         problem.case,
         solver=replace(
@@ -546,8 +554,15 @@ def _run_record(
     initialization_sha256: str | None = None,
     num_devices: int | None = None,
     prolong_restart: bool = False,
+    additional_steps: int | None = None,
 ) -> tuple[dict[str, Any], Any]:
-    problem = _variant_problem(case_id, mesh_level, variant, num_devices=num_devices)
+    problem = _variant_problem(
+        case_id,
+        mesh_level,
+        variant,
+        num_devices=num_devices,
+        additional_steps=additional_steps,
+    )
     prolongation = None
     mesh = _cross_section_mesh(problem.case)
     target_shape = (mesh.nx, mesh.ny, mesh.nz)
@@ -847,6 +862,8 @@ def _gpu_child_command(args, case_id: str, variant: str) -> list[str]:
     ]
     if args.resume:
         command.append("--resume")
+    if (additional_steps := getattr(args, "additional_steps", None)) is not None:
+        command.extend(("--additional-steps", str(additional_steps)))
     if getattr(args, "prolong_restart", False):
         command.append("--prolong-restart")
     if variant == "baseline" and args.initial_restart is not None:
@@ -955,6 +972,8 @@ def _run_gpu_campaign(args) -> int:
         "--checkpoint-interval",
         str(args.checkpoint_interval),
     ]
+    if (additional_steps := getattr(args, "additional_steps", None)) is not None:
+        summary_args.extend(("--additional-steps", str(additional_steps)))
     return main(summary_args)
 
 
@@ -1083,6 +1102,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Write an atomic partial restart every N outer iterations (default: 8).",
     )
     parser.add_argument(
+        "--additional-steps",
+        type=int,
+        help="Bound each newly executed solve to this many outer updates.",
+    )
+    parser.add_argument(
         "--initial-restart",
         type=Path,
         help="Explicit restart used only to initialize a newly run baseline variant.",
@@ -1160,6 +1184,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.checkpoint_interval <= 0:
         parser.error("--checkpoint-interval must be positive")
+    if args.additional_steps is not None and args.additional_steps <= 0:
+        parser.error("--additional-steps must be positive")
     if args.spatial_devices is not None and args.spatial_devices < 1:
         parser.error("--spatial-devices must be positive")
     if args.spatial_devices is not None and args.gpu_devices is not None:
@@ -1202,6 +1228,7 @@ def main(argv: list[str] | None = None) -> int:
                     args.mesh_level,
                     variant,
                     num_devices=args.spatial_devices,
+                    additional_steps=args.additional_steps,
                 )
                 record = {
                     "case_id": case_id,
@@ -1255,6 +1282,7 @@ def main(argv: list[str] | None = None) -> int:
                     initialization_sha256=initialization_sha256,
                     num_devices=args.spatial_devices,
                     prolong_restart=args.prolong_restart,
+                    additional_steps=args.additional_steps,
                 )
                 if variant == "baseline":
                     baseline_bundle = solution.bundle
