@@ -417,56 +417,6 @@ def _solvax_pressure_poisson_pipe(
     )
 
 
-def _solve_pipe_diffusion_system(
-    linear_rhs: jnp.ndarray,
-    volume: jnp.ndarray,
-    coefficients: tuple[jnp.ndarray, ...],
-    wall_sink: jnp.ndarray,
-    initial_field: jnp.ndarray | None,
-    *,
-    mass_coefficient: float = 1.0,
-    diffusion_coefficient: float = 1.0,
-    iterations: int,
-    tolerance: float,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    """Solve one prepared shifted cylindrical diffusion system."""
-
-    coef_x_w, coef_x_e, coef_r_i, coef_r_o, _, _ = coefficients
-
-    def matvec(field: jnp.ndarray) -> jnp.ndarray:
-        diffusion = _apply_pipe_diffusion_coefficients_3d(field, coefficients) - wall_sink * field
-        return volume * (mass_coefficient * field - diffusion_coefficient * diffusion)
-
-    diagonal = volume * (mass_coefficient + diffusion_coefficient * (sum(coefficients) + wall_sink))
-    directions = (
-        (
-            0,
-            -volume * diffusion_coefficient * coef_x_w,
-            -volume * diffusion_coefficient * coef_x_e,
-        ),
-        (
-            1,
-            -volume * diffusion_coefficient * coef_r_i,
-            -volume * diffusion_coefficient * coef_r_o,
-        ),
-    )
-    precondition = additive_tridiagonal_line_preconditioner(diagonal, directions)
-    solution = pcg_linear_solve(
-        matvec,
-        linear_rhs,
-        x0=initial_field,
-        precond=precondition,
-        transpose_precond=precondition,
-        rtol=tolerance,
-        atol=tolerance,
-        max_steps=iterations,
-        transpose_rtol=tolerance,
-        transpose_atol=tolerance,
-        transpose_max_steps=iterations,
-    )
-    return solution.x, solution.residual_norm, solution.converged
-
-
 def _solvax_diffusion_pipe(
     rhs: jnp.ndarray,
     viscosity: jnp.ndarray,
@@ -480,7 +430,6 @@ def _solvax_diffusion_pipe(
     tolerance: float,
     initial_field: jnp.ndarray | None = None,
     reaction: jnp.ndarray | None = None,
-    _system_solve: Callable | None = None,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Solve steady or implicit cylindrical no-slip diffusion.
 
@@ -514,16 +463,36 @@ def _solvax_diffusion_pipe(
     )
     if reaction is not None:
         wall_sink = wall_sink + reaction
-    system = (volume * rhs, volume, coefficients, wall_sink, initial_field)
-    if _system_solve is not None:
-        return _system_solve(*system)
-    return _solve_pipe_diffusion_system(
-        *system,
-        mass_coefficient=float(dt is not None),
-        diffusion_coefficient=1.0 if dt is None else dt,
-        iterations=iterations,
-        tolerance=tolerance,
+    mass = float(dt is not None)
+    diffusion = 1.0 if dt is None else dt
+    coef_x_w, coef_x_e, coef_r_i, coef_r_o, _, _ = coefficients
+
+    def matvec(field):
+        applied = _apply_pipe_diffusion_coefficients_3d(field, coefficients) - wall_sink * field
+        return volume * (mass * field - diffusion * applied)
+
+    diagonal = volume * (mass + diffusion * (sum(coefficients) + wall_sink))
+    precondition = additive_tridiagonal_line_preconditioner(
+        diagonal,
+        (
+            (0, -volume * diffusion * coef_x_w, -volume * diffusion * coef_x_e),
+            (1, -volume * diffusion * coef_r_i, -volume * diffusion * coef_r_o),
+        ),
     )
+    solution = pcg_linear_solve(
+        matvec,
+        volume * rhs,
+        x0=initial_field,
+        precond=precondition,
+        transpose_precond=precondition,
+        rtol=tolerance,
+        atol=tolerance,
+        max_steps=iterations,
+        transpose_rtol=tolerance,
+        transpose_atol=tolerance,
+        transpose_max_steps=iterations,
+    )
+    return solution.x, solution.residual_norm, solution.converged
 
 
 def _generic_pipe_step(
