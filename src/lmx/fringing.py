@@ -938,7 +938,7 @@ def _solve_duct_projection(
         1.0e-10 if use_alex_b2_finite_volume else 8.0 * np.finfo(np.float64).eps,
     )
     projection_iterations = max(poisson_iterations, 4000)
-    projection_tolerance = min(poisson_tolerance, 1.0e-12)
+    projection_tolerance = min(poisson_tolerance, 1.0e-10)
     momentum_iterations = max(poisson_iterations, 400)
     momentum_tolerance = min(poisson_tolerance, 1.0e-10)
     velocity_limit = max(5.0, 2.0 * math.sqrt(float(case.geometry.target_ha or 1.0)))
