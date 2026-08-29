@@ -565,7 +565,7 @@ BENCHMARK_B_SPEC_FILES = {
 }
 _BENCHMARK_B_SPEC_DIGESTS = {
     "B1-fringing-pipe": "3d3433ae552ad1e9196d61066fd3c26bc2529f6f4da68c92cea0b86dc5112057",
-    "B2-fringing-square": "f7abe37bde526d2882f3827cafffb8bb9168a38006af12c19f266d2b03f33bad",
+    "B2-fringing-square": "af80149e71e83a30e6dea4306fe6e7221f6568f2c62155afcc2d4fbd5c8e897d",
 }
 _MATCHED_SHARED_SECTIONS = """equations nondimensional_groups geometry magnetic_field wall
 boundary_drive observable normalization""".split()

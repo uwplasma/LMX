@@ -48,6 +48,9 @@ if ROOT not in Path(lmx.__file__).resolve().parents:
 CASE_IDS = ("B1-fringing-pipe", "B2-fringing-square")
 MESH_LEVELS = ("coarse", "medium", "fine")
 VARIANTS = ("baseline", "tight_tolerance", "extended_iterations", "thin_wall")
+EVIDENCE_SCHEMA_VERSION = 2
+GCI_SAFETY_FACTOR = 1.25
+GCI_REFINEMENT_RATIO_MIN = 1.3
 
 
 def _summarize_pressure_linear_history(
@@ -83,6 +86,84 @@ def _source_fingerprint(root: Path = ROOT) -> str:
     return digest.hexdigest()
 
 
+def _array_sha256(values) -> str:
+    array = np.ascontiguousarray(np.asarray(values, dtype=np.float64))
+    digest = hashlib.sha256()
+    digest.update(np.asarray(array.shape, dtype=np.int64).tobytes())
+    digest.update(array.tobytes())
+    return digest.hexdigest()
+
+
+def _mesh_evidence(problem, mesh) -> dict[str, Any]:
+    """Identify the exact frozen mesh and its three-dimensional refinement scale."""
+
+    geometry = problem.case.geometry
+    fluid_shape = (
+        mesh.nx,
+        geometry.nr or geometry.ny,
+        geometry.ntheta or geometry.nz,
+    )
+    physics_cells = int(np.prod(fluid_shape))
+    fluid_volume = geometry.length * (
+        np.pi * geometry.radius**2 if geometry.kind == "pipe_ogrid" else geometry.width * geometry.height
+    )
+    return {
+        "geometry_kind": geometry.kind,
+        "shape": [mesh.nx, mesh.ny, mesh.nz],
+        "fluid_shape": list(fluid_shape),
+        "allocated_cell_count": int(mesh.nx * mesh.ny * mesh.nz),
+        "physics_cell_count": physics_cells,
+        "fluid_volume": fluid_volume,
+        "characteristic_spacing": (fluid_volume / physics_cells) ** (1.0 / 3.0),
+        "coordinate_sha256": {axis: _array_sha256(getattr(mesh, f"{axis}_faces")) for axis in "xyz"},
+    }
+
+
+def _frozen_mesh_evidence(case_id: str, level: str, devices: int = 1) -> dict[str, Any]:
+    problem = _variant_problem(case_id, level, "baseline", num_devices=devices)
+    return _mesh_evidence(problem, _cross_section_mesh(problem.case))
+
+
+def _refinement_metrics(coarse_medium: float, medium_fine: float, spacing) -> dict[str, Any]:
+    """Return unequal-ratio observed order and fine-grid GCI for one curve norm."""
+
+    coarse_h, medium_h, fine_h = map(float, spacing)
+    r21, r32 = medium_h / fine_h, coarse_h / medium_h
+    result = {
+        "safety_factor": GCI_SAFETY_FACTOR,
+        "refinement_ratio_medium_fine": r21,
+        "refinement_ratio_coarse_medium": r32,
+        "observed_order": None,
+        "fine_grid_gci": None,
+        "gci_asymptotic_ratio": None,
+    }
+    if not (coarse_h > medium_h > fine_h > 0.0 and 0.0 < medium_fine < coarse_medium):
+        return result
+    target = coarse_medium / medium_fine
+
+    def error_ratio(order):
+        return r21**order * np.expm1(order * np.log(r32)) / np.expm1(order * np.log(r21))
+
+    lower, upper = 1.0e-6, 12.0
+    if not error_ratio(lower) < target < error_ratio(upper):
+        return result
+    for _ in range(80):
+        midpoint = 0.5 * (lower + upper)
+        if error_ratio(midpoint) < target:
+            lower = midpoint
+        else:
+            upper = midpoint
+    order = 0.5 * (lower + upper)
+    fine_gci = GCI_SAFETY_FACTOR * medium_fine / np.expm1(order * np.log(r21))
+    medium_gci = GCI_SAFETY_FACTOR * coarse_medium / np.expm1(order * np.log(r32))
+    result.update(
+        observed_order=order,
+        fine_grid_gci=fine_gci,
+        gci_asymptotic_ratio=medium_gci / (r21**order * fine_gci),
+    )
+    return result
+
+
 def _evaluate_acceptance(
     case_id: str,
     mesh_campaigns: dict[str, dict[str, Any]],
@@ -98,6 +179,10 @@ def _evaluate_acceptance(
     if missing:
         return {
             "case_id": case_id,
+            "status": "mesh_incomplete",
+            "mesh_complete": False,
+            "numerical_pass": False,
+            "external_validation_pass": False,
             "complete": False,
             "missing_mesh_levels": missing,
             "pass": False,
@@ -109,6 +194,7 @@ def _evaluate_acceptance(
     curves: dict[str, tuple[np.ndarray, np.ndarray]] = {}
     literature: dict[str, dict[str, float]] = {}
     independence: dict[str, bool] = {}
+    spacing: dict[str, float] = {}
     fingerprints = set()
     for level in levels:
         campaign = mesh_campaigns[level]
@@ -120,6 +206,11 @@ def _evaluate_acceptance(
         fingerprints.add(fingerprint)
         if record.get("case_id") != case_id or record.get("mesh_level") != level:
             raise ValueError(f"Benchmark B {level} baseline metadata do not match")
+        devices = int(record.get("controls", {}).get("spatial_devices", 1))
+        expected_mesh = _frozen_mesh_evidence(case_id, level, devices)
+        if record.get("mesh") != expected_mesh:
+            raise ValueError(f"Benchmark B {level} exact mesh evidence does not match")
+        spacing[level] = float(expected_mesh["characteristic_spacing"])
         x = np.asarray(record.get("x_over_L"), dtype=float)
         observable = np.asarray(record.get("primary_observable"), dtype=float)
         if (
@@ -167,6 +258,11 @@ def _evaluate_acceptance(
 
     coarse_medium = relative_change(levels[0], levels[1])
     medium_fine = relative_change(levels[1], levels[2])
+    refinement = _refinement_metrics(
+        coarse_medium,
+        medium_fine,
+        tuple(spacing[level] for level in levels),
+    )
     finest = literature[levels[-1]]
     freemhd_validation = (
         validate_matched_b_record(
@@ -179,7 +275,7 @@ def _evaluate_acceptance(
     )
     exact_freemhd = bool(freemhd_validation and freemhd_validation["acceptance_pass"])
     acceptance = spec["acceptance"]
-    gates = {
+    numerical_gates = {
         "all_mesh_independence": all(independence.values()),
         "weighted_rms": finest["weighted_rms"] <= float(acceptance["weighted_rms_max"]),
         "weighted_linf": finest["weighted_linf"] <= float(acceptance["weighted_linf_max"]),
@@ -192,11 +288,32 @@ def _evaluate_acceptance(
             <= literature[levels[0]]["weighted_rms"]
         )
         or medium_fine <= coarse_medium,
-        "matched_freemhd": exact_freemhd,
+        "quantified_refinement": refinement["observed_order"] is not None,
+        "adequate_refinement_ratios": min(
+            refinement["refinement_ratio_medium_fine"],
+            refinement["refinement_ratio_coarse_medium"],
+        )
+        >= GCI_REFINEMENT_RATIO_MIN,
     }
+    external_required = bool(acceptance["matched_freemhd_case_required"])
+    external_gates = {"matched_freemhd": not external_required or exact_freemhd}
+    numerical_pass = all(numerical_gates.values())
+    external_pass = not external_required or exact_freemhd
+    schema_complete = bool(freemhd_validation and freemhd_validation["schema_complete"])
+    status = (
+        "accepted"
+        if numerical_pass and external_pass
+        else "external_validation_open"
+        if numerical_pass
+        else "numerical_rejected"
+    )
     return {
         "case_id": case_id,
-        "complete": bool(freemhd_validation and freemhd_validation["schema_complete"]),
+        "status": status,
+        "mesh_complete": True,
+        "external_validation_required": external_required,
+        "external_validation_schema_complete": schema_complete,
+        "complete": not external_required or schema_complete,
         "missing_mesh_levels": [],
         "literature": literature,
         "independence": independence,
@@ -204,10 +321,15 @@ def _evaluate_acceptance(
             "coarse_to_medium": coarse_medium,
             "medium_to_fine": medium_fine,
         },
+        "refinement": refinement,
         "freemhd": matched_freemhd,
         "freemhd_validation": freemhd_validation,
-        "gates": gates,
-        "pass": all(gates.values()),
+        "numerical_gates": numerical_gates,
+        "external_gates": external_gates,
+        "gates": {**numerical_gates, **external_gates},
+        "numerical_pass": numerical_pass,
+        "external_validation_pass": external_pass,
+        "pass": numerical_pass and external_pass,
     }
 
 
@@ -466,6 +588,7 @@ def _run_record(
     pressure_linear_diagnostics = _summarize_pressure_linear_history(
         pressure_linear_history, expected_steps=int(completed_steps)
     )
+    momentum_defect_history = np.asarray(solution.bundle.iteration_momentum_defect_history, dtype=float)
     return {
         "case_id": case_id,
         "mesh_level": mesh_level,
@@ -490,6 +613,7 @@ def _run_record(
             "b1_compatible_steady": case_id == "B1-fringing-pipe",
             "b1_retained_modal_blocks": case_id == "B1-fringing-pipe",
         },
+        "mesh": _mesh_evidence(problem, mesh),
         "restart": {
             "path": str(restart_path),
             "sha256": _file_sha256(restart_path),
@@ -516,6 +640,7 @@ def _run_record(
             solution.bundle.iteration_potential_residual_history
         ).tolist(),
         "iteration_courant_history": courant_history.tolist(),
+        "iteration_momentum_defect_history": momentum_defect_history.tolist(),
         "diagnostics": {
             "max_residual": validation.max_residual,
             "max_divergence_residual": validation.max_divergence_residual,
@@ -524,6 +649,9 @@ def _run_record(
             "max_wall_current_leakage": validation.max_wall_current_leakage,
             "net_boundary_current_residual": validation.net_boundary_current_residual,
             "max_courant": float(np.max(measured_courant)) if measured_courant.size else None,
+            "terminal_momentum_defect": (
+                float(momentum_defect_history[-1]) if momentum_defect_history.size else None
+            ),
             "completed_steps": completed_steps,
             "final_steady_streak": final_streak,
             "stop_reason": stop_reason,
@@ -546,7 +674,6 @@ def _comparison(case_id: str, records: dict[str, dict[str, Any]]) -> dict[str, A
     spec = load_benchmark_b_spec(case_id)
     baseline = np.asarray(records["baseline"]["primary_observable"], dtype=float)
     uncertainty = float(spec["reference"]["combined_uncertainty_absolute"])
-    base_diagnostics = records["baseline"]["diagnostics"]
     steady_max = float(spec["solver"]["steady_residual_max"])
     steady_steps = int(spec["solver"]["steady_steps_min"])
 
@@ -556,48 +683,37 @@ def _comparison(case_id: str, records: dict[str, dict[str, Any]]) -> dict[str, A
         requested = record.get("controls", {}).get("coupling_tolerance", steady_max)
         return min(steady_max, float(requested))
 
-    gates = {
-        "steady_residual": float(base_diagnostics["max_residual"]) <= steady_limit(records["baseline"]),
-        "mass_balance": max(
-            float(base_diagnostics["volumetric_flow_rate_span"]),
-            float(base_diagnostics.get("max_divergence_residual", 0.0)),
-        )
-        <= float(spec["solver"]["mass_balance_max"]),
-        "current_balance": float(base_diagnostics["max_charge_balance_residual"])
-        <= float(spec["solver"]["current_balance_max"]),
-        "boundary_current": float(base_diagnostics["net_boundary_current_residual"])
-        <= float(spec["solver"]["current_balance_max"]),
-        "sustained_stopping": (
-            base_diagnostics.get("stop_reason") == "converged"
-            and int(base_diagnostics.get("final_steady_streak", -1)) >= steady_steps
-        ),
-        "pressure_linear_diagnostics": base_diagnostics.get("pressure_linear_diagnostics_complete") is True,
-        "pressure_solve_convergence": base_diagnostics.get("pressure_solves_converged") is True,
-    }
+    def physical_gates(record):
+        diagnostics = record["diagnostics"]
+        checks = {
+            "steady_residual": float(diagnostics["max_residual"]) <= steady_limit(record),
+            "mass_balance": max(
+                float(diagnostics["volumetric_flow_rate_span"]),
+                float(diagnostics.get("max_divergence_residual", 0.0)),
+            )
+            <= float(spec["solver"]["mass_balance_max"]),
+            "current_balance": float(diagnostics["max_charge_balance_residual"])
+            <= float(spec["solver"]["current_balance_max"]),
+            "boundary_current": float(diagnostics["net_boundary_current_residual"])
+            <= float(spec["solver"]["current_balance_max"]),
+            "sustained_stopping": (
+                diagnostics.get("stop_reason") == "converged"
+                and int(diagnostics.get("final_steady_streak", -1)) >= steady_steps
+            ),
+            "pressure_linear_diagnostics": diagnostics.get("pressure_linear_diagnostics_complete") is True,
+            "pressure_solve_convergence": diagnostics.get("pressure_solves_converged") is True,
+        }
+        if momentum_limit := spec["solver"].get("momentum_balance_max"):
+            defect = diagnostics.get("terminal_momentum_defect")
+            checks["momentum_balance"] = defect is not None and float(defect) <= float(momentum_limit)
+        return checks
+
+    gates = physical_gates(records["baseline"])
     for variant, record in records.items():
         if variant == "baseline":
             continue
-        diagnostics = record["diagnostics"]
         prefix = variant.replace("_", "-")
-        gates[f"{prefix}_steady_residual"] = float(diagnostics["max_residual"]) <= steady_limit(record)
-        gates[f"{prefix}_mass_balance"] = max(
-            float(diagnostics["volumetric_flow_rate_span"]),
-            float(diagnostics.get("max_divergence_residual", 0.0)),
-        ) <= float(spec["solver"]["mass_balance_max"])
-        gates[f"{prefix}_current_balance"] = float(diagnostics["max_charge_balance_residual"]) <= float(
-            spec["solver"]["current_balance_max"]
-        )
-        gates[f"{prefix}_boundary_current"] = float(diagnostics["net_boundary_current_residual"]) <= float(
-            spec["solver"]["current_balance_max"]
-        )
-        gates[f"{prefix}_sustained_stopping"] = (
-            diagnostics.get("stop_reason") == "converged"
-            and int(diagnostics.get("final_steady_streak", -1)) >= steady_steps
-        )
-        gates[f"{prefix}_pressure_linear_diagnostics"] = (
-            diagnostics.get("pressure_linear_diagnostics_complete") is True
-        )
-        gates[f"{prefix}_pressure_solve_convergence"] = diagnostics.get("pressure_solves_converged") is True
+        gates.update({f"{prefix}_{name}": passed for name, passed in physical_gates(record).items()})
     result: dict[str, Any] = {
         "case_id": case_id,
         "complete": not missing,
@@ -703,7 +819,7 @@ def _freeze_acceptance(args) -> int:
             )
         )
     payload = {
-        "schema_version": 1,
+        "schema_version": EVIDENCE_SCHEMA_VERSION,
         "source_fingerprint": fingerprint,
         "cases": results,
         "pass": bool(results) and all(result["pass"] for result in results),
@@ -1081,12 +1197,26 @@ def main(argv: list[str] | None = None) -> int:
                     baseline_bundle = load_extruded_restart_bundle(restart_path).bundle
                     baseline_restart_sha256 = _file_sha256(restart_path)
             elif args.dry_run:
+                problem = _variant_problem(
+                    case_id,
+                    args.mesh_level,
+                    variant,
+                    num_devices=args.spatial_devices,
+                )
                 record = {
                     "case_id": case_id,
                     "mesh_level": args.mesh_level,
                     "variant": variant,
                     "source_fingerprint": fingerprint,
                     "dry_run": True,
+                    "mesh": _mesh_evidence(problem, _cross_section_mesh(problem.case)),
+                    "controls": {
+                        "coupling_tolerance": problem.case.solver.coupling_tolerance,
+                        "coupling_iterations": problem.case.solver.coupling_iterations,
+                        **_effective_iteration_limits(problem),
+                        "max_steps": problem.case.time_stepper.max_steps,
+                        "spatial_devices": args.spatial_devices or 1,
+                    },
                 }
             else:
                 initialization = None
@@ -1138,11 +1268,16 @@ def main(argv: list[str] | None = None) -> int:
     comparisons = [
         _comparison(case_id, records)
         if not any(record.get("dry_run") for record in records.values())
-        else {"case_id": case_id, "complete": False, "dry_run": True}
+        else {
+            "case_id": case_id,
+            "complete": False,
+            "dry_run": True,
+            "runs": list(records.values()),
+        }
         for case_id, records in records_by_case.items()
     ]
     summary = {
-        "schema_version": 1,
+        "schema_version": EVIDENCE_SCHEMA_VERSION,
         "source_fingerprint": fingerprint,
         "mesh_level": args.mesh_level,
         "cases": comparisons,
