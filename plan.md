@@ -16,7 +16,7 @@ The live root is the enforced repository baseline. The latest ordinary
 authenticated clone measurement is 2,304 KiB total, including 588 KiB of Git
 data and a 463.39 KiB pack. The current candidate contains 88 tracked files,
 1,830,901 bytes of tracked data, 15 package modules, and 28 root exports. Its
-complete six-worker portable gate passes 500 tests in 163.90 seconds with
+complete six-worker portable gate passes 500 tests in 171.42 seconds with
 95.41% combined line/branch coverage. Every change below must preserve the
 normal-clone limit of 9,766 KiB and the file, API, five-minute test-time, and
 coverage budgets. The capability-adjusted ceiling remains 15,370 package lines
@@ -1172,6 +1172,7 @@ artifacts or release assets, not committed files.
 | D-042 | Use the frozen momentum diagonal as the B2 pressure mobility | The pressure correction must use the same local response as the implicit momentum predictor. Reusing its already assembled diagonal is allocation-light and restores the variable-coefficient discrete flux identity; a full nested momentum inverse is still rejected by D-038. |
 | D-043 | Advance B2 with two relaxed SIMPLE-style pressure--momentum correctors per electric closure | Including the current pressure force and accumulating a bounded correction removes the diagonal-only plateau. Two correctors materially improve physical defect per second; a third has diminishing returns, and fixed relaxation avoids adding restart fields. |
 | D-044 | Retain depth-two Anderson for B2 until a safeguard improves both early and late evidence | The corrected raw and fixed-two maps are stable and smoother late, but neither improves physical defect over Anderson early or late. A one-step growth fallback amplifies alternating spikes. Replace acceleration only with a restart-exact method that wins defect, update, runtime, and memory together. |
+| D-045 | Stop the primal-only B2 pressure correction at `1e-10` while retaining volume-scaled balance checks | On the production coarse state this cuts pressure PCG work by about one quarter while leaving the state update and momentum-defect trajectory unchanged at reported precision. The resulting `2e-5`--`7e-5` divergence remains below five percent of the independent `1e-3` balance gate. Generic traced paths retain roundoff-level primal solves for implicit-derivative consistency. |
 
 ## Work log
 
@@ -3515,3 +3516,42 @@ surface, measurements, validation, decision, and next action.
   measure the merged primal on the office CPU and A4000 devices, including
   one-/two-GPU sharding, while deriving a restart-exact coupled acceleration
   that controls the physical defect rather than only the fixed-point update.
+
+### 2026-08-29 — budget B2 pressure work and reject local acceleration heuristics
+
+- Tested SOLVAX residual-history condition filtering, deterministic periodic
+  restart, and a norm trust region on the exact step-32 and step-64 production
+  states. A condition limit of 10 reduces the late maximum update from
+  `0.00442285` to `0.00205132` but worsens the early 12-step momentum defect
+  from `0.49779924` to `0.50222302`. Period-four restart ends late at
+  `0.00163566 / 0.22043781`, no better in physical defect than the raw map.
+  Trust radii two and four also lose early physical descent. All three
+  restart-exact trials were removed; Decision D-044 remains in force.
+- An exact frozen-convection contribution to the local momentum diagonal
+  changes the late defect only from `0.22026971` to `0.22025648` and worsens
+  the early 12-step result to `0.50055652`. Enabling the existing axial line
+  factor raises pressure PCG work from about 157 to 185 iterations; enabling
+  it for electric closure raises work from about 53 to 64 iterations. These
+  source trials were also removed rather than retained as nominal safeguards.
+- Decision D-045 changes only the primal-only B2 pressure linear tolerance
+  from `1e-12` to `1e-10`. Eight exact late updates reduce mean pressure PCG
+  work from about 157 to 118 iterations while reproducing the state updates
+  and terminal momentum defect `0.22026971` at reported precision. Maximum
+  projected divergence is `6.7852e-5`, below five percent of the independent
+  `1e-3` balance gate; finer cell volumes still tighten the effective absolute
+  target automatically. The frozen production and matched FreeMHD contracts,
+  independent observers, documentation, and a direct regression now declare
+  the same control.
+- The complete six-worker local gate passes all 500 tests in 171.42 seconds
+  (173.1 seconds end to end) with 95.41% combined line/branch coverage.
+  Coverage and JUnit SHA-256 digests are
+  `c5785bb4afcdbaa0b49ee47feeca070f7712a56829cbc309e6e0aa3f842528c4`
+  and `68dda1635ece7dfd05aa2077f074325f587a6fef3453fba99aaa5cb1f2564174`.
+  Ruff, formatting, byte compilation, architecture/import budgets, all seven
+  curated workflows, Sphinx HTML and external links with warnings as errors,
+  isolated build, Twine, and distribution inspection pass. The wheel is
+  146,492 bytes and the sdist is 139,152 bytes.
+- Next action: repeat the pinned FreeMHD Docker comparison from an immutable
+  source commit, then continue the compatible coupled B2 block response rather
+  than adding another fixed-point safeguard. Specialized B2 differentiation
+  remains unavailable until terminal primal convergence is established.

@@ -389,7 +389,7 @@ def _tiny_b2_problem(
             "electric_iterations": 600,
             "electric_tolerance": 1.0e-12,
             "projection_iterations": 4000,
-            "projection_tolerance": 1.0e-12,
+            "projection_tolerance": 1.0e-10,
             "momentum_iterations": 400,
             "momentum_tolerance": 1.0e-10,
             "executed_steps": executed_steps,
@@ -715,7 +715,7 @@ snGradSchemes { default uncorrected; }
     liquid_solution = """
 solvers {
  "alpha.liquidMetal.*" { nAlphaCorr 1; nAlphaSubCycles 1; cAlpha 1; solver PBiCG; preconditioner DILU; tolerance 1e-12; relTol 0; }
- p_rgh { solver PCG; preconditioner DIC; tolerance 1e-12; relTol 0; maxIter 4000; }
+ p_rgh { solver PCG; preconditioner DIC; tolerance 1e-10; relTol 0; maxIter 4000; }
  p_rghFinal { $p_rgh; }
  "(U).*" { solver PBiCG; preconditioner DILU; tolerance 1e-10; relTol 0; maxIter 400; }
  "(h|T).*" { solver PBiCG; preconditioner DILU; tolerance 1e-12; relTol 0; maxIter 0; }

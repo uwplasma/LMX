@@ -571,7 +571,7 @@ BENCHMARK_B_SPEC_FILES = {
 }
 _BENCHMARK_B_SPEC_DIGESTS = {
     "B1-fringing-pipe": "3d3433ae552ad1e9196d61066fd3c26bc2529f6f4da68c92cea0b86dc5112057",
-    "B2-fringing-square": "af80149e71e83a30e6dea4306fe6e7221f6568f2c62155afcc2d4fbd5c8e897d",
+    "B2-fringing-square": "599cdb6eac9b4b013cdc23befaf2ae31f3b79efb0f982062643900e37903ad21",
 }
 _MATCHED_SHARED_SECTIONS = """equations nondimensional_groups geometry magnetic_field wall
 boundary_drive observable normalization""".split()
@@ -717,7 +717,7 @@ def _validate_benchmark_b_spec(spec: dict[str, Any], root: Path) -> None:
         encoded_smoke = json.dumps(roles["harness-smoke"], sort_keys=True, separators=(",", ":")).encode()
         if (
             hashlib.sha256(encoded_smoke).hexdigest()
-            != "3ef7c6f58900629221bc83c90fe3afef8a656efddd1d455cd60a71e8b38ac4d5"
+            != "b57fc6c5a49724358bca1eb4b7df3060111b9a67cd54c10c0feba7d297fc7eed"
         ):
             raise ValueError("Benchmark B matched smoke role differs")
         smoke = spec.get("harness_smoke_execution")

@@ -345,6 +345,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     assert solution.bundle.iteration_courant_history[:, 0] == pytest.approx(0.064 / 540.0)
     pressure_linear = solution.bundle.iteration_pressure_linear_history
     assert benchmarks.jnp.all(pressure_linear[:, :2] >= 0.0)
+    assert benchmarks.jnp.all(pressure_linear[:, 0] <= 1.0e-10)
     assert benchmarks.jnp.all(pressure_linear[:, 2] > 0.0)
     assert benchmarks.jnp.all(pressure_linear[:, 3] == 1.0)
     assert benchmarks.jnp.all(pressure_linear[:, 4] > 0.0)
