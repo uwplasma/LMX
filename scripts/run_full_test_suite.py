@@ -27,6 +27,15 @@ _TEST_SHARDS = {
 }
 
 
+def _test_environment() -> dict[str, str]:
+    environment = os.environ.copy()
+    source = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
+    environment["PYTHONPATH"] = os.pathsep.join(
+        value for value in (source, environment.get("PYTHONPATH")) if value
+    )
+    return environment
+
+
 def _default_workers() -> int:
     return max(1, min(6, os.cpu_count() or 1))
 
@@ -91,7 +100,7 @@ def main(argv: list[str] | None = None) -> int:
         command.extend(("-m", "not curated"))
     command.extend(_TEST_SHARDS[args.shard] if args.shard else args.tests or ["tests"])
 
-    environment = os.environ.copy()
+    environment = _test_environment()
     environment.setdefault("MPLBACKEND", "Agg")
     environment.setdefault("JAX_ENABLE_X64", "true")
     environment.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
