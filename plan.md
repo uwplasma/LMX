@@ -2780,3 +2780,64 @@ surface, measurements, validation, decision, and next action.
   projection and establish primal, derivative, reverse-memory, refinement,
   GPU, and strong-scaling evidence. GPU claims remain open until the office
   host is reachable.
+
+### 2026-08-29 — trace the production B1 map and trim the pipe owner
+
+- Commit `3d8abf1e54b4e6237a3789f38cb995b416e96b9f` exposes the
+  specialized ALEX B1 finite-volume recurrence through the existing
+  `evolve_extruded_fields` API. Fixed-step design execution and the ordinary
+  production loop now call the same momentum, retained-modal fixed-flow
+  projection, conservative electric solve, current reconstruction, and
+  Lorentz map. ALEX B2 design fields still fail closed until their sharded
+  recurrence has an equivalent bounded reverse-memory contract.
+- Dynamic forcing, imposed field, conductivity, axial scale, and radial scale
+  remain inside the traced operator. Production runs still reuse compiled
+  momentum kernels and retained modal factors, while design runs deliberately
+  rebuild parameter-dependent factors inside the trace so geometry and
+  material gradients are not silently frozen. SOLVAX implicit linear solves
+  differentiate the momentum and Schur systems without retaining PCG/GMRES
+  iterations. The compiled one-step five-control value-and-gradient uses
+  223,272 temporary bytes on CPU; its reverse directional derivative matches a
+  centered finite difference within `3e-4`, and every field/material/geometry
+  component is finite and nonzero. Fixed-flow forcing is correctly nearly
+  inactive for the chosen velocity objective.
+- Generic and B1 pipe production paths now share one observables, diagnostics,
+  stopping, progress, and acceleration loop. Generic mapped-pipe kernels reuse
+  bound gradient, divergence, boundary, Poisson, and conservative-current
+  metrics; the steady projection shares face operators and its two flow
+  response solves. Pipe and duct vector products share one allocation-free
+  tuple cross product. Conservative current diagnostics reuse already computed
+  face fluxes.
+- The change adds 318 lines and removes 394 while adding the new derivative
+  gate and user documentation. `_fringing_pipe.py` falls from 1,539 to 1,499
+  lines, `_fringing_duct.py` falls to 1,493, and package source falls from
+  15,044 to 14,910 lines across the same 16 modules. All five fringing files
+  total 6,664 lines. Tests rise deliberately from 11,896 to 11,949 lines for
+  the production B1 gradient/finite-difference/memory contract; no test file or
+  root export is added. The wheel falls to 147,385 bytes and the tracked
+  checkout excluding build artifacts is 1,776,338 bytes.
+- The exact source passes all 506 tests in 182.4 seconds on Python
+  3.11.14/JAX 0.9.2/SOLVAX 0.18.0 with 95.36% combined branch coverage.
+  Coverage and JUnit SHA-256 digests are
+  `f784a37f4107a3009726a3f606ac716dc0cd86fb469e1ba8c0cd4987da200982`
+  and `7449c10085d03be0d87e7270466d2ef290f488aa75ae8bcb4a355de77838b70c`.
+  The changed B1 derivative and reduced production gates also pass on Python
+  3.10.21/JAX 0.6.2 and Python 3.13.9/JAX 0.11.1; the immediately preceding
+  merged tranche supplies complete 505-test matrices on both endpoints.
+- Ruff check/format, architecture/prose/import budgets, Sphinx HTML and
+  external-link builds with warnings as errors, isolated build, Twine,
+  distribution inspection, and a fresh non-editable-wheel B1 production-map
+  solve pass. The pinned FreeMHD Docker boundary passes contract, artifact,
+  execution, observation, comparison, and schema checks with zero failures and
+  unchanged pressure L-infinity/RMS discrepancies
+  `0.010917245284750786`/`0.004517977100484136`. Report and record SHA-256
+  digests are
+  `25494d6cfcd47f1dc75345d51644a6b6fcb4a00544e5a808eeb42063929acec9`
+  and `42ecb83a59f4e87873038b6393729e30d155512f1e75f363f65efce2b41eb57d`.
+  `acceptance_pass=false` remains correct for the two-update smoke role.
+- Next action: reduce the remaining 1,610-line orchestration owner by sharing
+  geometry-independent bundle finalization and recurrence setup without
+  moving numerical bulk between private files. Then establish matched B1/B2
+  mesh/tolerance refinement and production-resolution acceptance, and collect
+  one-/two-GPU primal, reverse, memory, and strong-scaling evidence when the
+  office host is reachable.
