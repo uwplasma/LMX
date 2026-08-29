@@ -12,9 +12,9 @@ extruded ducts and pipes in spatially varying magnetic fields, and periodic Q2D
 vortex dynamics with Hartmann-layer damping. LMX owns the MHD models, boundary
 conditions, coupling, diagnostics, and validation;
 [SOLVAX](https://github.com/uwplasma/SOLVAX) supplies reusable linear and
-fixed-point algorithms and their memory-efficient derivatives. The Q2D field
-core supports gradient-based design with a checkpointed reverse pass instead
-of retaining the complete time trajectory.
+fixed-point algorithms and their memory-efficient derivatives. The Q2D and
+finite 3-D field cores support gradient-based design with checkpointed reverse
+passes instead of retaining complete trajectories.
 
 ![Analytical duct profiles](docs/_static/analytic_velocity_profiles.webp)
 
@@ -76,9 +76,10 @@ momentum transport, and face-flux pressure projection on rectangular,
 layered-duct, straight-pipe, and mapped bent-pipe meshes. Analytic and tabulated
 vector fields use the same problem interface.
 
-Generic rectangular and layered ducts also expose their production finite-step
-fields for optimization. SOLVAX differentiates electric closure implicitly and
-checkpoints both projection iterations and the outer recurrence:
+Generic rectangular/layered ducts and straight pipes also expose their
+production finite-step fields for optimization. SOLVAX differentiates electric
+closure implicitly and checkpoints both projection iterations and the outer
+recurrence:
 
 ```python
 import jax
@@ -206,7 +207,7 @@ value, derivative = jax.value_and_grad(response)(case.hartmann_friction)
 | Differentiable steady rectangular/layered ducts | `solve_fully_developed_fields` | production-field parity, forcing identity, magnetic-scale finite difference, implicit Krylov adjoint |
 | Conducting and insulating wall layers | `WallLayer`, layered mesh builders | interface-current and layer-resolution gates |
 | 3-D rectangular/layered fringing fields | `solve_extruded_inductionless`, `evolve_extruded_fields` | production-field parity, station-wise field gradients, engineering objectives, manufactured operators, projection, finite differences, JVP/VJP, bounded reverse memory, Benchmark B2 |
-| 3-D pipe fringing fields | `lmx.fringing` | mapped operators, current closure, fixed-flow and Benchmark B1 gates |
+| 3-D straight-pipe fringing fields | `solve_extruded_inductionless`, `evolve_extruded_fields` | production-field parity, conducting-annulus material and geometry gradients, JVP/VJP, batched evaluation, bounded reverse memory, mapped current closure, fixed-flow and Benchmark B1 gates |
 | Periodic Q2D flow | `Q2DProblem`, `make_q2d_case`, `solve`, `evolve_q2d` | analytical decay/gradients, energy identity, spatial refinement, bounded reverse memory, measured CPU/GPU parity |
 | FreeMHD comparison | `validation/freemhd.py`, validation scripts | pinned case contracts, native-output observers, executable Docker workflow |
 | Meshes and analytic/tabulated fields | `lmx.mesh` | geometry, divergence, and interpolation tests |

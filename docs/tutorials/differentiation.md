@@ -4,7 +4,8 @@ LMX separates traced numerical fields from host-side validation, status, I/O,
 and plotting. An accepted field core must carry continuous physical parameters
 through the production discretization; mesh counts, iteration limits, and
 output policies remain static controls. The accepted field cores are the
-steady duct, finite 3-D rectangular/layered-duct, and transient Q2D models.
+steady duct, finite 3-D rectangular/layered-duct and straight-pipe, and
+transient Q2D models.
 
 SOLVAX-backed linear systems use implicit differentiation: a VJP solves one
 transposed system instead of recording PCG or GMRES iterations. A coupled
@@ -45,12 +46,13 @@ cases remain outside this API until their own gates pass.
 
 ## Three-dimensional fringe response
 
-`evolve_extruded_fields` returns the production generic-duct velocity,
-pressure, potential, current, and Lorentz-force fields after a static number of
-steps. Pressure forcing, material conductivity, fixed-topology axial/width/
-height scales, and either a scalar or one coefficient per axial station for the
-imposed field are continuous. The accompanying reducer keeps engineering
-objectives in the same traced program:
+`evolve_extruded_fields` returns the production generic-duct or straight-pipe
+velocity, pressure, potential, current, and Lorentz-force fields after a static
+number of steps. Pressure forcing, material conductivity, fixed-topology
+geometry scales, and either a scalar or one coefficient per axial station for
+the imposed field are continuous. Duct geometry uses axial/width/height scales;
+pipe geometry uses axial/radial scales. The accompanying reducer keeps
+engineering objectives in the same traced program:
 
 ```python
 import jax
@@ -103,11 +105,19 @@ its own exact production derivative.
 Geometry, material layout, step count, and checkpoint width are static. Choose
 the case timestep for the largest field and conductivity scales in the design
 domain so every differentiated evaluation uses the same stable recurrence.
-Specialized ALEX B2 and pipe paths fail closed until their coupled operators
-have independent derivative gates. `extruded_engineering_objectives` also
+Specialized ALEX B1/B2 acceptance paths fail closed because their production
+algorithms are distinct from the generic fixed-step cores.
+`extruded_engineering_objectives` also
 reports signed pressure drop, outlet flow rate, wall-current-density RMS, and a
 smooth recirculation fraction. Its wall-current quantity is a cell-centered
 design proxy; use the conservative boundary-flux diagnostics for validation.
+
+For a straight pipe, construct the problem with
+`build_pipe_ogrid_extruded_problem`, pass `(fluid, wall)` conductivity scales
+when the case contains a conducting annulus, and pass `(axial, radial)` geometry
+scales. The same `jax.jit`, `jax.value_and_grad`, `jax.vmap`, and bounded
+`jax.lax.map` composition shown above applies without a pipe-specific optimizer
+or derivative API.
 
 ## Reproduce a bounded field, wall, and geometry design
 

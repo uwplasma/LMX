@@ -767,16 +767,17 @@ def evolve_extruded_fields(
     steps: int | None = None,
     checkpoint_size: int | None = None,
 ) -> tuple[jnp.ndarray, ...]:
-    """Return differentiable 3-D duct fields through the production recurrence.
+    """Return differentiable 3-D duct or straight-pipe production fields.
 
     Returns velocity, pressure, potential, current, and Lorentz-force fields.
     Pressure forcing, imposed-field scale, and material conductivity are
     continuous. Field scale may contain one coefficient per axial station;
     conductivity scale may be scalar or ``(fluid, solid)``. Geometry scale may
-    be scalar or ``(axial, transverse_y, transverse_z)`` and maps the fixed
-    reference mesh without changing topology or imposed-field samples; callers
-    keep these scale factors positive. Step controls are static. SOLVAX supplies
-    implicit elliptic VJPs and exact checkpointing.
+    be scalar, ``(axial, transverse_y, transverse_z)`` for a duct, or
+    ``(axial, radial)`` for a pipe. It maps the fixed reference mesh without
+    changing topology or imposed-field samples; callers keep scale factors
+    positive. Step controls are static. SOLVAX supplies implicit elliptic VJPs
+    and exact checkpointing. Bent-pipe and specialized ALEX paths fail closed.
     """
 
     steps = (
@@ -816,8 +817,9 @@ def extruded_engineering_objectives(
     flow rate; wall current is a cell-centered design proxy, not a validation
     flux.
     """
-    if problem.case.geometry.kind not in {"rect_duct", "layered_duct"}:
-        raise NotImplementedError("engineering objectives require a rectangular or layered duct")
+    geometry_kind = problem.case.geometry.kind
+    if geometry_kind not in {"rect_duct", "layered_duct", "pipe_ogrid"}:
+        raise NotImplementedError("engineering objectives require a generic duct or straight pipe")
     if len(fields) < 8:
         raise ValueError("fields must contain velocity, pressure, potential, and current")
     if smoothing <= 0.0:
@@ -826,12 +828,24 @@ def extruded_engineering_objectives(
     with jax.ensure_compile_time_eval():
         mesh = _cross_section_mesh(problem.case)
         fluid = np.asarray(build_material_fields(problem.case, mesh).fluid_mask)
-        area = np.asarray(mesh.dy)[:, None] * np.asarray(mesh.dz)[None, :]
+        area = (
+            np.asarray(mesh.y_centers)[:, None] * np.asarray(mesh.dy)[:, None] * float(np.mean(mesh.dz))
+            if geometry_kind == "pipe_ogrid"
+            else np.asarray(mesh.dy)[:, None] * np.asarray(mesh.dz)[None, :]
+        )
     expected_shape = (len(mesh.x_centers), *mesh.yz_shape)
     if any(value.shape != expected_shape for value in (u, pressure, jx, jy, jz)):
         raise ValueError(f"field arrays must share the problem shape {expected_shape}")
-    _, transverse_y_scale, transverse_z_scale = _coordinate_scale(geometry_scale)
-    weights = transverse_y_scale * transverse_z_scale * jnp.asarray(fluid * area)
+    if geometry_kind == "pipe_ogrid":
+        scale = jnp.asarray(geometry_scale)
+        if scale.ndim and scale.shape != (2,):
+            raise ValueError("pipe geometry_scale must be scalar or (axial, radial)")
+        radial_scale = scale if scale.ndim == 0 else scale[1]
+        area_scale = radial_scale**2
+    else:
+        _, transverse_y_scale, transverse_z_scale = _coordinate_scale(geometry_scale)
+        area_scale = transverse_y_scale * transverse_z_scale
+    weights = area_scale * jnp.asarray(fluid * area)
     area_sum = jnp.sum(weights)
     flow = jnp.sum(weights * u, axis=(1, 2))
     mean_u = flow / area_sum
@@ -841,8 +855,10 @@ def extruded_engineering_objectives(
     flow_nonuniformity = outlet_variance / (mean_u[-1] ** 2 + smoothing**2)
     wall = ~fluid
     if not wall.any():
-        wall[[0, -1], :] = True
-        wall[:, [0, -1]] = True
+        wall[-1, :] = True
+        if geometry_kind != "pipe_ogrid":
+            wall[0, :] = True
+            wall[:, [0, -1]] = True
     wall_weights = jnp.asarray(wall) * area
     current_squared = jx**2 + jy**2 + jz**2
     wall_current_rms = (
