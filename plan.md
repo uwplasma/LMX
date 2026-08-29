@@ -2437,3 +2437,70 @@ surface, measurements, validation, decision, and next action.
   merge this locally evidenced tranche, then obtain one-/two-A4000 primal and
   gradient evidence, add smooth-coordinate and pipe derivatives, and promote
   B2/B1 only through production-resolution matched external comparisons.
+
+### 2026-08-28 — fixed-topology geometry design core
+
+- LMX PR 15 merged at `57833cab6bc4904e580cd3df69881a9101ecc621`.
+  Candidate commits `0dbb684be5af94709162dee09f1b886612c6383d` and
+  `eb6994a` add fixed-topology axial-length, transverse-width, and
+  transverse-height controls to the same production rectangular/layered 3-D
+  recurrence. Coordinates, spacings, cell areas, transport, projection, and
+  engineering integration weights change coherently; topology and imposed-field
+  samples remain static by contract.
+- The seven-control layered derivative gate is now a twelve-control gate over
+  pressure forcing, station-wise magnetic field, fluid/wall conductivity, and
+  three geometry scales. Independent centered differences give relative
+  geometry-gradient error `6.36796e-7`; the complete design example gives
+  relative gradient error `3.03215e-6` and retains JVP/VJP and batched-map
+  checks. No optimizer dependency, package module, public export, or example
+  file was added.
+- Forty bounded updates reduce portable-example loss from `0.900000` to
+  `0.554358`. The accepted scales are axial `0.909157`, width `1.040245`,
+  height `0.963902`, and wall conductivity `0.539592`; the seven field
+  coefficients keep mean one and stay within 0.8--1.2. Pumping-power magnitude
+  falls 68.27%, wall-current-density RMS falls 46.73%, and flow changes 0.336%.
+  This 7x6x6 result demonstrates the design workflow, not mesh-independent
+  physical optimality. The regenerated summary and tracked WebP SHA-256 digests
+  are `43a7e1fb713a13ec385aff02853025d1c2080c71b94dff99b07309ece26b1a91`
+  and `f8185a85eed2f0010797d399e4bd7d8545ee24a2e443c34dfe9bc476d01796af`.
+- On the same nine pre-existing controls with geometry fixed, the new source
+  takes 64.33 ms median versus 64.11 ms on merged main (+0.35%) and 2,325,920
+  versus 2,324,032 compiled temporary bytes (+0.08%). Requesting all three
+  additional geometry derivatives takes 72.98 ms median and 3,814,952 temporary
+  bytes. This reports the real marginal derivative cost rather than comparing
+  unequal control vectors.
+- The pinned external smoke caught an integration defect absent from the unit
+  path: a traced scalar spacing made the B2 compiled-kernel cache key
+  unhashable. The two-line `eb6994a` repair canonicalizes concrete scalar JAX
+  arrays at the cache boundary, and the existing cache regression now exercises
+  that exact key class. The rerun passed contract, artifact, execution,
+  observation, and comparison checks with zero failed checks and pressure
+  L-infinity/RMS discrepancies `0.0109172`/`0.00451798`. The report SHA-256 is
+  `be9e6c9e52f249c6b267f9535bc3a44ae4c7f227a4a677b8ff7670bfc73edf61`;
+  `acceptance_pass=false` remains correct because the two-update harness role
+  cannot establish production B2 validation.
+- The exact repaired source passed 509 tests in 140.4 seconds on Python
+  3.11.14/JAX 0.9.2 with 95.13% branch coverage. Coverage and JUnit SHA-256
+  digests are `dae36aec8b3b3c6fa69e4713e479566cf47e3fca1adfd4e6452236579a887484`
+  and `6da0569277fa04f8d3f796eca0ae2be64c4630c8088c45197f8bdb658fb76742`.
+  Complete Python 3.10.21/JAX 0.6.2 and Python 3.13.9/JAX 0.11.1 runs passed
+  all 509 tests in 111.6 and 104.9 seconds; their JUnit digests are
+  `9f90fb7c7db35efcb9160bcbdec88e46e1881017376276a7fa3d0593a2af2cda`
+  and `f8eb54a6929578f0e44ea3536b9594c68c5308d8b76c0eb8ebfe455aabb0b2fb`.
+  Compatibility matrices run concurrently on separate CI runners but
+  sequentially on one local host: three simultaneous JAX compilation matrices
+  oversubscribed this machine and pushed the otherwise 31--39 second design
+  example past its 60-second per-test limit.
+- Ruff check/format, architecture and prose/import gates, Sphinx HTML and
+  external links with warnings as errors, isolated build, Twine, distribution
+  inspection, and a fresh non-editable-wheel 12-control JIT gradient smoke pass.
+  The 150,610-byte wheel and 142,675-byte sdist SHA-256 digests are
+  `d84b9f7648a019c3821b7e91946bbd9383c807a0486a413aa9f510925813d06b`
+  and `1092cb562bb3515a901d9cb868e27e6c3fdc64e5fe696d28e1a381e022834cba`.
+  Compactness remains 16 modules, 6,009 maintained-core lines, 15,476 package
+  lines, 13 test files, 12,046 test lines, 28 exports, seven examples, and
+  1,772,930 tracked checkout bytes.
+- Next action: open and merge the geometry-control PR, then move the existing
+  straight/mapped-pipe production operators behind a fixed-work differentiable
+  core with independent primal, finite-difference, JVP/VJP, runtime, and memory
+  gates. GPU and production B1/B2 claims remain explicitly open.
