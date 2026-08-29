@@ -578,7 +578,7 @@ def validate_restart_bundle(
 
 
 def validate_extruded_restart_bundle(bundle: ExtrudedRestartBundle, *, case) -> None:
-    from ._fringing_duct import _cross_section_mesh
+    from .mesh import _cross_section_mesh
 
     if bundle.geometry_kind not in {"unknown", case.geometry.kind}:
         raise ValueError(

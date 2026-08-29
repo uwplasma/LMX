@@ -43,14 +43,11 @@ from ._fringing_common import (
 )
 from ._fringing_duct import (
     _b2_coupling_functions,
-    _clip_state,
     _conservative_current_diagnostics_3d,
     _conservative_current_fluxes_3d,
     _conservative_emf_rhs_3d,
-    _cross_section_mesh,
     _jit_b2_coupling_functions,
     _prepare_b2_momentum_runtime,
-    _sample_station_magnetic_field,
     _solvax_pressure_poisson_duct,
     _station_axial_current_from_fluxes,
 )
@@ -66,6 +63,7 @@ from ._fringing_pipe import (
     _solvax_diffusion_pipe,
     _steady_stokes_projection_pipe,
 )
+from .mesh import _cross_section_mesh, _sample_station_magnetic_field
 from .physics import build_material_fields
 from .specs import ExtrudedFieldBundle, ExtrudedInductionlessProblem, ExtrudedIterationProgress
 
@@ -690,7 +688,7 @@ def _solve_pipe_projection(
                 dtheta=dtheta,
                 tolerance=electric_tolerance,
             )
-            phi = _clip_state(phi, scalar_limit)
+            phi = jnp.clip(phi, -scalar_limit, scalar_limit)
             potential_update = _gauge_invariant_scalar_update(
                 phi,
                 phi_previous,
@@ -730,9 +728,9 @@ def _solve_pipe_projection(
                 r_centers=r,
                 dtheta=dtheta,
             )
-            jx = _clip_state(0.5 * (fx[1:] + fx[:-1]), scalar_limit)
-            jr = _clip_state(0.5 * (fr[:, 1:, :] + fr[:, :-1, :]), scalar_limit)
-            jtheta = _clip_state(0.5 * (ftheta + jnp.roll(ftheta, 1, axis=2)), scalar_limit)
+            jx = jnp.clip(0.5 * (fx[1:] + fx[:-1]), -scalar_limit, scalar_limit)
+            jr = jnp.clip(0.5 * (fr[:, 1:, :] + fr[:, :-1, :]), -scalar_limit, scalar_limit)
+            jtheta = jnp.clip(0.5 * (ftheta + jnp.roll(ftheta, 1, axis=2)), -scalar_limit, scalar_limit)
             lorentz_x = jr * btheta - jtheta * br
             lorentz_r = jtheta * bx - jx * btheta
             lorentz_theta = jx * br - jr * bx
@@ -1163,7 +1161,6 @@ def _solve_duct_projection(
             replicated_sharding,
             flux_sharding,
             kernel_key,
-            current_flux_components,
             current_rho_phi_inlet,
             current_rho_phi_plus,
             previous_anderson_flux,
@@ -1207,10 +1204,7 @@ def _solve_duct_projection(
             _b2_coupling_functions(
                 case=case,
                 target_flow_rate=target_flow_rate,
-                dt=dt,
-                dx=dx,
-                dy=dy,
-                dz=dz,
+                metric=(dt, dx, dy, dz),
                 projection_iterations=projection_iterations,
                 projection_tolerance=projection_tolerance,
                 electric_iterations=electric_iterations,
@@ -1254,7 +1248,7 @@ def _solve_duct_projection(
     for step in range(completed_steps, stop_step):
         flux_relaxation = jnp.asarray(1.0, dtype=u.dtype)
         step_courant = (
-            courant_numbers(*current_flux_components, current_rho_phi_inlet, rho)
+            courant_numbers(*unpack_flux(current_rho_phi_plus), current_rho_phi_inlet, rho)
             if use_alex_b2_finite_volume
             else (-1.0, -1.0)
         )
@@ -1536,18 +1530,15 @@ def _solve_duct_projection(
         if use_alex_b2_finite_volume:
             if case.solver.coupling_acceleration == "anderson":
                 current_rho_phi_plus = pack_flux(*mapped_flux_components) if converged else accelerated_flux
-                # Preserve component placement across older GPU JAX releases.
-                current_flux_components = unpack_flux(current_rho_phi_plus)
                 current_rho_phi_inlet = mapped_rho_phi_inlet if converged else accelerated_inlet
             else:
-                (*current_flux_components, current_rho_phi_inlet) = relax_flux(
-                    *current_flux_components,
+                current_rho_phi_plus, current_rho_phi_inlet = relax_flux(
+                    current_rho_phi_plus,
                     current_rho_phi_inlet,
-                    *mapped_flux_components,
+                    pack_flux(*mapped_flux_components),
                     mapped_rho_phi_inlet,
                     flux_relaxation,
                 )
-                current_rho_phi_plus = pack_flux(*current_flux_components)
         _emit_iteration_progress(
             progress_callback,
             checkpoint_interval=checkpoint_interval,

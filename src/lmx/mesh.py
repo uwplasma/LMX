@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import pi
 from pathlib import Path
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Callable, Sequence
 
 import jax.numpy as jnp
 import numpy as np
@@ -14,6 +14,7 @@ jax_config.update("jax_enable_x64", True)
 
 if TYPE_CHECKING:
     from .physics import WallLayer
+    from .specs import CaseSpec
 
 
 @dataclass(frozen=True)
@@ -995,3 +996,101 @@ def _interpolate_tabulated_field(data: dict[str, np.ndarray], **coordinates: np.
         for key in ("bx", "by", "bz")
     ]
     return np.stack(components, axis=-1)
+
+
+def _cross_section_mesh(case: CaseSpec) -> StructuredMesh:
+    geometry = case.geometry
+    if geometry.kind == "rect_duct":
+        mesh = generate_rect_duct_mesh(
+            width=geometry.width,
+            height=geometry.height,
+            length=geometry.length,
+            nx=geometry.nx,
+            ny=geometry.ny,
+            nz=geometry.nz,
+        )
+    elif geometry.kind == "layered_duct":
+        mesh = generate_layered_duct_mesh(
+            width=geometry.width,
+            height=geometry.height,
+            length=geometry.length,
+            nx=geometry.nx,
+            ny=geometry.ny,
+            nz=geometry.nz,
+            wall_thickness=geometry.wall_thickness,
+            wall_cells=geometry.wall_cells,
+            target_ha=geometry.target_ha,
+        )
+    elif geometry.kind == "pipe_ogrid":
+        mesh = generate_pipe_ogrid_mesh(
+            radius=geometry.radius or 0.5 * geometry.width,
+            length=geometry.length,
+            nx=geometry.nx,
+            nr=geometry.nr or geometry.ny,
+            ntheta=geometry.ntheta or geometry.nz,
+            wall_thickness=max(geometry.wall_thickness),
+            wall_cells=max(geometry.wall_cells),
+            target_ha=geometry.target_ha,
+            hartmann_layer_cells=geometry.hartmann_layer_cells,
+        )
+    else:
+        raise ValueError(f"Unsupported extruded geometry {geometry.kind!r}")
+    if geometry.axial_origin != 0.0:
+        points = mesh.point_coordinates
+        mesh = replace(
+            mesh,
+            x_faces=mesh.x_faces + geometry.axial_origin,
+            point_coordinates=(None if points is None else points.at[..., 0].add(geometry.axial_origin)),
+        )
+    return mesh
+
+
+def _sample_volume_field(volume_field, x, y, z):
+    sampled = jnp.asarray(volume_field(x, y, z), dtype=float)
+    if sampled.shape != (*x.shape, 3):
+        raise ValueError("Fringing volume field must append one three-component axis")
+    return tuple(sampled[..., index] for index in range(3))
+
+
+def _sample_station_magnetic_field(
+    case: CaseSpec,
+    *,
+    field_scale: jnp.ndarray,
+    x: jnp.ndarray,
+    y: jnp.ndarray,
+    z: jnp.ndarray,
+    volume_field: Callable[..., jnp.ndarray] | None = None,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+    nx, (ny, nz) = field_scale.shape[0], y.shape
+    shape = (nx, ny, nz)
+    if volume_field is not None:
+        return _sample_volume_field(
+            volume_field,
+            jnp.broadcast_to(x[:, None, None], shape),
+            jnp.broadcast_to(y[None], shape),
+            jnp.broadcast_to(z[None], shape),
+        )
+    if case.magnetic_field.kind == "constant":
+        return tuple(
+            jnp.broadcast_to(field_scale[:, None, None] * float(value), shape)
+            for value in case.magnetic_field.value or (0.0, 0.0, 0.0)
+        )
+    if case.magnetic_field.kind == "analytic":
+        if case.magnetic_field.fn is None:
+            raise ValueError("Analytic magnetic field requires fn")
+        sampled = jnp.asarray(case.magnetic_field.fn(y, z), dtype=float)
+        return tuple(field_scale[:, None, None] * sampled[None, ..., index] for index in range(3))
+    if case.magnetic_field.kind == "tabulated":
+        if case.magnetic_field.table_path is None:
+            raise ValueError("Tabulated magnetic field requires table_path")
+        has_x = "x" in load_tabulated_field(case.magnetic_field.table_path)
+        x_coords = np.asarray(case.geometry.length * jnp.linspace(0.0, 1.0, nx), dtype=float)
+        sampled = sample_tabulated_field_volume(
+            case.magnetic_field.table_path,
+            x=np.broadcast_to(x_coords[:, None, None], shape),
+            y=np.broadcast_to(np.asarray(y)[None], shape),
+            z=np.broadcast_to(np.asarray(z)[None], shape),
+        )
+        sampled = sampled if has_x else sampled * np.asarray(field_scale[:, None, None, None])
+        return tuple(jnp.asarray(sampled[..., index], dtype=float) for index in range(3))
+    raise ValueError(f"Unsupported magnetic-field kind {case.magnetic_field.kind!r}")
