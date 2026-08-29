@@ -15,7 +15,7 @@ supported current state.
 The live root is the enforced repository baseline. The latest ordinary
 authenticated clone measurement is 2,304 KiB total, including 588 KiB of Git
 data and a 463.39 KiB pack. The current candidate contains 88 tracked files,
-1,828,587 bytes of tracked data, 15 package modules, and 28 root exports. Its
+1,830,901 bytes of tracked data, 15 package modules, and 28 root exports. Its
 complete six-worker portable gate passes 500 tests in 163.90 seconds with
 95.41% combined line/branch coverage. Every change below must preserve the
 normal-clone limit of 9,766 KiB and the file, API, five-minute test-time, and
@@ -1171,6 +1171,7 @@ artifacts or release assets, not committed files.
 | D-041 | Reuse a compiled production evidence map across same-shape finite-difference samples | Centered differences remain mathematically independent of autodiff, but they do not require compiling an identical primal graph a second time. Production value-and-gradient executables may supply shifted primal values; physics, VJP/JVP, sensitivity, batching, memory, and tolerance assertions remain separate and unchanged. |
 | D-042 | Use the frozen momentum diagonal as the B2 pressure mobility | The pressure correction must use the same local response as the implicit momentum predictor. Reusing its already assembled diagonal is allocation-light and restores the variable-coefficient discrete flux identity; a full nested momentum inverse is still rejected by D-038. |
 | D-043 | Advance B2 with two relaxed SIMPLE-style pressure--momentum correctors per electric closure | Including the current pressure force and accumulating a bounded correction removes the diagonal-only plateau. Two correctors materially improve physical defect per second; a third has diminishing returns, and fixed relaxation avoids adding restart fields. |
+| D-044 | Retain depth-two Anderson for B2 until a safeguard improves both early and late evidence | The corrected raw and fixed-two maps are stable and smoother late, but neither improves physical defect over Anderson early or late. A one-step growth fallback amplifies alternating spikes. Replace acceleration only with a restart-exact method that wins defect, update, runtime, and memory together. |
 
 ## Work log
 
@@ -3485,3 +3486,32 @@ surface, measurements, validation, decision, and next action.
 - Next action: merge the pressure-coupled tranche, then continue the remaining
   long-horizon convergence and specialized derivative gates before office
   GPU/scaling measurements.
+
+### 2026-08-29 — establish long-horizon B2 descent and isolate acceleration noise
+
+- A fresh depth-two production continuation from the checksummed step-32 field
+  completed 64 pressure-coupled updates in `459.899` seconds. Momentum defect
+  falls monotonically from `0.5946010` at update 8 through `0.3073790` at 32
+  to `0.231654340909` at 64. Divergence remains at order `1e-7` and charge
+  below `3e-4`. The typed 101x65x65 restart is
+  `/tmp/lmx-b2-pressure-step64.npz`, SHA-256
+  `f0b3b5850d05bce0a0bacd37e83d22b6a56924d4016907f5ebc3c49993a00edc`.
+  This establishes sustained physical descent, not terminal convergence.
+- The raw state update bottoms at `0.00173388` near update 48 and rises to
+  `0.00229761` at 64 while the momentum defect keeps falling. Eight exact
+  continuations isolate the cause: unaccelerated relaxation 1 ends at update /
+  defect `0.00176628 / 0.22039979`; stored Anderson ends at
+  `0.00442285 / 0.22026971`. Anderson therefore provides negligible late
+  defect gain while introducing update oscillation.
+- A disposable “fall back when the raw update grows” safeguard worsened the
+  alternating spikes to `0.0161143` and was removed. Fixed relaxation 2 is now
+  stable under the corrected map: from the original state, update 12 reaches
+  `0.00416786 / 0.50100227` versus Anderson
+  `0.00385914 / 0.49779924`; from the step-64 state it ends at
+  `0.00157275 / 0.22062741`. It is smoother but does not improve physical
+  descent, so Decision D-044 retains the declared depth-two method.
+- No source, API, option, test lane, or state was retained from this audit.
+  Production B2 balance and specialized derivatives remain open. Next action:
+  measure the merged primal on the office CPU and A4000 devices, including
+  one-/two-GPU sharding, while deriving a restart-exact coupled acceleration
+  that controls the physical defect rather than only the fixed-point update.
