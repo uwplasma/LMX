@@ -111,23 +111,27 @@ ALEX_B2_PRESSURE_RELAXATION = 0.4
 ALEX_B2_SETTLED_RELAXATION = 2.0
 
 
-def _shard_extruded_fields(
-    fields: tuple[jnp.ndarray, ...], *, num_devices: int | None
-) -> tuple[jnp.ndarray, ...]:
-    """Place 3-D fields on an axial mesh, staging initial values through the host."""
-
+def _extruded_field_sharding(axial_size: int, num_devices: int | None) -> NamedSharding | None:
+    """Build the validated axial field placement."""
     if num_devices is None:
-        return fields
+        return None
     devices = jax.devices()
     if not 1 <= num_devices <= len(devices):
         raise ValueError(f"Requested {num_devices} devices, but only {len(devices)} are visible.")
-    axial_size = fields[0].shape[0]
     if axial_size % num_devices:
         raise ValueError(f"Axial cell count {axial_size} must be divisible by {num_devices} devices.")
-    sharding = NamedSharding(
-        Mesh(np.asarray(devices[:num_devices], dtype=object), ("x",)), P("x", None, None)
-    )
-    return tuple(jax.device_put(np.asarray(field), sharding) for field in fields)
+    return NamedSharding(Mesh(np.asarray(devices[:num_devices], dtype=object), ("x",)), P("x", None, None))
+
+
+def _shard_extruded_fields(
+    fields: tuple[jnp.ndarray, ...], *, num_devices: int | None
+) -> tuple[jnp.ndarray, ...]:
+    """Place 3-D fields on an axial mesh without breaking traced design inputs."""
+
+    sharding = _extruded_field_sharding(fields[0].shape[0], num_devices)
+    if sharding is None:
+        return fields
+    return tuple(jax.lax.with_sharding_constraint(field, sharding) for field in fields)
 
 
 def _iteration_history_arrays(
@@ -1042,12 +1046,22 @@ def _axial_mean_preconditioner_3d(
         return correction
 
     replicated = None if field_sharding is None else NamedSharding(field_sharding.mesh, P())
-    coarse_solve = jax.jit(solve_coarse, in_shardings=replicated, out_shardings=replicated)
+    coarse_solve = solve_coarse
+    if replicated is not None:  # pragma: no cover - exercised by hardware gates
+
+        def coarse_solve(system):
+            system = jax.lax.with_sharding_constraint(system, replicated)
+            return jax.lax.with_sharding_constraint(solve_coarse(system), replicated)
 
     def apply(residual: jnp.ndarray) -> jnp.ndarray:
         reduced = jnp.sum(residual, axis=(1, 2)) / normalization
         correction = coarse_solve(jnp.stack((west, diagonal, east, gauge_vector, reduced), axis=-1))
-        return jnp.broadcast_to(correction[:, None, None] / normalization, residual.shape)
+        correction = jnp.broadcast_to(correction[:, None, None] / normalization, residual.shape)
+        return (
+            correction
+            if field_sharding is None
+            else jax.lax.with_sharding_constraint(correction, field_sharding)
+        )
 
     return apply
 
@@ -1178,12 +1192,14 @@ def _transverse_modal_correction_3d(
 
     if sharding is not None:  # pragma: no cover - exercised by hardware gates
         replicated = NamedSharding(sharding.mesh, P())
-        coarse_solve = jax.jit(solve_global, in_shardings=replicated, out_shardings=replicated)
-        reshard_coarse = jax.jit(
-            lambda value: value,
-            in_shardings=replicated,
-            out_shardings=sharding,
-        )
+
+        def coarse_solve(rhs):
+            rhs = jax.lax.with_sharding_constraint(rhs, replicated)
+            return jax.lax.with_sharding_constraint(solve_global(rhs), replicated)
+
+        def reshard_coarse(value):
+            return jax.lax.with_sharding_constraint(value, sharding)
+
     coarse_zero = jnp.zeros(coarse_shape, dtype=volume.dtype)
 
     def prolong(coarse: jnp.ndarray) -> jnp.ndarray:
