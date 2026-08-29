@@ -69,11 +69,10 @@ disables it. Unknown executable paths fail closed to the complete suite.
 ## Active physics and performance tranche
 
 The live root is the enforced repository baseline. The current candidate
-contains 88 tracked files, 1,872,579 bytes of tracked data, 15 package modules,
-and 28 root exports. Its complete six-worker portable gate passes 502 tests in
-168.15 seconds (169.9 seconds end to end) with 95.29% combined line/branch
-coverage. The conservative gate for the execution-reset tranche selected 302
-tests and completed in 71.1 seconds. Every change below must preserve the
+contains 87 tracked files, 1,832,829 bytes of tracked data, 15 package modules,
+14,754 package lines, and 28 root exports. All 503 tests have passing candidate
+evidence with 95.29% combined line/branch coverage; the B2-affected gate
+selected 213 tests and completed in 103.9 seconds. Every change below must preserve the
 normal-clone limit of 9,766 KiB and the file, API, five-minute test-time, and
 coverage budgets. The capability-adjusted ceiling remains 15,370 package lines
 across at most 16 modules.
@@ -3966,3 +3965,34 @@ surface, measurements, validation, decision, and next action.
   measured raw-map step-96 defect `0.17898851`. The reduced B2 boundary,
   convergence, sharding, and exact-restart test passes. The office SSH endpoint
   timed out before connection, so terminal GPU continuation remains pending.
+- The conservative owning-surface gate passes 213 fringing, Benchmark-B,
+  FreeMHD-contract, and example tests in 103.21 seconds (103.9 seconds end to
+  end). The complete covered run passes all 500 numerical/runtime assertions at
+  95.29% combined line/branch coverage and rejects only a two-line test-source
+  budget excess. Compressing that regression without changing its assertion
+  restores the 11,950-line test budget; the three rejected architecture tests
+  and the new conditioning regression then pass exactly. No runtime source
+  changed after the covered run, so all 503 candidate tests have passing
+  evidence without repeating 500 unchanged tests. Ruff, formatting, the
+  14,754-line/15-module architecture/import audit, diff hygiene, and
+  warnings-as-errors Sphinx HTML pass.
+- The README now leads with a problem-to-example chooser, exact commands and
+  outputs, a four-stage research adaptation workflow, differentiable 3-D/Q2D
+  examples, evidence status, and explicit non-goals. It removes the nonexistent
+  PyPI installation claim. The ungenerated 46,678-byte two-resolution fringing
+  line plot is deleted rather than presented as a convergence curve; retained
+  figures identify their full profile, 41 optimization iterates/seven design
+  stations, and 41 Q2D frames. The repository falls to 87 tracked files and
+  1,832,829 tracked bytes.
+- Clean source commit `37f0e729c431977a7bbce99c13d464a1673c7f67` passes the
+  cached pinned two-rank Docker comparison against FreeMHD `14b54a3` and image
+  `sha256:535e995d557d2a73f5ab997380cb47ee3b044af8d2871bdadd570cff4cf175a8`.
+  Contract, artifacts, execution, observation, comparison, and schema pass with
+  zero failed checks; pressure L-infinity/RMS remain
+  `0.006838504934992036`/`0.0030649109539923614`. Report and record SHA-256 are
+  `5e1ebd7d7c00a47a124590be5998d413cce2168c46eb3e848f2417dc54104843`
+  and `b1dc7438ce96807f6793b45b52ec132baa9b2f3b0c6eddddb0d913dcd59421fd`.
+  `acceptance_pass=false` remains correct for the two-update smoke role. Next
+  action: resume the conditioned step-88 state on available accelerator
+  hardware to establish terminal primal convergence before constructing the
+  specialized implicit transpose solve.
