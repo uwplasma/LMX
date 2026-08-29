@@ -78,6 +78,7 @@ from lmx.specs import (
     NumericalFailure,
     RegionSpec,
 )
+from lmx.validation import build_benchmark_b_field_profile, build_benchmark_b_problem
 
 pytestmark = pytest.mark.unit
 
@@ -89,6 +90,58 @@ def _centered_gradient(function, point, step):
             for i in range(len(point))
         ]
     )
+
+
+@pytest.mark.timeout(180)
+def test_alex_b1_production_map_has_bounded_implicit_gradient():
+    problem = build_benchmark_b_problem("B1-fringing-pipe", mesh_level="coarse")
+    case = replace(
+        problem.case,
+        geometry=replace(
+            problem.case.geometry,
+            nx=3,
+            nr=2,
+            ntheta=4,
+            wall_cells=(1, 1, 1, 1),
+            target_ha=None,
+            hartmann_layer_cells=None,
+        ),
+        time_stepper=replace(problem.case.time_stepper, max_steps=1, potential_iterations=20),
+        solver=replace(problem.case.solver, coupling_iterations=1, coupling_tolerance=1.0e-6),
+    )
+    problem = replace(
+        problem,
+        case=case,
+        profile=build_benchmark_b_field_profile("B1-fringing-pipe", axial_stations=3),
+    )
+
+    def objective(parameters):
+        fields = evolve_extruded_fields(
+            problem,
+            forcing=parameters[0],
+            magnetic_field_scale=parameters[1],
+            material_conductivity_scale=parameters[2],
+            geometry_scale=parameters[3:],
+            steps=1,
+        )
+        return (
+            jnp.mean(fields[0] ** 2)
+            + 1.0e-4 * jnp.mean(fields[4] ** 2)
+            + 1.0e-6 * jnp.mean(fields[6] ** 2 + fields[7] ** 2)
+        )
+
+    parameters = jnp.ones(5)
+    compiled = jax.jit(jax.value_and_grad(objective)).lower(parameters).compile()
+    value, gradient = compiled(parameters)
+    epsilon = 2.0e-3
+    direction = jnp.asarray([0.1, -0.2, 0.3, -0.15, 0.12])
+    points = jnp.stack((parameters + epsilon * direction, parameters - epsilon * direction))
+    samples = jax.jit(jax.vmap(objective))(points)
+    finite_difference = (samples[0] - samples[1]) / (2.0 * epsilon)
+    assert jnp.isfinite(value) and jnp.all(jnp.isfinite(gradient))
+    assert jnp.vdot(gradient, direction) == pytest.approx(finite_difference, rel=3.0e-4, abs=5.0e-8)
+    assert jnp.all(jnp.abs(gradient[1:]) > 1.0e-6)
+    assert compiled.memory_analysis().temp_size_in_bytes < 300_000
 
 
 def test_extruded_solution_reports_terminal_state():

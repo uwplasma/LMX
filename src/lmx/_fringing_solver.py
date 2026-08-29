@@ -27,6 +27,7 @@ from ._fringing_common import (
     _broadcast_cross_section,
     _canonical_shell_widths,
     _coordinate_scale,
+    _cross,
     _cross_duct_pressure_difference,
     _emit_iteration_progress,
     _enforce_velocity_bc_3d,
@@ -118,11 +119,9 @@ def _solve_extruded_projection(
         case.name.startswith("alex_b1-fringing-pipe_") and case.geometry.kind == "pipe_ogrid"
     )
     if design_parameters is not None and (
-        case.geometry.kind not in {"rect_duct", "layered_duct", "pipe_ogrid"}
-        or use_alex_b1_finite_volume
-        or use_alex_b2_finite_volume
+        case.geometry.kind not in {"rect_duct", "layered_duct", "pipe_ogrid"} or use_alex_b2_finite_volume
     ):
-        raise NotImplementedError("differentiable extruded fields require a generic duct or straight pipe")
+        raise NotImplementedError("differentiable extruded fields do not yet support ALEX B2")
     if case.name.startswith("alex_") and not (use_alex_b1_finite_volume or use_alex_b2_finite_volume):
         raise NotImplementedError(
             "Unsupported ALEX production case; only the frozen B1 pipe and B2 square "
@@ -360,18 +359,6 @@ def _solve_pipe_projection(
             count = radial_fluid_count
             faces = r_faces[: count + 1]
             centers = r[:count]
-            kernel_key = (
-                "b1_diffusion",
-                u.shape,
-                count,
-                dt,
-                dx,
-                tuple(np.asarray(faces)),
-                tuple(np.asarray(centers)),
-                dtheta,
-                momentum_iterations,
-                momentum_tolerance,
-            )
             steady_reaction = (
                 2.0
                 * sigma[:, :count, :]
@@ -395,19 +382,6 @@ def _solve_pipe_projection(
             pressure_preconditioner_mobility = 1.0 / jnp.maximum(
                 rho[:, :count, :] * steady_rate_diagonal, 1.0e-20
             )
-            modal_factor_key = (
-                "b1_modal_factors",
-                "retained",
-                jax.default_backend(),
-                u.dtype.str,
-                kernel_key,
-                _array_fingerprint(
-                    rho[:, :count, :],
-                    nu[:, :count, :],
-                    steady_reaction,
-                    fluid_cell_area[:, :count, :],
-                ),
-            )
             momentum_viscosity = nu[:, :count, :]
 
             def momentum_solve(rhs, initial):
@@ -425,15 +399,38 @@ def _solve_pipe_projection(
                     reaction=steady_reaction,
                 )
 
-            momentum_solve = _reuse_fringing_jit(
-                (
-                    "b1_momentum",
+            modal_factor_key = None
+            if design_parameters is None:
+                kernel_key = (
+                    "b1_diffusion",
+                    u.shape,
+                    count,
+                    dt,
+                    dx,
+                    tuple(np.asarray(faces)),
+                    tuple(np.asarray(centers)),
+                    dtheta,
+                    momentum_iterations,
+                    momentum_tolerance,
+                )
+                parameter_key = _array_fingerprint(
+                    rho[:, :count, :],
+                    momentum_viscosity,
+                    steady_reaction,
+                    fluid_cell_area[:, :count, :],
+                )
+                momentum_solve = _reuse_fringing_jit(
+                    ("b1_momentum", jax.default_backend(), kernel_key, parameter_key),
+                    jax.jit(momentum_solve),
+                )
+                modal_factor_key = (
+                    "b1_modal_factors",
+                    "retained",
                     jax.default_backend(),
+                    u.dtype.str,
                     kernel_key,
-                    _array_fingerprint(momentum_viscosity, steady_reaction),
-                ),
-                jax.jit(momentum_solve),
-            )
+                    parameter_key,
+                )
             response_rhs = 1.0 / rho[:, :count, :]
             response_fluid, _, _ = momentum_solve(response_rhs, jnp.zeros_like(response_rhs))
             basis_rhs = jnp.eye(nx, dtype=u.dtype)[:, :, None, None] / rho[None, :, :count, :]
@@ -472,11 +469,108 @@ def _solve_pipe_projection(
                 flow=(target_flow_rate, unit_pressure_response, radial_fluid_count),
             )
         )
+        b1_step = None
+        if use_alex_b1_finite_volume:
+            if target_flow_rate is None:
+                raise ValueError("ALEX B1 requires its frozen fixed mean flow rate")
+            fluid = (slice(None), slice(0, count), slice(None))
+
+            def b1_step(state):
+                u0, v0, w0, _, potential = state
+                potential_gradient = _pipe_gradient_3d(potential, dx=dx, dr=dr_widths, dtheta=dtheta, r=rr)
+                emf = _cross((u0, v0, w0), (bx, br, btheta))
+                current = tuple(
+                    sigma * (-gradient + source)
+                    for gradient, source in zip(potential_gradient, emf, strict=True)
+                )
+                jx0, jr0, jtheta0 = current
+                lorentz = _cross(current, (bx, br, btheta))
+                previous = (u0[fluid], v0[fluid], w0[fluid])
+                drives = (forcing + lorentz[0][fluid], lorentz[1][fluid], lorentz[2][fluid])
+                predicted = tuple(
+                    momentum_solve(drive / rho[fluid] + steady_reaction * value, value)[0]
+                    for drive, value in zip(drives, previous, strict=True)
+                )
+                projection = _steady_stokes_projection_pipe(
+                    *predicted,
+                    rho[fluid],
+                    response_fluid,
+                    fluid_cell_area[fluid],
+                    lambda rhs: momentum_solve(rhs, zero)[0],
+                    target_flow_rate=target_flow_rate,
+                    dx=dx,
+                    r_faces=faces,
+                    r_centers=centers,
+                    dtheta=dtheta,
+                    pressure_iterations=projection_iterations,
+                    pressure_tolerance=momentum_tolerance,
+                    flow_response_matrix=flow_response_matrix,
+                    pressure_preconditioner_mobility=pressure_preconditioner_mobility,
+                    modal_momentum_coefficients=steady_coefficients,
+                    modal_momentum_sink=wall_sink + steady_reaction,
+                    modal_stabilization=True,
+                    modal_factor_key=modal_factor_key,
+                    physical_tolerance=ALEX_BALANCE_TOLERANCE,
+                )
+                velocity = tuple(
+                    jnp.zeros_like(value).at[fluid].set(projected)
+                    for value, projected in zip((u0, v0, w0), projection[:3], strict=True)
+                )
+                pressure = jnp.zeros_like(potential).at[fluid].set(projection[3])
+                u1, v1, w1 = velocity
+                emf = _cross(velocity, (bx, br, btheta))
+                potential, *electric = _separable_pressure_poisson_pipe(
+                    _pipe_conservative_emf_rhs_3d(
+                        sigma, *emf, dx=dx, r_faces=r_faces, r_centers=r, dtheta=dtheta
+                    ),
+                    sigma,
+                    dx=dx,
+                    r_faces=r_faces,
+                    r_centers=r,
+                    dtheta=dtheta,
+                    tolerance=electric_tolerance,
+                )
+                potential = jnp.clip(potential, -scalar_limit, scalar_limit)
+                fluxes = _pipe_conservative_current_fluxes_3d(
+                    sigma, potential, *emf, dx=dx, r_faces=r_faces, r_centers=r, dtheta=dtheta
+                )
+                current = tuple(
+                    jnp.clip(value, -scalar_limit, scalar_limit)
+                    for value in (
+                        0.5 * (fluxes[0][1:] + fluxes[0][:-1]),
+                        0.5 * (fluxes[1][:, 1:, :] + fluxes[1][:, :-1, :]),
+                        0.5 * (fluxes[2] + jnp.roll(fluxes[2], 1, axis=2)),
+                    )
+                )
+                jx, jr, jtheta = current
+                lorentz = _cross(current, (bx, br, btheta))
+                div_j, _, _ = _pipe_conservative_current_diagnostics_3d(
+                    sigma,
+                    potential,
+                    *emf,
+                    dx=dx,
+                    r_faces=r_faces,
+                    r_centers=r,
+                    dtheta=dtheta,
+                    fluxes=fluxes,
+                )
+                observables = (
+                    *current,
+                    *lorentz,
+                    div_j,
+                    projection[5],
+                    forcing + projection[4],
+                    projection[6],
+                    *electric,
+                )
+                return (*velocity, pressure, potential), observables
+
+        step_function = b1_step or generic_step
         if design_parameters is not None:
             state = (u, v, w, p, phi)
 
             def advance_pipe(_, current):
-                return generic_step(current)[0]
+                return step_function(current)[0]
 
             state = checkpointed_fori_loop(
                 0,
@@ -485,7 +579,7 @@ def _solve_pipe_projection(
                 state,
                 checkpoint_size=checkpoint_size,
             )
-            state, observables = generic_step(state)
+            state, observables = step_function(state)
             return (*state, *observables[:6])
         axial_pressure_loss_gradient = (
             jnp.asarray(initial_bundle.axial_pressure_loss_gradient, dtype=float)
@@ -524,254 +618,73 @@ def _solve_pipe_projection(
         for step in range(outer_steps):
             phi_previous = phi
             pressure_gradient_previous = axial_pressure_loss_gradient
-            if generic_step is not None:
-                previous_velocity = u, v, w
-                (u, v, w, p, phi), observables = generic_step((u, v, w, p, phi))
-                (
-                    jx,
-                    jr,
-                    jtheta,
-                    lorentz_x,
-                    lorentz_r,
-                    lorentz_theta,
-                    div_j,
-                    projected_divergence,
-                    axial_pressure_loss_gradient,
-                    electric_residual,
-                    electric_converged,
-                    electric_relative_residual,
-                    electric_iteration_count,
-                    electric_status,
-                    electric_local_residual,
-                ) = observables
-                potential_update = float(
-                    _gauge_invariant_scalar_update(
-                        phi, phi_previous, cell_area, scale=electric_potential_scale
-                    )
-                )
-                electric_linear_by_step.append(
-                    tuple(
-                        map(
-                            float,
-                            (
-                                electric_residual,
-                                electric_relative_residual,
-                                electric_local_residual,
-                                electric_iteration_count,
-                                electric_converged,
-                                electric_status,
-                            ),
-                        )
-                    )
-                )
-                updates = tuple(
-                    float(jnp.max(jnp.abs(current - previous)))
-                    for current, previous in zip((u, v, w), previous_velocity, strict=True)
-                )
-                projected_divergence_max = float(projected_divergence)
-                charge_balance = float(jnp.max(jnp.abs(div_j)))
-                update_residual = max(*updates, potential_update)
-                components = (*updates, projected_divergence_max, 0.0, charge_balance)
-                residual_by_step.append(update_residual)
-                pressure_residual_by_step.append(0.0)
-                potential_residual_by_step.append(potential_update)
-                component_residual_by_step.append(components)
-                converged = bool(
-                    update_residual <= case.solver.coupling_tolerance
-                    and projected_divergence_max <= ALEX_BALANCE_TOLERANCE
-                    and charge_balance <= ALEX_BALANCE_TOLERANCE
-                )
-                _emit_iteration_progress(
-                    progress_callback,
-                    checkpoint_interval=checkpoint_interval,
-                    step=step + 1,
-                    total_steps=outer_steps,
-                    converged=converged,
-                    residual=update_residual,
-                    component_residuals=components,
-                    pressure_residual=0.0,
-                    potential_residual=potential_update,
-                    checkpoint_factory=partial(pipe_checkpoint, step + 1, converged),
-                )
-                if converged:
-                    break
-                continue
-            dphi_dx, dphi_dr, dphi_dtheta = _pipe_gradient_3d(
-                phi,
-                dx=dx,
-                dr=dr_widths if use_alex_b1_finite_volume else dr,
-                dtheta=dtheta,
-                r=rr,
-            )
-            uxb_x = v * btheta - w * br
-            uxb_r = w * bx - u * btheta
-            uxb_theta = u * br - v * bx
-            jx = sigma * (-dphi_dx + uxb_x)
-            jr = sigma * (-dphi_dr + uxb_r)
-            jtheta = sigma * (-dphi_dtheta + uxb_theta)
-            lorentz_x = jr * btheta - jtheta * br
-            lorentz_r = jtheta * bx - jx * btheta
-            lorentz_theta = jx * br - jr * bx
-
-            count = radial_fluid_count
-            faces = r_faces[: count + 1]
-            centers = r[:count]
-            rhs_u = (forcing + lorentz_x[:, :count, :]) / rho[:, :count, :] + steady_reaction * u[
-                :, :count, :
-            ]
-            rhs_v = lorentz_r[:, :count, :] / rho[:, :count, :] + steady_reaction * v[:, :count, :]
-            rhs_w = lorentz_theta[:, :count, :] / rho[:, :count, :] + steady_reaction * w[:, :count, :]
-            u_fluid, _, _ = momentum_solve(rhs_u, u[:, :count, :])
-            v_fluid, _, _ = momentum_solve(rhs_v, v[:, :count, :])
-            w_fluid, _, _ = momentum_solve(rhs_w, w[:, :count, :])
-            if target_flow_rate is None:
-                raise ValueError("ALEX B1 requires its frozen fixed mean flow rate")
-            zero = jnp.zeros_like(u_fluid)
-            steady_projection = _steady_stokes_projection_pipe(
-                u_fluid,
-                v_fluid,
-                w_fluid,
-                rho[:, :count, :],
-                response_fluid,
-                fluid_cell_area[:, :count, :],
-                lambda rhs: momentum_solve(rhs, zero)[0],
-                target_flow_rate=target_flow_rate,
-                dx=dx,
-                r_faces=faces,
-                r_centers=centers,
-                dtheta=dtheta,
-                pressure_iterations=projection_iterations,
-                pressure_tolerance=momentum_tolerance,
-                flow_response_matrix=flow_response_matrix,
-                pressure_preconditioner_mobility=pressure_preconditioner_mobility,
-                modal_momentum_coefficients=steady_coefficients,
-                modal_momentum_sink=wall_sink + steady_reaction,
-                modal_stabilization=True,
-                modal_factor_key=modal_factor_key,
-                physical_tolerance=ALEX_BALANCE_TOLERANCE,
-            )
-            u_next = jnp.zeros_like(u).at[:, :count, :].set(steady_projection[0])
-            v_next = jnp.zeros_like(v).at[:, :count, :].set(steady_projection[1])
-            w_next = jnp.zeros_like(w).at[:, :count, :].set(steady_projection[2])
-            p = jnp.zeros_like(p).at[:, :count, :].set(steady_projection[3])
-            axial_pressure_loss_gradient = forcing + steady_projection[4]
-            projected_divergence_norm = steady_projection[5]
-            fixed_flow_error = steady_projection[6]
-
-            uxb_x = v_next * btheta - w_next * br
-            uxb_r = w_next * bx - u_next * btheta
-            uxb_theta = u_next * br - v_next * bx
-            emf_rhs = _pipe_conservative_emf_rhs_3d(
-                sigma,
-                uxb_x,
-                uxb_r,
-                uxb_theta,
-                dx=dx,
-                r_faces=r_faces,
-                r_centers=r,
-                dtheta=dtheta,
-            )
+            previous_velocity = u, v, w
+            (u_next, v_next, w_next, p, phi), observables = step_function((u, v, w, p, phi))
             (
-                phi,
+                jx,
+                jr,
+                jtheta,
+                lorentz_x,
+                lorentz_r,
+                lorentz_theta,
+                div_j,
+                projected_divergence_norm,
+                axial_pressure_loss_gradient,
+                fixed_flow_error,
                 electric_residual,
                 electric_converged,
                 electric_relative_residual,
                 electric_iteration_count,
                 electric_status,
                 electric_local_residual,
-            ) = _separable_pressure_poisson_pipe(
-                emf_rhs,
-                sigma,
-                dx=dx,
-                r_faces=r_faces,
-                r_centers=r,
-                dtheta=dtheta,
-                tolerance=electric_tolerance,
-            )
-            phi = jnp.clip(phi, -scalar_limit, scalar_limit)
-            potential_update = _gauge_invariant_scalar_update(
-                phi,
-                phi_previous,
-                cell_area,
-                scale=electric_potential_scale,
+            ) = observables
+            potential_update = float(
+                _gauge_invariant_scalar_update(phi, phi_previous, cell_area, scale=electric_potential_scale)
             )
             electric_linear_by_step.append(
-                (
-                    float(electric_residual),
-                    float(electric_relative_residual),
-                    float(electric_local_residual),
-                    float(electric_iteration_count),
-                    float(electric_converged),
-                    float(electric_status),
+                tuple(
+                    map(
+                        float,
+                        (
+                            electric_residual,
+                            electric_relative_residual,
+                            electric_local_residual,
+                            electric_iteration_count,
+                            electric_converged,
+                            electric_status,
+                        ),
+                    )
                 )
             )
-
-            fx, fr, ftheta = _pipe_conservative_current_fluxes_3d(
-                sigma,
-                phi,
-                uxb_x,
-                uxb_r,
-                uxb_theta,
-                dx=dx,
-                r_faces=r_faces,
-                r_centers=r,
-                dtheta=dtheta,
-            )
-            div_j, _, _ = _pipe_conservative_current_diagnostics_3d(
-                sigma,
-                phi,
-                uxb_x,
-                uxb_r,
-                uxb_theta,
-                dx=dx,
-                r_faces=r_faces,
-                r_centers=r,
-                dtheta=dtheta,
-            )
-            jx = jnp.clip(0.5 * (fx[1:] + fx[:-1]), -scalar_limit, scalar_limit)
-            jr = jnp.clip(0.5 * (fr[:, 1:, :] + fr[:, :-1, :]), -scalar_limit, scalar_limit)
-            jtheta = jnp.clip(0.5 * (ftheta + jnp.roll(ftheta, 1, axis=2)), -scalar_limit, scalar_limit)
-            lorentz_x = jr * btheta - jtheta * br
-            lorentz_r = jtheta * bx - jx * btheta
-            lorentz_theta = jx * br - jr * bx
             projected_divergence_max = float(projected_divergence_norm)
-            u_update = float(jnp.max(jnp.abs(u_next - u)))
-            v_update = float(jnp.max(jnp.abs(v_next - v)))
-            w_update = float(jnp.max(jnp.abs(w_next - w)))
-            flow_error_value = float(fixed_flow_error)
-            pressure_update = _normalized_pressure_observable_update(
-                axial_pressure_loss_gradient,
-                pressure_gradient_previous,
-                bx**2 + by**2 + bz**2,
+            updates = tuple(
+                float(jnp.max(jnp.abs(current - previous)))
+                for current, previous in zip((u_next, v_next, w_next), previous_velocity, strict=True)
             )
-            update_residual = max(
-                u_update,
-                v_update,
-                w_update,
-                pressure_update,
-                potential_update,
+            flow_error_value = float(fixed_flow_error) if use_alex_b1_finite_volume else 0.0
+            pressure_update = (
+                _normalized_pressure_observable_update(
+                    axial_pressure_loss_gradient,
+                    pressure_gradient_previous,
+                    bx**2 + by**2 + bz**2,
+                )
+                if use_alex_b1_finite_volume
+                else 0.0
             )
+            update_residual = max(*updates, pressure_update, potential_update)
             charge_balance = float(jnp.max(jnp.abs(div_j)))
+            components = (*updates, projected_divergence_max, flow_error_value, charge_balance)
             residual_by_step.append(update_residual)
             pressure_residual_by_step.append(pressure_update)
             potential_residual_by_step.append(potential_update)
-            component_residual_by_step.append(
-                (
-                    u_update,
-                    v_update,
-                    w_update,
-                    projected_divergence_max,
-                    flow_error_value,
-                    charge_balance,
-                )
-            )
+            component_residual_by_step.append(components)
             converged = (
                 update_residual <= case.solver.coupling_tolerance
                 and projected_divergence_max <= ALEX_BALANCE_TOLERANCE
-                and flow_error_value <= ALEX_BALANCE_TOLERANCE
+                and (not use_alex_b1_finite_volume or flow_error_value <= ALEX_BALANCE_TOLERANCE)
                 and charge_balance <= ALEX_BALANCE_TOLERANCE
             )
-            if not converged and step + 1 < outer_steps:
+            if use_alex_b1_finite_volume and not converged and step + 1 < outer_steps:
                 current_state = jnp.stack((u, v, w, phi_previous)) / fixed_point_scale
                 mapped_state = jnp.stack((u_next, v_next, w_next, phi)) / fixed_point_scale
                 fixed_point_residual = mapped_state - current_state
@@ -824,9 +737,7 @@ def _solve_pipe_projection(
         volumetric_flow_rate = jnp.sum(u * fluid_cell_area, axis=(1, 2))
         mean_velocity = volumetric_flow_rate / cross_section_area
         axial_current = jnp.sum(jx * cell_area, axis=(1, 2))
-        uxb_x = v * btheta - w * br
-        uxb_r = w * bx - u * btheta
-        uxb_theta = u * br - v * bx
+        uxb_x, uxb_r, uxb_theta = _cross((u, v, w), (bx, br, btheta))
         final_div_j, wall_current_leakage, boundary_current_residual = (
             _pipe_conservative_current_diagnostics_3d(
                 sigma,
@@ -1258,9 +1169,7 @@ def _solve_duct_projection(
             if use_alex_b2_finite_volume
             else jnp.zeros((nx,), dtype=p.dtype)
         )
-        uxb_x = v * bz - w * by
-        uxb_y = w * bx - u * bz
-        uxb_z = u * by - v * bx
+        uxb_x, uxb_y, uxb_z = _cross((u, v, w), (bx, by, bz))
         pressure_linear_residual = jnp.asarray(jnp.nan)
         pressure_linear_relative_residual = jnp.asarray(jnp.nan)
         pressure_linear_iterations = jnp.asarray(0)
@@ -1333,9 +1242,7 @@ def _solve_duct_projection(
                 raise FloatingPointError(f"ALEX B2 projection inactive guard: {state}")
             p = jnp.where(fluid_mask, p_corr, 0.0)
 
-        uxb_x = v_next * bz - w_next * by
-        uxb_y = w_next * bx - u_next * bz
-        uxb_z = u_next * by - v_next * bx
+        uxb_x, uxb_y, uxb_z = _cross((u_next, v_next, w_next), (bx, by, bz))
         if use_alex_b2_finite_volume:
             emf_rhs = emf_operator(sigma, uxb_x, uxb_y, uxb_z, fluid_mask)
             (
@@ -1599,9 +1506,7 @@ def _solve_duct_projection(
 
     if use_alex_b2_finite_volume:
         # Acceleration changes the accepted state after current reconstruction.
-        uxb_x = v * bz - w * by
-        uxb_y = w * bx - u * bz
-        uxb_z = u * by - v * bx
+        uxb_x, uxb_y, uxb_z = _cross((u, v, w), (bx, by, bz))
         jx, jy, jz, div_j, lorentz_x, lorentz_y, lorentz_z = reconstruct_electric(
             phi, sigma, uxb_x, uxb_y, uxb_z, bx, by, bz, fluid_mask
         )

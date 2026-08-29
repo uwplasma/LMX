@@ -24,6 +24,7 @@ from ._fringing_common import (
     ALEX_BALANCE_TOLERANCE,
     _axial_mean_preconditioner_3d,
     _coerce_spacing_vector,
+    _cross,
     _distance_weighted_harmonic_mean,
     _finalize_local_pressure_solve,
     _gradient_3d,
@@ -1405,14 +1406,7 @@ def _b2_coupling_functions(
         current_x = conductivity * (-dphi_dx + emf_x)
         current_y = conductivity * (-dphi_dy + emf_y)
         current_z = conductivity * (-dphi_dz + emf_z)
-        return (
-            current_x,
-            current_y,
-            current_z,
-            current_y * bz - current_z * by,
-            current_z * bx - current_x * bz,
-            current_x * by - current_y * bx,
-        )
+        return current_x, current_y, current_z, *_cross((current_x, current_y, current_z), (bx, by, bz))
 
     def reconstruct_electric(potential, conductivity, emf_x, emf_y, emf_z, bx, by, bz, mask):
         fields = electric_lorentz(potential, conductivity, emf_x, emf_y, emf_z, bx, by, bz)

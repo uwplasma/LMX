@@ -50,8 +50,9 @@ static. The field scale may be scalar or one coefficient per axial station;
 pipe geometry uses `(axial, radial)`. `extruded_engineering_objectives` reduces
 the fields to pressure drop, flow rate, pumping power, outlet nonuniformity,
 wall-current RMS, and recirculation without leaving the differentiated program.
-The specialized ALEX B1/B2 acceptance algorithms fail closed in this API; see
-the [differentiation tutorial](differentiation.md).
+The specialized ALEX B1 pipe shares its production finite-volume map with this
+API; specialized ALEX B2 design fields remain unavailable. See the
+[differentiation tutorial](differentiation.md).
 
 The axial, cross-section, and wall meshes are refined independently. A reported
 fringing result should demonstrate stable primary observables under all three

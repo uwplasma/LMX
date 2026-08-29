@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import partial
 
 import jax
 import jax.numpy as jnp
@@ -20,6 +21,7 @@ from solvax import (
 
 from ._fringing_common import (
     _apply_fixed_flow_pressure_constraint,
+    _cross,
     _enforce_stationwise_flow_rate_3d,
     _finalize_local_pressure_solve,
     _harmonic_mean,
@@ -31,9 +33,7 @@ from ._fringing_common import (
 
 
 def _pipe_theta_neighbors(field: jnp.ndarray) -> tuple[jnp.ndarray, jnp.ndarray]:
-    theta_prev = jnp.concatenate([field[:, :, -1:], field[:, :, :-1]], axis=2)
-    theta_next = jnp.concatenate([field[:, :, 1:], field[:, :, :1]], axis=2)
-    return theta_prev, theta_next
+    return jnp.roll(field, 1, axis=2), jnp.roll(field, -1, axis=2)
 
 
 def _pipe_gradient_3d(
@@ -557,15 +557,32 @@ def _generic_pipe_step(
     velocity_limit, scalar_limit = limits
     target_flow_rate, unit_pressure_response, radial_fluid_count = flow
     u, v, w, pressure, potential = state
-    potential_gradient = _pipe_gradient_3d(potential, dx=dx, dr=dr, dtheta=dtheta, r=radius)
-    uxb = (v * btheta - w * br, w * bx - u * btheta, u * br - v * bx)
+    gradient = partial(_pipe_gradient_3d, dx=dx, dr=dr, dtheta=dtheta, r=radius)
+    divergence_operator = partial(_pipe_divergence_3d, dx=dx, dr=dr, dtheta=dtheta, r=radius)
+    diffuse = partial(_pipe_laplacian_3d, dx=dx, dr=dr, dtheta=dtheta, r=radius)
+    enforce = partial(
+        _enforce_pipe_velocity_bc,
+        r_centers=r_centers,
+        r_faces=r_faces,
+        fluid_mask=fluid_mask,
+        radial_fluid_count=radial_fluid_count,
+    )
+    poisson = partial(
+        _solvax_pressure_poisson_pipe,
+        dx=dx,
+        r_faces=r_faces,
+        r_centers=r_centers,
+        dtheta=dtheta,
+        include_theta_line=True,
+    )
+    conservative_metric = dict(dx=dx, r_faces=r_faces, r_centers=r_centers, dtheta=dtheta)
+    potential_gradient = gradient(potential)
+    uxb = _cross((u, v, w), (bx, br, btheta))
     current = tuple(sigma * (-gradient + emf) for gradient, emf in zip(potential_gradient, uxb))
     jx, jr, jtheta = current
-    lorentz = (jr * btheta - jtheta * br, jtheta * bx - jx * btheta, jx * br - jr * bx)
-    pressure_gradient = _pipe_gradient_3d(pressure, dx=dx, dr=dr, dtheta=dtheta, r=radius)
-    laplacian = tuple(
-        _pipe_laplacian_3d(component, dx=dx, dr=dr, dtheta=dtheta, r=radius) for component in (u, v, w)
-    )
+    lorentz = _cross((jx, jr, jtheta), (bx, br, btheta))
+    pressure_gradient = gradient(pressure)
+    laplacian = tuple(map(diffuse, (u, v, w)))
     source = (forcing / rho, jnp.zeros_like(rho), jnp.zeros_like(rho))
     predicted = tuple(
         jnp.clip(
@@ -577,39 +594,22 @@ def _generic_pipe_step(
             (u, v, w), laplacian, source, lorentz, pressure_gradient, strict=True
         )
     )
-    predicted = _enforce_pipe_velocity_bc(
-        *predicted,
-        r_centers=r_centers,
-        r_faces=r_faces,
-        fluid_mask=fluid_mask,
-        radial_fluid_count=radial_fluid_count,
-    )
-    divergence = _pipe_divergence_3d(*predicted, dx=dx, dr=dr, dtheta=dtheta, r=radius)
-    correction, *_ = _solvax_pressure_poisson_pipe(
+    predicted = enforce(*predicted)
+    divergence = divergence_operator(*predicted)
+    correction, *_ = poisson(
         (rho / jnp.maximum(dt, 1.0e-12)) * divergence,
         jnp.ones_like(rho),
-        dx=dx,
-        r_faces=r_faces,
-        r_centers=r_centers,
-        dtheta=dtheta,
         iterations=projection_iterations,
         tolerance=projection_tolerance,
         initial_field=pressure,
-        include_theta_line=True,
     )
     correction = jnp.clip(correction, -scalar_limit, scalar_limit)
-    correction_gradient = _pipe_gradient_3d(correction, dx=dx, dr=dr, dtheta=dtheta, r=radius)
+    correction_gradient = gradient(correction)
     velocity = tuple(
         jnp.clip(value - (dt / rho) * gradient, -velocity_limit, velocity_limit)
         for value, gradient in zip(predicted, correction_gradient, strict=True)
     )
-    velocity = _enforce_pipe_velocity_bc(
-        *velocity,
-        r_centers=r_centers,
-        r_faces=r_faces,
-        fluid_mask=fluid_mask,
-        radial_fluid_count=radial_fluid_count,
-    )
+    velocity = enforce(*velocity)
     if target_flow_rate is None:
         velocity = (
             _enforce_stationwise_flow_rate_3d(
@@ -629,52 +629,33 @@ def _generic_pipe_step(
             base_pressure_loss_gradient=forcing,
         )
         velocity = (axial, velocity[1], velocity[2])
-    u, v, w = _enforce_pipe_velocity_bc(
-        *velocity,
-        r_centers=r_centers,
-        r_faces=r_faces,
-        fluid_mask=fluid_mask,
-        radial_fluid_count=radial_fluid_count,
-    )
+    u, v, w = enforce(*velocity)
     pressure = jnp.clip(pressure + correction, -scalar_limit, scalar_limit)
-    uxb = (v * btheta - w * br, w * bx - u * btheta, u * br - v * bx)
-    potential, *electric_diagnostics = _solvax_pressure_poisson_pipe(
-        _pipe_conservative_emf_rhs_3d(
-            sigma, *uxb, dx=dx, r_faces=r_faces, r_centers=r_centers, dtheta=dtheta
-        ),
+    uxb = _cross((u, v, w), (bx, br, btheta))
+    potential, *electric_diagnostics = poisson(
+        _pipe_conservative_emf_rhs_3d(sigma, *uxb, **conservative_metric),
         sigma,
-        dx=dx,
-        r_faces=r_faces,
-        r_centers=r_centers,
-        dtheta=dtheta,
         iterations=electric_iterations,
         tolerance=electric_tolerance,
         initial_field=potential,
-        include_theta_line=True,
     )
     potential = jnp.clip(potential, -scalar_limit, scalar_limit)
-    fluxes = _pipe_conservative_current_fluxes_3d(
-        sigma, potential, *uxb, dx=dx, r_faces=r_faces, r_centers=r_centers, dtheta=dtheta
-    )
+    fluxes = _pipe_conservative_current_fluxes_3d(sigma, potential, *uxb, **conservative_metric)
     current = (
         0.5 * (fluxes[0][1:] + fluxes[0][:-1]),
         0.5 * (fluxes[1][:, 1:, :] + fluxes[1][:, :-1, :]),
         0.5 * (fluxes[2] + jnp.roll(fluxes[2], 1, axis=2)),
     )
     jx, jr, jtheta = (jnp.clip(value, -scalar_limit, scalar_limit) for value in current)
-    lorentz = (jr * btheta - jtheta * br, jtheta * bx - jx * btheta, jx * br - jr * bx)
+    lorentz = _cross((jx, jr, jtheta), (bx, br, btheta))
     div_j, _, _ = _pipe_conservative_current_diagnostics_3d(
-        sigma,
-        potential,
-        *uxb,
-        dx=dx,
-        r_faces=r_faces,
-        r_centers=r_centers,
-        dtheta=dtheta,
-        fluxes=fluxes,
+        sigma, potential, *uxb, fluxes=fluxes, **conservative_metric
     )
-    projected_divergence = jnp.max(
-        jnp.abs(_pipe_divergence_3d(u, v, w, dx=dx, dr=dr, dtheta=dtheta, r=radius))
+    projected_divergence = jnp.max(jnp.abs(divergence_operator(u, v, w)))
+    flow_error = (
+        jnp.asarray(0.0, dtype=u.dtype)
+        if target_flow_rate is None
+        else jnp.max(jnp.abs(jnp.sum(u * cell_area, axis=(1, 2)) - target_flow_rate))
     )
     return (u, v, w, pressure, potential), (
         jx,
@@ -684,6 +665,7 @@ def _generic_pipe_step(
         div_j,
         projected_divergence,
         pressure_loss,
+        flow_error,
         *electric_diagnostics,
     )
 
@@ -975,6 +957,10 @@ def _steady_stokes_projection_pipe(
     gauge = sqrt_area / jnp.linalg.norm(sqrt_area, axis=1, keepdims=True)
     householder = gauge.at[:, -1].add(-1.0)
     householder_scale = 2.0 / jnp.maximum(jnp.sum(householder**2, axis=1, keepdims=True), 1.0e-30)
+    face_correction = partial(_pipe_pressure_face_correction, dx=dx, r_centers=r_centers, dtheta=dtheta)
+    face_divergence = partial(
+        _pipe_face_divergence, dx=dx, r_faces=r_faces, r_centers=r_centers, dtheta=dtheta
+    )
 
     def reflect(field):
         return field - householder_scale * householder * jnp.sum(householder * field, axis=1, keepdims=True)
@@ -995,16 +981,17 @@ def _steady_stokes_projection_pipe(
             return transformed[:, :-1].reshape(-1)
         return field.reshape((u.shape[0], cross_section_size))[:, :-1].reshape(-1)
 
+    def solve_flow(residual):
+        return (
+            jnp.linalg.solve(flow_response_matrix, residual)
+            if flow_response_matrix is not None
+            else residual / jnp.maximum(jnp.mean(response_flow), 1.0e-20)
+        )
+
     def velocity_response(state):
         pressure = unpack_pressure(state[:pressure_size])
         pressure_loss = state[pressure_size:]
-        face_force = _pipe_pressure_face_correction(
-            pressure,
-            mobility,
-            dx=dx,
-            r_centers=r_centers,
-            dtheta=dtheta,
-        )
+        face_force = face_correction(pressure, mobility)
         force_u, force_v, force_w = _pipe_face_velocity_cells(*face_force)
         force_u = force_u + pressure_loss[:, None, None] * mobility
         forces = jnp.stack((force_u, force_v, force_w))
@@ -1016,13 +1003,7 @@ def _steady_stokes_projection_pipe(
         return tuple(responses)
 
     def rhie_chow_faces(pressure, response):
-        pressure_faces = _pipe_pressure_face_correction(
-            pressure,
-            pressure_mobility,
-            dx=dx,
-            r_centers=r_centers,
-            dtheta=dtheta,
-        )
+        pressure_faces = face_correction(pressure, pressure_mobility)
         reconstructed_faces = _pipe_velocity_faces(*_pipe_face_velocity_cells(*pressure_faces))
         stabilization = tuple(
             direct - reconstructed for direct, reconstructed in zip(pressure_faces, reconstructed_faces)
@@ -1046,12 +1027,8 @@ def _steady_stokes_projection_pipe(
         )
 
     def constraints(state_u, state_v, state_w, *, faces=None):
-        divergence = _pipe_face_divergence(
-            *(_pipe_velocity_faces(state_u, state_v, state_w) if faces is None else faces),
-            dx=dx,
-            r_faces=r_faces,
-            r_centers=r_centers,
-            dtheta=dtheta,
+        divergence = face_divergence(
+            *(_pipe_velocity_faces(state_u, state_v, state_w) if faces is None else faces)
         )
         mean_divergence = jnp.sum(divergence * cell_area, axis=(1, 2), keepdims=True) / jnp.maximum(
             area_sum, 1.0e-20
@@ -1082,13 +1059,7 @@ def _steady_stokes_projection_pipe(
             tolerance=pressure_tolerance,
             include_theta_line=True,
         )
-        flow_residual = residual[pressure_size:]
-        pressure_loss = (
-            jnp.linalg.solve(flow_response_matrix, flow_residual)
-            if flow_response_matrix is not None
-            else flow_residual / jnp.maximum(jnp.mean(response_flow), 1.0e-20)
-        )
-        return jnp.concatenate((reduce_field(pressure), pressure_loss))
+        return jnp.concatenate((reduce_field(pressure), solve_flow(residual[pressure_size:])))
 
     if modal_stabilization:
         if modal_momentum_coefficients is None or modal_momentum_sink is None:
@@ -1190,12 +1161,7 @@ def _steady_stokes_projection_pipe(
             modal_residual = modal_restrict(residual - schur(local))
             modal_correction = _solve_pipe_retained_modal_factors(modal_factors, modal_residual)
             candidate = local + modal_prolong(modal_correction)
-            flow_residual = (residual - schur(candidate))[pressure_size:]
-            flow_response = (
-                jnp.linalg.solve(flow_response_matrix, flow_residual)
-                if flow_response_matrix is not None
-                else flow_residual / jnp.maximum(jnp.mean(response_flow), 1.0e-20)
-            )
+            flow_response = solve_flow((residual - schur(candidate))[pressure_size:])
             return candidate + jnp.zeros_like(candidate).at[pressure_size:].set(flow_response)
 
     else:
@@ -1343,13 +1309,7 @@ def _steady_stokes_projection_pipe(
         projected_faces = tuple(
             base + response for base, response in zip(_pipe_velocity_faces(u, v, w), response_faces)
         )
-    final_divergence = _pipe_face_divergence(
-        *projected_faces,
-        dx=dx,
-        r_faces=r_faces,
-        r_centers=r_centers,
-        dtheta=dtheta,
-    )
+    final_divergence = face_divergence(*projected_faces)
     final_mean_divergence = jnp.sum(final_divergence * cell_area, axis=(1, 2), keepdims=True) / jnp.maximum(
         area_sum, 1.0e-30
     )
