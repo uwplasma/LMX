@@ -39,15 +39,12 @@ from lmx._fringing_duct import (
 )
 from lmx._fringing_pipe import (
     _apply_pipe_diffusion_coefficients_3d,
-    _face_flux_pressure_projection_pipe,
-    _fixed_flow_face_flux_projection_pipe,
     _pipe_conservative_current_diagnostics_3d,
     _pipe_conservative_emf_rhs_3d,
     _pipe_face_divergence,
     _pipe_gradient_3d,
     _pipe_laplacian_3d,
     _pipe_pressure_face_correction,
-    _pipe_radial_fluid_count,
     _pipe_variable_diffusion_coefficients_3d,
     _separable_pressure_poisson_pipe,
     _solvax_diffusion_pipe,
@@ -1724,144 +1721,6 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow():
         steady_project(modal_stabilization=True)
 
 
-def test_pipe_face_projection_uses_fluid_wall_face():
-    nx, nr, ntheta = 5, 5, 8
-    r_faces = jnp.asarray([0.0, 0.12, 0.3, 0.55, 0.78, 1.0, 1.1])
-    r_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
-    fluid_count = nr
-    shape = (nx, nr + 1, ntheta)
-    mask = jnp.zeros(shape, dtype=bool).at[:, :fluid_count, :].set(True)
-    x = jnp.linspace(0.0, 1.0, nx)[:, None, None]
-    r = r_centers[None, :, None]
-    theta = jnp.linspace(0.0, 2.0 * jnp.pi, ntheta, endpoint=False)[None, None, :]
-    u = jnp.where(mask, 0.7 + 0.1 * jnp.cos(2.0 * jnp.pi * x), 0.0)
-    v = jnp.where(mask, 0.1 * r * jnp.cos(theta), 0.0)
-    w = jnp.where(mask, -0.1 * r * jnp.sin(theta), 0.0)
-    rho = jnp.ones(shape)
-    projected = _face_flux_pressure_projection_pipe(
-        u,
-        v,
-        w,
-        rho,
-        mask,
-        dt=0.05,
-        dx=0.25,
-        r_faces=r_faces,
-        r_centers=r_centers,
-        dtheta=2.0 * jnp.pi / ntheta,
-        iterations=500,
-        tolerance=1.0e-10,
-        radial_fluid_count=fluid_count,
-    )
-    projected_u, projected_v, projected_w, pressure, divergence = projected
-    assert divergence < 1.0e-8
-    assert jnp.isfinite(pressure).all()
-    assert jnp.allclose(projected_u[:, fluid_count:, :], 0.0)
-    assert jnp.allclose(projected_v[:, fluid_count:, :], 0.0)
-    assert jnp.allclose(projected_w[:, fluid_count:, :], 0.0)
-
-    assert _pipe_radial_fluid_count(mask) == fluid_count
-
-    def objective(amplitude):
-        projected_fields = _face_flux_pressure_projection_pipe(
-            amplitude * u,
-            v,
-            w,
-            rho,
-            mask,
-            dt=0.05,
-            dx=0.25,
-            r_faces=r_faces,
-            r_centers=r_centers,
-            dtheta=2.0 * jnp.pi / ntheta,
-            iterations=500,
-            tolerance=1.0e-10,
-            radial_fluid_count=fluid_count,
-        )
-        return jnp.mean(projected_fields[0] ** 2) + projected_fields[-1] ** 2
-
-    value, gradient = jax.jit(jax.value_and_grad(objective))(jnp.asarray(1.0))
-    step = 1.0e-4
-    finite_difference = (objective(1.0 + step) - objective(1.0 - step)) / (2.0 * step)
-    assert jnp.isfinite(value)
-    assert gradient == pytest.approx(finite_difference, rel=2.0e-5, abs=1.0e-8)
-
-
-def test_fixed_flow_pipe_projection_closes_flow_and_rejects_invalid_masks():
-    nx, nr, ntheta = 4, 4, 8
-    r_faces = jnp.asarray([0.0, 0.15, 0.4, 0.7, 1.0])
-    r_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
-    shape = (nx, nr, ntheta)
-    mask = jnp.ones(shape, dtype=bool)
-    rho = jnp.ones(shape)
-    u = jnp.linspace(0.6, 0.9, nx)[:, None, None] * jnp.ones(shape)
-    zeros = jnp.zeros(shape)
-    dtheta = 2.0 * jnp.pi / ntheta
-    cell_area = jnp.broadcast_to(
-        r_centers[None, :, None] * jnp.diff(r_faces)[None, :, None] * dtheta,
-        shape,
-    )
-    response = jnp.full(shape, 0.05)
-    target = 2.0
-    result = _fixed_flow_face_flux_projection_pipe(
-        u,
-        zeros,
-        zeros,
-        rho,
-        mask,
-        response,
-        cell_area,
-        target_flow_rate=target,
-        base_pressure_loss_gradient=0.0,
-        dt=0.05,
-        dx=0.3,
-        r_faces=r_faces,
-        r_centers=r_centers,
-        dtheta=dtheta,
-        iterations=300,
-        tolerance=1.0e-10,
-        radial_fluid_count=nr,
-    )
-    projected_u, _, _, pressure, pressure_loss, divergence, flow_error = result
-    flow = jnp.sum(projected_u * cell_area, axis=(1, 2))
-    assert flow == pytest.approx(target, abs=1.0e-8)
-    assert divergence < 1.0e-8
-    assert flow_error < 1.0e-8
-    assert jnp.isfinite(pressure_loss).all()
-
-    warm = _fixed_flow_face_flux_projection_pipe(
-        u,
-        zeros,
-        zeros,
-        rho,
-        mask,
-        response,
-        cell_area,
-        target_flow_rate=target,
-        base_pressure_loss_gradient=0.0,
-        dt=0.05,
-        dx=0.3,
-        r_faces=r_faces,
-        r_centers=r_centers,
-        dtheta=dtheta,
-        iterations=300,
-        tolerance=1.0e-10,
-        radial_fluid_count=nr,
-        initial_pressure=pressure,
-    )
-    assert warm[3] == pytest.approx(pressure, rel=1.0e-8, abs=1.0e-8)
-
-    empty = jnp.zeros(shape, dtype=bool)
-    with pytest.raises(ValueError, match="nonempty"):
-        _pipe_radial_fluid_count(empty)
-    disconnected = mask.at[:, 1, :].set(False)
-    with pytest.raises(ValueError, match="contiguous"):
-        _pipe_radial_fluid_count(disconnected)
-    partial = mask.at[:, -1, 0].set(False)
-    with pytest.raises(ValueError, match="full annular"):
-        _pipe_radial_fluid_count(partial)
-
-
 def test_gauge_invariant_update_ignores_constant_shift():
     previous = jnp.asarray([[1.0, 2.0], [3.0, 4.0]])
     physical_update = jnp.asarray([[0.0, 0.2], [-0.1, 0.1]])
@@ -2160,6 +2019,88 @@ def test_layered_extruded_fields_share_the_production_update():
         evolve_extruded_fields(problem, geometry_scale=jnp.ones(2), steps=2)
 
 
+def test_pipe_fields_share_the_production_update_and_checked_derivative():
+    problem = build_pipe_ogrid_extruded_problem(
+        ha_peak=2.0,
+        nx_stations=3,
+        nr=3,
+        ntheta=8,
+        length=1.5,
+        entry_center=0.4,
+        exit_center=1.1,
+        transition_width=0.2,
+    )
+    problem = replace(
+        problem,
+        case=replace(
+            problem.case,
+            geometry=replace(
+                problem.case.geometry,
+                wall_thickness=(0.1,) * 4,
+                wall_cells=(1,) * 4,
+            ),
+            regions=(
+                problem.case.regions[0],
+                RegionSpec("wall", "solid", 0.5, 1.0, 1.0, 0.1),
+            ),
+            time_stepper=replace(problem.case.time_stepper, max_steps=4, potential_iterations=10),
+            solver=replace(problem.case.solver, coupling_iterations=1, coupling_tolerance=1.0e-12),
+        ),
+    )
+    production = solve_extruded_inductionless(problem).bundle
+    fields = evolve_extruded_fields(problem, magnetic_field_scale=jnp.ones(3), steps=4)
+    for actual, name in zip(
+        fields,
+        ("u", "v", "w", "p", "phi", "jx", "jy", "jz", "lorentz_x", "lorentz_y", "lorentz_z"),
+        strict=True,
+    ):
+        assert actual == pytest.approx(getattr(production, name), rel=2.0e-6, abs=2.0e-9)
+    assert all(jnp.isfinite(value) for value in extruded_engineering_objectives(problem, fields).values())
+
+    def objective(parameters, checkpoint_size=None):
+        evolved = evolve_extruded_fields(
+            problem,
+            forcing=parameters[0],
+            magnetic_field_scale=parameters[1:4],
+            material_conductivity_scale=parameters[4:6],
+            geometry_scale=parameters[6:],
+            steps=4,
+            checkpoint_size=checkpoint_size,
+        )
+        return (
+            jnp.mean(evolved[0] ** 2)
+            + 0.01 * jnp.mean(evolved[4] ** 2)
+            + 0.001 * jnp.mean(evolved[6] ** 2 + evolved[7] ** 2)
+        )
+
+    parameters = jnp.ones(8)
+    value_and_gradient = jax.jit(jax.value_and_grad(objective))
+    value, gradient = value_and_gradient(parameters)
+    finite_difference = _centered_gradient(jax.jit(objective), parameters, 2.0e-3)
+    direction = jnp.asarray([0.1, -0.2, 0.15, 0.05, 0.2, -0.08, -0.1, 0.12])
+    tangent = jax.jvp(objective, (parameters,), (direction,))[1]
+    assert jnp.isfinite(value) and jnp.all(jnp.isfinite(gradient))
+    assert abs(gradient[5]) > 1.0e-12
+    assert gradient == pytest.approx(finite_difference, rel=5.0e-4, abs=2.0e-9)
+    assert tangent == pytest.approx(jnp.vdot(gradient, direction), rel=2.0e-6, abs=1.0e-10)
+    batched_values, batched_gradients = jax.jit(jax.vmap(jax.value_and_grad(objective)))(
+        jnp.stack((parameters, parameters.at[0].set(0.9)))
+    )
+    assert batched_values[0] == pytest.approx(value)
+    assert batched_gradients[0] == pytest.approx(gradient)
+    bounded = value_and_gradient.lower(parameters).compile().memory_analysis().temp_size_in_bytes
+    full_tape = (
+        jax.jit(jax.value_and_grad(lambda values: objective(values, 4)))
+        .lower(parameters)
+        .compile()
+        .memory_analysis()
+        .temp_size_in_bytes
+    )
+    assert bounded < 0.9 * full_tape
+    with pytest.raises(ValueError, match="axial, radial"):
+        evolve_extruded_fields(problem, geometry_scale=jnp.ones(3), steps=2)
+
+
 def test_extruded_engineering_objectives_have_physical_conventions_and_gradients():
     problem = build_square_duct_extruded_problem(nx_stations=3, ny=3, nz=3)
     shape = (3, 3, 3)
@@ -2189,6 +2130,17 @@ def test_extruded_engineering_objectives_have_physical_conventions_and_gradients
     assert values["recirculation_fraction"] == pytest.approx(0.0, abs=1.0e-12)
     assert jax.grad(lambda speed: objectives(speed)["pumping_power"])(1.0) == pytest.approx(8.0)
     assert jax.grad(lambda scale: objectives(1.0, scale)["flow_rate"])(1.0) == pytest.approx(8.0)
+    pipe = build_pipe_ogrid_extruded_problem(nx_stations=3, nr=3, ntheta=8)
+    pipe_shape = (3, 3, 8)
+    pipe_fields = (jnp.ones(pipe_shape),) + (jnp.zeros(pipe_shape),) * 10
+
+    def pipe_flow(radial):
+        return extruded_engineering_objectives(pipe, pipe_fields, geometry_scale=jnp.asarray([1.0, radial]))[
+            "flow_rate"
+        ]
+
+    assert pipe_flow(2.0) == pytest.approx(4.0 * pipe_flow(1.0))
+    assert jax.grad(pipe_flow)(1.0) == pytest.approx(2.0 * pipe_flow(1.0))
     with pytest.raises(ValueError, match="velocity, pressure"):
         extruded_engineering_objectives(problem, ())
     with pytest.raises(ValueError, match="problem shape"):
