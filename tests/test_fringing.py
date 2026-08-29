@@ -172,9 +172,9 @@ def test_alex_b1_production_map_has_bounded_implicit_gradient():
     value, gradient = compiled(parameters)
     epsilon = 2.0e-3
     direction = jnp.asarray([0.1, -0.2, 0.3, -0.15, 0.12])
-    points = jnp.stack((parameters + epsilon * direction, parameters - epsilon * direction))
-    samples = jax.jit(jax.vmap(objective))(points)
-    finite_difference = (samples[0] - samples[1]) / (2.0 * epsilon)
+    plus, _ = compiled(parameters + epsilon * direction)
+    minus, _ = compiled(parameters - epsilon * direction)
+    finite_difference = (plus - minus) / (2.0 * epsilon)
     assert jnp.isfinite(value) and jnp.all(jnp.isfinite(gradient))
     assert jnp.vdot(gradient, direction) == pytest.approx(finite_difference, rel=3.0e-4, abs=5.0e-8)
     assert jnp.all(jnp.abs(gradient[1:]) > 1.0e-6)
@@ -1647,7 +1647,8 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow():
             **kwargs,
         )
 
-    steady_result = steady_project()
+    compiled_steady_project = jax.jit(steady_project)
+    steady_result = compiled_steady_project(jnp.asarray(1.0))
     assert steady_result[-3] < 1.0e-9
     cross_section_area = jnp.mean(jnp.sum(cell_area, axis=(1, 2)))
     assert steady_result[-2] / cross_section_area < 1.0e-9
@@ -1655,9 +1656,8 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow():
     assert steady_result[-1].residual_norm < 1.0e-9
 
     def projected_energy(scale):
-        return jnp.mean(steady_project(scale)[0] ** 2)
+        return jnp.mean(compiled_steady_project(scale)[0] ** 2)
 
-    projected_energy = jax.jit(projected_energy)
     epsilon = 1.0e-3
     gradient = jax.grad(projected_energy)(1.0)
     finite_difference = (projected_energy(1.0 + epsilon) - projected_energy(1.0 - epsilon)) / (2 * epsilon)
@@ -1885,9 +1885,8 @@ def test_extruded_fields_match_production_and_bound_reverse_memory():
     parameters = jnp.ones(4)
     value_and_gradient = jax.jit(jax.value_and_grad(objective))
     value, gradient = value_and_gradient(parameters)
-    compiled_objective = jax.jit(objective)
     epsilon = 2.0e-3
-    finite_difference = _centered_gradient(compiled_objective, parameters, epsilon)
+    finite_difference = _centered_gradient(lambda point: value_and_gradient(point)[0], parameters, epsilon)
     assert jnp.isfinite(value)
     assert gradient == pytest.approx(finite_difference, rel=2.0e-3, abs=2.0e-9)
     direction = jnp.asarray([0.3, -0.2, 0.1, -0.1])
@@ -1948,7 +1947,7 @@ def test_layered_extruded_fields_share_the_production_update():
     scale = jnp.ones(7)
     value_and_gradient = jax.jit(jax.value_and_grad(objective))
     value, gradient = value_and_gradient(scale)
-    finite_difference = _centered_gradient(jax.jit(objective), scale, 2.0e-3)
+    finite_difference = _centered_gradient(lambda point: value_and_gradient(point)[0], scale, 2.0e-3)
     direction = jnp.asarray([0.1, -0.2, 0.25, -0.5, 0.15, -0.1, 0.2])
     tangent = jax.jvp(objective, (scale,), (direction,))[1]
     assert gradient == pytest.approx(finite_difference, rel=5.0e-4, abs=2.0e-9)
@@ -2021,7 +2020,7 @@ def test_pipe_fields_share_the_production_update_and_checked_derivative():
     parameters = jnp.ones(8)
     value_and_gradient = jax.jit(jax.value_and_grad(objective))
     value, gradient = value_and_gradient(parameters)
-    finite_difference = _centered_gradient(jax.jit(objective), parameters, 2.0e-3)
+    finite_difference = _centered_gradient(lambda point: value_and_gradient(point)[0], parameters, 2.0e-3)
     direction = jnp.asarray([0.1, -0.2, 0.15, 0.05, 0.2, -0.08, -0.1, 0.12])
     tangent = jax.jvp(objective, (parameters,), (direction,))[1]
     assert jnp.isfinite(value) and jnp.all(jnp.isfinite(gradient))
