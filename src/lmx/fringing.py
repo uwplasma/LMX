@@ -1158,11 +1158,11 @@ def _solve_duct_projection(
                 pack_vector(u0, v0, w0),
                 pack_vector(lorentz_x0 + forcing, lorentz_y0, lorentz_z0),
             )
-            velocity_fluid, _, momentum_converged = momentum_solve(
+            velocity_fluid, _, momentum_converged, momentum_mobility = momentum_solve(
                 velocity, momentum_force, rho, nu, rho_phi_plus, rho_phi_inlet
             )
             predicted = embed_velocity(velocity_fluid, fluid_mask)
-            projection = mixed_boundary_projection(*predicted, p0, rho, fluid_mask)
+            projection = mixed_boundary_projection(*predicted, p0, rho, fluid_mask, momentum_mobility)
             u1, v1, w1, pressure = projection[:4]
             mapped_flux = pack_flux(*projection[7:10])
             emf = common._cross((u1, v1, w1), (bx, by, bz))

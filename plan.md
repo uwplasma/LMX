@@ -15,9 +15,9 @@ supported current state.
 The live root is the enforced repository baseline. The latest ordinary
 authenticated clone measurement is 2,304 KiB total, including 588 KiB of Git
 data and a 463.39 KiB pack. The current candidate contains 88 tracked files,
-1,813,079 bytes of tracked data, 15 package modules, and 28 root exports. Its
-complete six-worker portable gate passes 500 tests in 154.98 seconds with
-95.43% combined line/branch coverage. Every change below must preserve the
+1,821,142 bytes of tracked data, 15 package modules, and 28 root exports. Its
+complete six-worker portable gate passes 500 tests in 158.55 seconds with
+95.41% combined line/branch coverage. Every change below must preserve the
 normal-clone limit of 9,766 KiB and the file, API, five-minute test-time, and
 coverage budgets. The capability-adjusted ceiling remains 15,370 package lines
 across at most 16 modules.
@@ -1169,6 +1169,7 @@ artifacts or release assets, not committed files.
 | D-039 | Do not impose derivative-only roundoff tolerances on a primal-only specialized path | Generic traced 3-D fields retain roundoff electric closure for implicit VJP consistency. B2 remains unavailable to differentiation and instead uses a directly tested `1e-10` linear tolerance, while its independent charge, restart, and external-validation gates remain unchanged. |
 | D-040 | Fold single-consumer fringing orchestration into the public module, not into another private file | `fringing.py` owns its three solve-dispatch functions; case construction belongs to `cases.py`, validation belongs to `validation.py`, and only shared, duct, and pipe numerical kernels retain private modules. The public import surface is unchanged. |
 | D-041 | Reuse a compiled production evidence map across same-shape finite-difference samples | Centered differences remain mathematically independent of autodiff, but they do not require compiling an identical primal graph a second time. Production value-and-gradient executables may supply shifted primal values; physics, VJP/JVP, sensitivity, batching, memory, and tolerance assertions remain separate and unchanged. |
+| D-042 | Use the frozen momentum diagonal as the B2 pressure mobility | The pressure correction must use the same local response as the implicit momentum predictor. Reusing its already assembled diagonal is allocation-light and restores the variable-coefficient discrete flux identity; a full nested momentum inverse is still rejected by D-038. |
 
 ## Work log
 
@@ -3382,3 +3383,50 @@ surface, measurements, validation, decision, and next action.
   then measure the production B1/B2 primal and gradient throughput on the
   office CPU/A4000 hardware. Keep compile-evidence reuse separate from warm
   production-performance claims.
+
+### 2026-08-29 — match the B2 pressure and momentum diagonals
+
+- Decision D-042 replaces the B2 pressure mobility $\Delta t/\rho$ with the
+  diagonal inverse already assembled for its frozen implicit momentum
+  predictor. The local fluid-only response is returned with the momentum
+  result, so no second operator assembly, Krylov solve, padded wall field,
+  public API, option, or solver implementation is added. Pressure assembly and
+  face correction now share the same distance-weighted harmonic coefficient
+  on nonuniform transverse cells.
+- A variable-coefficient, nonuniform-grid regression closes the reconstructed
+  compact face flux to `1e-10`; the reduced B2 conservation and exact-restart
+  contract also passes unchanged. On the checksummed 101x65x65 step-32 state,
+  one history-free update reduces the momentum defect from about `3.01` to
+  `1.5208315033251738`, with divergence `2.974512041120647e-7`. Five raw or
+  freshly restarted depth-two updates remain stable but plateau near
+  `1.4926`, so this is a compatibility repair and material defect reduction,
+  not a production-convergence claim. A separate reaction-only trial failed
+  to transfer its reduced-case gain to the production mesh and was removed.
+- The candidate warm production step is `4.406` seconds versus the retained
+  `4.682`-second median. All 500 portable tests pass in 158.55 seconds (159.9
+  seconds end to end) with 95.41% combined line/branch coverage. Coverage and
+  JUnit SHA-256 digests are
+  `703c64ab850fcc1d3712c921d6ad3395c0a588af945a19899431a74b8b14a903`
+  and `441a4ca06ce909b11e617fa53a039fe93764ab103ef401194951d8dbec80506f`.
+- Ruff, formatting, byte compilation, architecture/import budgets, all seven
+  curated workflows, Sphinx HTML and external links with warnings as errors,
+  isolated build, Twine, distribution inspection, and clean-wheel primal and
+  gradient smoke pass. The wheel is 146,214 bytes and the sdist is 138,873
+  bytes; their SHA-256 digests are
+  `f13ab36cfe080099c958835e29829eb80326d5e3e34c1cbd5fc20f6c103db3fb`
+  and `5e34c8f69b6aceee468d9ef046ba04432369088a54c0fb94faa9e07f10f47cde`.
+- Committed the immutable source candidate as `dc76ee5` and repeated the
+  pinned FreeMHD B2 Docker comparison against source `14b54a3` and image
+  `sha256:535e995d557d2a73f5ab997380cb47ee3b044af8d2871bdadd570cff4cf175a8`.
+  Contract, artifacts, execution, observation, comparison, and schema all pass
+  with zero failed checks. Pressure L-infinity/RMS differences are
+  `0.010917245364311495`/`0.004517977131740069`; report and record SHA-256
+  digests are
+  `91b0bee0c2c84e63edfdb47e9cf7227e5b7157d9ef3c3decd6381f5e9b856bf3`
+  and `ec0e02af83265aad369bcd644fabf45cc0f1fae37d5bb83c123b1e9032b75ab6`.
+  `acceptance_pass=false` remains correct for the smoke-only role.
+- Next action: merge the compatible diagonal tranche and continue from the
+  remaining coupled pressure/electric plateau. Specialized B2 differentiation
+  remains unavailable until primal convergence and derivative gates both pass;
+  then measure the production B1/B2 primal and gradient throughput on the
+  office CPU/A4000 hardware.
