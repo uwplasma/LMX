@@ -2,7 +2,7 @@
 
 **Status:** active
 
-**Last updated:** 2026-08-28
+**Last updated:** 2026-08-29
 
 **Purpose:** product goal, executable roadmap, decision register, and work log
 
@@ -2893,3 +2893,53 @@ surface, measurements, validation, decision, and next action.
   simplification only where it removes duplicate work or improves a measured
   numerical/performance boundary; do not trim capabilities to chase line
   counts.
+
+### 2026-08-29 — quantify Benchmark B refinement evidence
+
+- Commit `38271879a04cbf940adfd55795028b8780187a8c` upgrades the Benchmark B
+  campaign schema from workload labels to exact numerical evidence. Every run
+  records the allocated and physical mesh shapes, cell counts, fluid volume,
+  three-dimensional characteristic spacing, and SHA-256 identities of all
+  face-coordinate arrays. Acceptance reconstructs the frozen mesh from the
+  current case contract and rejects mismatched coordinates, including the
+  device-rounded axial extent.
+- The three-grid gate now reports unequal-ratio observed order, fine-grid GCI
+  with the Celik et al. `1.25` safety factor, asymptotic-range ratio, and a
+  minimum `1.3` refinement ratio. Numerical convergence and external FreeMHD
+  validation are separate fail-closed surfaces with explicit
+  `mesh_incomplete`, `numerical_rejected`, `external_validation_open`, and
+  `accepted` states. Literature error, mesh independence, exact external
+  evidence, and final acceptance remain distinct claims.
+- B2 now persists its existing production momentum-defect history and enforces
+  a conservative `1e-3` terminal balance gate. A real coarse B2 CPU run on an
+  Apple M3 Max compiled its first update in about 32 seconds and advanced at
+  about 6 seconds per update, but its depth-two Anderson recurrence plateaued:
+  at update 48 the maximum residual was `0.006117260424545412` and the
+  momentum defect was `3.026987806821503`. The run was stopped at a valid
+  atomic checkpoint rather than relabeled as converged. Tolerances were not
+  relaxed; production B2 acceptance remains open pending a measured
+  acceleration/convergence correction.
+- All 504 tests pass in 209.69 seconds on Python 3.11.14/JAX 0.9.2/SOLVAX
+  0.18.0 with 95.36% combined line/branch coverage. Coverage and JUnit
+  SHA-256 digests are
+  `a96a185ee821f7cf5f3a8023f1853db3d68e817c2365fc2344e58cd453bc9efa`
+  and `049a7544a4d524e3b0c92148bf89bf183805078e7ada585e05977216033b0847`.
+  The changed campaign/spec gates also pass on Python 3.10/JAX 0.6.2 and
+  Python 3.13/JAX 0.11.1. Ruff, formatting, byte compilation, architecture,
+  import, Sphinx HTML/link, isolated build, Twine, wheel, and sdist gates pass;
+  the wheel is 147,212 bytes.
+- The pinned FreeMHD/OpenFOAM image was rebuilt from commit
+  `14b54a3e8e1a05b6ee4c98331995abaaae96e7a5`. The exact two-update B2 smoke
+  passes contract, artifact, execution, observation, comparison, and schema
+  checks with zero failures and unchanged pressure L-infinity/RMS differences
+  `0.010917245284750786`/`0.004517977100484136`. Report and record SHA-256
+  digests are
+  `7ba23d05a8d6f8337ef386aacf6b180f4daf7f1951b312d7392ab1888f1c8e77`
+  and `1c7e5303c684fefb4fc5351cad4c8185adc47573ad055b184d063460ad1ae4a7`.
+  `acceptance_pass=false` remains correct for the smoke-only role.
+- Next action: audit every function in the 5,833 private fringing lines for
+  production reachability, duplicated pipe/duct recurrence, redundant arrays
+  and host work, and reusable SOLVAX ownership. Preserve the validated 3-D,
+  B1, and B2 capabilities; delete or fuse only with physics, derivative,
+  runtime, and memory evidence. Then diagnose the B2 production plateau and
+  execute the frozen coarse/medium/fine campaign without weakening its gates.
