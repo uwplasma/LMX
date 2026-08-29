@@ -4171,3 +4171,26 @@ surface, measurements, validation, decision, and next action.
   not promoted by assertion. The sole active code experiment remains the
   fixed-work B2 Schur defect correction, with a reduced performance/physics
   gate before one production restart run.
+
+### 2026-08-29 — reject fixed-work predictor defect correction
+
+- Tested the sole predictor-level candidate authorized by the finalization
+  ledger. It replaced the second physical B2 momentum predictor with one
+  homogeneous frozen response to the first pressure correction, retaining two
+  pressure solves and the same number of momentum Krylov solves. It added no
+  nested inverse, solver family, public parameter, or changed stopping gate.
+- On the identical maintained 5x5x5 six-step case, current main reaches update
+  `0.01569680` and momentum defect `0.16896604` in 7.223 seconds. The candidate
+  reaches the smaller algebraic update `0.00903749` but the worse physical
+  defect `0.19460791` in 7.732 seconds: 15.2% worse momentum balance and 7.0%
+  more wall time. Charge closure remains valid, so the failure is the coupled
+  physical trajectory rather than an electric-solve breakdown.
+- The candidate fails before production promotion. Every experimental source
+  edit was deleted, no step-152 run was spent, and no numerical test or user
+  option was retained. This closes fixed-work predictor defect correction and
+  reinforces that algebraic map contraction is not an acceptance surrogate.
+- Remaining B2 work is narrowed to an operator-form coupled momentum/pressure
+  solve with a cheap non-nested approximate block inverse. It must apply the
+  frozen momentum and conservative divergence/gradient operators directly;
+  another SIMPLE/predictor correction or full momentum inverse inside a
+  pressure iteration is outside the finish queue.
