@@ -967,7 +967,7 @@ purpose.
 
 - [ ] Finish the function-level ownership and necessity audit. The first pass
   removed rejected solver lanes and decomposed the 3-D monolith, but the live
-  fringing implementation still contains 7,087 lines and one 1,662-line
+  fringing implementation still contains 7,063 lines and one 1,662-line
   orchestration function. Keep `lmx.fringing` as the only public surface while
   removing test-only helpers and duplicate recurrences; no private owner may
   remain merely because the monolith was split. Reduce the largest private
@@ -2623,3 +2623,57 @@ surface, measurements, validation, decision, and next action.
   specialized ALEX derivative gates and production-resolution matched B1/B2;
   retry one-/two-device primal, gradient, memory, and scaling evidence when the
   registered GPU host is reachable.
+
+### 2026-08-28 — reopen private-fringing trim and differentiate the B1 projection
+
+- Commit `62db12c7a82762351acdaa10fc1b477da29daf48` keeps
+  `lmx.fringing` as the only public 3-D surface. The underscore modules are not
+  compatibility copies: they own shared structured-grid, rectangular-grid,
+  cylindrical-grid, and orchestration mathematics. Their decomposition did
+  not finish the compactness work, so Phase 4's function-level audit is open
+  again with a <1,500-line immediate private-module gate, a 1,200-line target,
+  and an explicit ban on increasing the private-file count to satisfy it.
+- The physical fixed-flow pipe Schur projection now composes SOLVAX
+  `linear_solve` with its existing GMRES primal and a GMRES transpose solve.
+  The adjoint uses the actual linear transpose of the retained-modal
+  preconditioner; using the primal preconditioner produced a measurable
+  finite-tolerance derivative error and was rejected. Krylov `while_loop`
+  iterations are no longer differentiated or stored.
+- The manufactured pipe gate closes divergence and flow below `1e-9`, checks
+  the implicit VJP against centered finite differences within `1e-3`, and
+  checks JVP/VJP contraction within `1e-7`. Its compiled scalar
+  value-and-gradient uses 66,968 temporary bytes on CPU. The grid was reduced
+  from `5 x 3 x 8` to the smallest meaningful `3 x 2 x 4` system; under branch
+  coverage the gate takes 74 seconds while overlapping other shards. The
+  complete covered suite passes all 505 tests in 184.1 seconds at 95.26%
+  combined branch coverage. Coverage and JUnit SHA-256 digests are
+  `0a7da854194aab8e011277d5cc32813f05aa0adee90fe9cf87dadac99e3ec60c`
+  and `fca92d258f6e977c52028d12fd54aff89b01693933466818593ad794b53d2341`.
+- Complete concurrent compatibility matrices pass all 505 tests on Python
+  3.10.21/JAX 0.6.2/SOLVAX 0.18.0 in 281.2 seconds and Python
+  3.13.9/JAX 0.11.1/SOLVAX 0.18.0 in 251.8 seconds. Their JUnit SHA-256
+  digests are
+  `e82b0ce60ca1802f4d25ef00a85d42b79a8920afa814d03aa2c822437383ac6a`
+  and `6fd001c507d7bdf401cc2cdf5a1021658c4786ff634700a1110b95ac2aa2ecad`.
+- Ruff, formatting, architecture, all curated workflows, Sphinx HTML and
+  external links with warnings as errors, isolated build, Twine, distribution
+  inspection, and a fresh non-editable-wheel TOML solve pass. The wheel and
+  sdist are 148,619 and 140,570 bytes with SHA-256 digests
+  `e820f021b4c3de30085d570eb1f496659cfae1e5e2e5a02f4120ee4c0934fb73`
+  and `66aef271fc27f4849a10f2a0d7300393799d25db2f573b1addea95febf97562f`.
+  Package source is 15,210 lines across 16 modules; all five fringing files
+  total 7,063 lines, tests remain exactly at the 11,900-line ceiling, and the
+  root API remains 28 names.
+- The clean pinned FreeMHD Docker smoke passes contract, artifact, execution,
+  observation, comparison, and schema gates with zero failed checks and
+  pressure L-infinity/RMS discrepancies `0.0109172`/`0.00451798`. Report and
+  record SHA-256 digests are
+  `147d89ef93458e3090a2da23e7315ae0419c902f063f077ba9fe05831f253612`
+  and `52bd15916390473b2ffdc12e0edecef59199cd46ff0ed84fa5d2bd6fbe5f7c3c`.
+  The two-update smoke remains non-accepting by role. The office A4000 host
+  timed out again, so GPU and strong-scaling claims remain open.
+- Next action: split the 1,662-line orchestration function by physical phase
+  without adding files, remove remaining duplicate pipe/duct recurrences, and
+  use the accepted implicit projection inside a traced production B1
+  recurrence. Production B1/B2 derivative, refinement, GPU, and scaling claims
+  remain open until their independent gates pass.
