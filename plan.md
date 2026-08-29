@@ -2988,6 +2988,11 @@ surface, measurements, validation, decision, and next action.
   `49fcb194e86d189b07fc8bc825f7e6bd23c4d6ab0d370805c049fa906bc31ba1`
   and `6cad316c71ef82c4ea79793dc1f2bd645aed8a6d27be7c9601914ebf132f7ce7`.
   `acceptance_pass=false` remains correct for the smoke-only role.
+- PR #25 created all seven hosted CI, documentation, and external-validation
+  jobs, but every job ended before its first step with the same GitHub Actions
+  account billing/spending-limit annotation. This is recorded as unavailable
+  hosted execution, not numerical evidence; the equivalent local gates above
+  are the merge evidence under the approved temporary policy.
 - Next action: audit the remaining large recurrence/finalization functions for
   measurable duplicate work and allocations, especially the shared pipe/duct
   orchestration in `_fringing_solver.py`. Fuse private owners only when the
