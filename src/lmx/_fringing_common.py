@@ -65,6 +65,12 @@ _FRINGING_MODAL_FACTOR_CACHE: dict[tuple[object, ...], object] = {}
 _MIXED_AXIAL_PRESSURE_MODE = "inlet_neumann_outlet_dirichlet_zero"
 
 
+def _cross(a, b):
+    ax, ay, az = a
+    bx, by, bz = b
+    return ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx
+
+
 def _reuse_fringing_jit(key: tuple[object, ...], function: Callable) -> Callable:
     """Reuse an identical compiled production kernel across repeated solves."""
 
