@@ -4194,3 +4194,37 @@ surface, measurements, validation, decision, and next action.
   frozen momentum and conservative divergence/gradient operators directly;
   another SIMPLE/predictor correction or full momentum inverse inside a
   pressure iteration is outside the finish queue.
+
+### 2026-08-29 — reject direct transient block correction
+
+- Implemented a disposable matrix-free correction system using the exact
+  production frozen momentum action, conservative pressure force, mixed-
+  boundary velocity divergence, and SOLVAX Schur composition. The block solve
+  acted directly on velocity/pressure pytrees and applied no dense production
+  matrix. One physical predictor, one block correction, and one final pressure
+  reconstruction replaced the retained two predictor/projection correctors.
+- A cheap diagonal momentum/pressure block inverse did not certify the block
+  solve at the inherited `1e-10` tolerance. Replacing only its pressure action
+  with the retained converged pressure inverse made the reduced boundary and
+  restart test pass, isolating preconditioner accuracy without changing the
+  candidate physical trajectory.
+- On the identical strict 5x5x5 six-step case, main reaches update
+  `0.01569680` and momentum defect `0.16896604` in 7.223 seconds. The converged-
+  pressure block diagnostic reaches update `0.00903564` and the worse momentum
+  defect `0.18329578` in 8.198 seconds: 8.5% worse physical balance and 13.5%
+  more wall time. The cheap inverse gives `0.18335636` in 7.841 seconds and
+  fails its linear-convergence flag. Both reproduce the same incorrect
+  physical direction despite visibly smaller algebraic updates.
+- The direct transient correction therefore fails the reduced physics/time
+  gate and receives no step-152 run. All source edits, sharding signatures,
+  helper functions, and imports were deleted; no test, file, parameter, or API
+  remains. This exhausts pressure corrections around the transient predictor,
+  including diagonal, exact-response, fixed-work, nested, and direct-block
+  variants recorded above.
+- Terminal B2 now requires a formulation-level steady residual containing
+  momentum, conservative mass flux, electric potential/current, pressure,
+  fixed flow, and Lorentz coupling in one square system. Further retuning of
+  the retained transient map is outside the finish queue. Before source
+  integration, that residual must pass term-by-term scale/units and reduced
+  Jacobian-rank audits; SOLVAX then owns globalization and implicit
+  tangent/transpose solves.
