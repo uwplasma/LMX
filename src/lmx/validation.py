@@ -23,9 +23,15 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
     import tomli as tomllib
 
 from .cases import make_hartmann_case
-from .mesh import StructuredMesh
+from .mesh import StructuredMesh, _cross_section_mesh, sample_tabulated_field_volume
 from .physics import dynamic_to_kinematic_viscosity, hartmann_number, wall_conductance_ratio
-from .specs import CaseSpec, Solution
+from .specs import (
+    CaseSpec,
+    ExtrudedFieldBundle,
+    ExtrudedInductionlessSolution,
+    ExtrudedInductionlessValidation,
+    Solution,
+)
 
 
 @dataclass(frozen=True)
@@ -1082,3 +1088,278 @@ def write_benchmark_report(report: dict[str, float | str], path: str | Path) -> 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report, indent=2))
     return path
+
+
+def _safe_correlation(x: jnp.ndarray, y: jnp.ndarray) -> float:
+    x, y = x - jnp.mean(x), y - jnp.mean(y)
+    scale = jnp.sqrt(jnp.sum(x**2) * jnp.sum(y**2))
+    return float(jnp.where(scale > 0.0, jnp.sum(x * y) / scale, 0.0))
+
+
+def _bundle_station_history(bundle: ExtrudedFieldBundle) -> tuple[dict[str, float], ...]:
+    zeros = jnp.zeros_like(bundle.x)
+    axial_pressure = getattr(bundle, "axial_pressure_loss_gradient", zeros)
+    transverse_pressure = getattr(bundle, "transverse_pressure_difference", zeros)
+    columns = {
+        "x": bundle.x,
+        "field_scale": bundle.field_scale,
+        "u_max": jnp.max(jnp.abs(bundle.u), axis=(1, 2)),
+        "mean_velocity": bundle.mean_velocity,
+        "volumetric_flow_rate": bundle.volumetric_flow_rate,
+        "axial_current": bundle.axial_current,
+        "wall_current_leakage": bundle.wall_current_leakage,
+        "current_scaled_pressure_proxy": bundle.current_scaled_pressure_proxy,
+        "axial_pressure_loss_gradient": axial_pressure if axial_pressure.size else zeros,
+        "transverse_pressure_difference": transverse_pressure if transverse_pressure.size else zeros,
+        "pressure_span": jnp.max(bundle.p, axis=(1, 2)) - jnp.min(bundle.p, axis=(1, 2)),
+        "residual": bundle.residual,
+        "charge_balance_residual": bundle.charge_balance_residual,
+        "boundary_current_residual": bundle.boundary_current_residual,
+    }
+    rows = np.asarray(jnp.stack(tuple(columns.values()), axis=1))
+    return tuple(dict(zip(columns, map(float, row), strict=True)) for row in rows)
+
+
+def validate_variable_field_extruded_solution(
+    solution: ExtrudedInductionlessSolution,
+    *,
+    field_ny: int = 81,
+    field_nz: int = 81,
+) -> dict[str, float | bool]:
+    if solution.problem.case.geometry.kind not in {"rect_duct", "layered_duct"}:
+        raise ValueError(
+            "Variable-field extruded validation currently supports rectangular and layered ducts only"
+        )
+    field_metrics = _variable_field_metrics(solution, field_ny=field_ny, field_nz=field_nz)
+    validation = solution.validation
+    finite_velocity = bool(np.isfinite(np.asarray(solution.bundle.u, dtype=float)).all())
+    field_scale = np.asarray(solution.bundle.field_scale, dtype=float)
+    mean_velocity = np.asarray(solution.bundle.mean_velocity, dtype=float)
+    current_proxy = np.asarray(solution.bundle.current_scaled_pressure_proxy, dtype=float)
+    field_velocity_correlation = float(
+        _safe_correlation(jnp.asarray(field_scale), jnp.asarray(mean_velocity))
+    )
+    velocity_change = float(np.max(mean_velocity) - np.min(mean_velocity)) if mean_velocity.size else 0.0
+    current_proxy_change = float(np.max(current_proxy) - np.min(current_proxy)) if current_proxy.size else 0.0
+    charge_limit = 5.0e-2 if solution.problem.case.geometry.kind == "rect_duct" else 2.0e-1
+    validation_pass = bool(
+        finite_velocity
+        and field_metrics["rms_divergence"] <= 5.0e-2
+        and validation.max_charge_balance_residual <= charge_limit
+        and validation.net_boundary_current_residual <= 1.0e-8
+        and validation.max_wall_current_leakage <= 1.0e-8
+        and abs(field_velocity_correlation) >= 0.2
+        and velocity_change > 1.0e-8
+        and current_proxy_change > 1.0e-8
+    )
+    return {
+        **field_metrics,
+        "finite_velocity": finite_velocity,
+        "field_velocity_correlation": field_velocity_correlation,
+        "mean_velocity_change": velocity_change,
+        "current_proxy_change": current_proxy_change,
+        "max_charge_balance_residual": float(validation.max_charge_balance_residual),
+        "max_wall_current_leakage": float(validation.max_wall_current_leakage),
+        "net_boundary_current_residual": float(validation.net_boundary_current_residual),
+        "validation_pass": validation_pass,
+    }
+
+
+def validate_variable_field_pipe_solution(
+    solution: ExtrudedInductionlessSolution,
+    *,
+    field_ny: int = 81,
+    field_nz: int = 81,
+) -> dict[str, float | bool]:
+    if solution.problem.case.geometry.kind != "pipe_ogrid":
+        raise ValueError("Variable-field pipe validation requires pipe_ogrid geometry")
+    field_metrics = _variable_field_metrics(solution, field_ny=field_ny, field_nz=field_nz)
+    validation = solution.validation
+    mean_velocity = np.asarray(solution.bundle.mean_velocity, dtype=float)
+    current_proxy = np.asarray(solution.bundle.current_scaled_pressure_proxy, dtype=float)
+    velocity_change = float(np.max(mean_velocity) - np.min(mean_velocity)) if mean_velocity.size else 0.0
+    current_proxy_change = float(np.max(current_proxy) - np.min(current_proxy)) if current_proxy.size else 0.0
+    divergence_ratio = float(
+        field_metrics["rms_divergence"] / max(field_metrics["mean_field_magnitude"], 1.0e-12)
+    )
+    validation_pass = bool(
+        divergence_ratio <= 8.0e-2
+        and validation.max_charge_balance_residual <= 6.0e-2
+        and validation.net_boundary_current_residual <= 1.0e-8
+        and validation.max_wall_current_leakage <= 1.0e-8
+        and current_proxy_change > 1.0e-6
+    )
+    return {
+        **field_metrics,
+        "divergence_to_field_ratio": divergence_ratio,
+        "mean_velocity_change": velocity_change,
+        "current_proxy_change": current_proxy_change,
+        "max_charge_balance_residual": float(validation.max_charge_balance_residual),
+        "max_wall_current_leakage": float(validation.max_wall_current_leakage),
+        "net_boundary_current_residual": float(validation.net_boundary_current_residual),
+        "validation_pass": validation_pass,
+    }
+
+
+def _variable_field_metrics(
+    solution: ExtrudedInductionlessSolution,
+    *,
+    field_ny: int = 81,
+    field_nz: int = 81,
+) -> dict[str, float]:
+    field_kind = solution.problem.case.magnetic_field.kind
+    geometry = solution.problem.case.geometry
+    if field_kind == "analytic" and solution.problem.case.magnetic_field.fn is not None:
+        from .mesh import cross_section_divergence_metrics
+
+        return cross_section_divergence_metrics(
+            solution.problem.case.magnetic_field.fn,
+            width=geometry.width,
+            height=geometry.height,
+            ny=field_ny,
+            nz=field_nz,
+        )
+    if field_kind == "tabulated":
+        # The bundle does not store B explicitly, so resample the tabulated field at the magnet mid-station.
+        mesh = _cross_section_mesh(solution.problem.case)
+        x_mid = np.full((mesh.ny, mesh.nz), 0.5 * geometry.length, dtype=float)
+        y_mid, z_mid = np.meshgrid(
+            np.asarray(mesh.y_centers, dtype=float),
+            np.asarray(mesh.z_centers, dtype=float),
+            indexing="ij",
+        )
+        sampled = sample_tabulated_field_volume(
+            solution.problem.case.magnetic_field.table_path,
+            x=x_mid,
+            y=y_mid,
+            z=z_mid,
+        )
+        by = np.asarray(sampled[..., 1], dtype=float)
+        bz = np.asarray(sampled[..., 2], dtype=float)
+        dy = float(mesh.y_centers[1] - mesh.y_centers[0]) if mesh.ny > 1 else 1.0
+        dz = float(mesh.z_centers[1] - mesh.z_centers[0]) if mesh.nz > 1 else 1.0
+        div = np.gradient(by, dy, axis=0) + np.gradient(bz, dz, axis=1)
+        magnitude = np.sqrt(by**2 + bz**2)
+        return {
+            "max_abs_divergence": float(np.max(np.abs(div))),
+            "rms_divergence": float(np.sqrt(np.mean(div**2))),
+            "mean_field_magnitude": float(np.mean(magnitude)),
+        }
+    raise ValueError("Variable-field validation currently supports analytic and tabulated magnetic fields")
+
+
+def validate_magnetic_obstacle_baseline(
+    solution: ExtrudedInductionlessSolution,
+    *,
+    field_ny: int = 81,
+    field_nz: int = 81,
+) -> dict[str, float | bool | str]:
+    if solution.problem.case.geometry.kind != "rect_duct":
+        raise ValueError("Magnetic-obstacle baseline currently supports rectangular ducts only")
+    field_metrics = _variable_field_metrics(solution, field_ny=field_ny, field_nz=field_nz)
+    bundle = solution.bundle
+    validation = solution.validation
+    field_scale = np.asarray(bundle.field_scale, dtype=float)
+    mean_velocity = np.asarray(bundle.mean_velocity, dtype=float)
+    current_proxy = np.asarray(bundle.current_scaled_pressure_proxy, dtype=float)
+    peak_index = int(np.argmax(field_scale)) if field_scale.size else 0
+    inlet_reference = float(mean_velocity[0]) if mean_velocity.size else 0.0
+    obstacle_velocity_deficit = (
+        float(inlet_reference - mean_velocity[peak_index]) if mean_velocity.size else 0.0
+    )
+    current_proxy_peak = float(np.max(current_proxy)) if current_proxy.size else 0.0
+    field_velocity_correlation = float(
+        _safe_correlation(jnp.asarray(field_scale), jnp.asarray(mean_velocity))
+    )
+    divergence_to_field_ratio = float(
+        field_metrics["rms_divergence"] / max(field_metrics["mean_field_magnitude"], 1.0e-12)
+    )
+    field_quality_pass = bool(divergence_to_field_ratio <= 2.5e-2)
+    conservation_pass = bool(
+        validation.max_charge_balance_residual <= 5.0e-2
+        and validation.net_boundary_current_residual <= 1.0e-8
+        and validation.max_wall_current_leakage <= 1.0e-8
+    )
+    response_observable_pass = bool(
+        obstacle_velocity_deficit > 1.0e-8
+        and current_proxy_peak > 1.0e-8
+        and field_velocity_correlation < -0.2
+    )
+    validation_pass = bool(field_quality_pass and conservation_pass and response_observable_pass)
+    return {
+        **field_metrics,
+        "divergence_to_field_ratio": divergence_to_field_ratio,
+        "obstacle_velocity_deficit": obstacle_velocity_deficit,
+        "current_proxy_peak": current_proxy_peak,
+        "field_velocity_correlation": field_velocity_correlation,
+        "max_charge_balance_residual": float(validation.max_charge_balance_residual),
+        "max_wall_current_leakage": float(validation.max_wall_current_leakage),
+        "net_boundary_current_residual": float(validation.net_boundary_current_residual),
+        "field_quality_pass": field_quality_pass,
+        "conservation_pass": conservation_pass,
+        "response_observable_pass": response_observable_pass,
+        "reference_kind": "none",
+        "external_reference_available": False,
+        "research_grade_validation_pass": False,
+        "validation_pass": validation_pass,
+    }
+
+
+def validate_extruded_inductionless_solution(
+    bundle: ExtrudedFieldBundle,
+    *,
+    station_history: list[dict[str, float]] | tuple[dict[str, float], ...] | None = None,
+) -> ExtrudedInductionlessValidation:
+    required = (
+        "field_scale",
+        "u_max",
+        "mean_velocity",
+        "volumetric_flow_rate",
+        "axial_current",
+        "wall_current_leakage",
+        "residual",
+        "charge_balance_residual",
+        "boundary_current_residual",
+        "pressure_span",
+    )
+    history = tuple(station_history or ())
+    if len(history) != bundle.x.shape[0] or any(any(name not in row for name in required) for row in history):
+        history = _bundle_station_history(bundle)
+    values = {name: np.asarray([row[name] for row in history], dtype=float) for name in required}
+    field_scale, mean_velocity = values["field_scale"], values["mean_velocity"]
+    centered_field = field_scale - np.mean(field_scale)
+    centered_velocity = mean_velocity - np.mean(mean_velocity)
+    correlation_scale = np.sqrt(np.sum(centered_field**2) * np.sum(centered_velocity**2))
+    correlation = (
+        float(np.sum(centered_field * centered_velocity) / correlation_scale)
+        if correlation_scale > 0.0
+        else 0.0
+    )
+    axial_current, pressure_span = values["axial_current"], values["pressure_span"]
+    component_history = np.asarray(getattr(bundle, "iteration_component_residual_history", jnp.zeros((0, 6))))
+
+    def center(array):
+        return float(np.mean(array[(array.size - 1) // 2 : array.size // 2 + 1]))
+
+    return ExtrudedInductionlessValidation(
+        station_count=int(bundle.x.shape[0]),
+        max_residual=float(np.max(np.abs(values["residual"]))),
+        max_charge_balance_residual=float(np.max(np.abs(values["charge_balance_residual"]))),
+        mean_velocity_span=float(np.ptp(mean_velocity)),
+        volumetric_flow_rate_span=float(np.ptp(values["volumetric_flow_rate"])),
+        axial_current_span=float(np.ptp(axial_current)),
+        axial_current_mirror_residual=float(np.max(np.abs(axial_current + axial_current[::-1]))),
+        max_wall_current_leakage=float(np.max(np.abs(values["wall_current_leakage"]))),
+        net_boundary_current_residual=float(np.max(np.abs(values["boundary_current_residual"]))),
+        field_mean_velocity_correlation=correlation,
+        peak_velocity_span=float(np.ptp(values["u_max"])),
+        pressure_span_range=float(np.ptp(pressure_span)),
+        pressure_span_mirror_residual=float(np.max(np.abs(pressure_span - pressure_span[::-1]))),
+        center_axial_current=center(axial_current),
+        center_pressure_span=center(pressure_span),
+        max_divergence_residual=(
+            float(component_history[-1, 3])
+            if component_history.ndim == 2 and component_history.shape[0]
+            else 0.0
+        ),
+    )
