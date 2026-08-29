@@ -287,7 +287,7 @@ def write_extruded_bundle_restart_npz(
             raise ValueError("B2 Anderson restart state must be all-or-none")
         anderson_arrays = tuple(np.asarray(value) for value in anderson_state)
         if (
-            anderson_arrays[0].shape != (4, *np.asarray(bundle.u).shape)
+            anderson_arrays[0].shape != (3, *np.asarray(bundle.u).shape)
             or anderson_arrays[0].shape != anderson_arrays[1].shape
             or not has_compact_flux
             or anderson_arrays[2].shape != np.asarray(rho_phi_plus).shape
@@ -485,7 +485,7 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
             tuple(jnp.asarray(data[field]) for field in _B2_ANDERSON_FIELDS) if has_anderson else None
         )
         if has_anderson and (
-            anderson_state[0].shape != (4, *data["u"].shape)
+            anderson_state[0].shape != (3, *data["u"].shape)
             or anderson_state[0].shape != anderson_state[1].shape
             or anderson_state[2].shape != data["rho_phi_plus"].shape
             or anderson_state[3].shape != data["rho_phi_inlet"].shape

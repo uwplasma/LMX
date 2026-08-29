@@ -302,7 +302,6 @@ def _restore_duct_iteration_state(
     use_b2: bool,
     velocity: jnp.ndarray,
     velocity_scale: float,
-    potential_scale: float,
     forcing: float,
 ):
     """Restore current duct histories and fixed-point accelerator state."""
@@ -358,7 +357,7 @@ def _restore_duct_iteration_state(
             previous_fixed_residual = None
         elif previous_fixed_residual is not None:
             previous_fixed_residual = jnp.asarray(previous_fixed_residual, dtype=velocity.dtype)
-            if previous_fixed_residual.shape != (4, *velocity.shape):
+            if previous_fixed_residual.shape != (3, *velocity.shape):
                 raise ValueError("B2 restart Aitken residual has inconsistent shape")
 
     previous_mapped = previous_anderson_residual = None
@@ -373,13 +372,11 @@ def _restore_duct_iteration_state(
             previous_mapped, previous_anderson_residual, previous_flux, previous_inlet = (
                 jnp.asarray(value, dtype=velocity.dtype) for value in restart_anderson
             )
-            expected = (4, *velocity.shape)
+            expected = (3, *velocity.shape)
             if previous_mapped.shape != expected or previous_anderson_residual.shape != expected:
                 raise ValueError("B2 restart Anderson field state has inconsistent shape")
 
-    fixed_scale = jnp.asarray(
-        [velocity_scale, velocity_scale, velocity_scale, potential_scale], dtype=velocity.dtype
-    )[:, None, None, None]
+    fixed_scale = jnp.full((3, 1, 1, 1), velocity_scale, dtype=velocity.dtype)
     return (
         *histories,
         completed_steps,

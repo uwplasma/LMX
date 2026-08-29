@@ -16,6 +16,11 @@ For a three-dimensional result, use `write_extruded_restart_npz`,
 validation rejects mismatched geometry, mesh shape, material arrays, or field
 metadata before a restart enters the solver.
 
+B2 restart files retain the compact conservative face fluxes and only the
+three-component mechanical accelerator state. Electric potential is already
+closed on the accepted velocity and does not require a duplicate accelerator
+history.
+
 `write_solution_outputs` and `write_extruded_solution_outputs` honor the
 case's `OutputSpec`. Prefer NPZ plus JSON for repeatable studies. Enable VTK
 only when a downstream visualization tool needs it, and keep generated output
