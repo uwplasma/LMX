@@ -3189,3 +3189,13 @@ surface, measurements, validation, decision, and next action.
   extracted; keep pipe modal factors geometry-local. Acceptance requires a
   dense reduced identity, coarse momentum reduction, lower total runtime than
   continued recurrence, bounded implicit transpose memory, and exact restart.
+- A separate face-identity check tested distance-weighted transverse velocity
+  interpolation in the pressure projection, matching the compact-flux
+  initializer on the nonuniform wall mesh. Projection conservation and reduced
+  restart tests passed, but the reduced six-step result worsened from update /
+  momentum `0.0168165 / 0.0472907` to `0.0311214 / 0.0526960`. One continuation
+  from the exact coarse restart cost 30.41 seconds, worsened the update to
+  `0.00446561`, and changed momentum only to `3.00643`. The source change was
+  removed. This rules out interpolation weighting alone; the accepted next
+  operator remains the full compatible momentum response, not a face-flux
+  cosmetic correction.
