@@ -3840,3 +3840,13 @@ surface, measurements, validation, decision, and next action.
   repeated generic duct/pipe recurrences, and private-only test imports. A file
   will be deleted when that work leaves no coherent mathematical owner, not by
   concatenating unchanged code into `fringing.py`.
+- The immutable source candidate is
+  `f4b36250cda64a9809bb335df9d835b51c131144`. The pinned two-rank Docker
+  comparison passes against FreeMHD `14b54a3` and image
+  `sha256:535e995d557d2a73f5ab997380cb47ee3b044af8d2871bdadd570cff4cf175a8`
+  with zero failed checks. Pressure L-infinity/RMS differences remain
+  `0.006838504934992036`/`0.0030649109539923614`; report and record SHA-256
+  digests are
+  `3a78bb769955f0c9956dba691a8bf977efe82b7321136b8128588f12304d836d`
+  and `cbb04c6974c771e9f95eac2f6652d0e0ceccb848d11525554e2d4d3b00f63887`.
+  `acceptance_pass=false` remains correct for the smoke-only role.
