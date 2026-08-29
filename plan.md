@@ -15,9 +15,9 @@ supported current state.
 The live root is the enforced repository baseline. The latest ordinary
 authenticated clone measurement is 2,304 KiB total, including 588 KiB of Git
 data and a 463.39 KiB pack. The current candidate contains 88 tracked files,
-1,813,079 bytes of tracked data, 15 package modules, and 28 root exports. Its
-complete six-worker portable gate passes 500 tests in 154.98 seconds with
-95.43% combined line/branch coverage. Every change below must preserve the
+1,821,142 bytes of tracked data, 15 package modules, and 28 root exports. Its
+complete six-worker portable gate passes 500 tests in 158.55 seconds with
+95.41% combined line/branch coverage. Every change below must preserve the
 normal-clone limit of 9,766 KiB and the file, API, five-minute test-time, and
 coverage budgets. The capability-adjusted ceiling remains 15,370 package lines
 across at most 16 modules.
@@ -3415,8 +3415,18 @@ surface, measurements, validation, decision, and next action.
   bytes; their SHA-256 digests are
   `f13ab36cfe080099c958835e29829eb80326d5e3e34c1cbd5fc20f6c103db3fb`
   and `5e34c8f69b6aceee468d9ef046ba04432369088a54c0fb94faa9e07f10f47cde`.
-- Next action: commit the immutable source candidate and repeat the pinned
-  FreeMHD B2 Docker comparison. If that independent boundary passes, merge the
-  tranche and continue from the remaining coupled pressure/electric plateau;
-  specialized B2 differentiation remains unavailable until primal convergence
-  and derivative gates both pass.
+- Committed the immutable source candidate as `dc76ee5` and repeated the
+  pinned FreeMHD B2 Docker comparison against source `14b54a3` and image
+  `sha256:535e995d557d2a73f5ab997380cb47ee3b044af8d2871bdadd570cff4cf175a8`.
+  Contract, artifacts, execution, observation, comparison, and schema all pass
+  with zero failed checks. Pressure L-infinity/RMS differences are
+  `0.010917245364311495`/`0.004517977131740069`; report and record SHA-256
+  digests are
+  `91b0bee0c2c84e63edfdb47e9cf7227e5b7157d9ef3c3decd6381f5e9b856bf3`
+  and `ec0e02af83265aad369bcd644fabf45cc0f1fae37d5bb83c123b1e9032b75ab6`.
+  `acceptance_pass=false` remains correct for the smoke-only role.
+- Next action: merge the compatible diagonal tranche and continue from the
+  remaining coupled pressure/electric plateau. Specialized B2 differentiation
+  remains unavailable until primal convergence and derivative gates both pass;
+  then measure the production B1/B2 primal and gradient throughput on the
+  office CPU/A4000 hardware.
