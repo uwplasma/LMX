@@ -42,6 +42,29 @@ Work proceeds in this order:
    movie, performance tables, validation matrix, and concise current-state
    documentation; then perform the one final history rewrite and public release.
 
+### Finalization ledger
+
+No new solver family, example, public API, documentation architecture, or
+standalone trimming tranche enters the finish queue. A change must close one
+of the gates below or remove work from its critical path.
+
+| Order | Deliverable | Current state | Completion evidence | Stop condition |
+|---:|---|---|---|---|
+| 1 | Terminal CPU B2 primal | **active**: exact step-152 restart is conservative but momentum defect is `0.13780740` | declared coarse-mesh momentum, mass, charge, pressure, restart, runtime, and peak-memory gates | promote a bounded Schur/block method only if it improves physical defect per second; otherwise delete it |
+| 2 | B2 implicit derivative | blocked only by gate 1 | tangent/transpose residual, Taylor, JVP/VJP, finite difference, warm runtime, and peak memory on the accepted equation | no differentiation through nonlinear or Krylov histories |
+| 3 | Matched B1 external validation | case construction required: the pinned FreeMHD source has no ready ALEX B1 pipe case | independently executed identical equations, annulus, drive, controls, mesh study, and pressure/flow observable | do not relabel the existing internal B1 benchmark as external evidence |
+| 4 | Fusion-design demonstration | implementation exists; production evidence waits for gate 2 | one bounded field/wall/geometry study with independently checked gradients and selected Pareto points | use LMX objectives and an external optimizer; add no optimizer framework |
+| 5 | GPU parity and scaling | explicitly deferred until gates 1--4; office runner unavailable | synchronized one-/two-A4000 primal and gradient measurements with memory and collective counts | make no GPU speed or scaling claim from emulated devices |
+| 6 | Release qualification | blocked by gates 1--5 and GitHub billing | one commit passes complete validation, clean install/clone, docs, package, citation, and release artifact checks | no repeated release matrix before the candidate is feature-complete |
+
+Everything else in this document is specification, completed evidence, or
+historical engineering log. The next numerical experiment is exactly one
+fixed-work Schur defect-correction candidate using the production frozen
+momentum response and retained pressure solve on the reduced fixture. It earns
+one exact step-152 comparison only after beating the retained reduced map in
+both physical defect and warm time. Failure deletes the experiment and closes
+that algorithmic branch; it does not create another user option.
+
 The numerical policy is fixed for these priorities: converged linear and steady
 systems use implicit derivatives; finite trajectories use selective
 checkpointing rather than storing every iteration; explicit axial sharding
@@ -70,11 +93,12 @@ disables it. Unknown executable paths fail closed to the complete suite.
 
 ## Active physics and performance tranche
 
-The live root is the enforced repository baseline. The current candidate
-contains 87 tracked files, 1,832,829 bytes of tracked data, 15 package modules,
-14,754 package lines, and 28 root exports. All 503 tests have passing candidate
-evidence with 95.29% combined line/branch coverage; the B2-affected gate
-selected 213 tests and completed in 103.9 seconds. Every change below must preserve the
+The live root is the enforced repository baseline. Commit `d4dcc9b` contains
+87 tracked files, 1,847,518 bytes of tracked data, 15 package modules, 14,793
+package lines, 11,950 test lines, and 28 root exports. Its latest complete
+qualification passes 501 tests with 95.24% combined line/branch coverage; the
+latest B2-affected gate selected 211 tests and completed in 84.0 seconds end to
+end. Every change below must preserve the
 normal-clone limit of 9,766 KiB and the file, API, five-minute test-time, and
 coverage budgets. The capability-adjusted ceiling remains 15,370 package lines
 across at most 16 modules.
@@ -1023,27 +1047,16 @@ purpose.
 
 ### Phase 4 — simplify and optimize the supported solver
 
-- [ ] Finish the function-level ownership and necessity audit. The initial passes
-  removed rejected solver lanes, decomposed the 3-D monolith, and deleted
-  non-production private testbeds, but the committed fringing implementation
-  currently contains 6,005 lines: 1,724 lines in the public `lmx.fringing`
-  orchestration/API layer and 4,281 lines in three private numerical owners.
-  Keep
-  `lmx.fringing` as the only public surface while removing unreachable helpers,
-  duplicate recurrences, redundant materialization, and reusable algebra that
-  belongs in SOLVAX. No private owner may remain merely because the monolith
-  was split, and four files just below a mechanical line ceiling do not count
-  as completed simplification. Prefer fewer owners when responsibilities can
-  be fused without creating a mega-module; otherwise retain the common, duct,
-  pipe, and orchestration boundaries only when their production dependencies
-  and performance measurements justify them. In particular, converge the
-  generic and frozen ALEX B1/B2 recurrences onto shared production operators;
-  delete a specialized branch only after its physics, restart, derivative,
-  performance, and external-validation gates pass through the replacement.
-  Target 1,200 lines per owner and decompose the current 638-line pipe and
-  788-line duct orchestrators around stable mathematical phases. Do not
-  increase the private-file count, flatten the kernels into a mega-module, or
-  move lines between files to satisfy a size metric.
+- [x] Finish the function-level ownership and necessity audit. Repeated
+  reachability and production-call audits removed the solver façade, rejected
+  lanes, private testbeds, duplicate recurrences, and generic algebra now owned
+  by SOLVAX. The retained 6,000-line fringing implementation has one public
+  orchestration/API owner plus common, duct, and pipe numerical owners; each is
+  reached by protected production, restart, differentiation, B1/B2, or
+  validation paths. Fusing them would enlarge the public module or mix
+  coordinate systems without removing work. No further line-count-only tranche
+  is authorized; code encountered while closing a finalization gate is still
+  simplified in place.
 - [x] Reuse coefficients, factors, preconditioners, and initial guesses.
 - [x] Make full histories opt-in and remove plot-only work from solves.
 - [x] Consolidate JIT boundaries and eliminate hot-path host transfers.
@@ -4135,3 +4148,26 @@ surface, measurements, validation, decision, and next action.
   steps. Each check-run annotation reports the same account payment/spending-
   limit condition, and all downstream jobs were skipped. The targeted local
   evidence is therefore merge authority under the active temporary policy.
+
+### 2026-08-29 — lock the finalization queue
+
+- PR #49 merged the private frozen-momentum response at
+  `d4dcc9b63ab630ffd857fa99b595be692f324964`. The live architecture inventory
+  is 87 tracked files, 1,847,518 bytes, 15 modules, 14,793 package lines,
+  11,950 test lines, 28 root exports, and seven curated examples.
+- Converted the broad roadmap into six ordered finish gates: terminal CPU B2
+  primal, its implicit derivative, matched B1 external validation, one fusion-
+  design demonstration, deferred real-GPU evidence, and one release
+  qualification. Completed repository, API, documentation, Q2D, packaging,
+  and ownership work is no longer eligible for standalone follow-up tranches.
+- Closed the function-level ownership audit. All four retained fringing owners
+  have protected production responsibilities, while the rejected façade,
+  testbeds, histories, proxies, and general numerical algebra have already
+  been removed or moved to SOLVAX. Future simplification is opportunistic and
+  must accompany a finish-gate change.
+- Inspected the pinned local FreeMHD source before scheduling B1 validation.
+  It contains no ready ALEX B1 circular-pipe case, so that gate requires an
+  independently specified matched case; the current internal B1 benchmark is
+  not promoted by assertion. The sole active code experiment remains the
+  fixed-work B2 Schur defect correction, with a reduced performance/physics
+  gate before one production restart run.
