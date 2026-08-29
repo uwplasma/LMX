@@ -181,6 +181,13 @@ EXTRUDED_HISTORY_WIDTHS = (
     ("iteration_courant_history", 3),
 )
 
+EXTRUDED_RESULT_FIELDS = tuple(
+    """x y z field_scale u v w p phi jx jy jz lorentz_x lorentz_y lorentz_z residual
+    volumetric_flow_rate mean_velocity axial_current wall_current_leakage current_scaled_pressure_proxy
+    charge_balance_residual boundary_current_residual axial_pressure_loss_gradient
+    transverse_pressure_difference""".split()
+)
+
 
 @dataclass(frozen=True)
 class FringingProfile:
@@ -251,13 +258,13 @@ class ExtrudedFieldBundle:
         **metadata,
     ) -> ExtrudedFieldBundle:
         """Assemble the grouped field and station diagnostics produced by a solver."""
-        names = (
-            "x y z field_scale u v w p phi jx jy jz lorentz_x lorentz_y lorentz_z residual "
-            "volumetric_flow_rate mean_velocity axial_current wall_current_leakage "
-            "current_scaled_pressure_proxy charge_balance_residual boundary_current_residual "
-            "axial_pressure_loss_gradient transverse_pressure_difference"
-        ).split()
-        values = dict(zip(names, (*coordinates, *fields, *current, *lorentz, *diagnostics), strict=True))
+        values = dict(
+            zip(
+                EXTRUDED_RESULT_FIELDS,
+                (*coordinates, *fields, *current, *lorentz, *diagnostics),
+                strict=True,
+            )
+        )
         return cls(geometry_kind=geometry_kind, solver_kind=solver_kind, **values, **metadata)
 
 

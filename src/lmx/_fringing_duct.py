@@ -1,4 +1,4 @@
-"""Rectangular-duct momentum and conservative-current kernels."""
+"""Private rectangular-duct momentum and conservative-current kernels."""
 
 from __future__ import annotations
 
@@ -230,16 +230,20 @@ def _solvax_implicit_momentum_duct(
     dz: jnp.ndarray,
     iterations: int,
     tolerance: float,
+    reaction: jnp.ndarray,
     frozen_setup=None,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Solve one frozen, conservative three-component momentum system.
 
-    ``force`` includes explicit deviatoric stresses and body forces.  The inlet
-    is prescribed and the outlet is zero-gradient. Affine terms stay outside GMRES.
+    ``force`` includes explicit deviatoric stresses and body forces. The
+    positive ``reaction`` is added to both sides at the old velocity, changing
+    pseudo-time conditioning without changing a fixed point. The inlet is
+    prescribed, the outlet is zero-gradient, and affine terms stay outside GMRES.
     """
 
     shape = velocity.shape
-    if shape != (*density.shape, 3) or force.shape != shape:
+    reaction = jnp.asarray(reaction)
+    if shape != (*density.shape, 3) or force.shape != shape or reaction.shape != density.shape:
         raise ValueError("Momentum fields must share one (nx, ny, nz, 3) shape")
     dy_widths = _coerce_spacing_vector(dy, shape[1], dtype=velocity.dtype)
     dz_widths = _coerce_spacing_vector(dz, shape[2], dtype=velocity.dtype)
@@ -268,9 +272,11 @@ def _solvax_implicit_momentum_duct(
         convection, diffusion = _duct_momentum_transport(
             field, rho_phi, weights, homogeneous_patches, widths, coefficients, diffusion_sink
         )
-        return volume[..., None] * (density[..., None] * field + dt * (convection - diffusion))
+        return volume[..., None] * (
+            density[..., None] * field + dt * (convection - diffusion + reaction[..., None] * field)
+        )
 
-    diagonal = volume * (density + dt * (sum(coefficients) + diffusion_sink))
+    diagonal = volume * (density + dt * (reaction + sum(coefficients) + diffusion_sink))
 
     def precondition(flat: jnp.ndarray) -> jnp.ndarray:
         # The transient mass term dominates this operator; diagonal scaling
@@ -278,7 +284,7 @@ def _solvax_implicit_momentum_duct(
         return (flat.reshape(shape) / diagonal[..., None]).reshape(-1)
 
     inlet_velocity = jnp.where(inlet_cells[..., None], boundary_velocity[0], 0.0)
-    source = force - boundary_action + inlet_sink[..., None] * inlet_velocity
+    source = force - boundary_action + inlet_sink[..., None] * inlet_velocity + reaction[..., None] * velocity
     linear_rhs = volume[..., None] * (density[..., None] * velocity + dt * source)
     flat_rhs = linear_rhs.reshape(-1)
 
@@ -1066,9 +1072,9 @@ def _b2_momentum_functions(
             velocity, density, inlet, dx=dx, dy=local_dy, dz=local_dz, sharding=field_sharding
         )
 
-    def momentum_solve(velocity, force, density, viscosity, rho_phi_plus, rho_phi_inlet, pressure):
-        local_velocity, local_density, local_viscosity = (
-            field[:, y0:y1, z0:z1] for field in (velocity, density, viscosity)
+    def momentum_solve(velocity, force, density, viscosity, rho_phi_plus, rho_phi_inlet, pressure, reaction):
+        local_velocity, local_density, local_viscosity, local_reaction = (
+            field[:, y0:y1, z0:z1] for field in (velocity, density, viscosity, reaction)
         )
         inlet_patch = local_velocity[0].at[..., 0].set(rho_phi_inlet / (local_density[0] * face_area))
         zero_y, zero_z = jnp.zeros_like(local_velocity[:, 0]), jnp.zeros_like(local_velocity[:, :, 0])
@@ -1102,8 +1108,11 @@ def _b2_momentum_functions(
             iterations=momentum_iterations,
             tolerance=momentum_tolerance,
             frozen_setup=setup,
+            reaction=local_reaction,
         )
-        momentum_mobility = dt / jnp.maximum(local_density + dt * (sum(setup[1]) + setup[2]), 1.0e-20)
+        momentum_mobility = dt / jnp.maximum(
+            local_density + dt * (local_reaction + sum(setup[1]) + setup[2]), 1.0e-20
+        )
         return (*solved, momentum_mobility)
 
     def momentum_defect(velocity, force, density, viscosity, rho_phi_plus, rho_phi_inlet, pressure):
@@ -1194,7 +1203,8 @@ def _jit_b2_momentum_functions(
         (
             (vector_sharding,) * 2
             + (field_sharding,) * 2
-            + (flux_sharding, replicated_sharding, field_sharding),
+            + (flux_sharding, replicated_sharding)
+            + (field_sharding,) * 2,
             (vector_sharding, replicated_sharding, replicated_sharding, field_sharding),
         ),
         (

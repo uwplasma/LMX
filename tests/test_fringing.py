@@ -774,7 +774,7 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
 
     monkeypatch.setattr(duct_impl, "linear_solve", capture)
 
-    def solve(applied_force, flux=rho_phi, patches=boundary, rho=density):
+    def solve(applied_force, flux=rho_phi, patches=boundary, rho=density, reaction=None):
         return _solvax_implicit_momentum_duct(
             velocity,
             applied_force,
@@ -788,6 +788,7 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
             dz=dz,
             iterations=240,
             tolerance=1.0e-10,
+            reaction=jnp.zeros_like(rho) if reaction is None else reaction,
         )
 
     solved, residual, converged = solve(force)
@@ -805,6 +806,18 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
     )
     expected_rhs = expected_rhs.at[0].add(dt * inlet_source * boundary[0])
     assert rhs.reshape((*shape, 3)) == pytest.approx(expected_rhs)
+    reaction = jnp.linspace(0.1, 0.4, density.size).reshape(density.shape)
+    solved_reaction, _, _ = solve(force, reaction=reaction)
+    reaction_matrix, reaction_rhs = captured["matrix"], captured["rhs"]
+    pseudo_mass = np.repeat(np.asarray(volume * dt * reaction).reshape(-1), 3)
+    assert reaction_matrix == pytest.approx(reference + np.diag(pseudo_mass))
+    assert reaction_rhs == pytest.approx(expected_rhs.reshape(-1) + pseudo_mass * velocity.reshape(-1))
+    assert reaction_matrix @ velocity.reshape(-1) - reaction_rhs == pytest.approx(
+        matrix @ velocity.reshape(-1) - rhs
+    )
+    assert solved_reaction.reshape(-1) == pytest.approx(
+        np.linalg.solve(reaction_matrix, reaction_rhs), abs=2e-7
+    )
     mass = np.repeat(np.asarray(volume * density).reshape(-1), 3)
     cell_volume = np.repeat(np.broadcast_to(np.asarray(volume), shape).reshape(-1), 3)
     old, star = map(np.asarray, (velocity.reshape(-1), solved.reshape(-1)))

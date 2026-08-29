@@ -968,9 +968,10 @@ purpose.
 
 - [ ] Finish the function-level ownership and necessity audit. The initial passes
   removed rejected solver lanes, decomposed the 3-D monolith, and deleted
-  non-production private testbeds, but the live fringing implementation still
-  contains 6,491 lines: 743 lines in the public `lmx.fringing` case/API layer
-  and 5,748 lines in four private owners. Keep
+  non-production private testbeds, but the committed fringing implementation
+  still contains 6,019 lines: 1,718 lines in the public `lmx.fringing`
+  orchestration/API layer and 4,301 lines in three private numerical owners.
+  Keep
   `lmx.fringing` as the only public surface while removing unreachable helpers,
   duplicate recurrences, redundant materialization, and reusable algebra that
   belongs in SOLVAX. No private owner may remain merely because the monolith
@@ -978,10 +979,14 @@ purpose.
   as completed simplification. Prefer fewer owners when responsibilities can
   be fused without creating a mega-module; otherwise retain the common, duct,
   pipe, and orchestration boundaries only when their production dependencies
-  and performance measurements justify them. Target 1,200 lines per private
-  owner and ensure no production solve remains one monolithic function. Do not
-  increase the private-file count or move lines between files to satisfy a
-  size metric.
+  and performance measurements justify them. In particular, converge the
+  generic and frozen ALEX B1/B2 recurrences onto shared production operators;
+  delete a specialized branch only after its physics, restart, derivative,
+  performance, and external-validation gates pass through the replacement.
+  Target 1,200 lines per owner and decompose the current 638-line pipe and
+  788-line duct orchestrators around stable mathematical phases. Do not
+  increase the private-file count, flatten the kernels into a mega-module, or
+  move lines between files to satisfy a size metric.
 - [x] Reuse coefficients, factors, preconditioners, and initial guesses.
 - [x] Make full histories opt-in and remove plot-only work from solves.
 - [x] Consolidate JIT boundaries and eliminate hot-path host transfers.
@@ -1173,6 +1178,7 @@ artifacts or release assets, not committed files.
 | D-043 | Advance B2 with two relaxed SIMPLE-style pressure--momentum correctors per electric closure | Including the current pressure force and accumulating a bounded correction removes the diagonal-only plateau. Two correctors materially improve physical defect per second; a third has diminishing returns, and fixed relaxation avoids adding restart fields. |
 | D-044 | Retain depth-two Anderson for B2 until a safeguard improves both early and late evidence | The corrected raw and fixed-two maps are stable and smoother late, but neither improves physical defect over Anderson early or late. A one-step growth fallback amplifies alternating spikes. Replace acceleration only with a restart-exact method that wins defect, update, runtime, and memory together. |
 | D-045 | Stop the primal-only B2 pressure correction at `1e-10` while retaining volume-scaled balance checks | On the production coarse state this cuts pressure PCG work by about one quarter while leaving the state update and momentum-defect trajectory unchanged at reported precision. The resulting `2e-5`--`7e-5` divergence remains below five percent of the independent `1e-3` balance gate. Generic traced paths retain roundoff-level primal solves for implicit-derivative consistency. |
+| D-046 | Add the local electromagnetic reaction to the B2 predictor as a fixed-point-neutral pseudo-mass | The term $R_B=\sigma|\boldsymbol B|^2$ is added to the implicit momentum diagonal and the identical $R_B\boldsymbol u^n$ term to the right-hand side, so it cancels at a fixed point while improving the predictor and pressure mobility. The retained operation order is deliberate: reassociating the terms changes the finite-precision nonlinear trajectory materially. Dense operator, autodiff, restart, and production-continuation gates protect the contract. |
 
 ## Work log
 
@@ -3566,3 +3572,64 @@ surface, measurements, validation, decision, and next action.
   coupled B2 block response rather than adding another fixed-point safeguard.
   Specialized B2 differentiation remains unavailable until terminal primal
   convergence is established.
+
+### 2026-08-29 — audit private fringing ownership and retain a fixed-point-neutral B2 response
+
+- Audited all 95 top-level functions across `fringing.py` and its three private
+  implementation owners. Static source-and-test reachability found no
+  unreferenced function. The 40-function common owner contains six
+  cross-geometry operations, 17 orchestration/runtime consumers, eight
+  duct-only consumers, four pipe-only consumers, and five internal building
+  blocks. This proves reachability, not necessity: Phase 4 remains open while
+  generic and ALEX recurrences are converged and reusable algebra is upstreamed.
+- Retained the four-file boundary for this tranche. Flattening 5,997 lines into
+  the public module would create a mega-module without reducing source, while
+  duplicating the six shared kernels into both geometries would add code and
+  inconsistent derivative surfaces. Private files remain implementation
+  details, not additional APIs, and must still earn their size through the
+  Phase 4 physics, derivative, and performance gates.
+- Removed a duplicate 26-field result schema, current-schema fallback branches,
+  and a single-use sharding constructor. The source changes in this tranche are
+  40 net lines smaller before documentation and tests; package source is 14,785
+  lines, below the committed 14,825-line baseline.
+- Decision D-046 adds $R_B=\sigma|\boldsymbol B|^2$ as a fixed-point-neutral
+  pseudo-mass to the B2 momentum predictor and pressure mobility. Dense matrix,
+  right-hand-side, solution, fixed-point, and automatic-differentiation checks
+  pass. An exact eight-update continuation reaches momentum defects
+  `0.20083865, 0.19979831, 0.19896500, 0.19803814, 0.19711240,
+  0.19598774, 0.19445617, 0.19313568` in `131.49` seconds, with maximum
+  divergence `2.1699e-5` and charge residual `2.0855e-4`. Raw fixed-point
+  updates remain oscillatory, so terminal convergence and specialized B2
+  differentiation remain open.
+- A separate SOLVAX audit found that a finite-zero-cotangent norm optimization
+  could map NaN GMRES residual norms to zero. The fail-closed correction and
+  jitted array/PyTree regression tests pass the complete local SOLVAX gate:
+  753 tests, 97.50% combined coverage, types, docs, build, and distribution
+  checks. PR 93 is merged; no package publication was performed.
+- The complete six-worker LMX gate passes all 500 tests in 155.25 seconds
+  (156.5 seconds end to end) with 95.44% combined line/branch coverage.
+  Coverage and JUnit SHA-256 digests are
+  `c7c47c879928b071a63a99862a8fb2d5d5aef25d864b9f97fe93ce78a7922b0b`
+  and `56c922f91dc6a2fd2dbac6ea013c85c72d21f6f73b4e36b5095abf32e2ecccf8`.
+  Ruff, formatting, byte compilation, architecture/import budgets, all seven
+  curated workflows, Sphinx HTML and external links with warnings as errors,
+  isolated build, Twine, distribution inspection, and clean-wheel primal and
+  gradient smoke pass. The wheel is 146,323 bytes and the sdist is 139,033
+  bytes, with SHA-256 digests
+  `d747d9673e48a4b2604c46c8746394829ea38b379ec84f693b483109bcbfab00`
+  and `0d5392d1f2eaff171d8ebf55a85acb84faed7776c3aa70717d1426232d1e8af7`.
+- Committed the immutable source candidate as `a2d4b1e` and repeated the pinned
+  Docker comparison against FreeMHD `14b54a3` and image
+  `sha256:535e995d557d2a73f5ab997380cb47ee3b044af8d2871bdadd570cff4cf175a8`.
+  Contract, artifacts, execution, independent observation, comparison, and
+  schema pass with zero failed checks. Pressure L-infinity/RMS differences are
+  `0.006838504934991994`/`0.0030649109539924494`, within the smoke contract and
+  effectively unchanged at the validation scale. Report and record SHA-256
+  digests are
+  `4e7402e4531782130d19ffbb6961ae0078cdd4d788a06ae95e07432e78bc1aae`
+  and `ffd1073e6e1963d5ce61de8b1bcd5b33d597aa29a365932f260531f85a469073`.
+  `acceptance_pass=false` remains correct for the smoke-only role.
+- Next action: merge this qualified tranche, then resume operator-level
+  convergence of the generic and ALEX B1/B2 paths rather than deleting private
+  files by name. Terminal B2 convergence and specialized derivatives remain
+  open evidence gates.
