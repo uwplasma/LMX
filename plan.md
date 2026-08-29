@@ -967,13 +967,19 @@ purpose.
 
 - [ ] Finish the function-level ownership and necessity audit. The first pass
   removed rejected solver lanes and decomposed the 3-D monolith, but the live
-  fringing implementation still contains 7,043 lines. Keep `lmx.fringing` as
-  the only public surface while
-  removing test-only helpers and duplicate recurrences; no private owner may
-  remain merely because the monolith was split. Reduce the largest private
-  module below 1,500 lines, target 1,200, and split functions by physical phase
-  until no production solve is one monolithic function. Do not increase the
-  private-file count to meet a line-length metric.
+  fringing implementation still contains 6,576 lines: 743 lines in the public
+  `lmx.fringing` case/API layer and 5,833 lines in four private owners. Keep
+  `lmx.fringing` as the only public surface while removing unreachable helpers,
+  duplicate recurrences, redundant materialization, and reusable algebra that
+  belongs in SOLVAX. No private owner may remain merely because the monolith
+  was split, and four files just below a mechanical line ceiling do not count
+  as completed simplification. Prefer fewer owners when responsibilities can
+  be fused without creating a mega-module; otherwise retain the common, duct,
+  pipe, and orchestration boundaries only when their production dependencies
+  and performance measurements justify them. Target 1,200 lines per private
+  owner and ensure no production solve remains one monolithic function. Do not
+  increase the private-file count or move lines between files to satisfy a
+  size metric.
 - [x] Reuse coefficients, factors, preconditioners, and initial guesses.
 - [x] Make full histories opt-in and remove plot-only work from solves.
 - [x] Consolidate JIT boundaries and eliminate hot-path host transfers.

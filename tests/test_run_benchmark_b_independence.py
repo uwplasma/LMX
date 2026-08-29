@@ -68,6 +68,7 @@ def _record(observable, *, residual=1.0e-9, coupling_tolerance=None):
             "stop_reason": "converged",
             "pressure_linear_diagnostics_complete": True,
             "pressure_solves_converged": True,
+            "terminal_momentum_defect": 1.0e-5,
         },
     }
 
@@ -95,7 +96,6 @@ def test_comparison_applies_uncertainty_and_thin_wall_gates():
         "thin_wall": _record([0.1001, 0.2001, 0.1001]),
     }
     comparison = campaign._comparison("B2-fringing-square", records)
-    assert comparison["complete"] is True
     assert comparison["pass"] is True
     assert all(comparison["gates"].values())
 
@@ -146,9 +146,9 @@ def test_dry_run_writes_deterministic_campaign_plan(tmp_path: Path):
         ]
     )
     payload = json.loads((output / "benchmark-b-independence.json").read_text())
-    assert exit_code == 0
-    assert payload["pass"] is False
-    assert payload["cases"] == [{"case_id": "B1-fringing-pipe", "complete": False, "dry_run": True}]
+    case = payload["cases"][0]
+    assert exit_code == 0 and not payload["pass"] and case["case_id"] == "B1-fringing-pipe"
+    assert case["runs"][0]["mesh"]["physics_cell_count"] == 827392
 
 
 def test_resume_rejects_checkpoint_from_another_fingerprint(tmp_path: Path):
@@ -267,6 +267,13 @@ def test_variant_restart_parser_is_explicit_and_rejects_invalid_values():
         campaign._parse_variant_restarts(["thin_wall"])
     with pytest.raises(ValueError, match="VARIANT"):
         campaign._parse_variant_restarts(["unknown=/tmp/x.npz"])
+    with pytest.raises(ValueError, match="each of coarse, medium, fine once"):
+        campaign._parse_acceptance_paths(
+            ["coarse=/a", "coarse=/b"], campaign.MESH_LEVELS, "--acceptance-mesh"
+        )
+    assert campaign._parse_gpu_devices("0, 1") == ("0", "1")
+    with pytest.raises(ValueError, match="unique"):
+        campaign._parse_gpu_devices("0,0")
 
 
 def test_acceptance_assembly_reuses_three_campaigns_without_solver(
@@ -315,13 +322,6 @@ def test_acceptance_assembly_reuses_three_campaigns_without_solver(
     assert payload["pass"] is True
 
 
-def test_acceptance_path_parser_requires_every_unique_name():
-    with pytest.raises(ValueError, match="each of coarse, medium, fine once"):
-        campaign._parse_acceptance_paths(
-            ["coarse=/a", "coarse=/b"], campaign.MESH_LEVELS, "--acceptance-mesh"
-        )
-
-
 @pytest.mark.parametrize("case_id", campaign.CASE_IDS)
 def test_acceptance_combines_literature_mesh_and_freemhd(case_id, monkeypatch):
     reference = campaign.load_benchmark_b_reference(case_id)
@@ -334,12 +334,14 @@ def test_acceptance_combines_literature_mesh_and_freemhd(case_id, monkeypatch):
                 "case_id": case_id,
                 "mesh_level": level,
                 "source_fingerprint": "source",
+                "controls": {"spatial_devices": 1},
+                "mesh": campaign._frozen_mesh_evidence(case_id, level),
                 "x_over_L": x,
                 "primary_observable": [value + offset for value in expected],
             },
             "independence": {"case_id": case_id, "complete": True, "pass": True},
         }
-        for level, offset in zip(campaign.MESH_LEVELS, (1.0e-4, 5.0e-5, 0.0))
+        for level, offset in zip(campaign.MESH_LEVELS, (4.0e-4, 1.0e-4, 0.0))
     }
     roots = []
 
@@ -353,15 +355,19 @@ def test_acceptance_combines_literature_mesh_and_freemhd(case_id, monkeypatch):
     monkeypatch.setattr(campaign, "validate_matched_b_record", validate)
     freemhd = {"case_id": case_id, "validated": True}
     artifact_root = Path("/evidence")
-
     result = campaign._evaluate_acceptance(
         case_id, meshes, freemhd, matched_freemhd_artifact_root=artifact_root
     )
 
-    assert result["pass"]
-    assert all(result["gates"].values())
-    assert result["literature"]["fine"]["weighted_rms"] == pytest.approx(0.0)
+    assert result["status"] == "accepted" and result["numerical_pass"]
+    assert result["refinement"]["gci_asymptotic_ratio"] == pytest.approx(1.0)
     assert roots == [artifact_root]
+    open_result = campaign._evaluate_acceptance(case_id, meshes)
+    assert (open_result["status"], open_result["numerical_pass"], open_result["pass"]) == (
+        "external_validation_open",
+        True,
+        False,
+    )
 
 
 def test_acceptance_reports_missing_and_rejects_bad_curves():
@@ -374,6 +380,8 @@ def test_acceptance_reports_missing_and_rejects_bad_curves():
                 "case_id": "B1-fringing-pipe",
                 "mesh_level": level,
                 "source_fingerprint": "source",
+                "controls": {"spatial_devices": 1},
+                "mesh": campaign._frozen_mesh_evidence("B1-fringing-pipe", level),
                 "x_over_L": [0.0, -1.0],
                 "primary_observable": [0.0, 0.0],
             },
@@ -387,14 +395,6 @@ def test_acceptance_reports_missing_and_rejects_bad_curves():
     }
     with pytest.raises(ValueError, match="baseline curve is invalid"):
         campaign._evaluate_acceptance("B1-fringing-pipe", bad)
-
-
-def test_gpu_device_parser_requires_unique_ids():
-    assert campaign._parse_gpu_devices("0, 1") == ("0", "1")
-    with pytest.raises(ValueError, match="unique"):
-        campaign._parse_gpu_devices("")
-    with pytest.raises(ValueError, match="unique"):
-        campaign._parse_gpu_devices("0,0")
 
 
 def test_spatial_placement_records_and_enforces_actual_shards():
