@@ -3153,3 +3153,39 @@ surface, measurements, validation, decision, and next action.
   critical path is the compatible B2 coupled preconditioner and coarse-mesh
   convergence gate; GPU speedup and two-device scaling remain evidence gaps,
   not claims.
+
+### 2026-08-29 — reject an unpreconditioned B2 map root at production scale
+
+- The pure B2 map enabled a controlled SOLVAX pseudo-transient root audit
+  without retaining a new runtime lane. Pressure was removed from the root
+  state because it is a nested Lagrange-multiplier solve whose input is only a
+  warm start. The tested state was exactly `(u, v, w, phi, rho_phi_plus,
+  rho_phi_inlet)`. Residual orientation matters: `state - map(state)` is
+  compatible with SOLVAX's positive pseudo-time mass shift; the algebraically
+  equivalent reverse sign made the shifted Jacobian unstable.
+- On the 5x5x5 reduced problem, six correctly oriented dimensionless steps
+  reached algebraic norm `0.00549103`, maximum velocity update `0.00120980`,
+  and momentum defect `0.0372833` with 33 Krylov iterations. A Newton-like
+  two-step trial reduced the norm rapidly but accepted only one step and left
+  momentum defect `0.267823`; converting velocity coordinates by the existing
+  physical factor `N*dt=0.064` improved the two-step reduced defect to
+  `0.0959909`. These are useful conditioning results, not production evidence.
+- The exact 101x65x65 step-32 state was regenerated in 180.62 seconds with
+  update `0.004153443021910452` and momentum defect
+  `3.0097461041226583`. Its untracked 61 MiB typed restart has SHA-256
+  `b1f6070150bd66db462175ee65c037cb7a557c30cb7e3fd783aff70a0bebbb8b`.
+  Two loose shifted steps cost 34.94 seconds and changed the defect only to
+  `3.0077351`; an unshifted Newton trial rejected every step after 16 Krylov
+  directions and 57.34 seconds; an intermediate shift cost 57.63 seconds and
+  left `3.0090324`; physical velocity scaling cost 57.62 seconds and left
+  `3.0088956`. None is a material improvement per second.
+- Decision: do not integrate unpreconditioned fixed-point rooting, do not add
+  a `pseudo_transient` user option, and do not retain proof code. The next B2
+  numerical implementation must expose the compatible pressure response
+  `D A^-1 G` (or an equivalently verified block preconditioner) using the
+  frozen conservative momentum operator, with fixed-flow constraints and
+  compact flux reconstruction in the same discrete identity. Reuse the B1
+  steady Schur methodology where its geometry-independent contract can be
+  extracted; keep pipe modal factors geometry-local. Acceptance requires a
+  dense reduced identity, coarse momentum reduction, lower total runtime than
+  continued recurrence, bounded implicit transpose memory, and exact restart.
