@@ -109,6 +109,7 @@ ALEX_B2_MAGNETIC_STABILITY_SAFETY = 0.064
 ALEX_B2_PRESSURE_CORRECTORS = 2
 ALEX_B2_PRESSURE_RELAXATION = 0.4
 ALEX_B2_SETTLED_RELAXATION = 2.0
+ALEX_B2_ANDERSON_CONDITION_LIMIT = 5.0
 
 
 def _extruded_field_sharding(axial_size: int, num_devices: int | None) -> NamedSharding | None:

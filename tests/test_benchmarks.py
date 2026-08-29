@@ -4,8 +4,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from solvax import anderson_weights
 
 import lmx.validation as benchmarks
+from lmx._fringing_common import ALEX_B2_ANDERSON_CONDITION_LIMIT
 from lmx._fringing_duct import _unpack_duct_mass_flux
 from lmx.fringing import solve_extruded_inductionless
 from lmx.io import load_extruded_restart_bundle, write_extruded_bundle_restart_npz
@@ -82,6 +84,15 @@ def test_benchmark_solver_returns_positive_timings(monkeypatch: pytest.MonkeyPat
     assert report["warm_cv"] == 0.0
     assert report["backend"]
     assert synchronized == [(fields.u, fields.phi)] * 2
+
+
+def test_b2_anderson_filter_bounds_the_measured_terminal_history():
+    residuals = benchmarks.jnp.asarray(((0.30102388, 0.0), (0.44014515, 0.12847185)))
+    filtered = anderson_weights(
+        residuals,
+        condition_limit=ALEX_B2_ANDERSON_CONDITION_LIMIT,
+    )
+    assert filtered == pytest.approx((0.39237697, 0.60762303), rel=1.0e-7)
 
 
 def test_benchmark_writer(tmp_path: Path):
