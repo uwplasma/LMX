@@ -16,7 +16,7 @@ The live root is the enforced repository baseline. The latest ordinary
 authenticated clone measurement is 2,304 KiB total, including 588 KiB of Git
 data and a 463.39 KiB pack. The current candidate contains 89 tracked files,
 about 1.8 MiB of tracked data, 16 package modules, and 28 root exports. Its
-complete six-worker portable gate passes 500 tests in 179.80 seconds with
+complete six-worker portable gate passes 500 tests in 178.68 seconds with
 95.44% combined line/branch coverage. Every change below must preserve the
 normal-clone limit of 9,766 KiB and the file, API, five-minute test-time, and
 coverage budgets. The capability-adjusted ceiling remains 15,370 package lines
@@ -1166,6 +1166,7 @@ artifacts or release assets, not committed files.
 | D-036 | Keep `lmx.fringing` as the only public 3-D surface and retain private fringing files only by mathematical ownership | Common structured-grid operations, rectangular-duct kernels, cylindrical-pipe kernels, and orchestration have different metrics and change reasons. Private ownership files reduce coupling; test-only proxy solvers and duplicate recurrences do not, so they are removed. |
 | D-037 | Remove the label-only bent-pipe lane | Curved display coordinates never entered its straight cylindrical operators, and its validator mislabeled generic transverse velocity as Dean curvature physics. A future curved-pipe solver must introduce coherent curvilinear metrics, independent validation, and derivative gates rather than reuse the removed name. |
 | D-038 | Do not nest a full transient momentum Krylov solve inside every B2 pressure-Schur action | The construction passes dense compatibility and autodiff identities, but repeats an expensive mass-dominated inverse, leaves the reduced physical trajectory effectively unchanged, and exceeds the production runtime gate. A viable block method must use a separately reusable/coarse response or factorized preconditioner with bounded primal and transpose work. |
+| D-039 | Do not impose derivative-only roundoff tolerances on a primal-only specialized path | Generic traced 3-D fields retain roundoff electric closure for implicit VJP consistency. B2 remains unavailable to differentiation and instead uses a directly tested `1e-10` linear tolerance, while its independent charge, restart, and external-validation gates remain unchanged. |
 
 ## Work log
 
@@ -3234,3 +3235,67 @@ surface, measurements, validation, decision, and next action.
   physical defect, warm runtime, implicit-transpose work/storage, and exact
   restart; only then rerun the production coarse state. The B2 public path and
   all numerical tolerances remain unchanged.
+
+### 2026-08-29 — stop oversolving primal B2 electric closure
+
+- Repeated the private-fringing function/call-graph audit across source, tests,
+  examples, validation, and scripts. The common, duct, pipe, and orchestration
+  owners are each reached by protected production, restart, differentiation,
+  B1/B2, or validation paths; no entire underscore file is dead. Their private
+  names remain implementation ownership, not user API. Moving them into
+  `fringing.py` would enlarge the public module without reducing code or work.
+- A disposable shifted line-block preconditioner used SOLVAX additive
+  tridiagonal solves for the three frozen momentum directions and no nested
+  momentum GMRES. After six strict 5x5x5 updates, three accepted root steps
+  took the total to 41.94 seconds and reached update `0.00188368` and momentum
+  defect `0.0397514`. Nine retained updates took 33.90 seconds and reached the
+  lower defect `0.0376508`. The algebraic update reduction therefore did not
+  improve physical balance per second; all proof code was removed. A viable
+  B2 block response must include the pressure/electric coupling or otherwise
+  beat continued recurrence on the physical defect, not only the map norm.
+- Profiling the unchanged reduced map attributed 13.72 of 32.99 seconds to
+  electric closure. The specialized B2 path inherited a roundoff tolerance
+  required by the generic implicit VJP even though B2 differentiation remains
+  deliberately unavailable. Commit `5db42c449418c35ca31964622e0d61b24c569640`
+  applies Decision D-039: generic traced fields retain the roundoff solve, while
+  primal-only B2 uses a directly certified `1e-10` electric tolerance. No API,
+  option, file, iteration limit, physical tolerance, or validation claim changes.
+- On the same six-update reduced case, electric iterations fell from
+  `56/46/46` to `41/31/31`. Two-process warm runtime fell from 18.619 to
+  12.352 seconds, a 33.7% improvement. Terminal update and momentum defect
+  changed by less than `7e-13`; maximum charge residual changed from
+  `1.15e-10` to `4.31e-9`, still more than five orders of magnitude below the
+  `1e-3` B2 balance gate. A looser `1e-8` trial gave no additional speed and
+  raised reduced charge residual to `9.22e-7`, so it was rejected.
+- Five warm continuations from the checksummed 101x65x65 step-32 restart had
+  medians 4.682 seconds for the candidate and 4.740 seconds for the retained
+  roundoff solve. Both produced update `0.004166759820736776`, momentum defect
+  `3.0079227388830585`, and charge residual `0.0004964470863342285` to the
+  reported precision. The production gain is a modest 1.24%; the accepted
+  change is primarily a deliberate primal/derivative contract and a substantial
+  reduced-development/strict-tolerance speedup, not a claim that the B2
+  convergence plateau is solved.
+- All 500 portable tests pass in 178.68 seconds with 95.44% combined
+  line/branch coverage on Python 3.11.14, JAX/JAXLIB 0.9.2, and SOLVAX 0.18.0.
+  Coverage and JUnit SHA-256 digests are
+  `88f81cc014485d99183237a6e959cdc29d8dc2b94243cbf16ceddbd5df3d6afc`
+  and `22773647dba1e941b078907a5bc8f30296d34d5183f61ec6cd104b37ac6b3f6c`.
+  Ruff check/format, architecture/import budgets, curated examples, Sphinx HTML
+  and external links with warnings as errors, build, Twine, distribution
+  inspection, and isolated-wheel primal/gradient smoke pass. The package has
+  16 modules, 6,084 maintained-core lines, 14,764 package lines, and 28 root
+  exports; the wheel is 146,636 bytes and the sdist is 138,493 bytes.
+- Rebuilt the pinned FreeMHD image from commit `14b54a3` as
+  `sha256:535e995d557d2a73f5ab997380cb47ee3b044af8d2871bdadd570cff4cf175a8`.
+  The committed LMX smoke passes contract, artifacts, execution, observation,
+  comparison, and schema with zero failed checks. Pressure L-infinity/RMS
+  differences are `0.010917245284640538`/`0.004517977100439702`; report and
+  record SHA-256 digests are
+  `7a8ea024591a0afc0e361ea9d7b356f4a4ae0fe996f4b357173bfa6250b73bc5`
+  and `f9f7c160f364a57f91dc6f77ce6ce9e1def829f5511b6ecf8950d5aea144d526`.
+  `acceptance_pass=false` remains correct for the smoke-only role.
+- Next action: continue the compatible steady B2 block derivation with coupled
+  pressure/electric response and continue function-level trimming only where
+  reachability, runtime, memory, and physics evidence justify a deletion or
+  fusion. The production B2 defect, specialized adjoint, and GPU scaling gates
+  remain open.
