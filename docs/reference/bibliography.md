@@ -48,11 +48,22 @@ Core references used by the implemented models and validation contracts include:
   [doi:10.3389/fnuen.2024.1384788](https://doi.org/10.3389/fnuen.2024.1384788)
   — the external CAD/neutronics boundary for future stellarator blanket-design
   coupling.
+- D. Panici et al., “The DESC stellarator code suite. Part 1. Quick and
+  accurate equilibria computations,” *Journal of Plasma Physics* 89, 2023,
+  [doi:10.1017/S0022377823000272](https://doi.org/10.1017/S0022377823000272)
+  — differentiable, high-accuracy stellarator equilibrium and the natural
+  upstream field/geometry boundary for liquid-metal design constraints.
 - P. Fischer et al., “NekRS, a GPU-accelerated spectral element Navier--Stokes
   solver,” *Parallel Computing* 114, 2022,
   [doi:10.1016/j.parco.2022.102982](https://doi.org/10.1016/j.parco.2022.102982)
   — the reference for production GPU-resident high-order CFD and strong-scaling
   evidence.
+- H. Walker and P. Ni, “Anderson acceleration for fixed-point iterations,”
+  *SIAM Journal on Numerical Analysis* 49, 2011,
+  [doi:10.1137/10078356X](https://doi.org/10.1137/10078356X) — residual-window
+  acceleration, its linear-GMRES relationship, and the basis for treating
+  history depth, scaling, regularization, and safeguarding as numerical
+  algorithm choices rather than arbitrary tuning.
 - A. Griewank and A. Walther, “Algorithm 799: Revolve: An implementation of
   checkpointing for the reverse or adjoint mode of computational
   differentiation,” *ACM Transactions on Mathematical Software* 26, 2000,
