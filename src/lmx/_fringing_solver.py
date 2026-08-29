@@ -70,6 +70,35 @@ from .physics import build_material_fields
 from .specs import ExtrudedFieldBundle, ExtrudedInductionlessProblem, ExtrudedIterationProgress
 
 
+def _initial_projection_fields(case, fluid_mask, initial_bundle):
+    if initial_bundle is not None:
+        if initial_bundle.u.shape != fluid_mask.shape:
+            raise ValueError("Extruded restart bundle shape does not match the current problem")
+        return tuple(
+            jnp.asarray(getattr(initial_bundle, name), dtype=float) for name in ("u", "v", "w", "p", "phi")
+        )
+    u = jnp.where(fluid_mask, jnp.asarray(case.initial_velocity, dtype=float), 0.0)
+    zeros = jnp.zeros_like(u)
+    return u, zeros, zeros, zeros, zeros
+
+
+def _scale_projection_properties(field, sigma, fluid_mask, magnetic_scale, conductivity_scale):
+    magnetic_scale = jnp.asarray(magnetic_scale, dtype=float)
+    if magnetic_scale.ndim:
+        nx = field[0].shape[0]
+        if magnetic_scale.shape != (nx,):
+            raise ValueError(
+                f"magnetic_field_scale must be scalar or have one value per axial station ({nx},)"
+            )
+        magnetic_scale = magnetic_scale[:, None, None]
+    conductivity_scale = jnp.asarray(conductivity_scale, dtype=float)
+    if conductivity_scale.ndim:
+        if conductivity_scale.shape != (2,):
+            raise ValueError("material_conductivity_scale must be scalar or (fluid, solid)")
+        conductivity_scale = jnp.where(fluid_mask, conductivity_scale[0], conductivity_scale[1])
+    return tuple(magnetic_scale * value for value in field), sigma * conductivity_scale
+
+
 def _solve_extruded_projection(
     problem: ExtrudedInductionlessProblem,
     *,
@@ -109,6 +138,27 @@ def _solve_extruded_projection(
         and case.solver.coupling_history_depth != 2
     ):
         raise ValueError("B2 conservative Anderson mixing requires history depth 2")
+    runtime = (
+        initial_bundle,
+        num_devices,
+        progress_callback,
+        phase_timing_callback,
+        checkpoint_interval,
+        design_parameters,
+    )
+    if case.geometry.kind == "pipe_ogrid":
+        return _solve_pipe_projection(problem, mesh, use_alex_b1_finite_volume, runtime)
+    return _solve_duct_projection(problem, mesh, use_alex_b2_finite_volume, runtime)
+
+
+def _solve_pipe_projection(
+    problem: ExtrudedInductionlessProblem,
+    mesh,
+    use_alex_b1_finite_volume: bool,
+    runtime,
+) -> ExtrudedFieldBundle | tuple[jnp.ndarray, ...]:
+    initial_bundle, num_devices, progress_callback, _, checkpoint_interval, design_parameters = runtime
+    case = problem.case
     if case.geometry.kind == "pipe_ogrid":
         with jax.ensure_compile_time_eval():
             materials = build_material_fields(case, mesh)
@@ -164,43 +214,13 @@ def _solve_extruded_projection(
                 volume_field=problem.profile.volume_field,
             )
         stability_bx, stability_by, stability_bz = bx, by, bz
-        magnetic_scale = jnp.asarray(magnetic_scale, dtype=float)
-        if magnetic_scale.ndim:
-            if magnetic_scale.shape != (nx,):
-                raise ValueError(
-                    f"magnetic_field_scale must be scalar or have one value per axial station ({nx},)"
-                )
-            magnetic_scale = magnetic_scale[:, None, None]
-        bx, by, bz = (magnetic_scale * value for value in (bx, by, bz))
-        conductivity_scale = jnp.asarray(conductivity_scale, dtype=float)
-        if conductivity_scale.ndim:
-            if conductivity_scale.shape != (2,):
-                raise ValueError("material_conductivity_scale must be scalar or (fluid, solid)")
-            conductivity_scale = jnp.where(fluid_mask, conductivity_scale[0], conductivity_scale[1])
-        sigma = sigma * conductivity_scale
+        (bx, by, bz), sigma = _scale_projection_properties(
+            (bx, by, bz), sigma, fluid_mask, magnetic_scale, conductivity_scale
+        )
         br = by * jnp.cos(theta_grid) + bz * jnp.sin(theta_grid)
         btheta = -by * jnp.sin(theta_grid) + bz * jnp.cos(theta_grid)
 
-        if initial_bundle is not None:
-            if initial_bundle.u.shape != (nx, nr, ntheta):
-                raise ValueError(
-                    "Extruded restart bundle shape does not match the current mapped-pipe problem"
-                )
-            u = jnp.asarray(initial_bundle.u, dtype=float)
-            v = jnp.asarray(initial_bundle.v, dtype=float)
-            w = jnp.asarray(initial_bundle.w, dtype=float)
-            p = jnp.asarray(initial_bundle.p, dtype=float)
-            phi = jnp.asarray(initial_bundle.phi, dtype=float)
-        else:
-            u = jnp.where(
-                fluid_mask,
-                jnp.asarray(case.initial_velocity, dtype=float),
-                0.0,
-            )
-            v = jnp.zeros_like(u)
-            w = jnp.zeros_like(u)
-            p = jnp.zeros_like(u)
-            phi = jnp.zeros_like(u)
+        u, v, w, p, phi = _initial_projection_fields(case, fluid_mask, initial_bundle)
 
         (
             u,
@@ -477,6 +497,32 @@ def _solve_extruded_projection(
             else jnp.full((nx,), forcing, dtype=float)
         )
 
+        def pipe_checkpoint(iteration, terminal):
+            return _iteration_checkpoint_bundle(
+                case=case,
+                x=x,
+                y=r,
+                z=theta,
+                field_scale=field_scale,
+                u=u,
+                v=v,
+                w=w,
+                p=p,
+                phi=phi,
+                axial_pressure_loss_gradient=axial_pressure_loss_gradient,
+                transverse_pressure_difference=None,
+                residual_history=residual_by_step,
+                component_history=component_residual_by_step,
+                pressure_history=pressure_residual_by_step,
+                electric_history=electric_linear_by_step,
+                potential_history=potential_residual_by_step,
+                stopping_state=(
+                    iteration,
+                    0,
+                    "converged" if terminal else "step_limit" if iteration == outer_steps else "in_progress",
+                ),
+            )
+
         for step in range(outer_steps):
             phi_previous = phi
             pressure_gradient_previous = axial_pressure_loss_gradient
@@ -547,34 +593,7 @@ def _solve_extruded_projection(
                     component_residuals=components,
                     pressure_residual=0.0,
                     potential_residual=potential_update,
-                    checkpoint_factory=lambda: _iteration_checkpoint_bundle(
-                        case=case,
-                        x=x,
-                        y=r,
-                        z=theta,
-                        field_scale=field_scale,
-                        u=u,
-                        v=v,
-                        w=w,
-                        p=p,
-                        phi=phi,
-                        axial_pressure_loss_gradient=axial_pressure_loss_gradient,
-                        transverse_pressure_difference=None,
-                        residual_history=residual_by_step,
-                        component_history=component_residual_by_step,
-                        pressure_history=pressure_residual_by_step,
-                        electric_history=electric_linear_by_step,
-                        potential_history=potential_residual_by_step,
-                        stopping_state=(
-                            step + 1,
-                            0,
-                            "converged"
-                            if converged
-                            else "step_limit"
-                            if step + 1 == outer_steps
-                            else "in_progress",
-                        ),
-                    ),
+                    checkpoint_factory=partial(pipe_checkpoint, step + 1, converged),
                 )
                 if converged:
                     break
@@ -796,34 +815,7 @@ def _solve_extruded_projection(
                 component_residuals=component_residual_by_step[-1],
                 pressure_residual=pressure_update,
                 potential_residual=potential_update,
-                checkpoint_factory=lambda: _iteration_checkpoint_bundle(
-                    case=case,
-                    x=x,
-                    y=r,
-                    z=theta,
-                    field_scale=field_scale,
-                    u=u,
-                    v=v,
-                    w=w,
-                    p=p,
-                    phi=phi,
-                    axial_pressure_loss_gradient=axial_pressure_loss_gradient,
-                    transverse_pressure_difference=None,
-                    residual_history=residual_by_step,
-                    component_history=component_residual_by_step,
-                    pressure_history=pressure_residual_by_step,
-                    electric_history=electric_linear_by_step,
-                    potential_history=potential_residual_by_step,
-                    stopping_state=(
-                        step + 1,
-                        0,
-                        "converged"
-                        if converged
-                        else "step_limit"
-                        if step + 1 == outer_steps
-                        else "in_progress",
-                    ),
-                ),
+                checkpoint_factory=partial(pipe_checkpoint, step + 1, converged),
             )
             if converged:
                 break
@@ -897,6 +889,23 @@ def _solve_extruded_projection(
                 stride=case.output.history_stride,
             ),
         )
+
+
+def _solve_duct_projection(
+    problem: ExtrudedInductionlessProblem,
+    mesh,
+    use_alex_b2_finite_volume: bool,
+    runtime,
+) -> ExtrudedFieldBundle | tuple[jnp.ndarray, ...]:
+    (
+        initial_bundle,
+        num_devices,
+        progress_callback,
+        phase_timing_callback,
+        checkpoint_interval,
+        design_parameters,
+    ) = runtime
+    case = problem.case
     with jax.ensure_compile_time_eval():
         materials = build_material_fields(case, mesh)
     if design_parameters is None:
@@ -951,39 +960,10 @@ def _solve_extruded_projection(
             z=field_z,
             volume_field=problem.profile.volume_field,
         )
-    magnetic_scale = jnp.asarray(magnetic_scale, dtype=float)
-    if magnetic_scale.ndim:
-        if magnetic_scale.shape != (nx,):
-            raise ValueError(
-                f"magnetic_field_scale must be scalar or have one value per axial station ({nx},)"
-            )
-        magnetic_scale = magnetic_scale[:, None, None]
-    bx, by, bz = (magnetic_scale * value for value in base_field)
-    conductivity_scale = jnp.asarray(conductivity_scale, dtype=float)
-    if conductivity_scale.ndim:
-        if conductivity_scale.shape != (2,):
-            raise ValueError("material_conductivity_scale must be scalar or (fluid, solid)")
-        conductivity_scale = jnp.where(fluid_mask, conductivity_scale[0], conductivity_scale[1])
-    sigma = sigma * conductivity_scale
-
-    if initial_bundle is not None:
-        if initial_bundle.u.shape != (nx, ny, nz):
-            raise ValueError("Extruded restart bundle shape does not match the current duct problem")
-        u = jnp.asarray(initial_bundle.u, dtype=float)
-        v = jnp.asarray(initial_bundle.v, dtype=float)
-        w = jnp.asarray(initial_bundle.w, dtype=float)
-        p = jnp.asarray(initial_bundle.p, dtype=float)
-        phi = jnp.asarray(initial_bundle.phi, dtype=float)
-    else:
-        u = jnp.where(
-            fluid_mask,
-            jnp.asarray(case.initial_velocity, dtype=float),
-            0.0,
-        )
-        v = jnp.zeros_like(u)
-        w = jnp.zeros_like(u)
-        p = jnp.zeros_like(u)
-        phi = jnp.zeros_like(u)
+    (bx, by, bz), sigma = _scale_projection_properties(
+        base_field, sigma, fluid_mask, magnetic_scale, conductivity_scale
+    )
+    u, v, w, p, phi = _initial_projection_fields(case, fluid_mask, initial_bundle)
 
     (
         u,
