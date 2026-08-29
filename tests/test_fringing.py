@@ -762,7 +762,7 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
 
     monkeypatch.setattr(duct_impl, "linear_solve", capture)
 
-    def solve(applied_force, flux=rho_phi, patches=boundary, rho=density, reaction=None):
+    def solve(applied_force, flux=rho_phi, patches=boundary, rho=density, reaction=None, **kwargs):
         return _solvax_implicit_momentum_duct(
             velocity,
             applied_force,
@@ -777,6 +777,7 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
             iterations=240,
             tolerance=1.0e-10,
             reaction=jnp.zeros_like(rho) if reaction is None else reaction,
+            **kwargs,
         )
 
     solved, residual, converged = solve(force)
@@ -785,15 +786,13 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
     assert matrix == pytest.approx(reference) and solved.sharding == velocity.sharding
     assert solved.reshape(-1) == pytest.approx(np.linalg.solve(reference, rhs), abs=2e-7)
     assert residual < 1e-8 and bool(converged) and solved.shape == (*shape, 3)
-    assert captured["has_aux"]
-    assert captured["zero"] == pytest.approx(0.0) and not jnp.allclose(matrix, matrix.T)
+    assert captured["has_aux"] and captured["zero"] == pytest.approx(0.0)
+    assert not jnp.allclose(matrix, matrix.T)
     volume = dx * dy[None, :, None] * dz[None, None, :]
-    pressure_force = jax.jacfwd(
-        lambda p: (
-            volume[..., None] * dt * duct_impl._duct_pressure_force(p, dx=dx, dy=dy, dz=dz)
-        ).reshape(-1)
-    )(jnp.zeros(shape)).reshape((velocity.size, scalar.size))
-
+    pressure = lambda p: duct_impl._duct_pressure_force(p, dx=dx, dy=dy, dz=dz)  # noqa: E731
+    pressure_force = jax.jacfwd(lambda p: (volume[..., None] * dt * pressure(p)).reshape(-1))(
+        jnp.zeros(shape)
+    ).reshape((velocity.size, scalar.size))
     divergence = jax.jacfwd(
         lambda value: duct_impl._duct_velocity_divergence(
             value.reshape(velocity.shape), jnp.zeros_like(velocity[0, ..., 0]), dx=dx, dy=dy, dz=dz
@@ -812,6 +811,8 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
     assert jnp.concatenate(precondition(block_rhs)) == pytest.approx(
         jnp.linalg.solve(block, jnp.concatenate(block_rhs)), abs=2.0e-12
     )
+    response = solve(force, linear_rhs=block_rhs[0].reshape(velocity.shape))[0]
+    assert response.reshape(-1) == pytest.approx(a_inverse(block_rhs[0]), abs=2e-7)
     expected_rhs = volume[..., None] * (density[..., None] * velocity + dt * force)
     inlet_source = rho_phi[0][0][..., None] + volume[0, ..., None] * (
         2.0 * (density * viscosity)[0, ..., None] / dx**2
