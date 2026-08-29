@@ -27,13 +27,13 @@ import jax
 import numpy as np
 
 import lmx
-from lmx._fringing_duct import _cross_section_mesh
 from lmx.fringing import solve_extruded_inductionless
 from lmx.io import (
     load_extruded_restart_bundle,
     write_extruded_bundle_restart_npz,
     write_extruded_restart_npz,
 )
+from lmx.mesh import _cross_section_mesh
 from lmx.validation import (
     benchmark_b_pressure_observable,
     build_benchmark_b_problem,

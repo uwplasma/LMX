@@ -6,9 +6,10 @@ from types import SimpleNamespace
 import pytest
 
 import lmx.validation as benchmarks
-from lmx._fringing_duct import _cross_section_mesh, _unpack_duct_mass_flux
+from lmx._fringing_duct import _unpack_duct_mass_flux
 from lmx.fringing import solve_extruded_inductionless
 from lmx.io import load_extruded_restart_bundle, write_extruded_bundle_restart_npz
+from lmx.mesh import _cross_section_mesh
 from lmx.validation import (
     benchmark_b_pressure_observable,
     benchmark_solver,
@@ -25,12 +26,7 @@ _MATCHED = ("matched_contract",)
 _SHARED = _MATCHED + ("shared",)
 _EQUATIONS = _SHARED + ("equations",)
 _SEMANTICS = "matched formulation semantics differ"
-_STEADY_STEPS = _MATCHED + (
-    "roles",
-    "b2-production",
-    "stopping_rules",
-    "steady_steps_min",
-)
+_STEADY_STEPS = _MATCHED + ("roles", "b2-production", "stopping_rules", "steady_steps_min")
 _STOPPING = "matched stopping contract differs"
 _REFERENCE_HEADER = "x_over_L,b_over_B0,b_uncertainty,pressure_observable,pressure_uncertainty"
 
