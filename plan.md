@@ -14,10 +14,10 @@ supported current state.
 
 The live root is the enforced repository baseline. The latest ordinary
 authenticated clone measurement is 2,304 KiB total, including 588 KiB of Git
-data and a 463.39 KiB pack. The current candidate contains 89 tracked files,
-about 1.8 MiB of tracked data, 16 package modules, and 28 root exports. Its
-complete six-worker portable gate passes 500 tests in 178.68 seconds with
-95.44% combined line/branch coverage. Every change below must preserve the
+data and a 463.39 KiB pack. The current candidate contains 88 tracked files,
+1,813,079 bytes of tracked data, 15 package modules, and 28 root exports. Its
+complete six-worker portable gate passes 500 tests in 154.98 seconds with
+95.43% combined line/branch coverage. Every change below must preserve the
 normal-clone limit of 9,766 KiB and the file, API, five-minute test-time, and
 coverage budgets. The capability-adjusted ceiling remains 15,370 package lines
 across at most 16 modules.
@@ -1168,6 +1168,7 @@ artifacts or release assets, not committed files.
 | D-038 | Do not nest a full transient momentum Krylov solve inside every B2 pressure-Schur action | The construction passes dense compatibility and autodiff identities, but repeats an expensive mass-dominated inverse, leaves the reduced physical trajectory effectively unchanged, and exceeds the production runtime gate. A viable block method must use a separately reusable/coarse response or factorized preconditioner with bounded primal and transpose work. |
 | D-039 | Do not impose derivative-only roundoff tolerances on a primal-only specialized path | Generic traced 3-D fields retain roundoff electric closure for implicit VJP consistency. B2 remains unavailable to differentiation and instead uses a directly tested `1e-10` linear tolerance, while its independent charge, restart, and external-validation gates remain unchanged. |
 | D-040 | Fold single-consumer fringing orchestration into the public module, not into another private file | `fringing.py` owns its three solve-dispatch functions; case construction belongs to `cases.py`, validation belongs to `validation.py`, and only shared, duct, and pipe numerical kernels retain private modules. The public import surface is unchanged. |
+| D-041 | Reuse a compiled production evidence map across same-shape finite-difference samples | Centered differences remain mathematically independent of autodiff, but they do not require compiling an identical primal graph a second time. Production value-and-gradient executables may supply shifted primal values; physics, VJP/JVP, sensitivity, batching, memory, and tolerance assertions remain separate and unchanged. |
 
 ## Work log
 
@@ -3342,3 +3343,42 @@ surface, measurements, validation, decision, and next action.
   response and the queued B1 gradient-gate runtime reduction; do not remove
   the protected 3-D, B1, B2, restart, or autodiff capabilities to satisfy a
   filename metric.
+
+### 2026-08-29 — remove redundant derivative-evidence compilations
+
+- Decision D-041 removes four duplicate JAX primal compilations from the
+  rectangular, layered, straight-pipe, and ALEX B1 production-gradient gates.
+  Each already-compiled value-and-gradient executable is shape stable and
+  returns the exact production primal value, so it now supplies the shifted
+  samples for the same centered finite differences. The coordinate or
+  directional difference formula, epsilon, tolerance, nonzero-sensitivity,
+  JVP/VJP, batching, production-parity, and bounded-memory assertions are
+  unchanged. This is evidence scheduling only; no LMX or SOLVAX source,
+  algorithm, tolerance, public API, or physics claim changes.
+- The steady-pipe projection gate now compiles its full primal projection once
+  and reuses it for the conservation result and derivative samples. The
+  unjitted callable remains the fail-closed oracle for unsupported retained
+  modal options. Its isolated call time falls from 48.80 to 31.88 seconds, a
+  34.7% reduction. The ALEX B1 gate falls from about 86.5 to 47.78 seconds in
+  isolation and from 140.02 to 61.27 seconds under the six-worker full gate,
+  a 56.2% reduction in the contended configuration.
+- The complete six-worker portable gate falls from 174.4 to 156.3 seconds
+  end-to-end (10.4%) and passes all 500 tests in 154.98 pytest seconds with
+  95.43% combined line/branch coverage. Coverage and JUnit SHA-256 digests are
+  `e319fa9c645f293d46c9c20fbb0c132dd284ef7fe740e95a4bec7488926558c6`
+  and `9fff827a957deea19a3cdb2c755aa2d7d1a27bf895314b51ff2dad1916ef2e96`.
+  The exact 51-test fringing shard completes in 87.3 seconds with coverage
+  instrumentation, far below its 540-second CI budget.
+- Ruff, formatting, byte compilation, architecture/import budgets, and the
+  complete curated workflow pass locally. Package source and distribution
+  contents are unchanged because the tranche modifies only an existing test
+  file and this plan.
+- PR #35 created all compatibility, coverage, metadata, and documentation
+  jobs, but GitHub rejected each runnable job before its first step with the
+  account payment/spending-limit annotation. The combined report correctly
+  skipped without shard evidence. This is unavailable hosted execution; the
+  complete local gates above remain the approved merge authority.
+- Next action: return to the compatible coupled B2 pressure/electric response,
+  then measure the production B1/B2 primal and gradient throughput on the
+  office CPU/A4000 hardware. Keep compile-evidence reuse separate from warm
+  production-performance claims.
