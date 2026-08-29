@@ -13,6 +13,7 @@ from solvax import (
     block_thomas_factor,
     block_thomas_solve,
     gmres,
+    linear_solve,
     pcg_linear_solve,
     tridiagonal_solve,
 )
@@ -1216,21 +1217,19 @@ def _steady_stokes_projection_pipe(
             jax.jit(precondition, inline=False),
         )
 
-    preconditioned_rhs = precondition(rhs)
-
-    def physical_constraint_residual(state, linear_rhs):
-        residual = schur(state) - linear_rhs
+    def physical_constraint_residual(operator, state, linear_rhs):
+        residual = operator(state) - linear_rhs
         divergence = unpack_pressure(residual[:pressure_size])
         flow = residual[pressure_size:] / jnp.maximum(jnp.mean(area_sum), 1.0e-30)
         return jnp.maximum(jnp.max(jnp.abs(divergence)), jnp.max(jnp.abs(flow)))
 
-    def solve_pressure(linear_rhs, initial):
+    def solve_operator(operator, linear_rhs, initial, operator_precondition=precondition):
         if physical_tolerance is None:
             return gmres(
-                schur,
+                operator,
                 linear_rhs,
                 x0=initial,
-                precond=precondition,
+                precond=operator_precondition,
                 restart=restart,
                 rtol=pressure_tolerance,
                 atol=pressure_tolerance,
@@ -1238,26 +1237,26 @@ def _steady_stokes_projection_pipe(
             )
         pilot_tolerance = max(pressure_tolerance, min(1.0e-6, physical_tolerance))
         pilot = gmres(
-            schur,
+            operator,
             linear_rhs,
             x0=initial,
-            precond=precondition,
+            precond=operator_precondition,
             restart=restart,
             rtol=pilot_tolerance,
             atol=pilot_tolerance,
             max_restarts=1,
         )
-        pilot_passes = physical_constraint_residual(pilot.x, linear_rhs) <= physical_tolerance
+        pilot_passes = physical_constraint_residual(operator, pilot.x, linear_rhs) <= physical_tolerance
 
         def accept_pilot(_):
             return pilot
 
         def refine_pilot(_):
             refined = gmres(
-                schur,
+                operator,
                 linear_rhs,
                 x0=pilot.x,
-                precond=precondition,
+                precond=operator_precondition,
                 restart=restart,
                 rtol=pressure_tolerance,
                 atol=pressure_tolerance,
@@ -1273,6 +1272,9 @@ def _steady_stokes_projection_pipe(
 
         return jax.lax.cond(pilot_passes, accept_pilot, refine_pilot, operand=None)
 
+    def solve_pressure(linear_rhs, initial):
+        return solve_operator(schur, linear_rhs, initial)
+
     if modal_factor_key is not None:
         solve_pressure = _reuse_fringing_jit(
             (
@@ -1287,7 +1289,29 @@ def _steady_stokes_projection_pipe(
             ),
             jax.jit(solve_pressure),
         )
-    pressure_solution = solve_pressure(rhs, preconditioned_rhs)
+
+    def implicit_solver(_, linear_rhs):
+        solution = solve_pressure(linear_rhs, precondition(linear_rhs))
+        return solution.x, (solution.residual_norm, solution.iterations, solution.converged)
+
+    def implicit_transpose_solver(operator, linear_rhs):
+        transpose = jax.linear_transpose(precondition, jnp.zeros_like(linear_rhs))
+
+        def transpose_precondition(value):
+            return transpose(value)[0]
+
+        initial = transpose_precondition(linear_rhs)
+        solution = solve_operator(operator, linear_rhs, initial, transpose_precondition)
+        return solution.x, (solution.residual_norm, solution.iterations, solution.converged)
+
+    pressure_state, pressure_aux = linear_solve(
+        schur,
+        rhs,
+        implicit_solver,
+        transpose_solver=implicit_transpose_solver,
+        has_aux=True,
+    )
+    pressure_solution = KrylovSolution(pressure_state, *pressure_aux)
     pressure = unpack_pressure(pressure_solution.x[:pressure_size])
     pressure_loss = pressure_solution.x[pressure_size:]
     correction = velocity_response(pressure_solution.x)
