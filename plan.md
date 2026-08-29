@@ -1238,6 +1238,7 @@ artifacts or release assets, not committed files.
 | D-047 | Shard the generic differentiable 3-D production fields and replicate only global coarse solves | Axial `NamedSharding` constraints must remain inside the traced program rather than staging design-dependent fields through NumPy. Rectangular, layered, and straight-pipe primal fields compose with reverse mode over the same recurrence; global axial/transverse coarse solves are explicitly replicated and their corrections repartitioned. Specialized ALEX B1 stays single-device until its cylindrical production operators pass an independent sharding gate. |
 | D-048 | Accelerate only the B2 mechanical state and close electricity once on the accepted velocity | Anderson/Aitken owns velocity and compact conservative flux; the one post-acceptance electric solve makes current, Lorentz force, charge, defects, checkpoints, and returned fields describe one state without retaining potential history or performing a second electric solve. |
 | D-049 | Qualify evidence at the boundary it informs | Exact tests serve edits, a conservative change gate serves local candidates, and the complete covered suite runs once for a source candidate. Documentation, packaging, external validation, accelerator, and release gates run only for their owning surfaces; required workflows remain visible and skip jobs with successful job-level conditions. |
+| D-050 | Spectrally filter ill-conditioned depth-two B2 Anderson histories | SOLVAX's condition filter bounds the retained residual Gram condition at 25. Well-conditioned Anderson steps are unchanged; near-dependent histories become bounded residual-space combinations without another field, map evaluation, or user parameter. Production evidence must still beat unfiltered Anderson and the raw map in defect, update, runtime, balance, and restart equivalence. |
 
 ## Work log
 
@@ -3940,3 +3941,28 @@ surface, measurements, validation, decision, and next action.
   intentionally not rerun. The candidate remains 88 tracked files and
   1,872,579 tracked bytes. Next action: close the terminal B2 primal and
   transpose-solve acceptance gate.
+
+### 2026-08-29 — condition the terminal B2 Anderson history
+
+- Continued the current accepted-state step-32 restart on the exact 101x65x65
+  fluid mesh. The physical momentum defect continued descending through step
+  88 to `0.16867260`, but depth-two Anderson updates became oscillatory and
+  reached `0.21000656`; divergence and charge remained bounded. The campaign
+  driver exposed its configured 128-update horizon in the progress record, so
+  the run was stopped at the valid atomic step-88 checkpoint instead of
+  spending another ten minutes on a known unstable accelerator.
+- At step 89 the two residual norms are `0.30102388` and `0.45851147`. Their
+  Gram matrix has condition number `58.4998` and unfiltered SOLVAX weights
+  `[2.16785015, -1.16785015]`, producing a `0.41279231` accepted velocity jump.
+  Decision D-050 passes `condition_limit=5` to the existing SOLVAX spectral
+  filter, bounding the effective Gram condition at 25. The filtered weights are
+  `[0.39237697, 0.60762303]`; no solve, field, restart value, or public option is
+  added.
+- On the identical step-88 state, the guarded step reduces the accepted update
+  to `0.07565518` and improves defect from the unguarded `0.16809644` to
+  `0.16669591`. Over steps 89--96, defect decreases monotonically to
+  `0.16247107` and update contracts to `0.00166472`; maximum divergence and
+  charge are `3.97e-5` and `2.42e-4`. This is also better than the previously
+  measured raw-map step-96 defect `0.17898851`. The reduced B2 boundary,
+  convergence, sharding, and exact-restart test passes. The office SSH endpoint
+  timed out before connection, so terminal GPU continuation remains pending.
