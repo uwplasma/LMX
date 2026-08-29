@@ -46,13 +46,13 @@ outputs = ["internal conservation summary", "field/flow plots"]
 docs = "docs/tutorials/fringing.md"
 
 [[example]]
-id = "custom-field"
+id = "blanket-design"
 path = "examples/variable_field_extruded_demo.py"
 command = "python examples/variable_field_extruded_demo.py"
 status = "research-stage"
 runtime = "portable"
-outputs = ["field reconstruction", "solution summary"]
-docs = "docs/tutorials/walls_and_fields.md"
+outputs = ["bounded design controls", "gradient check", "optimization plot"]
+docs = "docs/tutorials/differentiation.md"
 
 [[example]]
 id = "q2d-vortex-decay"

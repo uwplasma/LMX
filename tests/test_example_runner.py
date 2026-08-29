@@ -45,19 +45,23 @@ def test_fringing_benchmark_demo_runs_real_bounded_diagnostic(tmp_path: Path):
     assert all((summary_path.parent / name).is_file() for name in summary["plots"])
 
 
-def test_variable_field_extruded_demo_writes_summary(tmp_path: Path):
+def test_variable_field_extruded_demo_optimizes_with_checked_gradients(tmp_path: Path):
     script = Path(__file__).resolve().parents[1] / "examples/variable_field_extruded_demo.py"
     subprocess.run([sys.executable, script], cwd=tmp_path, timeout=60, check=True)
     summary_path = next((tmp_path / "artifacts").rglob("variable_field_extruded_summary.json"))
     summary = json.loads(summary_path.read_text())
-    validation = summary["validation"]
-    assert summary["case"].startswith("variable_field_duct")
-    assert summary["geometry_kind"] == "rect_duct"
-    assert validation["finite_velocity"] is True
-    assert validation["mean_velocity_change"] > 0.0
-    assert validation["current_proxy_change"] > 0.0
-    assert isinstance(validation["validation_pass"], bool)
-    assert (summary_path.parent / "extruded_overview.png").exists()
+    assert summary["shape"] == [7, 6, 6]
+    assert summary["controls"]["field_mean"] == pytest.approx(1.0, abs=1.0e-12)
+    assert all(0.8 < value < 1.2 for value in summary["controls"]["field_scale"])
+    assert 0.5 < summary["controls"]["wall_conductivity_scale"] < 1.5
+    assert summary["optimization"]["final_loss"] < 0.8 * summary["optimization"]["initial_loss"]
+    assert summary["gradient_check"]["relative_l2_error"] < 2.0e-3
+    assert (
+        min(summary["improvements"][name] for name in ("pumping_power_magnitude", "wall_current_density_rms"))
+        > 0.4
+    )
+    assert abs(summary["improvements"]["flow_rate_relative_change"]) < 0.01
+    assert (summary_path.parent / summary["plot"]).is_file()
 
 
 def test_li_aln_wall_stack_example_runs_explicit_models(tmp_path: Path):
