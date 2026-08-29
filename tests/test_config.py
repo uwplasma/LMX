@@ -508,7 +508,7 @@ def test_curated_examples_use_submodules_and_linear_scripts_are_editable() -> No
             "hunt_example.py": 160,
             "li_aln_wall_stack_example.py": 260,
             "q2d_turbulence_demo.py": 140,
-            "variable_field_extruded_demo.py": 160,
+            "variable_field_extruded_demo.py": 190,
         }
         if path.name in linear_limits:
             assert ast.get_docstring(tree)

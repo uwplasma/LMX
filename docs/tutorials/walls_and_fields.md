@@ -49,7 +49,6 @@ source table, coordinate units, field units, interpolation rule, and Maxwell
 checks with the run record.
 
 Run `python examples/li_aln_wall_stack_example.py` for explicit conducting and
-insulating layers, then `python examples/variable_field_extruded_demo.py` for
-an analytic divergence-free field and a complete 3-D solve. Both write a
-compact JSON summary under `artifacts/examples/` so wall, charge-closure, and
-field-response diagnostics can be inspected together.
+insulating layers. The differentiated field/wall design workflow is executable
+as `python examples/variable_field_extruded_demo.py`; it writes a compact JSON
+record and optimization figure under `artifacts/examples/`.

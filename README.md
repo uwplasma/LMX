@@ -109,7 +109,15 @@ def fringe_response(parameters):
 value, gradient = jax.jit(jax.value_and_grad(fringe_response))(jnp.ones(9))
 ```
 
+Run `python examples/variable_field_extruded_demo.py` for a bounded design
+study that preserves the mean imposed field while optimizing its axial shape
+and wall conductivity. The script checks the complete objective gradient
+against centered differences and writes the controls, metrics, convergence
+trace, and figure beneath `artifacts/examples/`.
+
 ![Three-dimensional fringing-field result](docs/_static/fringing_solver_family.webp)
+
+![Differentiable field and wall design](docs/_static/blanket_design_optimization.webp)
 
 ## Differentiate a steady duct
 
