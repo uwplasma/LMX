@@ -1098,6 +1098,54 @@ def _solve_duct_projection(
             ),
         }
 
+    if use_alex_b2_finite_volume:
+
+        def b2_map(state, flux):
+            """Apply one complete conservative B2 fixed-point map."""
+            u0, v0, w0, p0, phi0 = state
+            rho_phi_plus, rho_phi_inlet = flux
+            emf = common._cross((u0, v0, w0), (bx, by, bz))
+            _, _, _, lorentz_x0, lorentz_y0, lorentz_z0 = lorentz_operator(phi0, sigma, *emf, bx, by, bz)
+            velocity, momentum_force = (
+                pack_vector(u0, v0, w0),
+                pack_vector(lorentz_x0 + forcing, lorentz_y0, lorentz_z0),
+            )
+            velocity_fluid, _, momentum_converged = momentum_solve(
+                velocity, momentum_force, rho, nu, rho_phi_plus, rho_phi_inlet
+            )
+            predicted = embed_velocity(velocity_fluid, fluid_mask)
+            projection = mixed_boundary_projection(*predicted, p0, rho, fluid_mask)
+            u1, v1, w1, pressure = projection[:4]
+            mapped_flux = pack_flux(*projection[7:10])
+            emf = common._cross((u1, v1, w1), (bx, by, bz))
+            electric = electric_solve(emf_operator(sigma, *emf, fluid_mask), phi0, sigma, fluid_mask)
+            potential = electric[0]
+            current = reconstruct_electric(potential, sigma, *emf, bx, by, bz, fluid_mask)
+            jx0, jy0, jz0, div_j0, lorentz_x1, lorentz_y1, lorentz_z1 = current
+            defect = momentum_defect(
+                pack_vector(u1, v1, w1),
+                pack_vector(lorentz_x1, lorentz_y1, lorentz_z1),
+                rho,
+                nu,
+                mapped_flux,
+                projection[10],
+                pressure,
+            )
+            return (
+                (u1, v1, w1, jnp.where(fluid_mask, pressure, 0.0), potential),
+                (mapped_flux, projection[10]),
+                (
+                    (jx0, jy0, jz0, div_j0, lorentz_x1, lorentz_y1, lorentz_z1),
+                    (projection[4], projection[5], projection[6]),
+                    defect,
+                    momentum_converged,
+                    projection[11:],
+                    electric[1:],
+                ),
+            )
+
+        b2_map = jax.named_call(b2_map, name="lmx.b2.map")
+
     for step in range(completed_steps, stop_step):
         flux_relaxation = jnp.asarray(1.0, dtype=u.dtype)
         step_courant = (
@@ -1111,12 +1159,7 @@ def _solve_duct_projection(
             if use_alex_b2_finite_volume
             else jnp.zeros((nx,), dtype=p.dtype)
         )
-        uxb_x, uxb_y, uxb_z = common._cross((u, v, w), (bx, by, bz))
-        pressure_linear_residual = jnp.asarray(jnp.nan)
-        pressure_linear_relative_residual = jnp.asarray(jnp.nan)
-        pressure_linear_iterations = jnp.asarray(0)
-        pressure_linear_converged = jnp.asarray(False)
-        pressure_linear_status = jnp.asarray(-1)
+        pressure_linear = jnp.asarray((jnp.nan, jnp.nan, 0.0, 0.0, -1.0))
         momentum_linear_converged = jnp.asarray(True)
         if not use_alex_b2_finite_volume:
             assert generic_step is not None
@@ -1131,90 +1174,40 @@ def _solve_duct_projection(
                 div_j,
                 projected_divergence_max,
                 axial_pressure_loss_gradient,
-                electric_residual,
-                electric_converged,
-                electric_relative_residual,
-                electric_iteration_count,
-                electric_status,
-                electric_local_residual,
+                *electric_linear,
             ) = generic
             fixed_flow_error = jnp.asarray(0.0)
             momentum_defect_components = jnp.full((4,), jnp.nan)
         else:
-            jx, jy, jz, lorentz_x, lorentz_y, lorentz_z = lorentz_operator(
-                phi, sigma, uxb_x, uxb_y, uxb_z, bx, by, bz
+            (u_next, v_next, w_next, p, phi), (mapped_rho_phi_plus, mapped_rho_phi_inlet), b2 = b2_map(
+                (u, v, w, p, phi), (current_rho_phi_plus, current_rho_phi_inlet)
             )
-            velocity = pack_vector(u, v, w)
-            momentum_force = pack_vector(lorentz_x + forcing, lorentz_y, lorentz_z)
-            velocity_fluid, _, momentum_linear_converged = momentum_solve(
-                velocity, momentum_force, rho, nu, current_rho_phi_plus, current_rho_phi_inlet
-            )
-            u_star, v_star, w_star = embed_velocity(velocity_fluid, fluid_mask)
             (
-                u_next,
-                v_next,
-                w_next,
-                p_corr,
-                axial_pressure_loss_gradient,
-                projected_divergence_norm,
-                fixed_flow_error,
-                mapped_rho_phi_x,
-                mapped_rho_phi_y,
-                mapped_rho_phi_z,
-                mapped_rho_phi_inlet,
-                pressure_linear_residual,
-                pressure_linear_relative_residual,
-                pressure_linear_iterations,
-                pressure_linear_converged,
-                pressure_linear_status,
-            ) = mixed_boundary_projection(u_star, v_star, w_star, p, rho, fluid_mask)
-            mapped_flux_components = (mapped_rho_phi_x, mapped_rho_phi_y, mapped_rho_phi_z)
-            valid = all(bool(jnp.all(jnp.isfinite(field))) for field in (u_next, v_next, w_next, p_corr))
+                (jx, jy, jz, div_j, lorentz_x, lorentz_y, lorentz_z),
+                (axial_pressure_loss_gradient, projected_divergence_norm, fixed_flow_error),
+                momentum_defect_components,
+                momentum_linear_converged,
+                pressure_linear,
+                electric_linear,
+            ) = b2
+            mapped_flux_components = unpack_flux(mapped_rho_phi_plus)
+            valid = all(bool(jnp.all(jnp.isfinite(field))) for field in (u_next, v_next, w_next, p, phi))
             valid &= all(
                 bool(jnp.all(jnp.abs(field) <= velocity_limit)) for field in (u_next, v_next, w_next)
             )
             if not valid:
                 state = tuple(
                     (name, bool(jnp.all(jnp.isfinite(field))), float(jnp.nanmax(jnp.abs(field))))
-                    for name, field in zip(("u", "v", "w", "p"), (u_next, v_next, w_next, p_corr))
+                    for name, field in zip(("u", "v", "w", "p"), (u_next, v_next, w_next, p))
                 )
                 raise FloatingPointError(f"ALEX B2 projection inactive guard: {state}")
-            p = jnp.where(fluid_mask, p_corr, 0.0)
 
-        uxb_x, uxb_y, uxb_z = common._cross((u_next, v_next, w_next), (bx, by, bz))
-        if use_alex_b2_finite_volume:
-            emf_rhs = emf_operator(sigma, uxb_x, uxb_y, uxb_z, fluid_mask)
-            (
-                phi,
-                electric_residual,
-                electric_converged,
-                electric_relative_residual,
-                electric_iteration_count,
-                electric_status,
-                electric_local_residual,
-            ) = electric_solve(emf_rhs, phi, sigma, fluid_mask)
-            if not bool(jnp.all(jnp.isfinite(phi))):
-                raise FloatingPointError("ALEX B2 electric solve produced non-finite potential")
         potential_update = common._gauge_invariant_scalar_update(
             phi,
             phi_previous,
             cell_area,
             scale=electric_potential_scale,
         )
-
-        if use_alex_b2_finite_volume:
-            jx, jy, jz, div_j, lorentz_x, lorentz_y, lorentz_z = reconstruct_electric(
-                phi, sigma, uxb_x, uxb_y, uxb_z, bx, by, bz, fluid_mask
-            )
-            momentum_defect_components = momentum_defect(
-                pack_vector(u_next, v_next, w_next),
-                pack_vector(lorentz_x, lorentz_y, lorentz_z),
-                rho,
-                nu,
-                pack_flux(*mapped_flux_components),
-                mapped_rho_phi_inlet,
-                p_corr,
-            )
 
         if use_alex_b2_finite_volume:
             projected_divergence_max = projected_divergence_norm
@@ -1245,17 +1238,13 @@ def _solve_duct_projection(
                     momentum_defect_components[-1],
                     pressure_update,
                     potential_update,
-                    pressure_linear_residual,
-                    pressure_linear_relative_residual,
-                    pressure_linear_iterations,
-                    pressure_linear_converged,
-                    pressure_linear_status,
-                    electric_residual,
-                    electric_relative_residual,
-                    electric_local_residual,
-                    electric_iteration_count,
-                    electric_converged,
-                    electric_status,
+                    *pressure_linear,
+                    electric_linear[0],
+                    electric_linear[2],
+                    electric_linear[5],
+                    electric_linear[3],
+                    electric_linear[1],
+                    electric_linear[4],
                 )
             )
         )
@@ -1303,7 +1292,7 @@ def _solve_duct_projection(
             and charge_balance <= common.ALEX_BALANCE_TOLERANCE
             and (
                 not use_alex_b2_finite_volume
-                or all(map(bool, (momentum_linear_converged, pressure_linear_converged, electric_converged)))
+                or all(map(bool, (momentum_linear_converged, pressure_linear[3], electric_linear[1])))
             )
         )
         accepted_state_converged = (
@@ -1420,9 +1409,9 @@ def _solve_duct_projection(
         if converged:
             break
 
+    # Acceleration changes the accepted state after current reconstruction.
+    uxb_x, uxb_y, uxb_z = common._cross((u, v, w), (bx, by, bz))
     if use_alex_b2_finite_volume:
-        # Acceleration changes the accepted state after current reconstruction.
-        uxb_x, uxb_y, uxb_z = common._cross((u, v, w), (bx, by, bz))
         jx, jy, jz, div_j, lorentz_x, lorentz_y, lorentz_z = reconstruct_electric(
             phi, sigma, uxb_x, uxb_y, uxb_z, bx, by, bz, fluid_mask
         )
