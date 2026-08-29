@@ -12,6 +12,11 @@ projection, enforces the prescribed flow constraint when present, and resolves
 electric current closure. Gauge constraints remove the constant nullspace of
 pressure and electric potential.
 
+The production B2 fixed-point residual uses the prescribed mean flow velocity
+and induced-potential scale to balance its velocity and electric blocks before
+Anderson mixing. Numerical safety limits are guardrails, not state scales, and
+therefore do not enter the residual norm.
+
 ## LMX and SOLVAX
 
 LMX owns:

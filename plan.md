@@ -12,15 +12,15 @@ supported current state.
 
 ## Active physics and performance tranche
 
-The live root is the enforced repository baseline: an ordinary authenticated
-clone is 2,304 KiB total, including 588 KiB of Git data and a 463.39 KiB pack.
-It contains 85 tracked files, 1,563,958 tracked bytes, one commit, 15 package
-modules, and 24 root exports. The complete portable gate passes 505 tests in
-80.1 seconds. Every change below must preserve the normal-clone limit of
-9,766 KiB and the file, API, test-time, and coverage budgets. The Q2D physics
-and differentiable-core addition may use one module of at most 360 lines,
-setting a narrow capability-adjusted ceiling of 15,370 package lines across 16
-modules.
+The live root is the enforced repository baseline. The latest ordinary
+authenticated clone measurement is 2,304 KiB total, including 588 KiB of Git
+data and a 463.39 KiB pack. The current candidate contains 89 tracked files,
+about 1.8 MiB of tracked data, 16 package modules, and 28 root exports. Its
+complete six-worker portable gate passes 500 tests in 177.89 seconds with
+95.41% combined line/branch coverage. Every change below must preserve the
+normal-clone limit of 9,766 KiB and the file, API, five-minute test-time, and
+coverage budgets. The capability-adjusted ceiling remains 15,370 package lines
+across at most 16 modules.
 
 The tranche has six coupled outcomes:
 
@@ -90,6 +90,7 @@ high-fidelity comparisons.
 | Code or ecosystem | Established strength | Boundary for LMX | Useful relationship |
 |---|---|---|---|
 | ParaStell | Parametric stellarator in-vessel CAD, VMEC/first-wall input, radial builds, DAGMC/OpenMC neutronics | LMX does not own CAD, meshing arbitrary blanket solids, or neutronics | Consume versioned field/centerline/cross-section samples and return hydraulic, electromagnetic, and sensitivity observables to a device-design workflow |
+| DESC | Differentiable pseudo-spectral 3-D equilibrium, coil, and stellarator optimization with verified force-balance objectives | LMX does not solve plasma equilibrium or duplicate DESC's optimization framework | Consume equilibrium magnetic fields and smooth geometry controls; return differentiable liquid-metal hydraulic/electromagnetic constraints so a coupled design loop differentiates each model at its natural boundary |
 | NekRS and SAM | NekRS provides massively scalable high-order GPU CFD; SAM provides fast system models and MHD closures | LMX does not claim exascale arbitrary-geometry CFD or plant transients | Use matched duct/fringe cases for code comparison; publish when LMX gradients and design throughput add information not supplied by a primal CFD solve |
 | FreeMHD / FreeMHD2 | OpenFOAM finite-volume free-surface, multi-region, and now full-induction liquid-MHD physics | LMX remains inductionless and internal-flow focused; it does not chase free surfaces or full induction without a fusion design requirement | Maintain a pinned inductionless oracle, add a separately pinned current-source comparison, and exchange common dimensional observables |
 | JAX-Fluids, XLB, and JAX-CFD | Differentiable accelerator CFD, compressible/multiphase or lattice-Boltzmann methods, and scientific-ML workflows | LMX does not become a general differentiable CFD framework | Adopt evidence standards for multi-device execution, end-to-end gradients, profiling, and reproducible examples while keeping liquid-MHD equations and validation unique |
@@ -965,10 +966,11 @@ purpose.
 
 ### Phase 4 — simplify and optimize the supported solver
 
-- [ ] Finish the function-level ownership and necessity audit. The first pass
-  removed rejected solver lanes and decomposed the 3-D monolith, but the live
-  fringing implementation still contains 6,576 lines: 743 lines in the public
-  `lmx.fringing` case/API layer and 5,833 lines in four private owners. Keep
+- [ ] Finish the function-level ownership and necessity audit. The initial passes
+  removed rejected solver lanes, decomposed the 3-D monolith, and deleted
+  non-production private testbeds, but the live fringing implementation still
+  contains 6,502 lines: 743 lines in the public `lmx.fringing` case/API layer
+  and 5,759 lines in four private owners. Keep
   `lmx.fringing` as the only public surface while removing unreachable helpers,
   duplicate recurrences, redundant materialization, and reusable algebra that
   belongs in SOLVAX. No private owner may remain merely because the monolith
@@ -1029,9 +1031,9 @@ derivative, and remaining nonsmooth/static controls are explicit in the API.
 - [x] Make all examples fast, self-contained, editable, and CI-executed.
 - [x] Enforce source/file/size/media/API budgets in package tests.
 
-Exit: default suite is <= 90 seconds, coverage >=95%, Docker smoke passes when
-requested, scheduled/release parity is reproducible, all examples run, and
-source/tests/scripts meet their budgets.
+Exit: the complete six-worker suite is <= 300 seconds, coverage >=95%, Docker
+smoke passes when requested, scheduled/release parity is reproducible, all
+examples run, and source/tests/scripts meet their budgets.
 
 ### Phase 6 — rebuild docs and README
 
@@ -3001,3 +3003,66 @@ surface, measurements, validation, decision, and next action.
   without simplifying the code. In parallel, diagnose the B2 production
   plateau and run the frozen mesh/tolerance campaign without weakening its
   numerical or external-validation gates.
+
+### 2026-08-29 — correct B2 fixed-point scaling and isolate the plateau
+
+- Commit `a02cb8212b84885263acc59ff83cccb4a6145bfb` separates the B2
+  fixed-point normalization from its velocity safety guard. The Anderson state
+  now uses the prescribed mean flow velocity, $Q/A=1$ for the frozen B2 case,
+  instead of the guard $2\sqrt{Ha}\approx108$. The induced-potential block
+  retains its physical scale. This changes only the residual geometry used by
+  acceleration; the finite-volume map, boundary conditions, tolerances,
+  conservation gates, compact flux state, and restart contract are unchanged.
+- Controlled runs used the exact 101x65x65 coarse B2 problem. The current
+  depth-two method reaches a maximum update `0.004153443021944203` at step 32,
+  already below the previous guard-scaled result `0.006117260424545412` at
+  step 48. Measured depth-two coefficients remained finite and moderately
+  extrapolative rather than singular. A four-map experiment with physical
+  scaling reached `0.0022967856283384602` at step 32, but would multiply the
+  fine-grid field/residual/flux restart memory and still left a `3.01565`
+  momentum defect, so that extra production state was rejected. Dynamic
+  Aitken with `[0.05, 1]` reached only `0.0114979`; fixed relaxation 2 diverged
+  in transverse velocity to `2.9832` with momentum defect `307.0`.
+- The remaining defect is not an Anderson-conditioning artifact or a
+  wall-only diagnostic. At early coarse steps the largest axial defect occurs
+  at the inlet, but an interior maximum remains `2.21818` by step 3; transverse
+  maxima also occur downstream next to both wall families. Physical scaling
+  improves the state update while the terminal momentum defect remains
+  `3.0097461040979154`. Production B2 convergence and acceptance therefore
+  stay open; no tolerance, balance limit, or validation label was relaxed.
+- All 500 tests pass in 177.89 seconds on Python 3.11.14/JAX 0.9.2/SOLVAX
+  0.18.0 with 95.41% combined line/branch coverage. Coverage and JUnit SHA-256
+  digests are
+  `ef2f84612e3af09b571f94b2654901427dde9d4a1e70ebc8c6f44bb6017e7088`
+  and `98b0b871c7db8369e3b01817c43e3afd3be121301bac96d72cc0f9c987cf0b6b`.
+  The B2 restart/closure and scale-contract gates also pass on Python
+  3.10.21/JAX 0.6.2 and Python 3.13.9/JAX 0.11.1.
+- Ruff check/format, byte compilation, architecture/import budgets, Sphinx HTML
+  and external links with warnings as errors, isolated build, Twine, wheel,
+  and sdist inspection pass. The wheel is 146,441 bytes. The pinned FreeMHD
+  smoke passes contract, artifact, execution, observation, comparison, and
+  schema checks with zero failures and pressure L-infinity/RMS differences
+  `0.010917245284747775`/`0.004517977100483119`. Report and record SHA-256
+  digests are
+  `cb7d2f707ebd933ec3f682003e99f1b613a4b930839520e9e05367ff7e5e7582`
+  and `b1252d3770cacbb59d1d7ea7f747bd3418938df7ff23831247a8fe9f3cc13528`.
+  `acceptance_pass=false` remains correct for the smoke-only role.
+- PR #26 created all seven hosted CI, documentation, and external-validation
+  jobs; every job ended before its first step with GitHub's account
+  payment/spending-limit annotation. The hosted service supplied no numerical
+  evidence, so the complete recorded local matrix above remains the merge
+  authority under the temporary policy.
+- The current primary-source refresh adds DESC as the natural differentiable
+  equilibrium/geometry provider alongside ParaStell's CAD/neutronics role.
+  NekRS remains the scalable high-order primal comparison, FreeMHD the
+  independently executed liquid-MHD oracle, and JAX rematerialization/sharding
+  the implementation substrate rather than a novelty claim. Walker--Ni
+  Anderson evidence reinforces that scaling, history, regularization, and
+  safeguarding are numerical-method choices that require measured gates.
+- Next action: compare the implicit momentum equation, pressure projection,
+  conservative face-flux reconstruction, explicit deviatoric stress, and
+  post-map defect term by term on the accepted state. Repair the first
+  operator inconsistency that fails a discrete identity, then rerun the coarse
+  convergence study before considering deeper history or a coupled steady
+  root solve. Keep specialized B2 differentiation unavailable until the primal
+  balance and convergence contracts pass.
