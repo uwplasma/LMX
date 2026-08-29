@@ -2512,21 +2512,16 @@ def test_emit_solver_header_forwards_restart_payload():
     assert captured["reference_mean_velocity"] == pytest.approx(0.2)
 
 
-def test_build_mesh_rejects_bent_pipe_for_laminar_solver():
+def test_build_mesh_rejects_unknown_geometry():
     case = replace(
         make_hartmann_case(ha=5.0, ny=4, nz=4),
         geometry=GeometrySpec(
-            kind="bent_pipe",
+            kind="unsupported",
             width=1.0,
             height=1.0,
-            radius=0.25,
-            bend_radius=1.0,
-            bend_angle=1.0,
-            nr=4,
-            ntheta=8,
         ),
     )
-    with pytest.raises(NotImplementedError, match="bent_pipe"):
+    with pytest.raises(NotImplementedError, match="unsupported"):
         solvers._build_mesh(case)
 
 

@@ -73,8 +73,8 @@ print(result.converged, result.validation.max_charge_balance_residual)
 
 The 3-D formulation solves electric-potential/current closure, Lorentz force,
 momentum transport, and face-flux pressure projection on rectangular,
-layered-duct, straight-pipe, and mapped bent-pipe meshes. Analytic and tabulated
-vector fields use the same problem interface.
+layered-duct, and straight-pipe meshes. Analytic and tabulated vector fields
+use the same problem interface.
 
 Generic rectangular/layered ducts and straight pipes also expose their
 production finite-step fields for optimization. SOLVAX differentiates electric

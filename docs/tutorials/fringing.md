@@ -36,8 +36,7 @@ print(gate.net_boundary_current_residual)
 ```
 
 Use `build_layered_duct_extruded_problem` for explicit wall regions and
-`build_pipe_ogrid_extruded_problem` for a straight conducting pipe. Bent pipes
-use the same mapped pipe operators through `build_bent_pipe_extruded_problem`.
+`build_pipe_ogrid_extruded_problem` for a straight conducting pipe.
 `build_extruded_problem_from_case` is the general entry point when the complete
 case is already available.
 

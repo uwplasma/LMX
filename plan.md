@@ -214,8 +214,8 @@ physics, convergence, restart, performance, and external-parity gates. Generic
 linear algebra inside it may move to SOLVAX, and duplicated campaign/report
 machinery may be collapsed without removing the capability.
 
-Q2D flow, bent-pipe flow, magnetic obstacles, and additional 3-D imposed-field
-applications are active development surfaces. A lane stays only if it has an
+Q2D flow, magnetic obstacles, and additional 3-D imposed-field applications
+are active development surfaces. A lane stays only if it has an
 owner, a clear physical contract, an executable numerical test, and a
 documented validation path. Compatibility shims, alternative solvers already
 supplied by SOLVAX, dashboards, paper pipelines, one-off media generators, and
@@ -238,7 +238,7 @@ remains intact until its acceptance decision is recorded here.
 | Rectangular/layered 3-D fringing | Variable imposed field, electric-current closure, Lorentz force, momentum and face-flux pressure projection on extruded grids | manufactured operators, projection/divergence, restart, variable-field and B2 square-duct tests in `test_fringing.py`; B2 spec/reference | shared 3-D core | **protected, active development**; pass reduced 3-D gates and executed B2 FreeMHD smoke after every structural tranche |
 | Straight-pipe 3-D fringing | O-grid cylindrical metrics, conducting annulus, fixed-flow projection, variable field | manufactured pipe Poisson/diffusion/projection tests, B1 spec/reference, retained-modal benchmark | shared 3-D core | **protected, active development**; preserve B1 internal/manufactured gates and establish a matched external parity claim before promotion |
 | FreeMHD parity | Matched equations, geometry, material, forcing, controls, native-output observation, and declared tolerances | B2 deterministic contract, two-update Docker harness, independent observers, and parser/forgery tests in `test_freemhd.py` | `freemhd.py` plus one external runner | **protected validation boundary**; retain the pinned B2 Docker path and add B1 only when its equations and observables can be matched end to end |
-| Bent-pipe flow | Mapped pipe plus low-Dean hydrodynamic limit | mapped finite-state and low-De baseline tests through the common 3-D solver | shared 3-D core | **retained as a 3-D geometry extension**; require metric/manufactured tests, low-De mesh convergence, and a named external target before a quantitative validation claim |
+| Bent-pipe flow | Curvilinear momentum/current equations with curvature-driven secondary flow | the removed lane generated curved display points but solved straight cylindrical equations and labeled MHD transverse motion as Dean observables | none in live tree | **removed as a proxy**; restore only with curvature metrics in every production operator, manufactured tests, mesh convergence, derivatives, and a named external target |
 | Magnetic obstacle | Localized imposed field in a 3-D rectangular channel with velocity, pressure, current, and wake observables | internal field-response and baseline tests through the common 3-D solver | shared 3-D core | **retained as a 3-D field application**; add executable external data before a quantitative validation claim |
 | Q2D MHD | Depth-averaged incompressible inductionless flow with transverse-field damping and optional forcing | analytical decay/energy identity, spectral incompressibility, nonlinear three-grid refinement, CPU/GPU parity, reproducible poster/movie example | one 284-line module plus existing shared API/docs/tests | **protected, active development**; keep the compact SM82 path and do not restore a separate configuration, campaign, plotting, or solver framework |
 | Branded mirror-pipe adapter | Product-specific proxy around generic tabulated fields and pipe fringing | archived source and tests | none in live tree | **removed**; generic tabulated/vector-field and straight-pipe capabilities remain available for a future matched case |
@@ -253,10 +253,9 @@ reference, and maintenance cost.
 
 The accountable owner for retained 3-D geometry/application rows is the LMX
 3-D/fringing maintainer. Their common workflow is one `FringingCase` and one
-`solve` result; they do not retain separate solver families. Bent-pipe gates
-are mapped-metric/manufactured operators, low-De mesh convergence, and a future
-external curved-pipe target. Magnetic-obstacle gates are imposed-field
-Maxwell checks, current/flow conservation, mesh convergence, and an executable
+`solve` result; they do not retain separate solver families. Magnetic-obstacle
+gates are imposed-field Maxwell checks, current/flow conservation, mesh
+convergence, and an executable
 Votyakov/Andreev comparison before any quantitative claim. Until those final
 external gates exist, the capabilities may remain documented as development
 applications but not as validated benchmarks.
@@ -477,7 +476,7 @@ physics implementation.
 | FreeMHD case contract and observable comparison | keep and consolidate | dedicated external-validation area, excluded from the runtime wheel |
 | FreeMHD/OpenFOAM execution | keep reproducible, not importable | pinned Docker runner used locally, on schedule, and before release |
 | Q2D flow | keep one compact physical path | LMX owns the SM82 vorticity model and diagnostics; released SOLVAX owns periodic Poisson inversion and the exact checkpointed recurrence adjoint |
-| Dean, bent-pipe, obstacle, and related helpers | use shared 3-D path | retain only coherent cases with an executable test and named validation target |
+| Magnetic-obstacle and related field helpers | use shared 3-D path | retain only coherent cases with an executable test and named validation target |
 | Blanket and product-specific proxy helpers | remove | archive outside the live package; do not restore parallel solver or campaign frameworks |
 
 ### Upstream workflow
@@ -988,9 +987,9 @@ purpose.
   rectangular, layered, and straight-pipe production recurrences accept
   continuous forcing, station-wise field, material, and fixed-topology geometry
   controls with implicit electric derivatives and bounded reverse storage.
-  Bent-pipe coordinate controls and the specialized ALEX acceptance paths
-  remain deliberately unavailable to differentiation until their production
-  equations pass independent primal, derivative, runtime, and memory gates.
+  Specialized ALEX acceptance paths remain deliberately unavailable to
+  differentiation until their production equations pass independent primal,
+  derivative, runtime, and memory gates.
 - [ ] Complete blanket/stellarator design evidence without adding an optimizer
   framework. Pressure-loss, flow-uniformity, pumping-power, wall-current, and
   recirculation objectives, bounded field/material controls, and chunked batched
@@ -1124,7 +1123,7 @@ artifacts or release assets, not committed files.
 | D-009 | Protect 3-D fringing and straight-pipe capabilities throughout the refactor | They are active development goals and must improve rather than disappear during trimming. |
 | D-010 | Keep FreeMHD as a pinned Docker validation oracle outside the runtime wheel | Executed independent parity is valuable; OpenFOAM runtime and generated data are not Python package responsibilities. |
 | D-011 | Do not restore the archived Q2D or blanket frameworks | The broad solver/configuration/plotting/campaign families duplicate common infrastructure. Q2D physics returns only as one compact shared-API model; the unvalidated blanket model remains outside the live product. |
-| D-012 | Retain bent-pipe geometry and magnetic-obstacle cases only as applications of the common 3-D fringing solver | They broaden the retained geometry/field model without justifying separate algorithms; independent validation remains a promotion gate. |
+| D-012 | Retain magnetic-obstacle cases only as applications of the common 3-D fringing solver | A localized divergence-free field broadens the retained field model without a separate algorithm; independent validation remains a promotion gate. |
 | D-013 | Remove branded WHAM proxy builders while retaining generic tabulated fields and straight-pipe fringing | The general capability can express a future WHAM case once matched evidence exists, without carrying product-specific unvalidated code now. |
 | D-014 | Differentiate only retained production equations, and extend the canonical Hartmann contract to every retained Q2D/2-D/3-D solver family | Shadow 3-D, nonrectangular surrogate, WHAM, and blanket objectives can report gradients of a different model; deleting them does not justify leaving the production paths primal-only. |
 | D-015 | Use released SOLVAX native sparse solves instead of calling SciPy solvers from LMX | LMX owns MHD matrix assembly; reusable host factorization and solve behavior belongs to SOLVAX. |
@@ -1145,10 +1144,11 @@ artifacts or release assets, not committed files.
 | D-030 | Differentiate the mathematical result, not incidental solver work | Implicit adjoints are the default for converged steady equations; checkpointed discrete adjoints are the default for finite trajectories. This matches established Optimistix, PETSc TSAdjoint/Revolve, and JAX scientific-computing practice while preserving one LMX production equation path. |
 | D-031 | Fail closed when a production adjoint does not converge | A finite primal is insufficient evidence: unsupported geometry remains unavailable until its transpose solve passes an independent derivative gate. |
 | D-032 | Eliminate inactive degrees of freedom from SPD off-diagonals | A fluid boundary contribution belongs on the diagonal, not as a coupling to an identity-constrained solid cell. Keeping the volume-scaled momentum operator symmetric makes primal PCG mathematically valid and gives its implicit transpose solve the same conditioning. |
-| D-033 | Differentiate each production 3-D recurrence with bounded nested derivatives | Generic rectangular/layered ducts and straight pipes expose continuous controls through their retained field updates. SOLVAX uses an implicit VJP for converged electric closure and exact checkpointing for finite projection and outer iterations. Specialized ALEX B1/B2 and bent-pipe coordinate lanes remain unavailable until their distinct coupled operators pass the same gates. |
+| D-033 | Differentiate each production 3-D recurrence with bounded nested derivatives | Generic rectangular/layered ducts and straight pipes expose continuous controls through their retained field updates. SOLVAX uses an implicit VJP for converged electric closure and exact checkpointing for finite projection and outer iterations. Specialized ALEX B1/B2 lanes remain unavailable until their distinct coupled operators pass the same gates. |
 | D-034 | Execute each PR test once and aggregate its evidence | Three duration-balanced shards run concurrently with branch coverage and save run-scoped JUnit/coverage caches. A report-only job enforces the repository threshold; release reuses the same workflow in parallel with docs and external validation. This preserves fail-closed evidence while targeting a sub-10-minute critical path. |
 | D-035 | Lead with differentiable inductionless blanket-design physics, not general CFD breadth | ParaStell owns parametric stellarator CAD/neutronics, NekRS owns exascale high-order CFD, and FreeMHD owns free-surface/multi-region/full-induction development. LMX earns a distinct role through compact high-Hartmann duct/fringe equations, verified bounded-memory derivatives, accelerator design throughput, and matched external evidence. New multiphysics enters through versioned coupling data before it enters the runtime. |
 | D-036 | Keep `lmx.fringing` as the only public 3-D surface and retain private fringing files only by mathematical ownership | Common structured-grid operations, rectangular-duct kernels, cylindrical-pipe kernels, and orchestration have different metrics and change reasons. Private ownership files reduce coupling; test-only proxy solvers and duplicate recurrences do not, so they are removed. |
+| D-037 | Remove the label-only bent-pipe lane | Curved display coordinates never entered its straight cylindrical operators, and its validator mislabeled generic transverse velocity as Dean curvature physics. A future curved-pipe solver must introduce coherent curvilinear metrics, independent validation, and derivative gates rather than reuse the removed name. |
 
 ## Work log
 
@@ -2565,3 +2565,53 @@ surface, measurements, validation, decision, and next action.
   retained bent-pipe coordinate map, establish matched production B1/B2
   refinement evidence, and obtain one-/two-A4000 primal, gradient, memory, and
   strong-scaling measurements. No GPU or production B1/B2 claim is made yet.
+
+### 2026-08-28 — remove the label-only curved-pipe proxy
+
+- LMX PR 17 merged the differentiable straight-pipe core at
+  `82da45862ea8f7b07cbe11f54ed5501be4378e41`. The follow-on candidate
+  `88582c3` removes the separate bent-pipe builder, display-only mesh generator,
+  pseudo-Dean validator, two schema parameters, documentation claim, and their
+  duplicate tests. It retains the production straight-pipe/annulus/B1 path,
+  rectangular/layered 3-D fringing, magnetic-obstacle application, and pinned
+  FreeMHD boundary.
+- The audit found no curvilinear physics to protect: curved Cartesian point
+  coordinates were not consumed by momentum, pressure projection, electric
+  closure, current, or Lorentz operators. The solve used straight cylindrical
+  metrics, while the validator labeled generic MHD transverse velocity as Dean
+  curvature observables. Removing the name is more accurate than exposing a
+  differentiable gradient of the wrong equations. A future curved-pipe lane
+  must begin with coherent curvilinear operators and an independent target.
+- The change adds 29 lines and removes 359. Package source falls from 15,435 to
+  15,215 lines, maintained core from 6,009 to 5,962, tests from 12,007 to
+  11,898 lines, and the wheel from 150,564 to 148,562 bytes. Package and test
+  ceilings tighten to 15,220 and 11,900 so the proxy cannot return unnoticed.
+  The remaining inventory is 16 modules, 13 test files, 28 root exports, seven
+  examples, a 1,761-line largest module, and 1,771,727 tracked checkout bytes.
+- The exact source passed 505 tests in 160.65 seconds on macOS 14.4.1 arm64,
+  Python 3.11.14, JAX/JAXLIB 0.9.2, SOLVAX 0.18.0, and CPU, with 95.25% combined
+  branch coverage. Coverage and JUnit SHA-256 digests are
+  `8406d85140d5ed7597df8f95c21e0f74bb175dacd8c7f6c431e384c641a2073e`
+  and `b5e1a623e44de64a47b9ef3ad6f739894f4f62ecb5a3187ec0007ebf2ea1d83b`.
+  Complete Python 3.10.21/JAX 0.6.2 and Python 3.13.9/JAX 0.11.1 runs passed all
+  505 tests in 145.4 and 113.26 seconds; their JUnit digests are
+  `a548d51640abf92215e0b4cac89f45c86e1f61260738abb0d663f0942b299fd4`
+  and `3562d83a58c8e583092353437105550c64d5552090a20cd5703b085107a2dc52`.
+- Ruff check/format, architecture/prose/import checks, Sphinx HTML and external
+  links with warnings as errors, isolated build, Twine, distribution
+  inspection, CLI, and a fresh non-editable-wheel straight-pipe solve passed.
+  The 148,562-byte wheel and 140,496-byte sdist SHA-256 digests are
+  `e4cb66e459a8de24e7e183751660c8cbe1e13e0ab8a9d66b37f2527ac31e7425`
+  and `85f6e1f22a195b7f04ca8f020187730775390580d9631efb50f1e2ff44964ad3`.
+- The clean pinned FreeMHD Docker rerun passed contract, artifact, execution,
+  observation, comparison, and schema checks with zero failed checks and
+  pressure L-infinity/RMS discrepancies `0.0109172`/`0.00451798`. Report and
+  external-record SHA-256 digests are
+  `c75c883a6a81d34a331c033912c206bd0dcd97275092191caa09b2f5e7a0dd65`
+  and `4d0a923491fef48e7839b114d43cd9439a1fc6416e691d3e68e3f040ad39e3c8`.
+  `acceptance_pass=false` remains correct for the two-update smoke role.
+- The office A4000 host again timed out before connection, so no GPU or scaling
+  claim is made. Next action: merge this correction, then focus the 3-D work on
+  specialized ALEX derivative gates and production-resolution matched B1/B2;
+  retry one-/two-device primal, gradient, memory, and scaling evidence when the
+  registered GPU host is reachable.
