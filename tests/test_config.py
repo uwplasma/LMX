@@ -26,6 +26,7 @@ from scripts.audit_architecture import (
     inspect_wheel,
     measure_import,
 )
+from scripts.run_full_test_suite import _test_environment
 
 pytestmark = pytest.mark.unit
 
@@ -390,6 +391,7 @@ EXPECTED_ROOT_API = {
 
 def test_architecture_inventory_is_deterministic_without_timing() -> None:
     assert build_inventory() == build_inventory()
+    assert Path(_test_environment()["PYTHONPATH"].split(os.pathsep)[0]) == Path("src").resolve()
 
 
 def test_stable_root_api_is_small_lazy_and_resolvable(
@@ -427,11 +429,18 @@ def test_unknown_root_attribute_has_standard_error() -> None:
         lmx.not_an_api
 
 
-def test_architecture_inventory_ignores_generated_egg_info(tmp_path: Path) -> None:
+def test_architecture_inventory_ignores_generated_egg_info(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     (tmp_path / "source.py").write_bytes(b"x")
     metadata = tmp_path / "package.egg-info"
     metadata.mkdir()
     (metadata / "PKG-INFO").write_bytes(b"generated")
+
+    def missing_git(*_args, **_kwargs):
+        raise FileNotFoundError
+
+    monkeypatch.setattr("scripts.audit_architecture.subprocess.run", missing_git)
     assert _checkout_size(tmp_path) == 1
 
 
