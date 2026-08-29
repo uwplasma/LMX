@@ -95,29 +95,33 @@ design_problem = build_layered_duct_extruded_problem(
 
 
 def fringe_response(parameters):
-    field_coefficients, material_scale = parameters[:-2], parameters[-2:]
+    field_coefficients = parameters[:7]
+    material_scale, geometry_scale = parameters[7:9], parameters[9:]
     fields = evolve_extruded_fields(
         design_problem,
         magnetic_field_scale=field_coefficients,
         material_conductivity_scale=material_scale,
+        geometry_scale=geometry_scale,
         steps=8,
     )
-    objectives = extruded_engineering_objectives(design_problem, fields)
+    objectives = extruded_engineering_objectives(
+        design_problem, fields, geometry_scale=geometry_scale
+    )
     return objectives["pumping_power"] + 0.1 * objectives["flow_nonuniformity"]
 
 
-value, gradient = jax.jit(jax.value_and_grad(fringe_response))(jnp.ones(9))
+value, gradient = jax.jit(jax.value_and_grad(fringe_response))(jnp.ones(12))
 ```
 
 Run `python examples/variable_field_extruded_demo.py` for a bounded design
-study that preserves the mean imposed field while optimizing its axial shape
-and wall conductivity. The script checks the complete objective gradient
-against centered differences and writes the controls, metrics, convergence
-trace, and figure beneath `artifacts/examples/`.
+study that preserves the mean imposed field while optimizing its axial shape,
+wall conductivity, and fixed-topology duct dimensions. The script checks the
+complete objective gradient against centered differences and writes the
+controls, metrics, convergence trace, and figure beneath `artifacts/examples/`.
 
 ![Three-dimensional fringing-field result](docs/_static/fringing_solver_family.webp)
 
-![Differentiable field and wall design](docs/_static/blanket_design_optimization.webp)
+![Differentiable field, wall, and geometry design](docs/_static/blanket_design_optimization.webp)
 
 ## Differentiate a steady duct
 
