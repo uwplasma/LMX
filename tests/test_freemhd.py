@@ -234,8 +234,8 @@ def _write_lmx_b2_output(
         inlet_flux = benchmarks.jnp.zeros((5, 5))
         anderson_state = (
             (
-                benchmarks.jnp.zeros((4, *shape)),
-                benchmarks.jnp.zeros((4, *shape)),
+                benchmarks.jnp.zeros((3, *shape)),
+                benchmarks.jnp.zeros((3, *shape)),
                 compact_flux,
                 inlet_flux,
             )

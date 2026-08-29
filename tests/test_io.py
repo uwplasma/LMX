@@ -371,7 +371,7 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
     bundle = _extruded_bundle(
         rho_phi_plus=jnp.arange(18.0).reshape((3, 3, 1, 2)),
         rho_phi_inlet=jnp.asarray([[0.4, 0.6]]),
-        aitken_state=(jnp.ones((4, 3, 2, 2)), 0.75, 1),
+        aitken_state=(jnp.ones((3, 3, 2, 2)), 0.75, 1),
         stopping_state=(4, 1, "in_progress"),
         iteration_residual_history=jnp.asarray([1.0e-3]),
         iteration_momentum_defect_history=jnp.asarray([4.0e-5]),
@@ -406,8 +406,8 @@ def test_extruded_restart_bundle_round_trip_and_layout(tmp_path: Path):
     assert all(path.exists() for path in vars(layout).values())
 
     anderson_values = (
-        jnp.full((4, 3, 2, 2), 2.0),
-        jnp.full((4, 3, 2, 2), 3.0),
+        jnp.full((3, 3, 2, 2), 2.0),
+        jnp.full((3, 3, 2, 2), 3.0),
         jnp.full((3, 3, 1, 2), 4.0),
         jnp.full((1, 2), 5.0),
     )

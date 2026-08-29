@@ -1445,12 +1445,12 @@ def _b2_coupling_functions(
     def lorentz_operator(potential, conductivity, emf_x, emf_y, emf_z, bx, by, bz):
         return electric_lorentz(potential, conductivity, emf_x, emf_y, emf_z, bx, by, bz)
 
-    def scaled_state(u, v, w, potential):
-        return jnp.stack((u, v, w, potential)) / fixed_point_scale
+    def scaled_state(u, v, w):
+        return jnp.stack((u, v, w)) / fixed_point_scale
 
     def unscaled_state(state):
         values = state * fixed_point_scale
-        return values[0], values[1], values[2], values[3]
+        return values[0], values[1], values[2]
 
     def mix_anderson(mapped0, residual0, flux0, inlet0, mapped1, residual1, flux1, inlet1):
         weights = anderson_weights(
@@ -1501,9 +1501,9 @@ def _jit_b2_coupling_functions(
         ((field_sharding,) * 5, field_sharding),
         ((field_sharding,) * 9, (field_sharding,) * 7),
         ((field_sharding,) * 8, (field_sharding,) * 6),
-        ((field_sharding,) * 4, state_sharding),
+        ((field_sharding,) * 3, state_sharding),
         ((state_sharding, state_sharding), state_sharding),
-        (state_sharding, (field_sharding,) * 4),
+        (state_sharding, (field_sharding,) * 3),
         (
             (state_sharding, state_sharding, flux_sharding, replicated_sharding) * 2,
             (state_sharding, flux_sharding, replicated_sharding),

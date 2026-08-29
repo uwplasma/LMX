@@ -1020,7 +1020,6 @@ def _solve_duct_projection(
         use_b2=use_alex_b2_finite_volume,
         velocity=u,
         velocity_scale=fixed_point_velocity_scale,
-        potential_scale=electric_potential_scale,
         forcing=forcing,
     )
     retained_history_steps = len(residual_by_step)
@@ -1176,37 +1175,19 @@ def _solve_duct_projection(
                 )
                 u1, v1, w1, pressure = projection[:4]
                 mapped_flux, mapped_inlet = pack_flux(*projection[7:10]), projection[10]
-            emf = common._cross((u1, v1, w1), (bx, by, bz))
-            electric = electric_solve(emf_operator(sigma, *emf, fluid_mask), phi0, sigma, fluid_mask)
-            potential = electric[0]
-            current = reconstruct_electric(potential, sigma, *emf, bx, by, bz, fluid_mask)
-            jx0, jy0, jz0, div_j0, lorentz_x1, lorentz_y1, lorentz_z1 = current
-            defect = momentum_defect(
-                pack_vector(u1, v1, w1),
-                pack_vector(lorentz_x1, lorentz_y1, lorentz_z1),
-                rho,
-                nu,
-                mapped_flux,
-                mapped_inlet,
-                pressure,
-            )
             return (
-                (u1, v1, w1, jnp.where(fluid_mask, pressure, 0.0), potential),
+                (u1, v1, w1, jnp.where(fluid_mask, pressure, 0.0)),
                 (mapped_flux, mapped_inlet),
                 (
-                    (jx0, jy0, jz0, div_j0, lorentz_x1, lorentz_y1, lorentz_z1),
                     (projection[4], projection[5], projection[6]),
-                    defect,
                     momentum_converged,
                     projection[11:],
-                    electric[1:],
                 ),
             )
 
         b2_map = jax.named_call(b2_map, name="lmx.b2.map")
 
     for step in range(completed_steps, stop_step):
-        flux_relaxation = jnp.asarray(1.0, dtype=u.dtype)
         step_courant = (
             courant_numbers(*unpack_flux(current_rho_phi_plus), current_rho_phi_inlet, rho)
             if use_alex_b2_finite_volume
@@ -1238,28 +1219,116 @@ def _solve_duct_projection(
             fixed_flow_error = jnp.asarray(0.0)
             momentum_defect_components = jnp.full((4,), jnp.nan)
         else:
-            (u_next, v_next, w_next, p, phi), (mapped_rho_phi_plus, mapped_rho_phi_inlet), b2 = b2_map(
+            (mapped_u, mapped_v, mapped_w, p), (mapped_rho_phi_plus, mapped_rho_phi_inlet), b2 = b2_map(
                 (u, v, w, p, phi), (current_rho_phi_plus, current_rho_phi_inlet)
             )
             (
-                (jx, jy, jz, div_j, lorentz_x, lorentz_y, lorentz_z),
                 (axial_pressure_loss_gradient, projected_divergence_norm, fixed_flow_error),
-                momentum_defect_components,
                 momentum_linear_converged,
                 pressure_linear,
-                electric_linear,
             ) = b2
             mapped_flux_components = unpack_flux(mapped_rho_phi_plus)
-            valid = all(bool(jnp.all(jnp.isfinite(field))) for field in (u_next, v_next, w_next, p, phi))
+            valid = all(bool(jnp.all(jnp.isfinite(field))) for field in (mapped_u, mapped_v, mapped_w, p))
             valid &= all(
-                bool(jnp.all(jnp.abs(field) <= velocity_limit)) for field in (u_next, v_next, w_next)
+                bool(jnp.all(jnp.abs(field) <= velocity_limit)) for field in (mapped_u, mapped_v, mapped_w)
             )
             if not valid:
                 state = tuple(
                     (name, bool(jnp.all(jnp.isfinite(field))), float(jnp.nanmax(jnp.abs(field))))
-                    for name, field in zip(("u", "v", "w", "p"), (u_next, v_next, w_next, p))
+                    for name, field in zip(("u", "v", "w", "p"), (mapped_u, mapped_v, mapped_w, p))
                 )
                 raise FloatingPointError(f"ALEX B2 projection inactive guard: {state}")
+            raw_update = float(jnp.max(jnp.abs(jnp.stack((mapped_u - u, mapped_v - v, mapped_w - w)))))
+            projected_divergence_max, flow_error_value = map(
+                float, np.asarray(jnp.stack((projected_divergence_norm, fixed_flow_error)))
+            )
+            mechanical_convergence = (
+                raw_update / (inverse_electromagnetic_scale * dt * common.ALEX_B2_PRESSURE_CORRECTORS)
+                <= case.solver.coupling_tolerance
+                and projected_divergence_max <= common.ALEX_BALANCE_TOLERANCE
+                and flow_error_value <= common.ALEX_BALANCE_TOLERANCE
+                and bool(momentum_linear_converged)
+                and bool(pressure_linear[3])
+            )
+            current_state = scaled_state(u, v, w)
+            mapped_state = scaled_state(mapped_u, mapped_v, mapped_w)
+            fixed_point_residual = state_difference(mapped_state, current_state)
+            mapped_flux = pack_flux(*mapped_flux_components)
+            if mechanical_convergence or case.solver.coupling_acceleration == "none":
+                accelerated = mapped_state
+                accepted_flux, accepted_inlet = mapped_flux, mapped_rho_phi_inlet
+                if case.solver.coupling_acceleration == "anderson":
+                    previous_anderson_mapped = mapped_state
+                    previous_anderson_residual = fixed_point_residual
+                    previous_anderson_flux = mapped_flux
+                    previous_anderson_inlet = mapped_rho_phi_inlet
+            elif case.solver.coupling_acceleration == "aitken":
+                if fixed_aitken_relaxation is not None:
+                    relaxation_value = 1.0 if step == 0 else fixed_aitken_relaxation
+                    fixed_point_relaxation = jnp.asarray(relaxation_value, dtype=u.dtype)
+                elif raw_update <= case.time_stepper.steady_tolerance:
+                    fixed_point_relaxation = jnp.asarray(common.ALEX_B2_SETTLED_RELAXATION, dtype=u.dtype)
+                    previous_fixed_point_residual = None
+                elif previous_fixed_point_residual is not None:
+                    fixed_point_relaxation = aitken_relaxation(
+                        previous_fixed_point_residual,
+                        fixed_point_residual,
+                        fixed_point_relaxation,
+                        min_relaxation=case.solver.coupling_min_relaxation,
+                        max_relaxation=case.solver.coupling_max_relaxation,
+                    )
+                else:
+                    fixed_point_relaxation = jnp.asarray(1.0, dtype=u.dtype)
+                accelerated = current_state + fixed_point_relaxation * fixed_point_residual
+                accepted_flux, accepted_inlet = relax_flux(
+                    current_rho_phi_plus,
+                    current_rho_phi_inlet,
+                    mapped_flux,
+                    mapped_rho_phi_inlet,
+                    fixed_point_relaxation,
+                )
+                if fixed_aitken_relaxation is None:
+                    previous_fixed_point_residual = fixed_point_residual
+            else:
+                if previous_anderson_mapped is None:
+                    accelerated, accepted_flux, accepted_inlet = (
+                        mapped_state,
+                        mapped_flux,
+                        mapped_rho_phi_inlet,
+                    )
+                else:
+                    accelerated, accepted_flux, accepted_inlet = mix_anderson(
+                        previous_anderson_mapped,
+                        previous_anderson_residual,
+                        previous_anderson_flux,
+                        previous_anderson_inlet,
+                        mapped_state,
+                        fixed_point_residual,
+                        mapped_flux,
+                        mapped_rho_phi_inlet,
+                    )
+                previous_anderson_mapped = mapped_state
+                previous_anderson_residual = fixed_point_residual
+                previous_anderson_flux = mapped_flux
+                previous_anderson_inlet = mapped_rho_phi_inlet
+            u_next, v_next, w_next = unscaled_state(accelerated)
+            current_rho_phi_plus, current_rho_phi_inlet = accepted_flux, accepted_inlet
+            emf = common._cross((u_next, v_next, w_next), (bx, by, bz))
+            phi, *electric_linear = electric_solve(
+                emf_operator(sigma, *emf, fluid_mask), phi_previous, sigma, fluid_mask
+            )
+            jx, jy, jz, div_j, lorentz_x, lorentz_y, lorentz_z = reconstruct_electric(
+                phi, sigma, *emf, bx, by, bz, fluid_mask
+            )
+            momentum_defect_components = momentum_defect(
+                pack_vector(u_next, v_next, w_next),
+                pack_vector(lorentz_x, lorentz_y, lorentz_z),
+                rho,
+                nu,
+                current_rho_phi_plus,
+                current_rho_phi_inlet,
+                p,
+            )
 
         potential_update = common._gauge_invariant_scalar_update(
             phi,
@@ -1355,85 +1424,13 @@ def _solve_duct_projection(
                 or all(map(bool, (momentum_linear_converged, pressure_linear[3], electric_linear[1])))
             )
         )
-        accepted_state_converged = (
-            max(u_update, v_update, w_update, potential_update) <= case.time_stepper.steady_tolerance
-        )
         if use_alex_b2_finite_volume:
             # Require repeated passing updates before accepting an oscillatory map.
             steady_streak = steady_streak + 1 if instantaneous_convergence else 0
             converged = steady_streak >= common.ALEX_B2_STEADY_STEPS
         else:
             converged = instantaneous_convergence
-        if use_alex_b2_finite_volume and not converged:
-            current_state = scaled_state(u, v, w, phi_previous)
-            mapped_state = scaled_state(u_next, v_next, w_next, phi)
-            fixed_point_residual = state_difference(mapped_state, current_state)
-            if case.solver.coupling_acceleration == "aitken":
-                if fixed_aitken_relaxation is not None:
-                    relaxation_value = 1.0 if step == 0 else fixed_aitken_relaxation
-                    fixed_point_relaxation = jnp.asarray(relaxation_value, dtype=u.dtype)
-                    accelerated = (
-                        mapped_state if step == 0 else current_state + relaxation_value * fixed_point_residual
-                    )
-                    flux_relaxation = relaxation_value
-                elif accepted_state_converged:
-                    # Avoid reduction noise after settling while retaining a
-                    # conservative, empirically monotone coupled acceleration.
-                    accelerated = current_state + common.ALEX_B2_SETTLED_RELAXATION * fixed_point_residual
-                    previous_fixed_point_residual = None
-                    fixed_point_relaxation = jnp.asarray(1.0, dtype=u.dtype)
-                    flux_relaxation = common.ALEX_B2_SETTLED_RELAXATION
-                elif previous_fixed_point_residual is not None:
-                    fixed_point_relaxation = aitken_relaxation(
-                        previous_fixed_point_residual,
-                        fixed_point_residual,
-                        fixed_point_relaxation,
-                        min_relaxation=case.solver.coupling_min_relaxation,
-                        max_relaxation=case.solver.coupling_max_relaxation,
-                    )
-                    accelerated = current_state + fixed_point_relaxation * fixed_point_residual
-                    flux_relaxation = fixed_point_relaxation
-                else:
-                    accelerated = mapped_state
-                if not accepted_state_converged and fixed_aitken_relaxation is None:
-                    previous_fixed_point_residual = fixed_point_residual
-            else:
-                mapped_flux = pack_flux(*mapped_flux_components)
-                if previous_anderson_mapped is None:
-                    accelerated = mapped_state
-                    accelerated_flux = mapped_flux
-                    accelerated_inlet = mapped_rho_phi_inlet
-                else:
-                    accelerated, accelerated_flux, accelerated_inlet = mix_anderson(
-                        previous_anderson_mapped,
-                        previous_anderson_residual,
-                        previous_anderson_flux,
-                        previous_anderson_inlet,
-                        mapped_state,
-                        fixed_point_residual,
-                        mapped_flux,
-                        mapped_rho_phi_inlet,
-                    )
-                # Keep only the latest raw map: schema 6 is exactly depth two.
-                previous_anderson_mapped = mapped_state
-                previous_anderson_residual = fixed_point_residual
-                previous_anderson_flux = mapped_flux
-                previous_anderson_inlet = mapped_rho_phi_inlet
-            u, v, w, phi = unscaled_state(accelerated)
-        else:
-            u, v, w = u_next, v_next, w_next
-        if use_alex_b2_finite_volume:
-            if case.solver.coupling_acceleration == "anderson":
-                current_rho_phi_plus = pack_flux(*mapped_flux_components) if converged else accelerated_flux
-                current_rho_phi_inlet = mapped_rho_phi_inlet if converged else accelerated_inlet
-            else:
-                current_rho_phi_plus, current_rho_phi_inlet = relax_flux(
-                    current_rho_phi_plus,
-                    current_rho_phi_inlet,
-                    pack_flux(*mapped_flux_components),
-                    mapped_rho_phi_inlet,
-                    flux_relaxation,
-                )
+        u, v, w = u_next, v_next, w_next
         common._emit_iteration_progress(
             progress_callback,
             checkpoint_interval=checkpoint_interval,
@@ -1469,12 +1466,7 @@ def _solve_duct_projection(
         if converged:
             break
 
-    # Acceleration changes the accepted state after current reconstruction.
     uxb_x, uxb_y, uxb_z = common._cross((u, v, w), (bx, by, bz))
-    if use_alex_b2_finite_volume:
-        jx, jy, jz, div_j, lorentz_x, lorentz_y, lorentz_z = reconstruct_electric(
-            phi, sigma, uxb_x, uxb_y, uxb_z, bx, by, bz, fluid_mask
-        )
 
     final_step_residual = residual_by_step[-1] if residual_by_step else 0.0
     residual = jnp.full((nx,), final_step_residual, dtype=float)
