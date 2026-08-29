@@ -2841,3 +2841,49 @@ surface, measurements, validation, decision, and next action.
   mesh/tolerance refinement and production-resolution acceptance, and collect
   one-/two-GPU primal, reverse, memory, and strong-scaling evidence when the
   office host is reachable.
+
+### 2026-08-29 — finish the private fringing ownership trim
+
+- Commit `7338d1478fd50101cc3e689e8f5610823925903e` completes the immediate
+  private-module size gate without removing a solver, field representation,
+  restart state, diagnostic, or public API. `lmx.fringing` remains the sole
+  user-facing 3-D surface. The private orchestrator now imports the common,
+  duct, and pipe owners as modules rather than recreating a broad private
+  re-export surface; geometry-independent initial-field and design-property
+  setup belongs to the common owner; and `ExtrudedFieldBundle.from_groups`
+  centralizes result assembly in the data model. Checkpoint calls use the same
+  coordinate/field grouping, and B2 accelerator metadata is assembled once
+  for both progress checkpoints and the terminal bundle.
+- The change adds 222 lines and removes 287. `_fringing_solver.py` falls from
+  1,610 to 1,498 lines, while `_fringing_pipe.py` remains at 1,499 and
+  `_fringing_duct.py` at 1,493. All five fringing files fall from 6,664 to
+  6,576 lines; package source falls from 14,910 to 14,845 lines across the same
+  16 modules. Tests remain 11,949 lines in 13 files, the root API remains 28
+  names, the tracked checkout excluding build artifacts is 1,778,832 bytes,
+  and the wheel falls from 147,385 to 147,210 bytes. The largest package module
+  is now 1,499 lines. The no-new-file constraint was preserved.
+- The exact source passes all 506 tests in 183.4 seconds on Python
+  3.11.14/JAX 0.9.2/SOLVAX 0.18.0 with 95.36% combined line/branch coverage.
+  Coverage and JUnit SHA-256 digests are
+  `5de24af55499b0709026f80c3626c030f2146035cef8dbd0adc0e100281b6a03`
+  and `b9424b265342bb94829bf6ec3eeba2f4543e240efadce721927edf984869f1eb`.
+  The changed B1, B2 exact-restart, strided-history, and complete IO gates also
+  pass on Python 3.10.21/JAX 0.6.2 and Python 3.13.9/JAX 0.11.1.
+- Ruff check/format, byte compilation, architecture/prose/import budgets,
+  Sphinx HTML and external-link builds with warnings as errors, isolated
+  build, Twine, distribution inspection, CLI, and a fresh non-editable-wheel
+  primal/compiled-gradient smoke pass. The pinned FreeMHD Docker boundary
+  passes contract, artifact, execution, observation, comparison, and schema
+  checks with zero failures and unchanged pressure L-infinity/RMS
+  discrepancies `0.010917245284750786`/`0.004517977100484136`. Report and
+  record SHA-256 digests are
+  `5e493830ead2aee1756b61a3eb01ba68dbc3464acf349b9eac1835df44873308`
+  and `ab2087c2ba5c0e4186a40227371fb67ce40d655c8aee99f7de843c021211381d`.
+  `acceptance_pass=false` remains correct for this two-update smoke role.
+- Next action: keep the retained 3-D/fringing capability and establish matched
+  B1/B2 mesh/tolerance refinement plus production-resolution acceptance.
+  Collect one-/two-GPU primal, reverse, peak-memory, speedup, and strong-scaling
+  evidence when the office host is reachable. Continue function-level
+  simplification only where it removes duplicate work or improves a measured
+  numerical/performance boundary; do not trim capabilities to chase line
+  counts.

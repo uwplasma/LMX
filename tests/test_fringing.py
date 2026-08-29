@@ -2424,7 +2424,7 @@ def test_tabulated_magnetic_obstacle_uses_solvax_and_reports_velocity_deficit(
         calls["count"] += 1
         return original(*args, **kwargs)
 
-    monkeypatch.setattr("lmx._fringing_solver._solvax_pressure_poisson_duct", wrapped)
+    monkeypatch.setattr(duct_impl, "_solvax_pressure_poisson_duct", wrapped)
     solution = solve_extruded_inductionless(problem)
     validation = validate_magnetic_obstacle_baseline(solution, field_ny=41, field_nz=41)
     field_validation = validate_variable_field_extruded_solution(solution, field_ny=41, field_nz=41)
