@@ -3373,6 +3373,11 @@ surface, measurements, validation, decision, and next action.
   complete curated workflow pass locally. Package source and distribution
   contents are unchanged because the tranche modifies only an existing test
   file and this plan.
+- PR #35 created all compatibility, coverage, metadata, and documentation
+  jobs, but GitHub rejected each runnable job before its first step with the
+  account payment/spending-limit annotation. The combined report correctly
+  skipped without shard evidence. This is unavailable hosted execution; the
+  complete local gates above remain the approved merge authority.
 - Next action: return to the compatible coupled B2 pressure/electric response,
   then measure the production B1/B2 primal and gradient throughput on the
   office CPU/A4000 hardware. Keep compile-evidence reuse separate from warm
