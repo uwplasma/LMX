@@ -647,6 +647,39 @@ def _duct_pressure_face_corrections(
     return correction_x, *transverse
 
 
+def _duct_face_divergence(plus_x, inlet_x, plus_y, plus_z, *, dx, dy, dz, field_sharding=None):
+    """Apply the conservative mixed-boundary divergence to oriented face fields."""
+    west = _neighbor_fields(
+        plus_x,
+        mode_x="dirichlet",
+        mode_y="neumann",
+        mode_z="neumann",
+        sharding=field_sharding,
+    )[0]
+    west = jnp.where(jnp.arange(plus_x.shape[0])[:, None, None] == 0, inlet_x, west)
+    return (
+        (plus_x - west) / jnp.maximum(dx, 1.0e-12)
+        + (plus_y[:, 1:] - plus_y[:, :-1]) / dy[None, :, None]
+        + (plus_z[:, :, 1:] - plus_z[:, :, :-1]) / dz[None, None, :]
+    )
+
+
+def _duct_velocity_divergence(velocity, inlet_x, *, dx, dy, dz, field_sharding=None):
+    """Map cell velocity to the conservative mixed-boundary divergence."""
+    u, v, w = jnp.moveaxis(velocity, -1, 0)
+    east = _neighbor_fields(u, mode_x="neumann", mode_y="neumann", mode_z="neumann", sharding=field_sharding)[
+        1
+    ]
+    plus_x = 0.5 * (u + east)
+    plus_y = jnp.zeros((u.shape[0], u.shape[1] + 1, u.shape[2]), dtype=u.dtype)
+    plus_y = plus_y.at[:, 1:-1].set(0.5 * (v[:, 1:] + v[:, :-1]))
+    plus_z = jnp.zeros((u.shape[0], u.shape[1], u.shape[2] + 1), dtype=u.dtype)
+    plus_z = plus_z.at[:, :, 1:-1].set(0.5 * (w[:, :, 1:] + w[:, :, :-1]))
+    return _duct_face_divergence(
+        plus_x, inlet_x, plus_y, plus_z, dx=dx, dy=dy, dz=dz, field_sharding=field_sharding
+    )
+
+
 def _cell_pressure_correction_duct(correction_x, correction_y, correction_z, *, field_sharding=None):
     """Interpolate conservative face pressure corrections to cell centres."""
     correction_x_west = _neighbor_fields(
@@ -713,7 +746,6 @@ def _face_flux_pressure_projection_duct(
     dys = dy[y0:y1]
     dzs = dz[z0:z1]
     nx, ny, nz = us.shape
-    inlet_cells = jnp.arange(nx)[:, None, None] == 0
     outlet_cells = jnp.arange(nx)[:, None, None] == nx - 1
 
     def axial_neighbors(value):
@@ -732,13 +764,8 @@ def _face_flux_pressure_projection_duct(
         target = jnp.asarray(inlet_flow_rate, dtype=u.dtype)
         uf_inlet = _flow_rate_inlet_profile(us[0], face_area, target)
 
-    def axial_minus(plus, inlet):
-        return jnp.where(inlet_cells, inlet, axial_neighbors(plus)[0])
-
-    divergence = (
-        (uf_plus - axial_minus(uf_plus, uf_inlet)) / jnp.maximum(dx, 1.0e-12)
-        + (vf[:, 1:, :] - vf[:, :-1, :]) / dys[None, :, None]
-        + (wf[:, :, 1:] - wf[:, :, :-1]) / dzs[None, None, :]
+    divergence = _duct_face_divergence(
+        uf_plus, uf_inlet, vf, wf, dx=dx, dy=dys, dz=dzs, field_sharding=field_sharding
     )
     mobility = dt / jnp.maximum(rhos, 1.0e-20) if momentum_mobility is None else momentum_mobility
     if mobility.shape != rhos.shape:
@@ -776,10 +803,8 @@ def _face_flux_pressure_projection_duct(
     uf_plus += correction_x
     vf += correction_y
     wf += correction_z
-    divergence_after = (
-        (uf_plus - axial_minus(uf_plus, uf_inlet)) / jnp.maximum(dx, 1.0e-12)
-        + (vf[:, 1:, :] - vf[:, :-1, :]) / dys[None, :, None]
-        + (wf[:, :, 1:] - wf[:, :, :-1]) / dzs[None, None, :]
+    divergence_after = _duct_face_divergence(
+        uf_plus, uf_inlet, vf, wf, dx=dx, dy=dys, dz=dzs, field_sharding=field_sharding
     )
     # Reconstruct only pressure correction; reconstructing the predictor filters it.
     cell_correction = _cell_pressure_correction_duct(

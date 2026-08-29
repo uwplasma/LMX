@@ -279,6 +279,8 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
     assert solution.steps == 2
     assert solution.status == "step_limit"
     assert not solution.converged
+    assert solution.fields is solution.bundle and solution.diagnostics is solution.validation
+    assert solution.residual == solution.validation.max_residual
     assert progress[-1].checkpoint.stopping_state == (2, 0, "step_limit")
     assert [item.step for item in progress] == list(range(1, len(progress) + 1))
     assert all(isinstance(item.potential_residual, float) for item in progress)
