@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 import jax
@@ -52,6 +53,7 @@ from .specs import (
     Diagnostics,
     ExtrudedInductionlessProblem,
     ExtrudedInductionlessSolution,
+    FringingProfile,
     GeometrySpec,
     MagneticFieldSpec,
     MHDState,
@@ -1153,3 +1155,257 @@ def solve_fully_developed_fields(
         mesh, materials.conductivity, fluid_mask, coupled.x, phi, by, bz
     )
     return coupled.x, phi, jy, jz, lorentz
+
+
+def smooth_fringing_profile(
+    *,
+    length: float,
+    nx: int,
+    entry_center: float,
+    exit_center: float,
+    transition_width: float,
+    peak_scale: float = 1.0,
+    axis: str = "z",
+) -> FringingProfile:
+    if axis not in {"x", "y", "z"}:
+        raise ValueError(f"Unsupported magnetic axis {axis!r}")
+    x = jnp.linspace(0.0, length, nx)
+    width = max(float(transition_width), 1.0e-6)
+    rise = 0.5 * (1.0 + jnp.tanh((x - entry_center) / width))
+    fall = 0.5 * (1.0 - jnp.tanh((x - exit_center) / width))
+    return FringingProfile(x=x, field_scale=peak_scale * rise * fall, axis=axis)
+
+
+def build_square_duct_extruded_problem(
+    *,
+    ha_peak: float = 20.0,
+    width: float = 2.0,
+    height: float = 2.0,
+    ny: int = 48,
+    nz: int = 48,
+    length: float = 6.0,
+    nx_stations: int = 21,
+    entry_center: float = 1.5,
+    exit_center: float = 4.5,
+    transition_width: float = 0.35,
+) -> ExtrudedInductionlessProblem:
+    case = make_shercliff_case(ha=ha_peak, width=width, height=height, ny=ny, nz=nz)
+    case = replace(
+        case,
+        geometry=replace(case.geometry, length=length, nx=nx_stations),
+        time_stepper=replace(
+            case.time_stepper,
+            max_steps=min(case.time_stepper.max_steps, 80),
+            potential_iterations=min(case.time_stepper.potential_iterations, 80),
+            steady_tolerance=1.0e-6,
+        ),
+        solver=replace(
+            case.solver,
+            kind="extruded_inductionless",
+            coupling_iterations=min(case.solver.coupling_iterations, 8),
+            coupling_tolerance=1.0e-7,
+        ),
+    )
+    profile = smooth_fringing_profile(
+        length=length,
+        nx=nx_stations,
+        entry_center=entry_center,
+        exit_center=exit_center,
+        transition_width=transition_width,
+        peak_scale=1.0,
+        axis="z",
+    )
+    return ExtrudedInductionlessProblem(case=case, profile=profile)
+
+
+def build_magnetic_obstacle_rect_extruded_problem(
+    *,
+    width: float = 2.0,
+    height: float = 2.0,
+    base_bz: float = 12.0,
+    core_fraction_y: float = 0.35,
+    core_fraction_z: float = 0.35,
+    ny: int = 36,
+    nz: int = 36,
+    length: float = 6.0,
+    nx_stations: int = 21,
+    entry_center: float = 2.2,
+    exit_center: float = 3.8,
+    transition_width: float = 0.22,
+    forcing: float = 1.0,
+) -> ExtrudedInductionlessProblem:
+    from .mesh import make_localized_divergence_free_obstacle_field
+
+    field_fn = make_localized_divergence_free_obstacle_field(
+        width=width,
+        height=height,
+        base_bz=base_bz,
+        core_fraction_y=core_fraction_y,
+        core_fraction_z=core_fraction_z,
+    )
+    problem = build_square_duct_extruded_problem(
+        ha_peak=1.0,
+        width=width,
+        height=height,
+        ny=ny,
+        nz=nz,
+        length=length,
+        nx_stations=nx_stations,
+        entry_center=entry_center,
+        exit_center=exit_center,
+        transition_width=transition_width,
+    )
+    case = replace(
+        problem.case,
+        name=f"magnetic_obstacle_rect_bz{int(base_bz)}",
+        magnetic_field=MagneticFieldSpec(kind="analytic", fn=field_fn),
+        forcing=forcing,
+        notes=(
+            "Localized-field magnetic-obstacle baseline on the rectangular "
+            "extruded inductionless solver lane."
+        ),
+    )
+    return replace(problem, case=case)
+
+
+def build_layered_duct_extruded_problem(
+    *,
+    ha_peak: float = 20.0,
+    width: float = 2.0,
+    height: float = 2.0,
+    ny: int = 32,
+    nz: int = 32,
+    wall_cells: int = 4,
+    wall_thickness: float = 0.1,
+    insulator_cells: int | None = None,
+    insulator_thickness: float | None = None,
+    length: float = 6.0,
+    nx_stations: int = 21,
+    entry_center: float = 1.5,
+    exit_center: float = 4.5,
+    transition_width: float = 0.35,
+) -> ExtrudedInductionlessProblem:
+    case = make_hunt_case(
+        ha=ha_peak,
+        width=width,
+        height=height,
+        ny=ny,
+        nz=nz,
+        wall_cells=wall_cells,
+        wall_thickness=wall_thickness,
+        insulator_cells=insulator_cells,
+        insulator_thickness=insulator_thickness,
+    )
+    case = replace(
+        case,
+        geometry=replace(case.geometry, length=length, nx=nx_stations),
+        time_stepper=replace(
+            case.time_stepper,
+            max_steps=min(case.time_stepper.max_steps, 80),
+            potential_iterations=min(case.time_stepper.potential_iterations, 80),
+            steady_tolerance=1.0e-6,
+        ),
+        solver=replace(
+            case.solver,
+            kind="extruded_inductionless",
+            coupling_iterations=min(case.solver.coupling_iterations, 8),
+            coupling_tolerance=1.0e-7,
+        ),
+    )
+    profile = smooth_fringing_profile(
+        length=length,
+        nx=nx_stations,
+        entry_center=entry_center,
+        exit_center=exit_center,
+        transition_width=transition_width,
+        peak_scale=1.0,
+        axis="z",
+    )
+    return ExtrudedInductionlessProblem(case=case, profile=profile)
+
+
+def build_pipe_ogrid_extruded_problem(
+    *,
+    ha_peak: float = 20.0,
+    radius: float = 1.0,
+    nr: int = 24,
+    ntheta: int = 64,
+    length: float = 6.0,
+    nx_stations: int = 21,
+    entry_center: float = 1.5,
+    exit_center: float = 4.5,
+    transition_width: float = 0.35,
+    conductivity: float = 1.0,
+    density: float = 1.0,
+    viscosity: float = 1.0,
+) -> ExtrudedInductionlessProblem:
+    bmag = _ha_to_b(ha_peak, radius, conductivity, density, viscosity)
+    case = CaseSpec(
+        name=f"pipe_fringing_ha{int(ha_peak)}",
+        geometry=GeometrySpec(
+            kind="pipe_ogrid",
+            width=2.0 * radius,
+            height=2.0 * radius,
+            radius=radius,
+            length=length,
+            nx=nx_stations,
+            nr=nr,
+            ntheta=ntheta,
+        ),
+        regions=(RegionSpec("fluid", "fluid", conductivity, density, viscosity),),
+        magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, 0.0, bmag)),
+        boundary_conditions=(
+            BoundaryCondition("wall", "no_slip"),
+            BoundaryCondition("electric", "insulating"),
+        ),
+        time_stepper=TimeStepperConfig(
+            dt=0.001,
+            t_final=1.0,
+            max_steps=80,
+            potential_iterations=80,
+            steady_tolerance=1.0e-6,
+        ),
+        solver=SolverConfig(
+            kind="extruded_inductionless",
+            mode="steady",
+            preconditioner="jacobi",
+            time_scheme="implicit_euler",
+            coupling_iterations=8,
+            coupling_tolerance=1.0e-7,
+        ),
+        output=OutputSpec(),
+        forcing=1.0,
+        reference_pressure_gradient=-1.0,
+        reference_phi_cell=(max(1, nr // 4), max(1, ntheta // 8)),
+        notes="Mapped-pipe fringing research slice with cylindrical metric terms.",
+    )
+    profile = smooth_fringing_profile(
+        length=length,
+        nx=nx_stations,
+        entry_center=entry_center,
+        exit_center=exit_center,
+        transition_width=transition_width,
+        peak_scale=1.0,
+        axis="z",
+    )
+    return ExtrudedInductionlessProblem(case=case, profile=profile)
+
+
+def build_extruded_problem_from_case(
+    case: CaseSpec,
+    *,
+    entry_center: float,
+    exit_center: float,
+    transition_width: float,
+    axis: str = "z",
+) -> ExtrudedInductionlessProblem:
+    profile = smooth_fringing_profile(
+        length=case.geometry.length,
+        nx=case.geometry.nx,
+        entry_center=entry_center,
+        exit_center=exit_center,
+        transition_width=transition_width,
+        peak_scale=1.0,
+        axis=axis,
+    )
+    return ExtrudedInductionlessProblem(case=case, profile=profile)
