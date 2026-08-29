@@ -223,7 +223,7 @@ def test_b2_canonical_shell_widths_remove_realization_thickness():
 def test_fringing_jit_cache_reuses_the_first_compiled_kernel():
     common_impl._FRINGING_JIT_CACHE.clear()
     first = object()
-    key = ("operator", "configuration")
+    key = ("operator", jnp.asarray(1.0))
 
     assert common_impl._reuse_fringing_jit(key, first) is first
     assert common_impl._reuse_fringing_jit(key, object()) is first
@@ -2133,26 +2133,31 @@ def test_layered_extruded_fields_share_the_production_update():
             problem,
             forcing=parameters[0],
             magnetic_field_scale=parameters[1],
-            material_conductivity_scale=parameters[2:],
+            material_conductivity_scale=parameters[2:4],
+            geometry_scale=parameters[4:],
             steps=1,
         )
-        return extruded_engineering_objectives(problem, evolved)["wall_current_density_rms"]
+        return extruded_engineering_objectives(problem, evolved, geometry_scale=parameters[4:])[
+            "wall_current_density_rms"
+        ]
 
-    scale = jnp.ones(4)
+    scale = jnp.ones(7)
     value_and_gradient = jax.jit(jax.value_and_grad(objective))
     value, gradient = value_and_gradient(scale)
     finite_difference = _centered_gradient(jax.jit(objective), scale, 2.0e-3)
-    direction = jnp.asarray([0.1, -0.2, 0.25, -0.5])
+    direction = jnp.asarray([0.1, -0.2, 0.25, -0.5, 0.15, -0.1, 0.2])
     tangent = jax.jvp(objective, (scale,), (direction,))[1]
     assert gradient == pytest.approx(finite_difference, rel=5.0e-4, abs=2.0e-9)
     assert tangent == pytest.approx(jnp.vdot(gradient, direction), rel=2.0e-6, abs=1.0e-9)
-    points = jnp.stack((scale, jnp.asarray([1.1, 0.9, 0.95, 1.2])))
+    points = jnp.stack((scale, jnp.asarray([1.1, 0.9, 0.95, 1.2, 1.02, 0.98, 1.03])))
     batched = jax.jit(jax.vmap(jax.value_and_grad(objective)))(points)
     second = value_and_gradient(points[1])
     assert batched[0] == pytest.approx(jnp.stack((value, second[0])))
     assert batched[1] == pytest.approx(jnp.stack((gradient, second[1])))
     with pytest.raises(ValueError, match="fluid, solid"):
         evolve_extruded_fields(problem, material_conductivity_scale=jnp.ones(3), steps=2)
+    with pytest.raises(ValueError, match="axial, transverse_y, transverse_z"):
+        evolve_extruded_fields(problem, geometry_scale=jnp.ones(2), steps=2)
 
 
 def test_extruded_engineering_objectives_have_physical_conventions_and_gradients():
@@ -2161,7 +2166,7 @@ def test_extruded_engineering_objectives_have_physical_conventions_and_gradients
     zeros = jnp.zeros(shape)
     pressure = jnp.broadcast_to(jnp.asarray([3.0, 2.0, 1.0])[:, None, None], shape)
 
-    def objectives(speed):
+    def objectives(speed, geometry_scale=1.0):
         fields = (
             jnp.full(shape, speed),
             zeros,
@@ -2171,7 +2176,9 @@ def test_extruded_engineering_objectives_have_physical_conventions_and_gradients
             jnp.full(shape, 3.0),
             *(zeros,) * 5,
         )
-        return extruded_engineering_objectives(problem, fields, smoothing=1.0e-6)
+        return extruded_engineering_objectives(
+            problem, fields, geometry_scale=geometry_scale, smoothing=1.0e-6
+        )
 
     values = objectives(1.0)
     assert values["pressure_drop"] == pytest.approx(2.0)
@@ -2181,6 +2188,7 @@ def test_extruded_engineering_objectives_have_physical_conventions_and_gradients
     assert values["wall_current_density_rms"] == pytest.approx(3.0, abs=2.0e-6)
     assert values["recirculation_fraction"] == pytest.approx(0.0, abs=1.0e-12)
     assert jax.grad(lambda speed: objectives(speed)["pumping_power"])(1.0) == pytest.approx(8.0)
+    assert jax.grad(lambda scale: objectives(1.0, scale)["flow_rate"])(1.0) == pytest.approx(8.0)
     with pytest.raises(ValueError, match="velocity, pressure"):
         extruded_engineering_objectives(problem, ())
     with pytest.raises(ValueError, match="problem shape"):

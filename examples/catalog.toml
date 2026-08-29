@@ -51,7 +51,7 @@ path = "examples/variable_field_extruded_demo.py"
 command = "python examples/variable_field_extruded_demo.py"
 status = "research-stage"
 runtime = "portable"
-outputs = ["bounded design controls", "gradient check", "optimization plot"]
+outputs = ["bounded field/wall/geometry controls", "gradient check", "optimization plot"]
 docs = "docs/tutorials/differentiation.md"
 
 [[example]]
