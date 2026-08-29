@@ -348,6 +348,11 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     assert benchmarks.jnp.all(pressure_linear[:, 2] > 0.0)
     assert benchmarks.jnp.all(pressure_linear[:, 3] == 1.0)
     assert benchmarks.jnp.all(pressure_linear[:, 4] > 0.0)
+    electric_linear = solution.bundle.iteration_electric_linear_history
+    assert benchmarks.jnp.all(electric_linear[:, :3] >= 0.0)
+    assert benchmarks.jnp.all(electric_linear[:, 2] < 1.0e-7)
+    assert benchmarks.jnp.all(electric_linear[:, 3] < case.time_stepper.potential_iterations)
+    assert benchmarks.jnp.all(electric_linear[:, 4:] == 1.0)
     momentum_defect = solution.bundle.iteration_momentum_defect_history
     assert momentum_defect.shape == history.shape
     assert benchmarks.jnp.all(benchmarks.jnp.isfinite(momentum_defect))

@@ -887,8 +887,12 @@ def _solve_duct_projection(
     )
     poisson_tolerance = case.solver.coupling_tolerance
     electric_iterations = max(poisson_iterations, 600)
-    # A roundoff-level primal keeps the implicit VJP consistent with finite differences.
-    electric_tolerance = min(poisson_tolerance, 8.0 * np.finfo(np.float64).eps)
+    # Generic traced fields need a roundoff-level primal for their implicit VJP.
+    # The primal-only B2 path instead certifies its stricter-than-physics linear solve directly.
+    electric_tolerance = min(
+        poisson_tolerance,
+        1.0e-10 if use_alex_b2_finite_volume else 8.0 * np.finfo(np.float64).eps,
+    )
     projection_iterations = max(poisson_iterations, 4000)
     projection_tolerance = min(poisson_tolerance, 1.0e-12)
     momentum_iterations = max(poisson_iterations, 400)
