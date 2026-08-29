@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
+from functools import partial
 
 import jax
 import jax.numpy as jnp
@@ -947,8 +948,14 @@ def _solve_extruded_projection(
     sigma = _broadcast_cross_section(materials.conductivity, nx)
     rho = _broadcast_cross_section(materials.density, nx)
     nu = _broadcast_cross_section(materials.viscosity, nx)
-    fluid_mask = _broadcast_cross_section(materials.fluid_mask.astype(float), nx) > 0.5
-    fluid_bounds = _rectangular_fluid_bounds(fluid_mask) if use_alex_b2_finite_volume else None
+    with jax.ensure_compile_time_eval():
+        fluid_mask = _broadcast_cross_section(materials.fluid_mask.astype(float), nx) > 0.5
+        fluid_bounds = (
+            _rectangular_fluid_bounds(fluid_mask)
+            if use_alex_b2_finite_volume
+            or (design_parameters is not None and case.geometry.kind == "layered_duct")
+            else None
+        )
     if use_alex_b2_finite_volume:
         y0, y1, z0, z1 = fluid_bounds
         dy = _canonical_shell_widths(dy, y0, y1)
@@ -1105,7 +1112,8 @@ def _solve_extruded_projection(
     )
     poisson_tolerance = case.solver.coupling_tolerance
     electric_iterations = max(poisson_iterations, 600)
-    electric_tolerance = min(poisson_tolerance, 1.0e-12)
+    # A roundoff-level primal keeps the implicit VJP consistent with finite differences.
+    electric_tolerance = min(poisson_tolerance, 8.0 * np.finfo(np.float64).eps)
     projection_iterations = max(poisson_iterations, 4000)
     projection_tolerance = min(poisson_tolerance, 1.0e-12)
     momentum_iterations = max(poisson_iterations, 400)
@@ -1138,7 +1146,9 @@ def _solve_extruded_projection(
                     0.6 if case.geometry.kind == "layered_duct" else 0.0,
                 ),
                 operators=(
-                    _solvax_pressure_poisson_duct,
+                    partial(_solvax_pressure_poisson_duct, transverse_coarse_bounds=fluid_bounds)
+                    if fluid_bounds is not None
+                    else _solvax_pressure_poisson_duct,
                     _conservative_emf_rhs_3d,
                     _conservative_current_diagnostics_3d,
                 ),

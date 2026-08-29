@@ -60,5 +60,5 @@ refinements and under tighter linear and coupling tolerances. The
 [FreeMHD guide](../validation/freemhd.md) describes the external comparison.
 
 Run `python examples/fringing_benchmark_demo.py` for a bounded rectangular
-diagnostic or `python examples/variable_field_extruded_demo.py` for a custom
-divergence-free vector field.
+diagnostic or `python examples/variable_field_extruded_demo.py` for a bounded
+field-profile and wall-conductance design using production-field gradients.
