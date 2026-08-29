@@ -1,4 +1,8 @@
+import os
+import subprocess
+import sys
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 
 import jax
@@ -151,6 +155,8 @@ def test_alex_b1_production_map_has_bounded_implicit_gradient():
         case=case,
         profile=build_benchmark_b_field_profile("B1-fringing-pipe", axial_stations=3),
     )
+    with pytest.raises(NotImplementedError, match="ALEX B1"):
+        evolve_extruded_fields(problem, steps=1, num_devices=2)
 
     def objective(parameters):
         fields = evolve_extruded_fields(
@@ -1832,13 +1838,89 @@ def test_extruded_sharding_validates_placement_and_supported_paths(
 
     monkeypatch.setattr("lmx._fringing_common.Mesh", lambda *args, **kwargs: "mesh")
     monkeypatch.setattr("lmx._fringing_common.NamedSharding", lambda *args, **kwargs: "sharding")
-    monkeypatch.setattr("lmx._fringing_common.jax.device_put", lambda value, sharding: value + 1)
+    monkeypatch.setattr(
+        "lmx._fringing_common.jax.lax.with_sharding_constraint",
+        lambda value, sharding: value + 1,
+    )
     for count in (1, 2):
         placed = _shard_extruded_fields((field,), num_devices=count)
         assert jnp.all(placed[0] == 1)
-    problem = build_square_duct_extruded_problem(nx_stations=4, ny=4, nz=4)
-    with pytest.raises(NotImplementedError, match="ALEX B2"):
-        solve_extruded_inductionless(problem, num_devices=2)
+
+
+@pytest.mark.timeout(60)
+def test_generic_extruded_sharding_matches_primal_and_gradient_on_two_devices():
+    root = Path(__file__).resolve().parents[1]
+    code = """
+from dataclasses import replace
+import jax
+import jax.numpy as jnp
+import numpy as np
+from lmx.fringing import (
+    build_layered_duct_extruded_problem,
+    build_pipe_ogrid_extruded_problem,
+    build_square_duct_extruded_problem,
+    evolve_extruded_fields,
+    solve_extruded_inductionless,
+)
+
+common = dict(
+    ha_peak=1.0,
+    nx_stations=4,
+    length=1.5,
+    entry_center=0.4,
+    exit_center=1.1,
+    transition_width=0.2,
+)
+problems = (
+    build_square_duct_extruded_problem(**common, ny=3, nz=3),
+    build_layered_duct_extruded_problem(**common, ny=3, nz=3, wall_cells=1),
+    build_pipe_ogrid_extruded_problem(**common, nr=2, ntheta=4),
+)
+for problem in problems:
+    problem = replace(
+        problem,
+        case=replace(
+            problem.case,
+            time_stepper=replace(problem.case.time_stepper, max_steps=1, potential_iterations=4),
+            solver=replace(problem.case.solver, coupling_iterations=1, coupling_tolerance=1.0e-8),
+        ),
+    )
+    reference = jax.jit(lambda: evolve_extruded_fields(problem, steps=1))()
+    sharded = jax.jit(lambda: evolve_extruded_fields(problem, steps=1, num_devices=2))()
+    for expected, actual in zip(reference, sharded, strict=True):
+        np.testing.assert_allclose(expected, actual, rtol=2.0e-6, atol=1.0e-9)
+    assert len(sharded[0].addressable_shards) == 2
+    assert all(part.data.shape[0] == 2 for part in sharded[0].addressable_shards)
+    if problem.case.geometry.kind == "rect_duct":
+        solved = solve_extruded_inductionless(problem, num_devices=2)
+        assert len(solved.bundle.u.addressable_shards) == 2
+
+problem = problems[0]
+parameters = jnp.ones(5)
+def objective(values, devices):
+    fields = evolve_extruded_fields(
+        problem,
+        forcing=values[0],
+        magnetic_field_scale=values[1:],
+        steps=1,
+        checkpoint_size=1,
+        num_devices=devices,
+    )
+    return jnp.mean(fields[0] ** 2) + 0.01 * jnp.mean(fields[4] ** 2)
+
+reference = jax.jit(jax.value_and_grad(lambda values: objective(values, None)))(parameters)
+sharded = jax.jit(jax.value_and_grad(lambda values: objective(values, 2)))(parameters)
+np.testing.assert_allclose(reference[0], sharded[0], rtol=2.0e-9, atol=2.0e-14)
+np.testing.assert_allclose(reference[1], sharded[1], rtol=2.0e-8, atol=2.0e-14)
+"""
+    environment = {
+        **os.environ,
+        "JAX_ENABLE_X64": "true",
+        "JAX_PLATFORMS": "cpu",
+        "PYTHONPATH": str(root / "src"),
+        "XLA_FLAGS": "--xla_force_host_platform_device_count=2",
+    }
+    subprocess.run([sys.executable, "-c", code], cwd=root, env=environment, timeout=60, check=True)
 
 
 def test_fringing_profile_and_constant_field_builders():

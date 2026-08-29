@@ -79,7 +79,8 @@ use the same problem interface.
 Generic rectangular/layered ducts and straight pipes also expose their
 production finite-step fields for optimization. SOLVAX differentiates electric
 closure implicitly and checkpoints both projection iterations and the outer
-recurrence:
+recurrence. Pass `num_devices` to shard generic rectangular, layered, or pipe
+fields over an evenly divisible axial mesh inside the same primal/gradient API:
 
 ```python
 import jax
@@ -206,8 +207,8 @@ value, derivative = jax.value_and_grad(response)(case.hartmann_friction)
 | Hartmann, Shercliff, and Hunt flow | `lmx.make_*_case`, `solve` | analytical profiles, conservation, power balance, mesh convergence |
 | Differentiable steady rectangular/layered ducts | `solve_fully_developed_fields` | production-field parity, forcing identity, magnetic-scale finite difference, implicit Krylov adjoint |
 | Conducting and insulating wall layers | `WallLayer`, layered mesh builders | interface-current and layer-resolution gates |
-| 3-D rectangular/layered fringing fields | `solve_extruded_inductionless`, `evolve_extruded_fields` | production-field parity, station-wise field gradients, engineering objectives, manufactured operators, projection, finite differences, JVP/VJP, bounded reverse memory, Benchmark B2 |
-| 3-D straight-pipe fringing fields | `solve_extruded_inductionless`, `evolve_extruded_fields` | production-field parity, conducting-annulus material and geometry gradients, JVP/VJP, batched evaluation, bounded reverse memory, mapped current closure, fixed-flow and Benchmark B1 gates |
+| 3-D rectangular/layered fringing fields | `solve_extruded_inductionless`, `evolve_extruded_fields` | production-field parity, station-wise field gradients, engineering objectives, manufactured operators, projection, finite differences, JVP/VJP, bounded reverse memory, two-device sharded primal/gradient parity, Benchmark B2 |
+| 3-D straight-pipe fringing fields | `solve_extruded_inductionless`, `evolve_extruded_fields` | production-field parity, conducting-annulus material and geometry gradients, JVP/VJP, batched evaluation, bounded reverse memory, two-device sharded primal parity, mapped current closure, fixed-flow and Benchmark B1 gates |
 | Periodic Q2D flow | `Q2DProblem`, `make_q2d_case`, `solve`, `evolve_q2d` | analytical decay/gradients, energy identity, spatial refinement, bounded reverse memory, measured CPU/GPU parity |
 | FreeMHD comparison | `validation/freemhd.py`, validation scripts | pinned case contracts, native-output observers, executable Docker workflow |
 | Meshes and analytic/tabulated fields | `lmx.mesh` | geometry, divergence, and interpolation tests |
