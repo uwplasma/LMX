@@ -3551,7 +3551,18 @@ surface, measurements, validation, decision, and next action.
   curated workflows, Sphinx HTML and external links with warnings as errors,
   isolated build, Twine, and distribution inspection pass. The wheel is
   146,492 bytes and the sdist is 139,152 bytes.
-- Next action: repeat the pinned FreeMHD Docker comparison from an immutable
-  source commit, then continue the compatible coupled B2 block response rather
-  than adding another fixed-point safeguard. Specialized B2 differentiation
-  remains unavailable until terminal primal convergence is established.
+- Committed the immutable source candidate as `d367a8b` and repeated the
+  pinned Docker comparison against FreeMHD `14b54a3` and image
+  `sha256:535e995d557d2a73f5ab997380cb47ee3b044af8d2871bdadd570cff4cf175a8`.
+  Contract, artifacts, execution, independent observation, comparison, and
+  schema pass with zero failed checks. Pressure L-infinity/RMS differences are
+  `0.006837808945711196`/`0.003064697969803467`, indistinguishable at the
+  validation scale from the prior `0.006837811881424563`/`0.003064699119643086`.
+  Report and record SHA-256 digests are
+  `585b66d071fc7b7ac2880961dac3256736464429dd30940258258b68a7877236`
+  and `01f6e391220d0ae2414db49f7ca527883f49e738224bc89ea2cc40992b0e6724`.
+  `acceptance_pass=false` remains correct for the smoke-only role.
+- Next action: merge this pressure-work tranche, then continue the compatible
+  coupled B2 block response rather than adding another fixed-point safeguard.
+  Specialized B2 differentiation remains unavailable until terminal primal
+  convergence is established.
