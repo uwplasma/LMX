@@ -10,14 +10,70 @@ This file is the authoritative product plan and engineering log for LMX.
 README, documentation, examples, names, and code comments describe only the
 supported current state.
 
+## Execution reset: shortest path to research-grade LMX
+
+Decision D-049 replaces serial release qualification after every edit with a
+staged, change-aware evidence process. Repository compactness, the public API,
+README, and documentation structure are already within their product budgets;
+they are no longer the critical path. Dedicated line-count-only tranches stop
+until the physics and accelerator blockers below are closed. Code encountered
+while closing those blockers is still simplified in place, and generic
+numerical algebra still moves to SOLVAX when it has an independent contract.
+
+Work proceeds in this order:
+
+1. **P0 — terminal B2 primal and adjoint.** Establish a conservative B2 map
+   that reaches the declared steady gate on the production mesh, then implement
+   its implicit tangent/transpose solve in SOLVAX and verify Taylor, JVP/VJP,
+   residual, runtime, and memory contracts. This is the methods-paper blocker.
+2. **P0 — real accelerator evidence.** Restore the office execution path and
+   measure cold compile, warm primal, warm gradient, transfer, and peak memory
+   on one A4000; then measure one-to-two-GPU strong scaling on the same accepted
+   workload. Emulated CPU devices remain correctness tests only.
+3. **P1 — matched B1 external validation.** Run an independently matched pipe
+   case with the same equations, annulus, drive, controls, and observable. Do
+   not expand the solver family while this validation contract is incomplete.
+4. **P1 — fusion-design demonstration.** Use the verified 3-D adjoint in one
+   bounded field/wall/geometry optimization and validate selected gradients and
+   Pareto points independently.
+5. **P2 — publication evidence and final release.** Generate the final plots,
+   movie, performance tables, validation matrix, and concise current-state
+   documentation; then perform the one final history rewrite and public release.
+
+The numerical policy is fixed for these priorities: converged linear and steady
+systems use implicit derivatives; finite trajectories use selective
+checkpointing rather than storing every iteration; explicit axial sharding
+must preserve local arrays and make collectives visible; benchmarks synchronize
+device work and separate compilation from warm execution. FreeMHD remains an
+independent inductionless finite-volume comparator, not a source of inherited
+acceptance or a runtime dependency.
+
+### Evidence cadence
+
+| Boundary | Required work | Target |
+|---|---|---:|
+| Edit loop | Ruff on touched Python plus exact unit/numerical tests named by the edit | under 60 s |
+| Local candidate | `run_full_test_suite.py --changed-from <base>` for the conservative impacted set; no global coverage | under 3 min |
+| Source PR, once | complete parallel suite with combined branch coverage; architecture/import audit | under 5 min |
+| Documentation-only PR | Sphinx HTML only; no Python, wheel, or Docker rerun | under 2 min |
+| B2/validation candidate | pinned FreeMHD smoke once after the source candidate is clean | under 2 min with the cached image |
+| Release/scheduled | all Python versions, links, package/Twine/clean-wheel, production FreeMHD, GPU/scaling, artifact checksums | under 10 min excluding declared production campaigns |
+
+The full suite is not rerun after an evidence-only `plan.md` commit. Package
+builds are required only when package metadata/distribution changes or at the
+release boundary. External link checks run scheduled/release, not on numerical
+source edits. JAX's persistent compilation cache is enabled outside the
+repository for local test processes; cold performance evidence explicitly
+disables it. Unknown executable paths fail closed to the complete suite.
+
 ## Active physics and performance tranche
 
-The live root is the enforced repository baseline. The latest ordinary
-authenticated clone measurement is 2,304 KiB total, including 588 KiB of Git
-data and a 463.39 KiB pack. The current candidate contains 88 tracked files,
-1,830,901 bytes of tracked data, 15 package modules, and 28 root exports. Its
-complete six-worker portable gate passes 500 tests in 171.42 seconds with
-95.41% combined line/branch coverage. Every change below must preserve the
+The live root is the enforced repository baseline. The current candidate
+contains 88 tracked files, 1,872,579 bytes of tracked data, 15 package modules,
+and 28 root exports. Its complete six-worker portable gate passes 502 tests in
+168.15 seconds (169.9 seconds end to end) with 95.29% combined line/branch
+coverage. The conservative gate for the execution-reset tranche selected 302
+tests and completed in 71.1 seconds. Every change below must preserve the
 normal-clone limit of 9,766 KiB and the file, API, five-minute test-time, and
 coverage budgets. The capability-adjusted ceiling remains 15,370 package lines
 across at most 16 modules.
@@ -1180,6 +1236,8 @@ artifacts or release assets, not committed files.
 | D-045 | Stop the primal-only B2 pressure correction at `1e-10` while retaining volume-scaled balance checks | On the production coarse state this cuts pressure PCG work by about one quarter while leaving the state update and momentum-defect trajectory unchanged at reported precision. The resulting `2e-5`--`7e-5` divergence remains below five percent of the independent `1e-3` balance gate. Generic traced paths retain roundoff-level primal solves for implicit-derivative consistency. |
 | D-046 | Add the local electromagnetic reaction to the B2 predictor as a fixed-point-neutral pseudo-mass | The term $R_B=\sigma|\boldsymbol B|^2$ is added to the implicit momentum diagonal and the identical $R_B\boldsymbol u^n$ term to the right-hand side, so it cancels at a fixed point while improving the predictor and pressure mobility. The retained operation order is deliberate: reassociating the terms changes the finite-precision nonlinear trajectory materially. Dense operator, autodiff, restart, and production-continuation gates protect the contract. |
 | D-047 | Shard the generic differentiable 3-D production fields and replicate only global coarse solves | Axial `NamedSharding` constraints must remain inside the traced program rather than staging design-dependent fields through NumPy. Rectangular, layered, and straight-pipe primal fields compose with reverse mode over the same recurrence; global axial/transverse coarse solves are explicitly replicated and their corrections repartitioned. Specialized ALEX B1 stays single-device until its cylindrical production operators pass an independent sharding gate. |
+| D-048 | Accelerate only the B2 mechanical state and close electricity once on the accepted velocity | Anderson/Aitken owns velocity and compact conservative flux; the one post-acceptance electric solve makes current, Lorentz force, charge, defects, checkpoints, and returned fields describe one state without retaining potential history or performing a second electric solve. |
+| D-049 | Qualify evidence at the boundary it informs | Exact tests serve edits, a conservative change gate serves local candidates, and the complete covered suite runs once for a source candidate. Documentation, packaging, external validation, accelerator, and release gates run only for their owning surfaces; required workflows remain visible and skip jobs with successful job-level conditions. |
 
 ## Work log
 
@@ -2954,6 +3012,7 @@ surface, measurements, validation, decision, and next action.
   `7ba23d05a8d6f8337ef386aacf6b180f4daf7f1951b312d7392ab1888f1c8e77`
   and `1c7e5303c684fefb4fc5351cad4c8185adc47573ad055b184d063460ad1ae4a7`.
   `acceptance_pass=false` remains correct for the smoke-only role.
+
 - Next action: audit every function in the 5,833 private fringing lines for
   production reachability, duplicated pipe/duct recurrence, redundant arrays
   and host work, and reusable SOLVAX ownership. Preserve the validated 3-D,
@@ -3850,3 +3909,34 @@ surface, measurements, validation, decision, and next action.
   `3a78bb769955f0c9956dba691a8bf977efe82b7321136b8128588f12304d836d`
   and `cbb04c6974c771e9f95eac2f6652d0e0ceccb848d11525554e2d4d3b00f63887`.
   `acceptance_pass=false` remains correct for the smoke-only role.
+
+### 2026-08-29 — reset execution around the scientific blockers
+
+- A final review of the JAX implicit-solve, rematerialization, sharding,
+  profiling, compilation-cache, and GPU guidance, together with current
+  differentiable-CFD and FreeMHD literature, confirms the retained numerical
+  direction. Converged systems keep implicit linear adjoints, finite recurrences
+  use selective checkpointing, sharding stays explicit, and performance
+  evidence separates cold compilation from synchronized warm execution. The
+  critical path is terminal B2 primal/adjoint evidence, real A4000 execution,
+  matched B1 external validation, and one fusion-design optimization—not more
+  standalone repository trimming or documentation rearrangement.
+- Decision D-049 adds a conservative `--changed-from` gate with fail-closed
+  ownership mapping and an external JAX compilation cache. Pull requests run
+  the complete three-shard 95% coverage gate once when source/tests change,
+  targeted tests for script-only changes, and no Python suite for prose-only
+  changes. Documentation and FreeMHD workflows always report a status but skip
+  expensive jobs with job-level conditions; this avoids both redundant work
+  and required checks left pending by workflow-level path filters.
+- The affected local candidate selected 302 tests and passed in 70.47 seconds
+  (71.1 seconds end to end). The one complete qualification passed 502 tests in
+  168.15 seconds (169.9 seconds end to end) at 95.29% combined line/branch
+  coverage. Ruff, formatting, YAML parsing, diff hygiene, the 14,750-line/
+  15-module architecture/import audit, and warnings-as-errors Sphinx HTML pass.
+- `benchmark_solver` now synchronizes final velocity and potential arrays
+  before stopping each timer. The external selector was exercised against this
+  hunk and correctly skipped FreeMHD because no Benchmark-B contract or B2
+  numerical surface changed. Package, external-link, Docker, and GPU gates were
+  intentionally not rerun. The candidate remains 88 tracked files and
+  1,872,579 tracked bytes. Next action: close the terminal B2 primal and
+  transpose-solve acceptance gate.

@@ -22,16 +22,21 @@ uv venv
 uv pip install -e '.[dev,docs]'
 ```
 
-Run focused tests while developing, then the complete gate:
+Run the conservative change-aware gate while developing, then the complete
+covered gate once for the source candidate:
 
 ```bash
+.venv/bin/python scripts/run_full_test_suite.py --changed-from HEAD
 .venv/bin/python scripts/run_full_test_suite.py
 ```
 
-The complete portable gate must retain at least 95% branch coverage and finish
-within 600 seconds per supported-Python job. New or changed logic should have
-complete branch coverage unless a documented numerical or platform constraint
-prevents it.
+The first command skips global coverage because a selected subset cannot
+measure it honestly. The complete portable gate must retain at least 95%
+combined line/branch coverage and finish within 600 seconds. Documentation,
+package, external-link, Docker, production-mesh, and accelerator gates run only
+when their boundary changes or at scheduled/release qualification. New or
+changed logic should have complete branch coverage unless a documented
+numerical or platform constraint prevents it.
 
 ## Evidence required with a capability
 
