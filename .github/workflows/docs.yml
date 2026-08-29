@@ -9,7 +9,29 @@ on:
   workflow_call:
 
 jobs:
+  impact:
+    runs-on: ubuntu-latest
+    outputs:
+      docs: ${{ steps.scope.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: scope
+        name: Select documentation work
+        run: |
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            echo "docs=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet "origin/${{ github.base_ref }}...HEAD" -- \
+            docs src/lmx README.md pyproject.toml; then
+            echo "docs=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs=true" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: impact
+    if: needs.impact.outputs.docs == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -20,3 +42,7 @@ jobs:
 
       - name: Build documentation
         run: python -m sphinx -W -b html docs docs/_build/html
+
+      - name: Check external links at integration boundaries
+        if: github.event_name != 'pull_request'
+        run: python -m sphinx -W -b linkcheck docs docs/_build/linkcheck
