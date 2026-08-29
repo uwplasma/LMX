@@ -71,6 +71,35 @@ def _cross(a, b):
     return ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx
 
 
+def _initial_projection_fields(case, fluid_mask, initial_bundle):
+    if initial_bundle is not None:
+        if initial_bundle.u.shape != fluid_mask.shape:
+            raise ValueError("Extruded restart bundle shape does not match the current problem")
+        return tuple(
+            jnp.asarray(getattr(initial_bundle, name), dtype=float) for name in ("u", "v", "w", "p", "phi")
+        )
+    u = jnp.where(fluid_mask, jnp.asarray(case.initial_velocity, dtype=float), 0.0)
+    zeros = jnp.zeros_like(u)
+    return u, zeros, zeros, zeros, zeros
+
+
+def _scale_projection_properties(field, sigma, fluid_mask, magnetic_scale, conductivity_scale):
+    magnetic_scale = jnp.asarray(magnetic_scale, dtype=float)
+    if magnetic_scale.ndim:
+        nx = field[0].shape[0]
+        if magnetic_scale.shape != (nx,):
+            raise ValueError(
+                f"magnetic_field_scale must be scalar or have one value per axial station ({nx},)"
+            )
+        magnetic_scale = magnetic_scale[:, None, None]
+    conductivity_scale = jnp.asarray(conductivity_scale, dtype=float)
+    if conductivity_scale.ndim:
+        if conductivity_scale.shape != (2,):
+            raise ValueError("material_conductivity_scale must be scalar or (fluid, solid)")
+        conductivity_scale = jnp.where(fluid_mask, conductivity_scale[0], conductivity_scale[1])
+    return tuple(magnetic_scale * value for value in field), sigma * conductivity_scale
+
+
 def _reuse_fringing_jit(key: tuple[object, ...], function: Callable) -> Callable:
     """Reuse an identical compiled production kernel across repeated solves."""
 
@@ -189,15 +218,8 @@ def _iteration_history_arrays(
 def _iteration_checkpoint_bundle(
     *,
     case: CaseSpec,
-    x: jnp.ndarray,
-    y: jnp.ndarray,
-    z: jnp.ndarray,
-    field_scale: jnp.ndarray,
-    u: jnp.ndarray,
-    v: jnp.ndarray,
-    w: jnp.ndarray,
-    p: jnp.ndarray,
-    phi: jnp.ndarray,
+    coordinates: tuple[jnp.ndarray, ...],
+    fields: tuple[jnp.ndarray, ...],
     axial_pressure_loss_gradient: jnp.ndarray | None,
     transverse_pressure_difference: jnp.ndarray | None,
     residual_history: list[float],
@@ -216,6 +238,8 @@ def _iteration_checkpoint_bundle(
 ) -> ExtrudedFieldBundle:
     """Build the minimal bundle needed to resume a solve."""
 
+    x, y, z, field_scale = coordinates
+    u, v, w, p, phi = fields
     return ExtrudedFieldBundle(
         x=x,
         y=y,

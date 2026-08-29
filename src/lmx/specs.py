@@ -237,6 +237,29 @@ class ExtrudedFieldBundle:
     iteration_potential_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
     iteration_courant_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0, 3)))
 
+    @classmethod
+    def from_groups(
+        cls,
+        coordinates,
+        fields,
+        current,
+        lorentz,
+        diagnostics,
+        *,
+        geometry_kind: str,
+        solver_kind: str,
+        **metadata,
+    ) -> ExtrudedFieldBundle:
+        """Assemble the grouped field and station diagnostics produced by a solver."""
+        names = (
+            "x y z field_scale u v w p phi jx jy jz lorentz_x lorentz_y lorentz_z residual "
+            "volumetric_flow_rate mean_velocity axial_current wall_current_leakage "
+            "current_scaled_pressure_proxy charge_balance_residual boundary_current_residual "
+            "axial_pressure_loss_gradient transverse_pressure_difference"
+        ).split()
+        values = dict(zip(names, (*coordinates, *fields, *current, *lorentz, *diagnostics), strict=True))
+        return cls(geometry_kind=geometry_kind, solver_kind=solver_kind, **values, **metadata)
+
 
 @dataclass(frozen=True)
 class ExtrudedIterationProgress:
