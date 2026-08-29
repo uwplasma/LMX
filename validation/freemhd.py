@@ -305,7 +305,7 @@ def infer_rectangular_geometry(
 def _decode_matched_b2_lmx_input(path: str | Path):
     from dataclasses import fields
 
-    from lmx._fringing_duct import _cross_section_mesh
+    from lmx.mesh import _cross_section_mesh
     from lmx.specs import (
         BoundaryCondition,
         CaseSpec,
