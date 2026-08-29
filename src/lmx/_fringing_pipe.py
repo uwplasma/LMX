@@ -1,4 +1,4 @@
-"""Mapped-pipe 3-D kernels and pressure systems."""
+"""Private mapped-pipe 3-D kernels and pressure systems."""
 
 from __future__ import annotations
 
