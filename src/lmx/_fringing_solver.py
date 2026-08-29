@@ -868,6 +868,8 @@ def _solve_duct_projection(
         ):
             raise ValueError("ALEX B2 requires one inlet flow rate and zero outlet pressure")
         target_flow_rate = float(inlet[0].value)
+        reference_area = float(jnp.mean(jnp.sum(jnp.where(fluid_mask, cell_area, 0.0), axis=(1, 2))))
+        fixed_point_velocity_scale = target_flow_rate / reference_area
     else:
         with jax.ensure_compile_time_eval():
             target_flow_rate = (
@@ -875,6 +877,7 @@ def _solve_duct_projection(
                 if initial_bundle is not None or case.initial_velocity != 0.0
                 else None
             )
+        fixed_point_velocity_scale = 1.0
     if design_parameters is None:
         outer_steps = min(case.time_stepper.max_steps, max(6, case.solver.coupling_iterations * 2))
     poisson_iterations = (
@@ -967,7 +970,7 @@ def _solve_duct_projection(
         case=case,
         use_b2=use_alex_b2_finite_volume,
         velocity=u,
-        velocity_limit=velocity_limit,
+        velocity_scale=fixed_point_velocity_scale,
         potential_scale=electric_potential_scale,
         forcing=forcing,
     )
