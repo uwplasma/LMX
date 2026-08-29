@@ -15,7 +15,7 @@ supported current state.
 The live root is the enforced repository baseline. The latest ordinary
 authenticated clone measurement is 2,304 KiB total, including 588 KiB of Git
 data and a 463.39 KiB pack. The current candidate contains 88 tracked files,
-1,827,964 bytes of tracked data, 15 package modules, and 28 root exports. Its
+1,828,587 bytes of tracked data, 15 package modules, and 28 root exports. Its
 complete six-worker portable gate passes 500 tests in 163.90 seconds with
 95.41% combined line/branch coverage. Every change below must preserve the
 normal-clone limit of 9,766 KiB and the file, API, five-minute test-time, and
@@ -3471,7 +3471,17 @@ surface, measurements, validation, decision, and next action.
   bytes and the sdist is 139,150 bytes, with SHA-256 digests
   `9daba7673c02335830b9c53e94985a312ec1d1d0cf1af40de83682d7e5e3a5e6`
   and `681440adadd4b94b731dcf59506390d6a15f9b246de76478a5ed3ce9a56cc1da`.
-- Next action: commit the immutable source candidate, repeat the pinned FreeMHD
-  B2 Docker comparison, and merge only if that independent boundary passes.
-  Then continue the remaining long-horizon convergence and specialized
-  derivative gates before office GPU/scaling measurements.
+- Committed the immutable source candidate as `ae02c61` and repeated the pinned
+  FreeMHD B2 Docker comparison against source `14b54a3` and image
+  `sha256:535e995d557d2a73f5ab997380cb47ee3b044af8d2871bdadd570cff4cf175a8`.
+  Contract, artifacts, execution, observation, comparison, and schema all pass
+  with zero failed checks. Pressure L-infinity/RMS differences improve from
+  `0.010917245364311495`/`0.004517977131740069` to
+  `0.006837811881424563`/`0.003064699119643086`. Report and record SHA-256
+  digests are
+  `8dcd03f39046a427c237c11bec911117e76e17af4aa223d40be27d925de9de6f`
+  and `27861f048e0028e696c651f20b5e7fda7a919b256d0390db7468b0dc74101908`.
+  `acceptance_pass=false` remains correct for the smoke-only role.
+- Next action: merge the pressure-coupled tranche, then continue the remaining
+  long-horizon convergence and specialized derivative gates before office
+  GPU/scaling measurements.
