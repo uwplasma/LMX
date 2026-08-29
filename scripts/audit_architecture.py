@@ -39,7 +39,6 @@ RESEARCH_STAGE = {
     "_fringing_common.py",
     "_fringing_duct.py",
     "_fringing_pipe.py",
-    "_fringing_solver.py",
     "fringing.py",
 }
 COMPATIBILITY: set[str] = set()

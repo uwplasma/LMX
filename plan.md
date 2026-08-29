@@ -1150,7 +1150,7 @@ artifacts or release assets, not committed files.
 | D-020 | Consolidate by stable concept: units and wall models into physics, and state/result schemas into specs | These types are small parts of the physical and public data contracts; separate modules added navigation and import boundaries without independent ownership. |
 | D-021 | Consolidate spatial construction, run configuration, output, and validation by user-facing ownership | Meshes own spatial operators and imposed fields; configuration owns run logging; IO owns lazy plotting; validation owns references and benchmark contracts. These boundaries minimize navigation while remaining acyclic and independently testable. |
 | D-022 | Separate reusable fully developed assembly from case-level solve workflows | `solvers.py` owns the physical systems delegated to SOLVAX; `cases.py` owns factories, orchestration, and differentiable case objectives. This keeps both files below 1,500 lines and removes a one-workflow autodiff module. |
-| D-023 | Keep one public fringing module over four private 3-D owners, and consolidate run configuration with result schemas | Users retain one `lmx.fringing` surface; generic kernels, duct kernels, pipe kernels, and solve orchestration have explicit internal ownership. Configuration and result schemas share one typed input/output contract in `specs.py`. |
+| D-023 | Keep one public fringing module over three private numerical owners, and consolidate run configuration with result schemas | Users retain one `lmx.fringing` surface; it owns solve orchestration while shared, duct, and pipe kernels retain explicit private ownership. Configuration and result schemas share one typed input/output contract in `specs.py`. |
 | D-024 | Keep FreeMHD execution, observation, and comparison in one repository-only validation module | Docker/reference tooling remains fully tested and executable from a checkout but is not installed with the runtime wheel. Shipped analytical and benchmark-data loaders remain in `lmx.validation`. |
 | D-025 | Remove the unbundled ClosedChannel/processed-slice adapter and example | A default clone and installed wheel cannot run this private-directory workflow; the packaged analytical and ALEX data plus the pinned, independently observed B2 Docker comparison provide standalone validation without silent optional-data skips. |
 | D-026 | Remove LMX's 3-D sparse-direct and duplicate Jacobi implementations | Reusable iteration belongs to SOLVAX. Matrix-free SOLVAX PCG serves the duct and pipe elliptic systems; the established collocated projection retains its LMX stencil and physical residual while SOLVAX owns fixed-point state and stopping. |
@@ -1163,10 +1163,11 @@ artifacts or release assets, not committed files.
 | D-033 | Differentiate each production 3-D recurrence with bounded nested derivatives | Generic rectangular/layered ducts and straight pipes expose continuous controls through their retained field updates. SOLVAX uses an implicit VJP for converged electric closure and exact checkpointing for finite projection and outer iterations. Specialized ALEX B1/B2 lanes remain unavailable until their distinct coupled operators pass the same gates. |
 | D-034 | Execute each PR test once and aggregate its evidence | Three duration-balanced shards run concurrently with branch coverage and save run-scoped JUnit/coverage caches. A report-only job enforces the repository threshold; release reuses the same workflow in parallel with docs and external validation. This preserves fail-closed evidence while targeting a sub-10-minute critical path. |
 | D-035 | Lead with differentiable inductionless blanket-design physics, not general CFD breadth | ParaStell owns parametric stellarator CAD/neutronics, NekRS owns exascale high-order CFD, and FreeMHD owns free-surface/multi-region/full-induction development. LMX earns a distinct role through compact high-Hartmann duct/fringe equations, verified bounded-memory derivatives, accelerator design throughput, and matched external evidence. New multiphysics enters through versioned coupling data before it enters the runtime. |
-| D-036 | Keep `lmx.fringing` as the only public 3-D surface and retain private fringing files only by mathematical ownership | Common structured-grid operations, rectangular-duct kernels, cylindrical-pipe kernels, and orchestration have different metrics and change reasons. Private ownership files reduce coupling; test-only proxy solvers and duplicate recurrences do not, so they are removed. |
+| D-036 | Keep `lmx.fringing` as the only public 3-D surface and retain private fringing files only by mathematical ownership | The public module owns orchestration. Common structured-grid operations, rectangular-duct kernels, and cylindrical-pipe kernels retain separate private owners because their metrics and change reasons differ; test-only proxy solvers and duplicate recurrences are removed. |
 | D-037 | Remove the label-only bent-pipe lane | Curved display coordinates never entered its straight cylindrical operators, and its validator mislabeled generic transverse velocity as Dean curvature physics. A future curved-pipe solver must introduce coherent curvilinear metrics, independent validation, and derivative gates rather than reuse the removed name. |
 | D-038 | Do not nest a full transient momentum Krylov solve inside every B2 pressure-Schur action | The construction passes dense compatibility and autodiff identities, but repeats an expensive mass-dominated inverse, leaves the reduced physical trajectory effectively unchanged, and exceeds the production runtime gate. A viable block method must use a separately reusable/coarse response or factorized preconditioner with bounded primal and transpose work. |
 | D-039 | Do not impose derivative-only roundoff tolerances on a primal-only specialized path | Generic traced 3-D fields retain roundoff electric closure for implicit VJP consistency. B2 remains unavailable to differentiation and instead uses a directly tested `1e-10` linear tolerance, while its independent charge, restart, and external-validation gates remain unchanged. |
+| D-040 | Fold single-consumer fringing orchestration into the public module, not into another private file | `fringing.py` owns its three solve-dispatch functions; case construction belongs to `cases.py`, validation belongs to `validation.py`, and only shared, duct, and pipe numerical kernels retain private modules. The public import surface is unchanged. |
 
 ## Work log
 
@@ -3299,3 +3300,45 @@ surface, measurements, validation, decision, and next action.
   reachability, runtime, memory, and physics evidence justify a deletion or
   fusion. The production B2 defect, specialized adjoint, and GPU scaling gates
   remain open.
+
+### 2026-08-29 — consolidate fringing orchestration and ownership
+
+- Removed `_fringing_solver.py`, whose three solve-dispatch functions had one
+  consumer and no independent API or test contract. `lmx.fringing` now owns
+  orchestration directly. Fringing problem builders moved to `lmx.cases` and
+  validation functions moved to `lmx.validation`; `lmx.fringing` deliberately
+  re-exports every prior user-facing name, so application code does not change.
+  The architecture guide describes concepts instead of private filenames.
+- The package falls from 16 to 15 Python modules. `fringing.py` remains below
+  the enforced 1,800-line ceiling, and the only private fringing modules are
+  the 1,314-line shared mapped owner, 1,461-line rectangular-duct owner, and
+  1,483-line cylindrical-pipe owner. They remain because each contains live
+  production, derivative, restart, B1/B2, or validation kernels; combining
+  them would create an undifferentiated numerical mega-module rather than
+  remove algorithms. Package source is 14,773 lines, and the architecture
+  gate reports 15 modules, 28 root exports, and seven curated examples.
+- All 500 portable tests pass in 173.04 seconds with 95.44% combined
+  line/branch coverage on Python 3.11.14, JAX/JAXLIB 0.9.2, and SOLVAX 0.18.0.
+  Coverage and JUnit SHA-256 digests are
+  `ddb11e2225dfca515dc434a32db74689d20453fc60d1bee746c5a609770977d1`
+  and `a0b182d01e12beba50241af3bf6d810e93b834d9f31724b5165b560d2707d135`.
+  Focused source and built-wheel API smokes confirm all 13 named
+  `lmx.fringing` callables remain importable and the removed module is absent
+  from the distribution.
+- Ruff, formatting, byte compilation, architecture/import budgets, curated
+  workflows, Sphinx HTML and external links with warnings as errors, isolated
+  build, Twine, and wheel/sdist content audits pass. The final build produced a
+  146,089-byte wheel and a 138,760-byte sdist; their SHA-256 digests are
+  `17fdf4447c0e512b790ecfd6c918997f2f1effc1d370635ebe33712e00060ff4`
+  and `7f16d01169e39164e4d8a07eb766abfe575e92182bb3f52c8d3cea9e7b714662`.
+- PR #34 created the metadata, documentation, link, compatibility, and pinned
+  FreeMHD checks, but GitHub rejected every sampled job before its first step
+  with the account payment/spending-limit annotation. This is unavailable
+  hosted execution, not numerical evidence; the complete local gates above are
+  the merge authority under the approved temporary policy.
+- Next action: continue function-level common/duct/pipe trimming only where it
+  removes actual work or duplication with measured physics, derivative,
+  runtime, and memory equivalence. Resume the coupled B2 pressure/electric
+  response and the queued B1 gradient-gate runtime reduction; do not remove
+  the protected 3-D, B1, B2, restart, or autodiff capabilities to satisfy a
+  filename metric.
