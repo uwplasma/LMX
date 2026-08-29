@@ -17,6 +17,26 @@ and induced-potential scale to balance its velocity and electric blocks before
 Anderson mixing. Numerical safety limits are guardrails, not state scales, and
 therefore do not enter the residual norm.
 
+B2 couples momentum and pressure with a conservative SIMPLE-style correction.
+For each frozen Lorentz field, two pressure--momentum correctors apply
+
+$$
+A^n u^* = b_L^n - Gp^n, \qquad
+D r_{AU} Gp' = D u^*, \qquad
+u^{n+1} = u^* - r_{AU}Gp', \qquad
+p^{n+1} = p^n + 0.4p'.
+$$
+
+Here $r_{AU}$ is the inverse diagonal already assembled for the implicit
+momentum predictor. The pressure operator and reconstructed face flux use the
+same distance-weighted harmonic interpolation on nonuniform cells. The fixed
+pressure relaxation stabilizes the segregated correction without adding a
+second field history, and two correctors give the selected production balance
+between physical defect reduction and runtime. Electric closure and Lorentz
+reconstruction then use the corrected conservative velocity. This follows the
+pressure-correction structure of SIMPLE and its consistent refinements while
+retaining LMX's MHD-specific residual and boundary contracts.
+
 ## LMX and SOLVAX
 
 LMX owns:
