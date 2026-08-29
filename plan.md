@@ -1169,6 +1169,7 @@ artifacts or release assets, not committed files.
 | D-039 | Do not impose derivative-only roundoff tolerances on a primal-only specialized path | Generic traced 3-D fields retain roundoff electric closure for implicit VJP consistency. B2 remains unavailable to differentiation and instead uses a directly tested `1e-10` linear tolerance, while its independent charge, restart, and external-validation gates remain unchanged. |
 | D-040 | Fold single-consumer fringing orchestration into the public module, not into another private file | `fringing.py` owns its three solve-dispatch functions; case construction belongs to `cases.py`, validation belongs to `validation.py`, and only shared, duct, and pipe numerical kernels retain private modules. The public import surface is unchanged. |
 | D-041 | Reuse a compiled production evidence map across same-shape finite-difference samples | Centered differences remain mathematically independent of autodiff, but they do not require compiling an identical primal graph a second time. Production value-and-gradient executables may supply shifted primal values; physics, VJP/JVP, sensitivity, batching, memory, and tolerance assertions remain separate and unchanged. |
+| D-042 | Use the frozen momentum diagonal as the B2 pressure mobility | The pressure correction must use the same local response as the implicit momentum predictor. Reusing its already assembled diagonal is allocation-light and restores the variable-coefficient discrete flux identity; a full nested momentum inverse is still rejected by D-038. |
 
 ## Work log
 
@@ -3382,3 +3383,40 @@ surface, measurements, validation, decision, and next action.
   then measure the production B1/B2 primal and gradient throughput on the
   office CPU/A4000 hardware. Keep compile-evidence reuse separate from warm
   production-performance claims.
+
+### 2026-08-29 — match the B2 pressure and momentum diagonals
+
+- Decision D-042 replaces the B2 pressure mobility $\Delta t/\rho$ with the
+  diagonal inverse already assembled for its frozen implicit momentum
+  predictor. The local fluid-only response is returned with the momentum
+  result, so no second operator assembly, Krylov solve, padded wall field,
+  public API, option, or solver implementation is added. Pressure assembly and
+  face correction now share the same distance-weighted harmonic coefficient
+  on nonuniform transverse cells.
+- A variable-coefficient, nonuniform-grid regression closes the reconstructed
+  compact face flux to `1e-10`; the reduced B2 conservation and exact-restart
+  contract also passes unchanged. On the checksummed 101x65x65 step-32 state,
+  one history-free update reduces the momentum defect from about `3.01` to
+  `1.5208315033251738`, with divergence `2.974512041120647e-7`. Five raw or
+  freshly restarted depth-two updates remain stable but plateau near
+  `1.4926`, so this is a compatibility repair and material defect reduction,
+  not a production-convergence claim. A separate reaction-only trial failed
+  to transfer its reduced-case gain to the production mesh and was removed.
+- The candidate warm production step is `4.406` seconds versus the retained
+  `4.682`-second median. All 500 portable tests pass in 158.55 seconds (159.9
+  seconds end to end) with 95.41% combined line/branch coverage. Coverage and
+  JUnit SHA-256 digests are
+  `703c64ab850fcc1d3712c921d6ad3395c0a588af945a19899431a74b8b14a903`
+  and `441a4ca06ce909b11e617fa53a039fe93764ab103ef401194951d8dbec80506f`.
+- Ruff, formatting, byte compilation, architecture/import budgets, all seven
+  curated workflows, Sphinx HTML and external links with warnings as errors,
+  isolated build, Twine, distribution inspection, and clean-wheel primal and
+  gradient smoke pass. The wheel is 146,214 bytes and the sdist is 138,873
+  bytes; their SHA-256 digests are
+  `f13ab36cfe080099c958835e29829eb80326d5e3e34c1cbd5fc20f6c103db3fb`
+  and `5e34c8f69b6aceee468d9ef046ba04432369088a54c0fb94faa9e07f10f47cde`.
+- Next action: commit the immutable source candidate and repeat the pinned
+  FreeMHD B2 Docker comparison. If that independent boundary passes, merge the
+  tranche and continue from the remaining coupled pressure/electric plateau;
+  specialized B2 differentiation remains unavailable until primal convergence
+  and derivative gates both pass.

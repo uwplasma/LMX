@@ -622,7 +622,12 @@ def _duct_pressure_face_corrections(
     transverse = []
     for axis, width in ((1, dy), (2, dz)):
         values, coefficient = (jnp.moveaxis(field, axis, 0) for field in (pressure, mobility))
-        face_coefficient = _harmonic_mean(coefficient[1:], coefficient[:-1])
+        face_coefficient = _distance_weighted_harmonic_mean(
+            coefficient[1:],
+            coefficient[:-1],
+            width[1:].reshape((-1,) + (1,) * (values.ndim - 1)),
+            width[:-1].reshape((-1,) + (1,) * (values.ndim - 1)),
+        )
         distance = 0.5 * (width[:-1] + width[1:])
         correction = jnp.zeros((values.shape[0] + 1, *values.shape[1:]), dtype=pressure.dtype)
         correction = correction.at[1:-1].set(
@@ -653,6 +658,7 @@ def _face_flux_pressure_projection_duct(
     include_axial_line: bool = True,
     inlet_flow_rate: float | None = None,
     field_sharding: NamedSharding | None = None,
+    momentum_mobility: jnp.ndarray | None = None,
 ) -> tuple[jnp.ndarray, ...]:
     """Project duct face fluxes; mixed boundaries also return flow diagnostics."""
     mixed_axial_pressure = inlet_flow_rate is not None
@@ -694,7 +700,9 @@ def _face_flux_pressure_projection_duct(
         + (vf[:, 1:, :] - vf[:, :-1, :]) / dys[None, :, None]
         + (wf[:, :, 1:] - wf[:, :, :-1]) / dzs[None, None, :]
     )
-    mobility = dt / jnp.maximum(rhos, 1.0e-20)
+    mobility = dt / jnp.maximum(rhos, 1.0e-20) if momentum_mobility is None else momentum_mobility
+    if mobility.shape != rhos.shape:
+        raise ValueError("Momentum mobility must match the projected velocity")
     pressure_result = _solvax_pressure_poisson_duct(
         divergence,
         mobility,
@@ -1052,7 +1060,7 @@ def _b2_momentum_functions(
         local_force = force[:, y0:y1, z0:z1] + _explicit_deviatoric_stress_duct(
             local_velocity, setup[0], boundary_velocity, widths, gradient=setup[-1]
         )
-        return _solvax_implicit_momentum_duct(
+        solved = _solvax_implicit_momentum_duct(
             local_velocity,
             local_force,
             local_density,
@@ -1067,6 +1075,8 @@ def _b2_momentum_functions(
             tolerance=momentum_tolerance,
             frozen_setup=setup,
         )
+        momentum_mobility = dt / jnp.maximum(local_density + dt * (sum(setup[1]) + setup[2]), 1.0e-20)
+        return (*solved, momentum_mobility)
 
     def momentum_defect(velocity, force, density, viscosity, rho_phi_plus, rho_phi_inlet, pressure):
         return _duct_momentum_defect(
@@ -1155,7 +1165,7 @@ def _jit_b2_momentum_functions(
         ((field_sharding,) * 4, (field_sharding,) * 3 + (replicated_sharding,)),
         (
             (vector_sharding,) * 2 + (field_sharding,) * 2 + (flux_sharding, replicated_sharding),
-            (vector_sharding, replicated_sharding, replicated_sharding),
+            (vector_sharding, replicated_sharding, replicated_sharding, field_sharding),
         ),
         (
             (vector_sharding,) * 2
@@ -1317,7 +1327,7 @@ def _b2_coupling_functions(
 
     dt, dx, dy, dz = metric
 
-    def mixed_boundary_projection(u, v, w, pressure, density, mask):
+    def mixed_boundary_projection(u, v, w, pressure, density, mask, momentum_mobility):
         return _face_flux_pressure_projection_duct(
             u,
             v,
@@ -1336,6 +1346,7 @@ def _b2_coupling_functions(
             single_reduction=field_sharding is not None,
             include_axial_line=False,
             field_sharding=field_sharding,
+            momentum_mobility=momentum_mobility,
         )
 
     def electric_solve(rhs, initial, conductivity, mask):
@@ -1440,7 +1451,7 @@ def _jit_b2_coupling_functions(
     state_sharding = NamedSharding(field_sharding.mesh, P(None, "x", None, None))
     shardings = (
         (
-            (field_sharding,) * 6,
+            (field_sharding,) * 7,
             (field_sharding,) * 4
             + (axial_sharding, replicated_sharding, replicated_sharding)
             + (field_sharding,) * 3
