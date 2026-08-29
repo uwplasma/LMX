@@ -19,6 +19,16 @@ Core references used by the implemented models and validation contracts include:
   to discretization in CFD applications,” *Journal of Fluids Engineering* 130,
   2008, [doi:10.1115/1.2960953](https://doi.org/10.1115/1.2960953) — the
   three-grid observed-order and Grid Convergence Index reporting convention.
+- S. Patankar and D. Spalding, “A calculation procedure for heat, mass and
+  momentum transfer in three-dimensional parabolic flows,” *International
+  Journal of Heat and Mass Transfer* 15, 1972,
+  [doi:10.1016/0017-9310(72)90054-3](https://doi.org/10.1016/0017-9310(72)90054-3)
+  — the segregated pressure-linked momentum-correction foundation used by the
+  B2 steady iteration.
+- J. van Doormaal and G. Raithby, “Enhancements of the SIMPLE method for
+  predicting incompressible fluid flows,” *Numerical Heat Transfer* 7, 1984,
+  [doi:10.1080/01495728408961817](https://doi.org/10.1080/01495728408961817)
+  — consistent momentum-diagonal pressure correction and convergence economy.
 - J. Sommeria and R. Moreau, “Why, how, and when, MHD turbulence becomes
   two-dimensional,” *Journal of Fluid Mechanics* 118, 1982,
   [doi:10.1017/S0022112082001177](https://doi.org/10.1017/S0022112082001177) —

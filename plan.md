@@ -15,8 +15,8 @@ supported current state.
 The live root is the enforced repository baseline. The latest ordinary
 authenticated clone measurement is 2,304 KiB total, including 588 KiB of Git
 data and a 463.39 KiB pack. The current candidate contains 88 tracked files,
-1,821,142 bytes of tracked data, 15 package modules, and 28 root exports. Its
-complete six-worker portable gate passes 500 tests in 158.55 seconds with
+1,828,587 bytes of tracked data, 15 package modules, and 28 root exports. Its
+complete six-worker portable gate passes 500 tests in 163.90 seconds with
 95.41% combined line/branch coverage. Every change below must preserve the
 normal-clone limit of 9,766 KiB and the file, API, five-minute test-time, and
 coverage budgets. The capability-adjusted ceiling remains 15,370 package lines
@@ -1170,6 +1170,7 @@ artifacts or release assets, not committed files.
 | D-040 | Fold single-consumer fringing orchestration into the public module, not into another private file | `fringing.py` owns its three solve-dispatch functions; case construction belongs to `cases.py`, validation belongs to `validation.py`, and only shared, duct, and pipe numerical kernels retain private modules. The public import surface is unchanged. |
 | D-041 | Reuse a compiled production evidence map across same-shape finite-difference samples | Centered differences remain mathematically independent of autodiff, but they do not require compiling an identical primal graph a second time. Production value-and-gradient executables may supply shifted primal values; physics, VJP/JVP, sensitivity, batching, memory, and tolerance assertions remain separate and unchanged. |
 | D-042 | Use the frozen momentum diagonal as the B2 pressure mobility | The pressure correction must use the same local response as the implicit momentum predictor. Reusing its already assembled diagonal is allocation-light and restores the variable-coefficient discrete flux identity; a full nested momentum inverse is still rejected by D-038. |
+| D-043 | Advance B2 with two relaxed SIMPLE-style pressure--momentum correctors per electric closure | Including the current pressure force and accumulating a bounded correction removes the diagonal-only plateau. Two correctors materially improve physical defect per second; a third has diminishing returns, and fixed relaxation avoids adding restart fields. |
 
 ## Work log
 
@@ -3430,3 +3431,57 @@ surface, measurements, validation, decision, and next action.
   remains unavailable until primal convergence and derivative gates both pass;
   then measure the production B1/B2 primal and gradient throughput on the
   office CPU/A4000 hardware.
+
+### 2026-08-29 — couple the B2 pressure state to momentum
+
+- Decision D-043 repairs the remaining segregated pressure inconsistency. Each
+  B2 momentum predictor now includes the conservative force $-\nabla p^n$;
+  the matched diagonal pressure equation solves $p'$, velocity receives the
+  full conservative correction, and the stored pressure advances as
+  $p^{n+1}=p^n+0.4p'$. Two pressure--momentum correctors execute before one
+  electric/Lorentz closure. They reuse the existing jitted momentum and
+  projection kernels and add no public API, solver, restart field, or file.
+  The documentation gives the equations and anchors them to the original
+  SIMPLE and SIMPLEC literature.
+- The relaxation/corrector campaign used the checksummed 101x65x65 step-32
+  restart. Unit pressure relaxation diverged after two improving updates; 0.5
+  turned upward at update eight, while 0.4 remained monotone through 24
+  one-corrector updates. At 0.4, eight two-corrector updates reach momentum
+  defect `0.596436346649753` versus `1.4926603110597991` on merged main. Cold
+  process time is `82.11` versus `62.81` seconds: 60.0% lower defect for 30.7%
+  more wall time. A third corrector reaches only `0.5677557320997869` in
+  `88.65` seconds, so its marginal work is rejected.
+- A fresh production depth-two continuation is stable: at update 12 it reaches
+  defect `0.4977992378596463`, update `0.0038591445280506953`, and divergence
+  `9.862796835900562e-8` in `106.56` seconds. Compiled peak footprint rises
+  from `2,313,384,384` to `2,733,733,056` bytes (18.2%); the macOS maximum-RSS
+  counter rises 5.1%. Persisted and accelerator state are unchanged. The
+  tranche therefore wins physical defect per second but does not yet establish
+  terminal production convergence or specialized B2 differentiation.
+- Manufactured pressure-force sign/boundary checks, variable-coefficient
+  projection, reduced B2 conservation/convergence, and bit-exact restart pass.
+  All 500 portable tests pass in 163.90 seconds (165.4 seconds end to end) with
+  95.41% combined line/branch coverage. Coverage and JUnit SHA-256 digests are
+  `2eb2a047d63cef5926f3abfcd9a1e8968ae9ade84ceda61c2ce1d6d1b28d49d1`
+  and `8f25ba0ed50367bff8e4b2b42be4949464e540f3057a7532e3561b0644fa2813`.
+- Ruff, formatting, byte compilation, architecture/import budgets, all seven
+  curated workflows, Sphinx HTML and external links with warnings as errors,
+  isolated build, Twine, distribution inspection, and clean-wheel primal and
+  gradient smoke pass. Package source is 14,825 lines; the wheel is 146,493
+  bytes and the sdist is 139,150 bytes, with SHA-256 digests
+  `9daba7673c02335830b9c53e94985a312ec1d1d0cf1af40de83682d7e5e3a5e6`
+  and `681440adadd4b94b731dcf59506390d6a15f9b246de76478a5ed3ce9a56cc1da`.
+- Committed the immutable source candidate as `ae02c61` and repeated the pinned
+  FreeMHD B2 Docker comparison against source `14b54a3` and image
+  `sha256:535e995d557d2a73f5ab997380cb47ee3b044af8d2871bdadd570cff4cf175a8`.
+  Contract, artifacts, execution, observation, comparison, and schema all pass
+  with zero failed checks. Pressure L-infinity/RMS differences improve from
+  `0.010917245364311495`/`0.004517977131740069` to
+  `0.006837811881424563`/`0.003064699119643086`. Report and record SHA-256
+  digests are
+  `8dcd03f39046a427c237c11bec911117e76e17af4aa223d40be27d925de9de6f`
+  and `27861f048e0028e696c651f20b5e7fda7a919b256d0390db7468b0dc74101908`.
+  `acceptance_pass=false` remains correct for the smoke-only role.
+- Next action: merge the pressure-coupled tranche, then continue the remaining
+  long-horizon convergence and specialized derivative gates before office
+  GPU/scaling measurements.

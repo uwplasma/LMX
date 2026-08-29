@@ -1281,6 +1281,16 @@ def test_mixed_face_flux_projection_recovers_coefficients_and_boundary_flow():
         axial_pressure_mode=common_impl._MIXED_AXIAL_PRESSURE_MODE,
     )
     assert pressure == pytest.approx(expected_pressure, abs=1.0e-7)
+    pressure_force = duct_impl._duct_pressure_force(
+        expected_pressure,
+        dx=dx,
+        dy=jnp.asarray([0.2, 0.8]),
+        dz=jnp.asarray([0.7, 0.3]),
+    )
+    assert pressure_force[..., 0] == pytest.approx(
+        jnp.broadcast_to(jnp.asarray([2.0, 4.0, 4.0, 6.0])[:, None, None], shape)
+    )
+    assert pressure_force[..., 1:] == pytest.approx(0.0)
     zeros = jnp.zeros(shape)
     projected = _face_flux_pressure_projection_duct(
         zeros,
