@@ -2725,3 +2725,58 @@ surface, measurements, validation, decision, and next action.
   bulk code merely to satisfy a file metric. Then use the accepted implicit
   pipe projection in the traced production B1 recurrence and run its primal,
   derivative, memory, runtime, and refinement gates.
+
+### 2026-08-29 — trim private B2 ownership without trimming 3-D capability
+
+- Commit `e29ae4ec2a45ad78335b4cbf3828a5b5edca8446` keeps
+  `lmx.fringing` as the single public 3-D API while making the underscore
+  boundary deliberate. Generic cross-section construction and analytic,
+  constant, tabulated, and volume-field sampling now belong to `lmx.mesh`;
+  user-facing station-history assembly belongs to `lmx.fringing`; and
+  `_fringing_duct.py` retains only rectangular/layered B2 discretization,
+  linear-solve, coupling, JIT, and sharding implementation details. No 3-D,
+  fringing-field, tabulated-field, restart, or validation capability was
+  removed, and no new module or root export was added.
+- B2 now carries the packed three-face mass flux as its single runtime state
+  instead of retaining packed and component copies. Momentum and coupling JIT
+  setup share one explicit data-driven compiler, using callable identities and
+  paired input/output sharding contracts instead of two parallel manual
+  registries. Electric-current and Lorentz reconstruction share one kernel,
+  and metric arguments are passed as one physical tuple. A forced two-CPU-
+  device B2 solve completed with the field sharded over both devices, unit mean
+  velocity, and maximum charge residual `1.9392842887100414e-10`.
+- The change adds 232 lines and removes 382. `_fringing_duct.py` falls from
+  1,541 to 1,499 lines, satisfying its immediate private-module gate; all five
+  fringing files fall from 7,043 to 6,798 lines. Package source falls from
+  15,190 to 15,044 lines across 16 modules, tests fall to 11,896 lines, the
+  root API remains 28 names, and the tracked checkout excluding build
+  artifacts is 1,774,241 bytes. The 147,465-byte wheel remains far below the
+  artifact budget. The packed Git history still exceeds the eventual <10 MB
+  clone target, so the authorized final history rewrite remains an open
+  release task rather than a claim of this tranche.
+- The exact source passes the 505-test parallel CPU gate in 183.8 seconds on
+  Python 3.11.14/JAX 0.9.2/SOLVAX 0.18.0 with 95.35% combined branch coverage.
+  Coverage and JUnit SHA-256 digests are
+  `93edf81e897ed07297406f3a3d9bf38f8735053001735a7d192c8eaf32ab09fe`
+  and `e5640a6a0c0524257b1eb36c1576e7ddea9f56a9002d12718b3d6b1f1e00a446`.
+  Complete Python 3.10.21/JAX 0.6.2 and Python 3.13.9/JAX 0.11.1 matrices also
+  pass all 505 tests; the corrected absolute-path Python 3.10 run completes in
+  560.33 seconds. The separate curated first-run workflow passes.
+- Ruff check/format, architecture/prose/import budgets, Sphinx HTML and
+  external-link builds with warnings as errors, isolated build, Twine,
+  distribution inspection, CLI, and a fresh non-editable-wheel import and
+  mesh-construction smoke pass. The pinned FreeMHD Docker boundary passes
+  contract, artifact, execution, observation, comparison, and schema checks
+  with zero failed checks and unchanged pressure L-infinity/RMS discrepancies
+  `0.010917245284750786`/`0.004517977100484136`. Report and record SHA-256
+  digests are
+  `1d3e679d1236d97d3723a6169260fb90af2b2e06cecf6701ef6e583e471c1e0f`
+  and `0d57cf5b73dc7d3f543aede75dd129de7643140ab2732e11566d67cd9ab2e760`.
+  `acceptance_pass=false` remains correct because the two-update smoke is not
+  production-resolution validation.
+- Next action: trim the remaining 1,539-line pipe and 1,705-line orchestration
+  owners through genuine recurrence/finalization consolidation, then trace the
+  specialized production B1 recurrence through the accepted implicit
+  projection and establish primal, derivative, reverse-memory, refinement,
+  GPU, and strong-scaling evidence. GPU claims remain open until the office
+  host is reachable.

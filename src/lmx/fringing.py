@@ -13,16 +13,12 @@ from ._fringing_common import (
     _EXTRUDED_NUMERICAL_RESULTS,
     _coordinate_scale,
 )
-from ._fringing_duct import (
-    _bundle_station_history,
-    _cross_section_mesh,
-    _safe_correlation,
-)
 from ._fringing_solver import (
     _solve_extruded_projection,
 )
 from .cases import _ha_to_b, make_shercliff_case
 from .mesh import (
+    _cross_section_mesh,
     sample_tabulated_field_volume,
 )
 from .physics import build_material_fields
@@ -43,6 +39,36 @@ from .specs import (
     TimeStepperConfig,
     require_finite,
 )
+
+
+def _safe_correlation(x: jnp.ndarray, y: jnp.ndarray) -> float:
+    x, y = x - jnp.mean(x), y - jnp.mean(y)
+    scale = jnp.sqrt(jnp.sum(x**2) * jnp.sum(y**2))
+    return float(jnp.where(scale > 0.0, jnp.sum(x * y) / scale, 0.0))
+
+
+def _bundle_station_history(bundle: ExtrudedFieldBundle) -> tuple[dict[str, float], ...]:
+    zeros = jnp.zeros_like(bundle.x)
+    axial_pressure = getattr(bundle, "axial_pressure_loss_gradient", zeros)
+    transverse_pressure = getattr(bundle, "transverse_pressure_difference", zeros)
+    columns = {
+        "x": bundle.x,
+        "field_scale": bundle.field_scale,
+        "u_max": jnp.max(jnp.abs(bundle.u), axis=(1, 2)),
+        "mean_velocity": bundle.mean_velocity,
+        "volumetric_flow_rate": bundle.volumetric_flow_rate,
+        "axial_current": bundle.axial_current,
+        "wall_current_leakage": bundle.wall_current_leakage,
+        "current_scaled_pressure_proxy": bundle.current_scaled_pressure_proxy,
+        "axial_pressure_loss_gradient": axial_pressure if axial_pressure.size else zeros,
+        "transverse_pressure_difference": transverse_pressure if transverse_pressure.size else zeros,
+        "pressure_span": jnp.max(bundle.p, axis=(1, 2)) - jnp.min(bundle.p, axis=(1, 2)),
+        "residual": bundle.residual,
+        "charge_balance_residual": bundle.charge_balance_residual,
+        "boundary_current_residual": bundle.boundary_current_residual,
+    }
+    rows = np.asarray(jnp.stack(tuple(columns.values()), axis=1))
+    return tuple(dict(zip(columns, map(float, row), strict=True)) for row in rows)
 
 
 def smooth_fringing_profile(

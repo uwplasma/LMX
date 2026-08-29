@@ -29,9 +29,7 @@ from lmx._fringing_common import (
 from lmx._fringing_duct import (
     _conservative_current_diagnostics_3d,
     _conservative_current_fluxes_3d,
-    _cross_section_mesh,
     _face_flux_pressure_projection_duct,
-    _sample_volume_field,
     _solvax_implicit_momentum_duct,
     _solvax_pressure_poisson_duct,
     _station_axial_current_from_fluxes,
@@ -65,6 +63,8 @@ from lmx.fringing import (
     validate_variable_field_pipe_solution,
 )
 from lmx.mesh import (
+    _cross_section_mesh,
+    _sample_volume_field,
     make_divergence_free_cross_section_field,
     make_localized_divergence_free_obstacle_field,
     sample_cross_section_field,
