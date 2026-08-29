@@ -6,8 +6,8 @@ and pipe models for spatially varying magnetic fields, and periodic Q2D flow
 with Hartmann-layer damping. LMX builds the physics;
 [SOLVAX](https://github.com/uwplasma/SOLVAX) supplies reusable numerical solvers.
 
-```{image} _static/fringing_solver_family.webp
-:alt: Rectangular-duct fringing-field solution
+```{image} _static/analytic_velocity_profiles.webp
+:alt: Full-profile analytical validation for Hartmann, Shercliff, and Hunt ducts
 :align: center
 ```
 
