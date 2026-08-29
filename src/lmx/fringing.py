@@ -640,7 +640,8 @@ def evolve_extruded_fields(
     ``(axial, radial)`` for a pipe. It maps the fixed reference mesh without
     changing topology or imposed-field samples; callers keep scale factors
     positive. Step controls are static. SOLVAX supplies implicit elliptic VJPs
-    and exact checkpointing. Specialized ALEX paths fail closed.
+    and exact checkpointing. ALEX B1 uses its production finite-volume map;
+    specialized ALEX B2 fields are not yet exposed here.
     """
 
     steps = (

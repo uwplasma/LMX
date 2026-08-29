@@ -105,8 +105,12 @@ its own exact production derivative.
 Geometry, material layout, step count, and checkpoint width are static. Choose
 the case timestep for the largest field and conductivity scales in the design
 domain so every differentiated evaluation uses the same stable recurrence.
-Specialized ALEX B1/B2 acceptance paths fail closed because their production
-algorithms are distinct from the generic fixed-step cores.
+The specialized ALEX B1 pipe uses its production finite-volume momentum,
+retained-modal fixed-flow projection, and conservative electric-current map.
+Its SOLVAX implicit VJPs differentiate forcing, field, conductivity, and mapped
+axial/radial geometry without retaining Krylov iterations. Specialized ALEX B2
+design fields remain unavailable until the sharded production recurrence has
+the same bounded reverse-memory contract.
 `extruded_engineering_objectives` also
 reports signed pressure drop, outlet flow rate, wall-current-density RMS, and a
 smooth recirculation fraction. Its wall-current quantity is a cell-centered
@@ -116,8 +120,8 @@ For a straight pipe, construct the problem with
 `build_pipe_ogrid_extruded_problem`, pass `(fluid, wall)` conductivity scales
 when the case contains a conducting annulus, and pass `(axial, radial)` geometry
 scales. The same `jax.jit`, `jax.value_and_grad`, `jax.vmap`, and bounded
-`jax.lax.map` composition shown above applies without a pipe-specific optimizer
-or derivative API.
+`jax.lax.map` composition shown above applies to generic and ALEX B1 pipes
+without a pipe-specific optimizer or derivative API.
 
 ## Reproduce a bounded field, wall, and geometry design
 
