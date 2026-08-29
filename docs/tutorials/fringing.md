@@ -42,17 +42,17 @@ use the same mapped pipe operators through `build_bent_pipe_extruded_problem`.
 case is already available.
 
 For differentiable blanket or duct design, call `evolve_extruded_fields` on a
-generic rectangular or layered problem. It returns only traced fields and
-accepts continuous pressure forcing and imposed-field scale. Electric closure
-is implicit while finite projection and outer iterations are
-checkpointed, so reverse memory does not grow as a full trajectory tape. Mesh
-and step controls remain static. The scale may be a scalar or one coefficient
-per axial station. `extruded_engineering_objectives` reduces the fields to
-pressure drop, flow rate, pumping power, outlet nonuniformity, wall-current RMS,
-and recirculation without leaving the differentiated program. The specialized
-ALEX B2 and pipe lanes fail
-closed in this API pending their own coupled-adjoint validation; see the
-[differentiation tutorial](differentiation.md).
+generic rectangular/layered duct or straight pipe. It returns only traced
+fields and accepts continuous pressure forcing, imposed-field scale, fluid/wall
+conductivity, and fixed-topology geometry scales. Electric closure is implicit
+while finite projection and outer iterations are checkpointed, so reverse
+memory does not grow as a full trajectory tape. Mesh and step controls remain
+static. The field scale may be scalar or one coefficient per axial station;
+pipe geometry uses `(axial, radial)`. `extruded_engineering_objectives` reduces
+the fields to pressure drop, flow rate, pumping power, outlet nonuniformity,
+wall-current RMS, and recirculation without leaving the differentiated program.
+The specialized ALEX B1/B2 acceptance algorithms fail closed in this API; see
+the [differentiation tutorial](differentiation.md).
 
 The axial, cross-section, and wall meshes are refined independently. A reported
 fringing result should demonstrate stable primary observables under all three
