@@ -29,6 +29,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # in browsers. The bibliography retains the persistent identifiers; executable
 # links for the associated software and preprints are checked separately.
 linkcheck_ignore = [
+    r"https://doi\.org/10\.1115/1\.2960953",
     r"https://doi\.org/10\.1063/5\.0230242",
     r"https://doi\.org/10\.1145/347837\.347846",
     r"https://doi\.org/10\.1073/pnas\.2101784118",
