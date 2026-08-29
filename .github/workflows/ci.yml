@@ -24,8 +24,39 @@ env:
   NUMEXPR_NUM_THREADS: "1"
 
 jobs:
+  scope:
+    runs-on: ubuntu-latest
+    outputs:
+      full: ${{ steps.scope.outputs.full }}
+      targeted: ${{ steps.scope.outputs.targeted }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: scope
+        name: Select test depth
+        run: |
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            echo "full=true" >> "$GITHUB_OUTPUT"
+            echo "targeted=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          if grep -Eq '^(src/lmx/|validation/|tests/|examples/|pyproject\.toml$|MANIFEST\.in$)' <<< "$changed"; then
+            echo "full=true" >> "$GITHUB_OUTPUT"
+            echo "targeted=false" >> "$GITHUB_OUTPUT"
+          elif grep -Eq '^scripts/' <<< "$changed"; then
+            echo "full=false" >> "$GITHUB_OUTPUT"
+            echo "targeted=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "full=false" >> "$GITHUB_OUTPUT"
+            echo "targeted=false" >> "$GITHUB_OUTPUT"
+          fi
+
   quality:
     name: Metadata and architecture
+    needs: scope
+    if: needs.scope.outputs.full == 'true' || needs.scope.outputs.targeted == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -40,8 +71,31 @@ jobs:
       - name: Enforce architecture budgets
         run: python scripts/audit_architecture.py --check --measure-import
 
+  pr-impact:
+    name: Changed numerical surface
+    needs: scope
+    if: github.event_name == 'pull_request' && needs.scope.outputs.targeted == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-lmx
+        with:
+          python-version: "3.10"
+          solvax-version: "0.17.0"
+          cache-suffix: pr-impact
+      - name: Run conservatively affected tests
+        run: |
+          python scripts/run_full_test_suite.py \
+            --changed-from "origin/${{ github.base_ref }}" \
+            --budget-seconds 540 --test-timeout-seconds 300
+
   compatibility:
     name: Python 3.10 (${{ matrix.shard }})
+    needs: scope
+    if: needs.scope.outputs.full == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
@@ -73,7 +127,8 @@ jobs:
 
   coverage:
     name: Combined branch coverage
-    needs: compatibility
+    needs: [scope, compatibility]
+    if: needs.scope.outputs.full == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:

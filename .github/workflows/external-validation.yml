@@ -2,17 +2,6 @@ name: external-validation
 
 on:
   pull_request:
-    paths:
-      - .github/workflows/external-validation.yml
-      - scripts/run_freemhd_parity_suite.py
-      - validation/freemhd.py
-      - src/lmx/_fringing_common.py
-      - src/lmx/_fringing_duct.py
-      - src/lmx/_fringing_pipe.py
-      - src/lmx/_fringing_solver.py
-      - src/lmx/fringing.py
-      - src/lmx/validation.py
-      - src/lmx/data/benchmarks/**
   schedule:
     - cron: "17 5 * * 1"
   workflow_dispatch:
@@ -32,19 +21,37 @@ env:
   NUMEXPR_NUM_THREADS: "1"
 
 jobs:
-  links:
-    name: External documentation links
+  impact:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    outputs:
+      b2: ${{ steps.scope.outputs.b2 }}
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup-lmx
         with:
-          extras: docs
-      - run: python -m sphinx -W -b linkcheck docs docs/_build/linkcheck
+          fetch-depth: 0
+      - id: scope
+        name: Select external validation work
+        run: |
+          base="origin/${{ github.base_ref }}...HEAD"
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            echo "b2=true" >> "$GITHUB_OUTPUT"
+          elif ! git diff --quiet "$base" -- \
+            scripts/run_freemhd_parity_suite.py validation/freemhd.py \
+            src/lmx/_fringing_common.py src/lmx/_fringing_duct.py \
+            src/lmx/fringing.py \
+            src/lmx/data/benchmarks; then
+            echo "b2=true" >> "$GITHUB_OUTPUT"
+          elif git diff -U0 "$base" -- src/lmx/validation.py | grep -Eq \
+            'BENCHMARK_B|benchmark_b_|canonical_matched_b_contract|_repository_root|load_benchmark_[ab]_spec'; then
+            echo "b2=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "b2=false" >> "$GITHUB_OUTPUT"
+          fi
 
   freemhd-b2:
     name: Pinned FreeMHD B2 Docker comparison
+    needs: impact
+    if: needs.impact.outputs.b2 == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

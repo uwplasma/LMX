@@ -1061,7 +1061,8 @@ def benchmark_solver(
     timings = []
     for _ in range(repeats):
         start = time.perf_counter()
-        solve_steady(case)
+        solution = solve_steady(case)
+        jax.block_until_ready((solution.fields.u, solution.fields.phi))
         timings.append(time.perf_counter() - start)
     cold = timings[0]
     warm_samples = np.asarray(timings[1:] or timings)
