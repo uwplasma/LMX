@@ -96,8 +96,8 @@ def _solve_extruded_projection(
             "Unsupported ALEX production case; only the frozen B1 pipe and B2 square "
             "finite-volume paths are implemented"
         )
-    if num_devices is not None and num_devices > 1 and not use_alex_b2_finite_volume:
-        raise NotImplementedError("Production spatial sharding currently supports the ALEX B2 duct path")
+    if num_devices is not None and num_devices > 1 and use_alex_b1_finite_volume:
+        raise NotImplementedError("Production spatial sharding does not yet support ALEX B1")
     if (
         use_alex_b2_finite_volume
         and case.solver.coupling_acceleration == "anderson"
@@ -863,6 +863,7 @@ def _solve_duct_projection(
         ),
         num_devices=num_devices,
     )
+    field_sharding = common._extruded_field_sharding(nx, num_devices)
 
     stability_field = (bx, by, bz) if design_parameters is None else base_field
     with jax.ensure_compile_time_eval():
@@ -967,9 +968,11 @@ def _solve_duct_projection(
                     0.6 if case.geometry.kind == "layered_duct" else 0.0,
                 ),
                 operators=(
-                    partial(duct._solvax_pressure_poisson_duct, transverse_coarse_bounds=fluid_bounds)
-                    if fluid_bounds is not None
-                    else duct._solvax_pressure_poisson_duct,
+                    partial(
+                        duct._solvax_pressure_poisson_duct,
+                        transverse_coarse_bounds=fluid_bounds,
+                        field_sharding=field_sharding,
+                    ),
                     duct._conservative_emf_rhs_3d,
                     duct._conservative_current_diagnostics_3d,
                 ),
@@ -1604,6 +1607,7 @@ def evolve_extruded_fields(
     geometry_scale: float | jnp.ndarray = 1.0,
     steps: int | None = None,
     checkpoint_size: int | None = None,
+    num_devices: int | None = None,
 ) -> tuple[jnp.ndarray, ...]:
     """Return differentiable 3-D duct or straight-pipe production fields.
 
@@ -1615,8 +1619,9 @@ def evolve_extruded_fields(
     ``(axial, radial)`` for a pipe. It maps the fixed reference mesh without
     changing topology or imposed-field samples; callers keep scale factors
     positive. Step controls are static. SOLVAX supplies implicit elliptic VJPs
-    and exact checkpointing. ALEX B1 uses its production finite-volume map;
-    specialized ALEX B2 fields are not yet exposed here.
+    and exact checkpointing. ``num_devices`` shards the axial dimension when
+    its cell count is divisible by the requested device count. Specialized
+    ALEX B1 sharding and ALEX B2 design fields are not yet exposed here.
     """
 
     steps = (
@@ -1631,6 +1636,7 @@ def evolve_extruded_fields(
     source = problem.case.forcing if forcing is None else forcing
     return _solve_extruded_projection(
         problem,
+        num_devices=num_devices,
         design_parameters=(
             jnp.asarray(source),
             jnp.asarray(magnetic_field_scale),

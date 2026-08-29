@@ -45,9 +45,11 @@ generic rectangular/layered duct or straight pipe. It returns only traced
 fields and accepts continuous pressure forcing, imposed-field scale, fluid/wall
 conductivity, and fixed-topology geometry scales. Electric closure is implicit
 while finite projection and outer iterations are checkpointed, so reverse
-memory does not grow as a full trajectory tape. Mesh and step controls remain
-static. The field scale may be scalar or one coefficient per axial station;
-pipe geometry uses `(axial, radial)`. `extruded_engineering_objectives` reduces
+memory does not grow as a full trajectory tape. Pass `num_devices` to shard an
+evenly divisible axial mesh for generic duct, layered, and straight-pipe primal
+or gradient runs. Mesh and step controls remain static. The field scale may be
+scalar or one coefficient per axial station; pipe geometry uses `(axial,
+radial)`. `extruded_engineering_objectives` reduces
 the fields to pressure drop, flow rate, pumping power, outlet nonuniformity,
 wall-current RMS, and recirculation without leaving the differentiated program.
 The specialized ALEX B1 pipe shares its production finite-volume map with this
