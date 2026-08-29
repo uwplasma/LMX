@@ -3047,6 +3047,11 @@ surface, measurements, validation, decision, and next action.
   `cb7d2f707ebd933ec3f682003e99f1b613a4b930839520e9e05367ff7e5e7582`
   and `b1252d3770cacbb59d1d7ea7f747bd3418938df7ff23831247a8fe9f3cc13528`.
   `acceptance_pass=false` remains correct for the smoke-only role.
+- PR #26 created all seven hosted CI, documentation, and external-validation
+  jobs; every job ended before its first step with GitHub's account
+  payment/spending-limit annotation. The hosted service supplied no numerical
+  evidence, so the complete recorded local matrix above remains the merge
+  authority under the temporary policy.
 - The current primary-source refresh adds DESC as the natural differentiable
   equilibrium/geometry provider alongside ParaStell's CAD/neutronics role.
   NekRS remains the scalable high-order primal comparison, FreeMHD the
