@@ -16,8 +16,8 @@ The live root is the enforced repository baseline. The latest ordinary
 authenticated clone measurement is 2,304 KiB total, including 588 KiB of Git
 data and a 463.39 KiB pack. The current candidate contains 89 tracked files,
 about 1.8 MiB of tracked data, 16 package modules, and 28 root exports. Its
-complete six-worker portable gate passes 500 tests in 177.89 seconds with
-95.41% combined line/branch coverage. Every change below must preserve the
+complete six-worker portable gate passes 500 tests in 179.80 seconds with
+95.44% combined line/branch coverage. Every change below must preserve the
 normal-clone limit of 9,766 KiB and the file, API, five-minute test-time, and
 coverage budgets. The capability-adjusted ceiling remains 15,370 package lines
 across at most 16 modules.
@@ -969,8 +969,8 @@ purpose.
 - [ ] Finish the function-level ownership and necessity audit. The initial passes
   removed rejected solver lanes, decomposed the 3-D monolith, and deleted
   non-production private testbeds, but the live fringing implementation still
-  contains 6,502 lines: 743 lines in the public `lmx.fringing` case/API layer
-  and 5,759 lines in four private owners. Keep
+  contains 6,491 lines: 743 lines in the public `lmx.fringing` case/API layer
+  and 5,748 lines in four private owners. Keep
   `lmx.fringing` as the only public surface while removing unreachable helpers,
   duplicate recurrences, redundant materialization, and reusable algebra that
   belongs in SOLVAX. No private owner may remain merely because the monolith
@@ -3137,3 +3137,19 @@ surface, measurements, validation, decision, and next action.
   Ruff check/format, byte compilation, architecture/import budgets, Sphinx
   HTML and link checking with warnings as errors, isolated build, Twine, wheel,
   and sdist inspection also pass. The wheel is 146,565 bytes.
+- LMX PR #28 merged the pure production map at
+  `9497846882742712c7353649159eb184b040bfec`. All seven hosted jobs had zero
+  executed steps; completed jobs reported GitHub's account payment/spending
+  annotation, while the fringing entry remained queued inside an already
+  concluded failed workflow. This is unavailable hosted execution, not test
+  evidence; the complete local matrix above is the merge authority.
+- Overall roadmap audit: Phases 0--3, 6, and 7 are complete. Phase 4 remains
+  open for function-level private-fringing reduction, specialized B1/B2
+  field derivatives, smooth geometry controls, production adjoint memory,
+  and CPU/GPU derivative parity. Phase 5 remains open only for scheduled or
+  release-grade production FreeMHD refinement on suitable hardware. Phase 8
+  remains open for the final all-capability validation, coherent public
+  release, and clean-install/release verification. The active numerical
+  critical path is the compatible B2 coupled preconditioner and coarse-mesh
+  convergence gate; GPU speedup and two-device scaling remain evidence gaps,
+  not claims.
