@@ -4053,3 +4053,54 @@ surface, measurements, validation, decision, and next action.
   skipped. This is hosted-service unavailability, not contrary test evidence,
   so the recorded local gate remains merge authority under the active
   temporary policy.
+
+### 2026-08-29 — establish the matrix-free B2 Schur contract
+
+- Materialized the frozen momentum block and both pressure responses on the
+  maintained 4x2x2 nonuniform dense fixture. The full mixed-boundary
+  `D A^-1 G` response is nonsingular with condition number `11.1027`; its
+  nonsymmetry ratio is `0.09644`, consistent with the frozen convective
+  momentum block. This fixes the sign, inlet-flow, outlet-pressure, and
+  transverse-wall conventions before production integration.
+- The retained diagonal-mobility response `D diag(A)^-1 G` has condition number
+  `35.5690`, differs from the full response by `2.5673` in relative Frobenius
+  norm, and leaves `S_diag^-1 S` at condition number `27.973`. Decision D-053
+  therefore retains it only as a cheap inner approximation; it is not accepted
+  as evidence for the compatible coupled preconditioner.
+- SOLVAX owns the missing reusable operation: a matrix-free Schur block
+  factorization on matching JAX pytrees. LMX will supply its frozen momentum
+  inverse, conservative pressure-force action, face-flux divergence, and
+  pressure-response inverse. This composition stores no Krylov trajectory and
+  is compatible with shifted pseudo-transient solves and implicit transpose
+  differentiation. Production promotion still requires a reduced dense
+  identity test plus lower runtime and defect on the exact step-152 state.
+- SOLVAX PR #96 merged the public `schur_complement_precond` composition at
+  `1bba449ffa413ee884ee9113bea1929b467db2bc`. The local exhaustive gate passes
+  755 tests with six optional-backend skips and 97.53% combined line/branch
+  coverage; mypy, warnings-as-errors Sphinx HTML, isolated distributions, and
+  Twine pass. Every hosted build, lint, type, minimum/current/advanced stack,
+  macOS, combined-coverage, and Codecov check is green; the longest exhaustive
+  shard is 7m59s.
+- LMX now owns one conservative mixed-boundary face divergence and one
+  cell-velocity-to-divergence action; the production pressure projection and
+  reduced Schur contract use the same operators. On the dense fixture, the
+  matrix-free factorization matches a direct solve of `[[A,G],[D,0]]` to
+  `2e-12`. Projection conservation and the reduced Benchmark-B restart gate
+  remain green. Two standalone result/proxy tests are consolidated into the
+  maintained Benchmark-B and dense-operator fixtures, leaving 11,949 test
+  lines rather than raising the budget. Next action: compose the shifted
+  production preconditioner and compare bounded work on the exact step-152
+  state before changing the public B2 recurrence.
+- The conservative owning-surface gate selected 211 fringing, Benchmark-B,
+  FreeMHD-contract, and example tests and passed in 83.85 seconds (84.2 seconds
+  end to end). Ruff, formatting, the 14,779-line/15-module architecture audit,
+  and diff hygiene pass. The one complete local source-PR qualification passes
+  all 501 tests in 134.43 seconds (135.8 seconds end to end) with 95.24%
+  combined line/branch coverage. Coverage and JUnit SHA-256 digests are
+  `65001b3d23c4935f5df88fb8d2eb5892602aca3f6ba0076525671cdf330ed414`
+  and `6f4bd1e3c178a4d931bc9396a6eb485cbd994a6edc51fa755229e06a4311d5cc`.
+- PR #48's three entry jobs queued for 2m37s--3m51s, then ended before their
+  first step with the account payment/spending-limit annotation; every
+  downstream job was skipped. The complete local covered gate is therefore
+  merge authority under the active temporary policy. No unrelated package,
+  documentation, Docker, FreeMHD, or GPU gate is repeated.

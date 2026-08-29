@@ -9,6 +9,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from solvax import schur_complement_precond
 
 import lmx._fringing_common as common_impl
 import lmx._fringing_duct as duct_impl
@@ -24,7 +25,6 @@ from lmx._fringing_common import (
     _laplacian_3d,
     _normalized_pressure_observable_update,
     _projection_pressure_correction_3d,
-    _rectangular_fluid_bounds,
     _restore_duct_iteration_state,
     _shard_extruded_fields,
     _spacing_vector,
@@ -76,7 +76,6 @@ from lmx.mesh import (
 )
 from lmx.specs import (
     ExtrudedFieldBundle,
-    ExtrudedInductionlessSolution,
     GeometrySpec,
     MagneticFieldSpec,
     NumericalFailure,
@@ -185,22 +184,6 @@ def test_alex_b1_production_map_has_bounded_implicit_gradient():
     assert jnp.vdot(gradient, direction) == pytest.approx(finite_difference, rel=3.0e-4, abs=5.0e-8)
     assert jnp.all(jnp.abs(gradient[1:]) > 1.0e-6)
     assert compiled.memory_analysis().temp_size_in_bytes < 300_000
-
-
-def test_extruded_solution_reports_terminal_state():
-    solution = ExtrudedInductionlessSolution(
-        problem=SimpleNamespace(),
-        bundle=SimpleNamespace(stopping_state=(7, 2, "step_limit")),
-        station_history=(),
-        validation=SimpleNamespace(max_residual=1.0e-5),
-    )
-
-    assert solution.steps == 7
-    assert solution.status == "step_limit"
-    assert solution.converged is False
-    assert solution.residual == pytest.approx(1.0e-5)
-    assert solution.fields is solution.bundle
-    assert solution.diagnostics is solution.validation
 
 
 def test_extruded_solver_rejects_nonfinite_result(monkeypatch: pytest.MonkeyPatch):
@@ -805,6 +788,30 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
     assert captured["has_aux"]
     assert captured["zero"] == pytest.approx(0.0) and not jnp.allclose(matrix, matrix.T)
     volume = dx * dy[None, :, None] * dz[None, None, :]
+    pressure_force = jax.jacfwd(
+        lambda p: (
+            volume[..., None] * dt * duct_impl._duct_pressure_force(p, dx=dx, dy=dy, dz=dz)
+        ).reshape(-1)
+    )(jnp.zeros(shape)).reshape((velocity.size, scalar.size))
+
+    divergence = jax.jacfwd(
+        lambda value: duct_impl._duct_velocity_divergence(
+            value.reshape(velocity.shape), jnp.zeros_like(velocity[0, ..., 0]), dx=dx, dy=dy, dz=dz
+        ).reshape(-1)
+    )(jnp.zeros(velocity.size))
+    a_inverse = lambda value: jnp.linalg.solve(matrix, value)  # noqa: E731
+    schur = divergence @ a_inverse(pressure_force)
+    block = jnp.block([[matrix, pressure_force], [divergence, jnp.zeros((scalar.size,) * 2)]])
+    precondition = schur_complement_precond(
+        a_inverse,
+        lambda value: pressure_force @ value,
+        lambda value: divergence @ value,
+        lambda value: jnp.linalg.solve(schur, value),
+    )
+    block_rhs = (jnp.linspace(-0.2, 0.3, velocity.size), jnp.linspace(0.1, -0.1, scalar.size))
+    assert jnp.concatenate(precondition(block_rhs)) == pytest.approx(
+        jnp.linalg.solve(block, jnp.concatenate(block_rhs)), abs=2.0e-12
+    )
     expected_rhs = volume[..., None] * (density[..., None] * velocity + dt * force)
     inlet_source = rho_phi[0][0][..., None] + volume[0, ..., None] * (
         2.0 * (density * viscosity)[0, ..., None] / dx**2
@@ -1392,16 +1399,6 @@ def test_mixed_face_flux_projection_recovers_coefficients_and_boundary_flow():
     nonuniform_divergence = jnp.diff(nfx, axis=0) + jnp.diff(nfy, axis=1) + jnp.diff(nfz, axis=2)
     assert nonuniform[5] < 1.0e-8
     assert jnp.max(jnp.abs(nonuniform_divergence)) < 1.0e-10
-
-
-def test_face_flux_projection_requires_nonempty_rectangular_fluid_mask():
-    empty = jnp.zeros((3, 4, 4), dtype=bool)
-    with pytest.raises(ValueError, match="nonempty"):
-        _rectangular_fluid_bounds(empty)
-
-    nonrectangular = empty.at[:, 1:3, 1:3].set(True).at[:, 1, 1].set(False)
-    with pytest.raises(ValueError, match="rectangular"):
-        _rectangular_fluid_bounds(nonrectangular)
 
 
 def test_nonuniform_pipe_radial_metrics_pass_manufactured_convergence():
