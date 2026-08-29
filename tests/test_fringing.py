@@ -223,7 +223,7 @@ def test_b2_canonical_shell_widths_remove_realization_thickness():
 def test_fringing_jit_cache_reuses_the_first_compiled_kernel():
     common_impl._FRINGING_JIT_CACHE.clear()
     first = object()
-    key = ("operator", "configuration")
+    key = ("operator", jnp.asarray(1.0))
 
     assert common_impl._reuse_fringing_jit(key, first) is first
     assert common_impl._reuse_fringing_jit(key, object()) is first

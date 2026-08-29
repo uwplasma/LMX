@@ -68,6 +68,7 @@ _MIXED_AXIAL_PRESSURE_MODE = "inlet_neumann_outlet_dirichlet_zero"
 def _reuse_fringing_jit(key: tuple[object, ...], function: Callable) -> Callable:
     """Reuse an identical compiled production kernel across repeated solves."""
 
+    key = tuple(float(value) if isinstance(value, jax.Array) and value.ndim == 0 else value for value in key)
     return _FRINGING_JIT_CACHE.setdefault(key, function)
 
 
