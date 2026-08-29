@@ -3686,3 +3686,48 @@ surface, measurements, validation, decision, and next action.
   merge this generic sharding tranche, then resume terminal ALEX convergence,
   specialized derivative gates, and real one-/two-GPU timing when the office
   host is reachable.
+
+### 2026-08-29 — reject generic pressure unification and expose B2 accepted-state inconsistency
+
+- Trialled replacing the generic duct's compact checkpointed Jacobi projection
+  with its SOLVAX-PCG finite-volume electric operator, then removed the trial.
+  Cold rectangular/layered production solves became 22--24% slower and serial
+  derivative gates 15--35% slower for only `0.014%`/`2.7%` lower divergence.
+  For the eight-step design gradient, compile time rose from `2.173` to `3.038`
+  seconds, median warm execution from `1.097` to `1.289` milliseconds, and
+  temporary memory from `121,200` to `136,224` bytes while the value and
+  gradient were unchanged. The existing physical stencil already delegates
+  bounded recurrence storage to SOLVAX and remains the deliberate faster path.
+- Continued the exact pseudo-mass B2 state from step 64 to step 112. Stored
+  depth-two Anderson reaches defect `0.19313568` at step 80 and `0.17726693`
+  at step 96, but its update grows from order `2e-3` to `2.57e-2`. From step
+  96 it briefly plateaus, then jumps to defect `0.15131795` at step 112 with
+  update `0.04415093` and accepted-state charge `0.00129454`, outside the
+  independent `1e-3` gate. The step-112 restart is 63 MiB and has SHA-256
+  `52495d2dd664175c882f8b47895c9fe8b4640280f5065df33b87b4e497612efd`.
+- Replayed step 80 with fixed relaxation two and with the raw map. Fixed two is
+  smooth and reaches defect `0.17872821` at step 96, but extrapolating the
+  finite-tolerance electric state yields accepted charge `0.00174633`. One
+  post-acceleration electric reclosure restores charge to `9.39e-5` but raises
+  16-update runtime from `124.9` to `148.1` seconds. The raw map needs no
+  reclosure: it reaches defect `0.17898851` at step 96 and decreases
+  monotonically to `0.16771035` at step 112 with update `0.00180815`, charge
+  `2.56e-4`, and 128.4-second continuation time. Its stateless restart is 34
+  MiB, SHA-256
+  `4395e92560c6776a79e750195ec169ce4ee915bffb91bdbd2fb02bbbd3a4eb1d`.
+- Canonical 12-step comparisons bound the early tradeoff. Anderson takes 107.9
+  seconds and reaches defect/update `0.34404766 / 0.01773752`; raw takes 106.1
+  seconds and reaches `0.34818429 / 0.03069781`. Raw therefore wins late
+  stability, accepted charge, runtime, and restart memory but not defect at
+  every fixed work point. Fixed two also fails accepted charge without the
+  extra solve. Decision D-044 remains in force rather than promoting a partial
+  win or adding a switching heuristic.
+- The discrepancy between mapped diagnostics and the stored accelerated state
+  identifies the next operator-level task: acceleration must act on mechanical
+  velocity/compact flux state, after which the one production electric solve
+  must close the accepted velocity. Charge, Lorentz force, momentum defect,
+  update, and restart diagnostics must then be computed from that same stored
+  state. This avoids a second electric solve while removing potential from the
+  accelerator state and is the next candidate for both convergence and code/
+  memory trimming. The office GPU endpoint timed out again, so no GPU claim is
+  added.
