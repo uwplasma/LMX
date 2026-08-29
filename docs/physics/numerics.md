@@ -37,6 +37,13 @@ reconstruction then use the corrected conservative velocity. This follows the
 pressure-correction structure of SIMPLE and its consistent refinements while
 retaining LMX's MHD-specific residual and boundary contracts.
 
+The primal-only B2 projection stops at a $10^{-10}$ linear tolerance while
+also enforcing the volume-scaled local mass-balance target. This keeps the
+linear error below five percent of the independent $10^{-3}$ balance gate on
+the production mesh without spending iterations on roundoff-level pressure
+corrections. Traced 3-D paths retain roundoff-level primal solves where their
+implicit derivatives require them.
+
 ## LMX and SOLVAX
 
 LMX owns:

@@ -517,7 +517,7 @@ def _decode_matched_b2_lmx_input(path: str | Path):
         "electric_iterations": max(case.time_stepper.potential_iterations, 600),
         "electric_tolerance": min(case.solver.coupling_tolerance, 1.0e-12),
         "projection_iterations": max(case.time_stepper.potential_iterations, 4000),
-        "projection_tolerance": min(case.solver.coupling_tolerance, 1.0e-12),
+        "projection_tolerance": min(case.solver.coupling_tolerance, 1.0e-10),
         "momentum_iterations": max(case.time_stepper.potential_iterations, 400),
         "momentum_tolerance": min(case.solver.coupling_tolerance, 1.0e-10),
         "executed_steps": case.time_stepper.max_steps,
