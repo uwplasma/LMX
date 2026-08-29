@@ -967,8 +967,8 @@ purpose.
 
 - [ ] Finish the function-level ownership and necessity audit. The first pass
   removed rejected solver lanes and decomposed the 3-D monolith, but the live
-  fringing implementation still contains 7,063 lines and one 1,662-line
-  orchestration function. Keep `lmx.fringing` as the only public surface while
+  fringing implementation still contains 7,043 lines. Keep `lmx.fringing` as
+  the only public surface while
   removing test-only helpers and duplicate recurrences; no private owner may
   remain merely because the monolith was split. Reduce the largest private
   module below 1,500 lines, target 1,200, and split functions by physical phase
@@ -2677,3 +2677,51 @@ surface, measurements, validation, decision, and next action.
   use the accepted implicit projection inside a traced production B1
   recurrence. Production B1/B2 derivative, refinement, GPU, and scaling claims
   remain open until their independent gates pass.
+
+### 2026-08-29 — split fringing orchestration by physical geometry
+
+- Commit `81f592b87dd221a0559428235939ecbbb3963425` replaces the
+  1,662-line mixed-geometry solve with a 50-line validated dispatcher, a
+  738-line mapped-pipe owner, and an 821-line rectangular/layered-duct owner.
+  It adds no module and changes no public API or numerical expression.
+- Pipe and duct paths now share one initial-state constructor and one
+  field/material scaling contract. The initial-state helper validates restart
+  shape once and reuses one immutable zero array for transverse velocity,
+  pressure, and potential instead of allocating four equal arrays. Both pipe
+  loops also share one restart-checkpoint constructor rather than maintaining
+  two 27-line state serializers.
+- `_fringing_solver.py` falls from 1,734 to 1,714 lines and total fringing
+  source from 7,063 to 7,043 lines. Package source falls from 15,210 to 15,190
+  lines across the same 16 modules; tests remain 11,900 lines, the root API
+  remains 28 names, and the wheel falls from 148,619 to 148,197 bytes. The
+  <1,500-line private-module gate remains open for `_fringing_duct.py`,
+  `_fringing_pipe.py`, and `_fringing_solver.py`.
+- The exact source passes all 505 tests in 185.3 seconds on macOS 14.4.1 arm64,
+  Python 3.11.14, JAX/JAXLIB 0.9.2, SOLVAX 0.18.0, and CPU, with 95.31%
+  combined branch coverage. Coverage and JUnit SHA-256 digests are
+  `6acc46c3c3df876d384aae245c716a57aedc7573ff0fb73d60dacd11ac7bc0da`
+  and `b86391684ba437c44aed96644b31a7bf3a86f73050d4982501037d15de463e2f`.
+  Complete Python 3.10.21/JAX 0.6.2 and Python 3.13.9/JAX 0.11.1 matrices pass
+  all 505 tests in 289.4 and 258.4 seconds under concurrent load; their JUnit
+  digests are
+  `b30493fa4ff12a7904b88c1d7b8ec919a6e29ff2022305b80b6633db6ccf831a`
+  and `e4d574ba62952a8f55caa0fb7a97edb8f2591763033a815d4f8088ca93a96a5f`.
+- Ruff, formatting, architecture, all curated workflows, Sphinx HTML and
+  external links with warnings as errors, isolated build, Twine, distribution
+  inspection, and a fresh non-editable-wheel TOML solve pass. The 148,197-byte
+  wheel and 140,121-byte sdist SHA-256 digests are
+  `1c3d6d847fdbd42ec213d8bf81d36e2033eb08fd846072dc1dd36f6c37cc2cb3`
+  and `be2f8e6f4f4b158af085c769aaec2f0340e63836acefcd552399e3bad0441eae`.
+- The clean pinned FreeMHD Docker smoke passes contract, artifact, execution,
+  observation, comparison, and schema checks with zero failures and unchanged
+  pressure L-infinity/RMS discrepancies `0.0109172`/`0.00451798`. Report and
+  record SHA-256 digests are
+  `ae3cfb49a08c2aa39f9e52705e194afcda300d98b6ee03669de4cf8deb597981`
+  and `1f1e70ae83505d2b1daf03d4ae56989520f4594d7fdb513477c4d96fe758e758`.
+  The two-update role remains non-accepting, and GPU/scaling evidence remains
+  open while the office host is unreachable.
+- Next action: reduce the three remaining >1,500-line private owners by
+  consolidating duct/pipe finalization and B2 setup, without redistributing
+  bulk code merely to satisfy a file metric. Then use the accepted implicit
+  pipe projection in the traced production B1 recurrence and run its primal,
+  derivative, memory, runtime, and refinement gates.
