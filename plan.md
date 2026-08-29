@@ -69,11 +69,10 @@ disables it. Unknown executable paths fail closed to the complete suite.
 ## Active physics and performance tranche
 
 The live root is the enforced repository baseline. The current candidate
-contains 88 tracked files, 1,872,579 bytes of tracked data, 15 package modules,
-and 28 root exports. Its complete six-worker portable gate passes 502 tests in
-168.15 seconds (169.9 seconds end to end) with 95.29% combined line/branch
-coverage. The conservative gate for the execution-reset tranche selected 302
-tests and completed in 71.1 seconds. Every change below must preserve the
+contains 87 tracked files, 1,832,829 bytes of tracked data, 15 package modules,
+14,754 package lines, and 28 root exports. All 503 tests have passing candidate
+evidence with 95.29% combined line/branch coverage; the B2-affected gate
+selected 213 tests and completed in 103.9 seconds. Every change below must preserve the
 normal-clone limit of 9,766 KiB and the file, API, five-minute test-time, and
 coverage budgets. The capability-adjusted ceiling remains 15,370 package lines
 across at most 16 modules.
@@ -1238,6 +1237,7 @@ artifacts or release assets, not committed files.
 | D-047 | Shard the generic differentiable 3-D production fields and replicate only global coarse solves | Axial `NamedSharding` constraints must remain inside the traced program rather than staging design-dependent fields through NumPy. Rectangular, layered, and straight-pipe primal fields compose with reverse mode over the same recurrence; global axial/transverse coarse solves are explicitly replicated and their corrections repartitioned. Specialized ALEX B1 stays single-device until its cylindrical production operators pass an independent sharding gate. |
 | D-048 | Accelerate only the B2 mechanical state and close electricity once on the accepted velocity | Anderson/Aitken owns velocity and compact conservative flux; the one post-acceptance electric solve makes current, Lorentz force, charge, defects, checkpoints, and returned fields describe one state without retaining potential history or performing a second electric solve. |
 | D-049 | Qualify evidence at the boundary it informs | Exact tests serve edits, a conservative change gate serves local candidates, and the complete covered suite runs once for a source candidate. Documentation, packaging, external validation, accelerator, and release gates run only for their owning surfaces; required workflows remain visible and skip jobs with successful job-level conditions. |
+| D-050 | Spectrally filter ill-conditioned depth-two B2 Anderson histories | SOLVAX's condition filter bounds the retained residual Gram condition at 25. Well-conditioned Anderson steps are unchanged; near-dependent histories become bounded residual-space combinations without another field, map evaluation, or user parameter. Production evidence must still beat unfiltered Anderson and the raw map in defect, update, runtime, balance, and restart equivalence. |
 
 ## Work log
 
@@ -3940,3 +3940,59 @@ surface, measurements, validation, decision, and next action.
   intentionally not rerun. The candidate remains 88 tracked files and
   1,872,579 tracked bytes. Next action: close the terminal B2 primal and
   transpose-solve acceptance gate.
+
+### 2026-08-29 — condition the terminal B2 Anderson history
+
+- Continued the current accepted-state step-32 restart on the exact 101x65x65
+  fluid mesh. The physical momentum defect continued descending through step
+  88 to `0.16867260`, but depth-two Anderson updates became oscillatory and
+  reached `0.21000656`; divergence and charge remained bounded. The campaign
+  driver exposed its configured 128-update horizon in the progress record, so
+  the run was stopped at the valid atomic step-88 checkpoint instead of
+  spending another ten minutes on a known unstable accelerator.
+- At step 89 the two residual norms are `0.30102388` and `0.45851147`. Their
+  Gram matrix has condition number `58.4998` and unfiltered SOLVAX weights
+  `[2.16785015, -1.16785015]`, producing a `0.41279231` accepted velocity jump.
+  Decision D-050 passes `condition_limit=5` to the existing SOLVAX spectral
+  filter, bounding the effective Gram condition at 25. The filtered weights are
+  `[0.39237697, 0.60762303]`; no solve, field, restart value, or public option is
+  added.
+- On the identical step-88 state, the guarded step reduces the accepted update
+  to `0.07565518` and improves defect from the unguarded `0.16809644` to
+  `0.16669591`. Over steps 89--96, defect decreases monotonically to
+  `0.16247107` and update contracts to `0.00166472`; maximum divergence and
+  charge are `3.97e-5` and `2.42e-4`. This is also better than the previously
+  measured raw-map step-96 defect `0.17898851`. The reduced B2 boundary,
+  convergence, sharding, and exact-restart test passes. The office SSH endpoint
+  timed out before connection, so terminal GPU continuation remains pending.
+- The conservative owning-surface gate passes 213 fringing, Benchmark-B,
+  FreeMHD-contract, and example tests in 103.21 seconds (103.9 seconds end to
+  end). The complete covered run passes all 500 numerical/runtime assertions at
+  95.29% combined line/branch coverage and rejects only a two-line test-source
+  budget excess. Compressing that regression without changing its assertion
+  restores the 11,950-line test budget; the three rejected architecture tests
+  and the new conditioning regression then pass exactly. No runtime source
+  changed after the covered run, so all 503 candidate tests have passing
+  evidence without repeating 500 unchanged tests. Ruff, formatting, the
+  14,754-line/15-module architecture/import audit, diff hygiene, and
+  warnings-as-errors Sphinx HTML pass.
+- The README now leads with a problem-to-example chooser, exact commands and
+  outputs, a four-stage research adaptation workflow, differentiable 3-D/Q2D
+  examples, evidence status, and explicit non-goals. It removes the nonexistent
+  PyPI installation claim. The ungenerated 46,678-byte two-resolution fringing
+  line plot is deleted rather than presented as a convergence curve; retained
+  figures identify their full profile, 41 optimization iterates/seven design
+  stations, and 41 Q2D frames. The repository falls to 87 tracked files and
+  1,832,829 tracked bytes.
+- Clean source commit `37f0e729c431977a7bbce99c13d464a1673c7f67` passes the
+  cached pinned two-rank Docker comparison against FreeMHD `14b54a3` and image
+  `sha256:535e995d557d2a73f5ab997380cb47ee3b044af8d2871bdadd570cff4cf175a8`.
+  Contract, artifacts, execution, observation, comparison, and schema pass with
+  zero failed checks; pressure L-infinity/RMS remain
+  `0.006838504934992036`/`0.0030649109539923614`. Report and record SHA-256 are
+  `5e1ebd7d7c00a47a124590be5998d413cce2168c46eb3e848f2417dc54104843`
+  and `b1dc7438ce96807f6793b45b52ec132baa9b2f3b0c6eddddb0d913dcd59421fd`.
+  `acceptance_pass=false` remains correct for the two-update smoke role. Next
+  action: resume the conditioned step-88 state on available accelerator
+  hardware to establish terminal primal convergence before constructing the
+  specialized implicit transpose solve.

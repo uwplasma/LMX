@@ -21,6 +21,7 @@ from solvax import (
 
 from ._fringing_common import (
     _MIXED_AXIAL_PRESSURE_MODE,
+    ALEX_B2_ANDERSON_CONDITION_LIMIT,
     ALEX_B2_PRESSURE_RELAXATION,
     ALEX_BALANCE_TOLERANCE,
     _axial_mean_preconditioner_3d,
@@ -1454,7 +1455,9 @@ def _b2_coupling_functions(
 
     def mix_anderson(mapped0, residual0, flux0, inlet0, mapped1, residual1, flux1, inlet1):
         weights = anderson_weights(
-            jnp.stack((residual0, residual1)), regularization=case.solver.coupling_regularization
+            jnp.stack((residual0, residual1)),
+            regularization=case.solver.coupling_regularization,
+            condition_limit=ALEX_B2_ANDERSON_CONDITION_LIMIT,
         )
         damping = case.solver.coupling_damping
 
