@@ -640,6 +640,8 @@ def test_write_extruded_solution_outputs_archives_last_station_with_stride(
         current_scaled_pressure_proxy=jnp.asarray([0.1, 0.2, 0.15, 0.1]),
         charge_balance_residual=jnp.asarray([1.0e-7, 2.0e-7, 1.5e-7, 1.0e-7]),
         boundary_current_residual=jnp.asarray([3.0e-8, 3.0e-8, 3.0e-8, 3.0e-8]),
+        axial_pressure_loss_gradient=jnp.zeros(4),
+        transverse_pressure_difference=jnp.zeros(4),
         geometry_kind="rect_duct",
         solver_kind="extruded_inductionless",
     )

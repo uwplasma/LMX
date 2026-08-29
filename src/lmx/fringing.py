@@ -20,10 +20,7 @@ from solvax import (
 from . import _fringing_common as common
 from . import _fringing_duct as duct
 from . import _fringing_pipe as pipe
-from ._fringing_common import (
-    _EXTRUDED_NUMERICAL_RESULTS,
-    _coordinate_scale,
-)
+from ._fringing_common import _coordinate_scale
 from .cases import (
     build_extruded_problem_from_case,
     build_layered_duct_extruded_problem,
@@ -38,6 +35,7 @@ from .mesh import (
 )
 from .physics import build_material_fields
 from .specs import (
+    EXTRUDED_RESULT_FIELDS,
     ExtrudedFieldBundle,
     ExtrudedInductionlessProblem,
     ExtrudedInductionlessSolution,
@@ -782,7 +780,7 @@ def _solve_duct_projection(
         forcing, magnetic_scale, conductivity_scale, geometry_scale, outer_steps, checkpoint_size = (
             design_parameters
         )
-    axial_scale, transverse_y_scale, transverse_z_scale = common._coordinate_scale(geometry_scale)
+    axial_scale, transverse_y_scale, transverse_z_scale = _coordinate_scale(geometry_scale)
     x = axial_scale * jnp.asarray(mesh.x_centers, dtype=float)
     y = transverse_y_scale * jnp.asarray(mesh.y_centers, dtype=float)
     z = transverse_z_scale * jnp.asarray(mesh.z_centers, dtype=float)
@@ -1147,6 +1145,7 @@ def _solve_duct_projection(
         }
 
     if use_alex_b2_finite_volume:
+        electromagnetic_reaction = sigma * sum(component**2 for component in (bx, by, bz))
 
         def b2_map(state, flux):
             """Apply one complete conservative B2 fixed-point map."""
@@ -1166,6 +1165,7 @@ def _solve_duct_projection(
                     mapped_flux,
                     mapped_inlet,
                     pressure,
+                    electromagnetic_reaction,
                 )
                 predicted = embed_velocity(velocity_fluid, fluid_mask)
                 projection = mixed_boundary_projection(
@@ -1583,7 +1583,7 @@ def solve_extruded_inductionless(
     bundle = _solve_extruded_projection(problem, **projection_kwargs)
     require_finite(
         "3-D fringing solve",
-        **{name: getattr(bundle, name) for name in _EXTRUDED_NUMERICAL_RESULTS},
+        **{name: getattr(bundle, name) for name in EXTRUDED_RESULT_FIELDS},
     )
     station_history = _bundle_station_history(bundle)
     validation = validate_extruded_inductionless_solution(bundle, station_history=station_history)

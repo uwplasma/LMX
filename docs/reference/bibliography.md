@@ -47,6 +47,13 @@ Core references used by the implemented models and validation contracts include:
   [doi:10.1063/5.0230242](https://doi.org/10.1063/5.0230242) — the
   [FreeMHD source](https://github.com/PlasmaControl/FreeMHD) supplies the
   independent finite-volume implementation used by the executable comparison.
+- M. K. Jung et al., “Extension of a multi-region free-surface MHD solver
+  beyond the inductionless approximation,” 2026,
+  [arXiv:2606.18745](https://arxiv.org/abs/2606.18745) — FreeMHD2 resolves the
+  induced field with a divergence-free vector-potential formulation and
+  validates free-surface response against LMX-U. This establishes full
+  induction and free surfaces as an external high-fidelity boundary rather
+  than an LMX runtime target.
 - T. Hua et al., “MHD capabilities in SAM and NekRS for fusion liquid metal
   blanket applications,” *Fusion Engineering and Design* 230, 2026,
   [doi:10.1016/j.fusengdes.2026.115888](https://doi.org/10.1016/j.fusengdes.2026.115888)

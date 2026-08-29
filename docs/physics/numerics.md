@@ -37,6 +37,19 @@ reconstruction then use the corrected conservative velocity. This follows the
 pressure-correction structure of SIMPLE and its consistent refinements while
 retaining LMX's MHD-specific residual and boundary contracts.
 
+The B2 predictor also uses the positive local electromagnetic pseudo-mass
+$R_B=\sigma|B|^2I$:
+
+$$
+(A^n+\Delta tR_B)u^* = b_L^n-Gp^n+\Delta tR_Bu^n.
+$$
+
+At a fixed point $u^*=u^n$, the added terms cancel exactly, so this changes
+neither the discrete steady equations nor their physical residual. It damps
+the stiff magnetic pseudo-time mode, and the same augmented diagonal defines
+$r_{AU}$ in the pressure correction. A dense-operator test verifies both the
+linear system and this fixed-point identity.
+
 The primal-only B2 projection stops at a $10^{-10}$ linear tolerance while
 also enforcing the volume-scaled local mass-balance target. This keeps the
 linear error below five percent of the independent $10^{-3}$ balance gate on

@@ -1,4 +1,4 @@
-"""Shared rectangular 3-D kernels and pressure systems."""
+"""Private runtime and structured-grid kernels shared by 3-D fringing solvers."""
 
 from __future__ import annotations
 
@@ -26,35 +26,6 @@ from .specs import (
     ExtrudedFieldBundle,
     ExtrudedIterationProgress,
 )
-
-_EXTRUDED_NUMERICAL_RESULTS = (
-    "x",
-    "y",
-    "z",
-    "field_scale",
-    "u",
-    "v",
-    "w",
-    "p",
-    "phi",
-    "jx",
-    "jy",
-    "jz",
-    "lorentz_x",
-    "lorentz_y",
-    "lorentz_z",
-    "residual",
-    "volumetric_flow_rate",
-    "mean_velocity",
-    "axial_current",
-    "wall_current_leakage",
-    "current_scaled_pressure_proxy",
-    "charge_balance_residual",
-    "boundary_current_residual",
-    "axial_pressure_loss_gradient",
-    "transverse_pressure_difference",
-)
-
 
 _FRINGING_JIT_CACHE: dict[tuple[object, ...], Callable] = {}
 
@@ -140,15 +111,6 @@ ALEX_B2_PRESSURE_RELAXATION = 0.4
 ALEX_B2_SETTLED_RELAXATION = 2.0
 
 
-def _axial_field_sharding(num_devices: int) -> NamedSharding:
-    """Return one process-stable axial mesh for compilation and repeat reuse."""
-
-    devices = jax.devices()
-    if not 1 <= num_devices <= len(devices):
-        raise ValueError(f"Requested {num_devices} devices, but only {len(devices)} are visible.")
-    return NamedSharding(Mesh(np.asarray(devices[:num_devices], dtype=object), ("x",)), P("x", None, None))
-
-
 def _shard_extruded_fields(
     fields: tuple[jnp.ndarray, ...], *, num_devices: int | None
 ) -> tuple[jnp.ndarray, ...]:
@@ -162,7 +124,9 @@ def _shard_extruded_fields(
     axial_size = fields[0].shape[0]
     if axial_size % num_devices:
         raise ValueError(f"Axial cell count {axial_size} must be divisible by {num_devices} devices.")
-    sharding = _axial_field_sharding(num_devices)
+    sharding = NamedSharding(
+        Mesh(np.asarray(devices[:num_devices], dtype=object), ("x",)), P("x", None, None)
+    )
     return tuple(jax.device_put(np.asarray(field), sharding) for field in fields)
 
 
