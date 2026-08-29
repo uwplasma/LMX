@@ -67,7 +67,10 @@ def test_benchmark_solver_returns_positive_timings(monkeypatch: pytest.MonkeyPat
         "make_hartmann_case",
         lambda ha, ny, nz: SimpleNamespace(name="hartmann_ha5"),
     )
-    monkeypatch.setattr("lmx.cases.solve_steady", lambda case: SimpleNamespace())
+    fields = SimpleNamespace(u=object(), phi=object())
+    monkeypatch.setattr("lmx.cases.solve_steady", lambda case: SimpleNamespace(fields=fields))
+    synchronized = []
+    monkeypatch.setattr(benchmarks.jax, "block_until_ready", synchronized.append)
     monkeypatch.setattr(benchmarks.time, "perf_counter", lambda: next(times))
     monkeypatch.setattr(benchmarks.jax, "default_backend", lambda: "cpu")
     monkeypatch.setattr(benchmarks.jax, "devices", lambda: [SimpleNamespace(device_kind="cpu")])
@@ -78,6 +81,7 @@ def test_benchmark_solver_returns_positive_timings(monkeypatch: pytest.MonkeyPat
     assert float(report["warm_seconds"]) == pytest.approx(0.3)
     assert report["warm_cv"] == 0.0
     assert report["backend"]
+    assert synchronized == [(fields.u, fields.phi)] * 2
 
 
 def test_benchmark_writer(tmp_path: Path):

@@ -26,7 +26,7 @@ from scripts.audit_architecture import (
     inspect_wheel,
     measure_import,
 )
-from scripts.run_full_test_suite import _test_environment
+from scripts.run_full_test_suite import _ALL_TESTS, _test_environment, _tests_for_changes
 
 pytestmark = pytest.mark.unit
 
@@ -392,6 +392,22 @@ EXPECTED_ROOT_API = {
 def test_architecture_inventory_is_deterministic_without_timing() -> None:
     assert build_inventory() == build_inventory()
     assert Path(_test_environment()["PYTHONPATH"].split(os.pathsep)[0]) == Path("src").resolve()
+
+
+def test_change_gate_selects_affected_tests_and_fails_closed() -> None:
+    assert _tests_for_changes(("docs/index.md", "plan.md")) == ()
+    assert _tests_for_changes(("src/lmx/_fringing_pipe.py",)) == (
+        "tests/test_fringing.py",
+        "tests/test_benchmarks.py",
+        "tests/test_freemhd.py",
+        "tests/test_example_runner.py",
+    )
+    assert _tests_for_changes(("src/lmx/q2d.py", "examples/q2d_vortex.py")) == (
+        "tests/test_physics.py",
+        "tests/test_example_runner.py",
+    )
+    assert _tests_for_changes(("tests/test_io.py",)) == ("tests/test_io.py",)
+    assert _tests_for_changes(("unknown executable",)) == _ALL_TESTS
 
 
 def test_stable_root_api_is_small_lazy_and_resolvable(
