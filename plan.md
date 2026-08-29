@@ -1165,6 +1165,7 @@ artifacts or release assets, not committed files.
 | D-035 | Lead with differentiable inductionless blanket-design physics, not general CFD breadth | ParaStell owns parametric stellarator CAD/neutronics, NekRS owns exascale high-order CFD, and FreeMHD owns free-surface/multi-region/full-induction development. LMX earns a distinct role through compact high-Hartmann duct/fringe equations, verified bounded-memory derivatives, accelerator design throughput, and matched external evidence. New multiphysics enters through versioned coupling data before it enters the runtime. |
 | D-036 | Keep `lmx.fringing` as the only public 3-D surface and retain private fringing files only by mathematical ownership | Common structured-grid operations, rectangular-duct kernels, cylindrical-pipe kernels, and orchestration have different metrics and change reasons. Private ownership files reduce coupling; test-only proxy solvers and duplicate recurrences do not, so they are removed. |
 | D-037 | Remove the label-only bent-pipe lane | Curved display coordinates never entered its straight cylindrical operators, and its validator mislabeled generic transverse velocity as Dean curvature physics. A future curved-pipe solver must introduce coherent curvilinear metrics, independent validation, and derivative gates rather than reuse the removed name. |
+| D-038 | Do not nest a full transient momentum Krylov solve inside every B2 pressure-Schur action | The construction passes dense compatibility and autodiff identities, but repeats an expensive mass-dominated inverse, leaves the reduced physical trajectory effectively unchanged, and exceeds the production runtime gate. A viable block method must use a separately reusable/coarse response or factorized preconditioner with bounded primal and transpose work. |
 
 ## Work log
 
@@ -3199,3 +3200,37 @@ surface, measurements, validation, decision, and next action.
   removed. This rules out interpolation weighting alone; the accepted next
   operator remains the full compatible momentum response, not a face-flux
   cosmetic correction.
+
+### 2026-08-29 — verify and reject a nested transient B2 Schur solve
+
+- A disposable implementation exposed the exact homogeneous response of the
+  frozen conservative momentum matrix and used it in a mixed-boundary
+  compatible projection. The response matrix and right-hand side matched a
+  dense oracle, its linear solve matched the dense solution, and force-scale
+  JVP/VJP identities passed. With a diagonal response, the compatible
+  projection reproduced the retained pressure and all three face-flux families
+  within `2e-8`; divergence, flow, and linear residuals were below `1e-8`.
+  These checks confirm the sign, boundary, pressure-gauge, and transpose
+  contract, but do not establish an acceptable production algorithm.
+- The exact response was then composed with the retained B2 frozen momentum
+  operator, conservative compact flux, fixed-flow correction, and restart
+  state. The reduced closure and restart gates passed. Six 5x5x5 updates took
+  45.095 seconds and ended at update `0.01683414` and momentum defect
+  `0.04731858`, essentially the retained trajectory
+  `0.0168165 / 0.0472907` at materially greater cost. The pressure Schur itself
+  converged in three iterations with residuals near `1e-15`; the cost is the
+  repeated full transient momentum inverse, not pressure Krylov stagnation.
+- One continuation step from the checksummed 101x65x65 step-32 restart did not
+  complete after 300 seconds and was terminated at 319 seconds. The retained
+  production recurrence costs about 5--6 seconds per continuation step, so the
+  candidate fails the runtime gate by more than an order of magnitude before a
+  terminal physics comparison is possible. No source, test, option, or private
+  helper from the experiment is retained.
+- Decision D-038 therefore rejects a nested full transient solve. The next
+  implementation must avoid applying the mass-dominated momentum GMRES inside
+  each pressure Krylov action. Derive a reusable separable, line, modal, or
+  coarse approximation to `D A^-1 G`, or a verified block factorization, from
+  the frozen momentum response. Gate it first on the dense identity, reduced
+  physical defect, warm runtime, implicit-transpose work/storage, and exact
+  restart; only then rerun the production coarse state. The B2 public path and
+  all numerical tolerances remain unchanged.
