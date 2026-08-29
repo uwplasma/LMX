@@ -1,4 +1,4 @@
-"""Optimize a layered-duct field profile and wall conductance with exact LMX gradients.
+"""Optimize layered-duct field, wall, and geometry controls with exact LMX gradients.
 
 Run ``python examples/variable_field_extruded_demo.py``. The deliberately
 small mesh is a portable workflow demonstration, not production validation.
@@ -23,11 +23,12 @@ from lmx.fringing import (
 
 jax.config.update("jax_enable_x64", True)
 
-# Inputs: a bounded axial field profile, wall scale, solver effort, and optimizer effort.
+# Inputs: bounded field, wall, fixed-topology geometry, solver, and optimizer controls.
 OUTPUT_DIR = Path("artifacts/examples/variable_field_extruded")
 NX_STATIONS, NY, NZ, WALL_CELLS = 7, 6, 6, 1
 FIELD_HALF_RANGE = 0.10
 WALL_HALF_RANGE = 0.50
+GEOMETRY_HALF_RANGE = jnp.asarray([0.10, 0.05, 0.05])
 EVOLUTION_STEPS = 8
 OPTIMIZATION_STEPS = 40
 LEARNING_RATE = 0.05
@@ -46,27 +47,29 @@ problem = build_layered_duct_extruded_problem(
 )
 
 
-def decode_controls(parameters: jax.Array) -> tuple[jax.Array, jax.Array]:
-    """Map unconstrained values to a fixed-mean field and bounded wall scale."""
-    field_shape = jnp.tanh(parameters[:-1])
+def decode_controls(parameters: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
+    """Map unconstrained values to bounded field, wall, and geometry controls."""
+    field_shape = jnp.tanh(parameters[:NX_STATIONS])
     field_scale = 1.0 + FIELD_HALF_RANGE * (field_shape - jnp.mean(field_shape))
-    wall_scale = 1.0 + WALL_HALF_RANGE * jnp.tanh(parameters[-1])
-    return field_scale, jnp.asarray([1.0, wall_scale])
+    wall_scale = 1.0 + WALL_HALF_RANGE * jnp.tanh(parameters[NX_STATIONS])
+    geometry_scale = 1.0 + GEOMETRY_HALF_RANGE * jnp.tanh(parameters[-3:])
+    return field_scale, jnp.asarray([1.0, wall_scale]), geometry_scale
 
 
 def metrics_for(parameters: jax.Array) -> dict[str, jax.Array]:
     """Return traced engineering metrics for one continuous design vector."""
-    field_scale, material_scale = decode_controls(parameters)
+    field_scale, material_scale, geometry_scale = decode_controls(parameters)
     fields = evolve_extruded_fields(
         problem,
         magnetic_field_scale=field_scale,
         material_conductivity_scale=material_scale,
+        geometry_scale=geometry_scale,
         steps=EVOLUTION_STEPS,
     )
-    return extruded_engineering_objectives(problem, fields, smoothing=1.0e-8)
+    return extruded_engineering_objectives(problem, fields, geometry_scale=geometry_scale, smoothing=1.0e-8)
 
 
-initial_parameters = jnp.zeros(NX_STATIONS + 1)
+initial_parameters = jnp.zeros(NX_STATIONS + 4)
 baseline = metrics_for(initial_parameters)
 power_scale = jnp.maximum(jnp.abs(baseline["pumping_power"]), 1.0e-12)
 nonuniformity_scale = jnp.maximum(baseline["flow_nonuniformity"], 1.0e-12)
@@ -83,7 +86,7 @@ def loss(parameters: jax.Array) -> jax.Array:
         0.35 * smooth_power / power_scale
         + 0.30 * metrics["flow_nonuniformity"] / nonuniformity_scale
         + 0.25 * metrics["wall_current_density_rms"] / current_scale
-        + 10.0 * flow_error**2
+        + 100.0 * flow_error**2
     )
 
 
@@ -124,7 +127,7 @@ finite_difference = jnp.asarray(
 gradient_error = jnp.linalg.norm(checked_gradient - finite_difference) / jnp.maximum(
     jnp.linalg.norm(finite_difference), 1.0e-14
 )
-field_scale, material_scale = decode_controls(parameters)
+field_scale, material_scale, geometry_scale = decode_controls(parameters)
 optimized = metrics_for(parameters)
 baseline_json, optimized_json = scalar_metrics(baseline), scalar_metrics(optimized)
 improvements = {
@@ -135,11 +138,15 @@ improvements = {
 }
 
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-figure, axes = plt.subplots(1, 3, figsize=(11.0, 3.2), constrained_layout=True)
+figure, axes = plt.subplots(1, 3, figsize=(12.0, 3.2), constrained_layout=True)
 x = np.asarray(problem.profile.x)
 axes[0].plot(x, np.asarray(problem.profile.field_scale), "--", label="baseline")
-axes[0].plot(x, np.asarray(problem.profile.field_scale * field_scale), label="optimized")
-axes[0].set(xlabel="axial coordinate", ylabel=r"$B/B_0$", title="Imposed field")
+axes[0].plot(
+    x * float(geometry_scale[0]),
+    np.asarray(problem.profile.field_scale * field_scale),
+    label="optimized",
+)
+axes[0].set(xlabel="axial coordinate", ylabel=r"$B/B_0$", title="Field and axial geometry")
 axes[0].legend(frameon=False)
 axes[1].semilogy(range(len(loss_history)), loss_history)
 axes[1].set(xlabel="design step", ylabel="normalized loss", title="Gradient optimization")
@@ -160,6 +167,7 @@ summary = {
         "field_scale": np.asarray(field_scale).tolist(),
         "field_mean": float(jnp.mean(field_scale)),
         "wall_conductivity_scale": float(material_scale[1]),
+        "geometry_scale": np.asarray(geometry_scale).tolist(),
     },
     "optimization": {
         "steps": OPTIMIZATION_STEPS,
