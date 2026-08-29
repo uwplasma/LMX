@@ -985,12 +985,12 @@ purpose.
   residual, memory, and runtime checks. The accepted rectangular Hartmann,
   Shercliff, and layered Hunt path uses `solve_fully_developed_fields`.
 - [ ] Complete field-level traced cores for every retained 3-D geometry. The
-  rectangular and layered production recurrence accepts continuous forcing,
-  station-wise field, and material controls with implicit electric derivatives
-  and bounded reverse storage. The straight- and mapped-pipe host paths still
-  materialize geometry/scales and convergence decisions with Python
-  `float`/`bool`; those boundaries must move outside a fixed-step or implicit
-  differentiable core rather than being bypassed by a shadow solver.
+  rectangular, layered, and straight-pipe production recurrences accept
+  continuous forcing, station-wise field, material, and fixed-topology geometry
+  controls with implicit electric derivatives and bounded reverse storage.
+  Bent-pipe coordinate controls and the specialized ALEX acceptance paths
+  remain deliberately unavailable to differentiation until their production
+  equations pass independent primal, derivative, runtime, and memory gates.
 - [ ] Complete blanket/stellarator design evidence without adding an optimizer
   framework. Pressure-loss, flow-uniformity, pumping-power, wall-current, and
   recirculation objectives, bounded field/material controls, and chunked batched
@@ -1145,9 +1145,10 @@ artifacts or release assets, not committed files.
 | D-030 | Differentiate the mathematical result, not incidental solver work | Implicit adjoints are the default for converged steady equations; checkpointed discrete adjoints are the default for finite trajectories. This matches established Optimistix, PETSc TSAdjoint/Revolve, and JAX scientific-computing practice while preserving one LMX production equation path. |
 | D-031 | Fail closed when a production adjoint does not converge | A finite primal is insufficient evidence: unsupported geometry remains unavailable until its transpose solve passes an independent derivative gate. |
 | D-032 | Eliminate inactive degrees of freedom from SPD off-diagonals | A fluid boundary contribution belongs on the diagonal, not as a coupling to an identity-constrained solid cell. Keeping the volume-scaled momentum operator symmetric makes primal PCG mathematically valid and gives its implicit transpose solve the same conditioning. |
-| D-033 | Differentiate one production 3-D recurrence with bounded nested derivatives | Generic rectangular/layered ducts expose pressure forcing and imposed-field scale through the retained field update. SOLVAX uses an implicit VJP for converged electric closure and exact checkpointing for finite projection and outer iterations. Specialized B2 and pipe lanes remain unavailable until their distinct coupled operators pass the same gates. |
+| D-033 | Differentiate each production 3-D recurrence with bounded nested derivatives | Generic rectangular/layered ducts and straight pipes expose continuous controls through their retained field updates. SOLVAX uses an implicit VJP for converged electric closure and exact checkpointing for finite projection and outer iterations. Specialized ALEX B1/B2 and bent-pipe coordinate lanes remain unavailable until their distinct coupled operators pass the same gates. |
 | D-034 | Execute each PR test once and aggregate its evidence | Three duration-balanced shards run concurrently with branch coverage and save run-scoped JUnit/coverage caches. A report-only job enforces the repository threshold; release reuses the same workflow in parallel with docs and external validation. This preserves fail-closed evidence while targeting a sub-10-minute critical path. |
 | D-035 | Lead with differentiable inductionless blanket-design physics, not general CFD breadth | ParaStell owns parametric stellarator CAD/neutronics, NekRS owns exascale high-order CFD, and FreeMHD owns free-surface/multi-region/full-induction development. LMX earns a distinct role through compact high-Hartmann duct/fringe equations, verified bounded-memory derivatives, accelerator design throughput, and matched external evidence. New multiphysics enters through versioned coupling data before it enters the runtime. |
+| D-036 | Keep `lmx.fringing` as the only public 3-D surface and retain private fringing files only by mathematical ownership | Common structured-grid operations, rectangular-duct kernels, cylindrical-pipe kernels, and orchestration have different metrics and change reasons. Private ownership files reduce coupling; test-only proxy solvers and duplicate recurrences do not, so they are removed. |
 
 ## Work log
 
@@ -2440,7 +2441,9 @@ surface, measurements, validation, decision, and next action.
 
 ### 2026-08-28 — fixed-topology geometry design core
 
-- LMX PR 15 merged at `57833cab6bc4904e580cd3df69881a9101ecc621`.
+- LMX PR 15, the bounded design study, merged at
+  `57833cab6bc4904e580cd3df69881a9101ecc621`; geometry-control PR 16 merged at
+  `069732139b3b6c071dd0360ad4a2e1d67cc93ac9`.
   Candidate commits `0dbb684be5af94709162dee09f1b886612c6383d` and
   `eb6994a` add fixed-topology axial-length, transverse-width, and
   transverse-height controls to the same production rectangular/layered 3-D
@@ -2504,3 +2507,61 @@ surface, measurements, validation, decision, and next action.
   straight/mapped-pipe production operators behind a fixed-work differentiable
   core with independent primal, finite-difference, JVP/VJP, runtime, and memory
   gates. GPU and production B1/B2 claims remain explicitly open.
+
+### 2026-08-28 — differentiable straight-pipe core and fringing trim
+
+- Candidate commits `40185cf`, `4c4da00`, and `3def842` put the generic
+  straight-pipe solve and `evolve_extruded_fields` on one cylindrical
+  recurrence. It accepts pressure forcing, three station-wise magnetic-field
+  scales, fluid/wall conductivity, and axial/radial fixed-topology geometry.
+  The public surface remains `lmx.fringing`; `_fringing_pipe.py` owns the
+  cylindrical metrics and kernels rather than forming a second user API.
+- Removed the test-only pipe face-flux and fixed-flow projection proxies and
+  their duplicate tests. They had no production caller and repeated behavior
+  already gated through the retained solve. Conducting-annulus, conservative
+  current, matrix-free potential, pressure projection, fixed-flow, variable
+  field, bent-pipe, B1, and production/field-core parity tests remain. The
+  tranche changes 751 lines and removes 797, so the new derivative capability
+  is a net source reduction.
+- On a three-station, three-fluid-ring/eight-sector pipe with one conducting
+  wall ring, all 11 final production fields agree with the differentiable core
+  to `1.79e-18` maximum absolute error. The eight-control gradient has
+  `2.74609e-7` relative L2 error against centered differences; JVP and reverse
+  contraction differ by `2.53e-18`, and the wall-conductivity derivative is
+  nonzero. Exact checkpointing uses 751,296 compiled temporary bytes versus
+  914,624 for the full tape, a 17.86% reduction. Warm CPU value-and-gradient
+  median is 2.05 ms on Python 3.11/JAX 0.9.2.
+- The exact source passed 508 tests in 166.7 seconds on macOS 14.4.1 arm64,
+  Python 3.11.14, JAX/JAXLIB 0.9.2, SOLVAX 0.18.0, and the CPU backend, with
+  95.32% combined branch coverage. Coverage and JUnit SHA-256 digests are
+  `8777530303e95ccfe697e0818cde3e5a87f79af853b3401694535a6b8678c30e`
+  and `eba96eb7ecacf7e265c8331294e86f9ba2399d31b2714ff41a93a8be5ca9e63b`.
+  A complete Python 3.13.9/JAX 0.11.1 run passed all 508 tests in 117.8 seconds;
+  its JUnit digest is
+  `31c9cfcdb8bdcdbde0b91ce499bc74caa5fef76b989a5f37b7b13a553be3ac87`.
+- The minimum Python 3.10.21/JAX 0.6.2/SOLVAX 0.18.0 Docker environment passed
+  all retained tests in the support, fringing, and physics ownership shards.
+  The constrained local Docker VM required one worker to avoid worker OOM, so
+  no misleading combined wall-time claim is made; the shipped test inventory,
+  including all eight FreeMHD snapshot gates, passed.
+- Ruff check/format, architecture/prose/import checks, Sphinx HTML and external
+  links with warnings as errors, isolated build, Twine, distribution
+  inspection, CLI, and a fresh non-editable-wheel eight-control JIT gradient
+  smoke passed. The 150,564-byte wheel and 142,664-byte sdist SHA-256 digests
+  are `8556c5138dc28d7976bf9dabc500d81c153828673f3815c71b61ce21983855e5`
+  and `dd4152ed7415cd15bd6cfce224f14f29eca60f4dd97bd35670100830fcc9f4db`.
+- Compactness is 16 modules, 6,009 maintained-core lines, 15,435 package lines,
+  13 test files, 12,007 test lines, 28 root exports, seven examples, and
+  1,782,519 tracked checkout bytes. The package and test ceilings tightened to
+  15,440 and 12,010 lines, respectively; merged main used 15,476 and 12,046.
+- A clean pinned FreeMHD Docker execution passed contract, artifact, execution,
+  observation, comparison, and schema checks with pressure L-infinity/RMS
+  discrepancies `0.0109172`/`0.00451798`. Report and external-record SHA-256
+  digests are `c2d07ff8df95da5f32b11c5d2fb8afc404e674555049701e78bf10855dd97d4f`
+  and `69450b3ad3b5b9fb145d978206d57dc76deeddc2d737ea874162e14da4f8cc50`.
+  `acceptance_pass=false` remains correct because the two-update smoke cannot
+  establish production-resolution B2 validation.
+- Next action: merge this locally evidenced tranche, then differentiate the
+  retained bent-pipe coordinate map, establish matched production B1/B2
+  refinement evidence, and obtain one-/two-A4000 primal, gradient, memory, and
+  strong-scaling measurements. No GPU or production B1/B2 claim is made yet.
