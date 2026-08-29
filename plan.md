@@ -3672,3 +3672,17 @@ surface, measurements, validation, decision, and next action.
   bytes and the sdist is 139,353 bytes, with SHA-256 digests
   `e1eb75bc59c4f397ffbcc758b2a34ac60117d60978c9e9240e88bfccc2dc7c15`
   and `0ca7ff9a99571aca6e90c7cc45bfb2a26f933935d6fe8bb02d6ea51f0a8c3482`.
+- Committed the immutable source candidate as `ca686a9` and repeated the pinned
+  Docker comparison against FreeMHD `14b54a3` and image
+  `sha256:535e995d557d2a73f5ab997380cb47ee3b044af8d2871bdadd570cff4cf175a8`.
+  Contract, artifacts, execution, independent observation, comparison, and
+  schema pass with zero failed checks. Pressure L-infinity/RMS differences are
+  `0.006838504934991994`/`0.0030649109539924494`, bit-for-bit unchanged from
+  the prior source candidate because this tranche does not alter the B2 map.
+  Report and record SHA-256 digests are
+  `032e7c6f970f3bf72a24bc6f6988841c8a18bba6bb3a75b16e1f7fd9ccab54db`
+  and `59b1f25fa269a0ccac82c0befaee02dcccd96a545a81b26635a6909d52be1437`.
+  `acceptance_pass=false` remains correct for the smoke-only role. Next action:
+  merge this generic sharding tranche, then resume terminal ALEX convergence,
+  specialized derivative gates, and real one-/two-GPU timing when the office
+  host is reachable.
