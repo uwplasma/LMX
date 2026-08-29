@@ -969,8 +969,8 @@ purpose.
 - [ ] Finish the function-level ownership and necessity audit. The initial passes
   removed rejected solver lanes, decomposed the 3-D monolith, and deleted
   non-production private testbeds, but the committed fringing implementation
-  still contains 6,019 lines: 1,718 lines in the public `lmx.fringing`
-  orchestration/API layer and 4,301 lines in three private numerical owners.
+  currently contains 6,005 lines: 1,724 lines in the public `lmx.fringing`
+  orchestration/API layer and 4,281 lines in three private numerical owners.
   Keep
   `lmx.fringing` as the only public surface while removing unreachable helpers,
   duplicate recurrences, redundant materialization, and reusable algebra that
@@ -1179,6 +1179,7 @@ artifacts or release assets, not committed files.
 | D-044 | Retain depth-two Anderson for B2 until a safeguard improves both early and late evidence | The corrected raw and fixed-two maps are stable and smoother late, but neither improves physical defect over Anderson early or late. A one-step growth fallback amplifies alternating spikes. Replace acceleration only with a restart-exact method that wins defect, update, runtime, and memory together. |
 | D-045 | Stop the primal-only B2 pressure correction at `1e-10` while retaining volume-scaled balance checks | On the production coarse state this cuts pressure PCG work by about one quarter while leaving the state update and momentum-defect trajectory unchanged at reported precision. The resulting `2e-5`--`7e-5` divergence remains below five percent of the independent `1e-3` balance gate. Generic traced paths retain roundoff-level primal solves for implicit-derivative consistency. |
 | D-046 | Add the local electromagnetic reaction to the B2 predictor as a fixed-point-neutral pseudo-mass | The term $R_B=\sigma|\boldsymbol B|^2$ is added to the implicit momentum diagonal and the identical $R_B\boldsymbol u^n$ term to the right-hand side, so it cancels at a fixed point while improving the predictor and pressure mobility. The retained operation order is deliberate: reassociating the terms changes the finite-precision nonlinear trajectory materially. Dense operator, autodiff, restart, and production-continuation gates protect the contract. |
+| D-047 | Shard the generic differentiable 3-D production fields and replicate only global coarse solves | Axial `NamedSharding` constraints must remain inside the traced program rather than staging design-dependent fields through NumPy. Rectangular, layered, and straight-pipe primal fields compose with reverse mode over the same recurrence; global axial/transverse coarse solves are explicitly replicated and their corrections repartitioned. Specialized ALEX B1 stays single-device until its cylindrical production operators pass an independent sharding gate. |
 
 ## Work log
 
@@ -3633,3 +3634,55 @@ surface, measurements, validation, decision, and next action.
   convergence of the generic and ALEX B1/B2 paths rather than deleting private
   files by name. Terminal B2 convergence and specialized derivatives remain
   open evidence gates.
+
+### 2026-08-29 — shard the generic differentiable 3-D field core
+
+- Rejected refreshing electric closure and Lorentz force inside both B2
+  pressure--momentum correctors. From the checksummed step-64 state, eight
+  updates took `162.18` seconds and ended at momentum defect `0.19317161`,
+  versus `131.49` seconds and `0.19313568` for the retained pseudo-mass map.
+  The trial was 23.3% slower and slightly worse in physical defect, so no
+  source, option, or test lane remains from it.
+- Decision D-047 removes the host NumPy staging boundary from generic 3-D
+  sharding and exposes `num_devices` on `evolve_extruded_fields`. Rectangular,
+  layered, and straight-pipe fields now retain axial `NamedSharding` through
+  the same finite recurrence used by reverse mode. The small axial and
+  transverse coarse preconditioners are replicated explicitly and their
+  corrections repartitioned; full 3-D state is not replicated. ALEX B1 remains
+  fail-closed for multiple devices until its specialized cylindrical map has
+  independent evidence.
+- A forced two-CPU-device process verifies all three generic geometry families
+  against one-device fields and confirms two local axial shards. The largest
+  field discrepancy is `3.79e-11` for the layered coarse solve; rectangular
+  and pipe differences are at roundoff. A jitted value-and-gradient comparison
+  agrees within `2.65e-23`, and the public non-differentiable solve also retains
+  two shards. The gate costs 23.8 seconds while running inside the ordinary
+  parallel suite, not in a slower optional lane.
+- The complete six-worker local gate passes all 501 tests in 163.49 seconds
+  (165.2 seconds end to end) with 95.41% combined line/branch coverage.
+  Coverage and JUnit SHA-256 digests are
+  `a033ac0d21fc01c2047fdac0729836b466bd03835d0997961c902c7f7d1a7b70`
+  and `f1f4858944092240a868c6999866fc4a4c6eb52ee0a700bedf248aa03782cc7d`.
+  Ruff, formatting, byte compilation, architecture/import budgets, Sphinx HTML
+  and external links with warnings as errors, isolated build, Twine,
+  distribution inspection, and clean-wheel primal/gradient smoke pass.
+- The retained fringing implementation is 6,005 lines across the public owner
+  and three private mathematical owners, below the prior 6,019-line planning
+  baseline. Total package source is 14,807 audit lines. The wheel is 146,566
+  bytes and the sdist is 139,353 bytes, with SHA-256 digests
+  `e1eb75bc59c4f397ffbcc758b2a34ac60117d60978c9e9240e88bfccc2dc7c15`
+  and `0ca7ff9a99571aca6e90c7cc45bfb2a26f933935d6fe8bb02d6ea51f0a8c3482`.
+- Committed the immutable source candidate as `ca686a9` and repeated the pinned
+  Docker comparison against FreeMHD `14b54a3` and image
+  `sha256:535e995d557d2a73f5ab997380cb47ee3b044af8d2871bdadd570cff4cf175a8`.
+  Contract, artifacts, execution, independent observation, comparison, and
+  schema pass with zero failed checks. Pressure L-infinity/RMS differences are
+  `0.006838504934991994`/`0.0030649109539924494`, bit-for-bit unchanged from
+  the prior source candidate because this tranche does not alter the B2 map.
+  Report and record SHA-256 digests are
+  `032e7c6f970f3bf72a24bc6f6988841c8a18bba6bb3a75b16e1f7fd9ccab54db`
+  and `59b1f25fa269a0ccac82c0befaee02dcccd96a545a81b26635a6909d52be1437`.
+  `acceptance_pass=false` remains correct for the smoke-only role. Next action:
+  merge this generic sharding tranche, then resume terminal ALEX convergence,
+  specialized derivative gates, and real one-/two-GPU timing when the office
+  host is reachable.

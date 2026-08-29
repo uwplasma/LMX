@@ -101,7 +101,11 @@ The material coefficients are ``(fluid, solid)`` multipliers, so a layered
 case exposes wall conductance without rebuilding its mesh or region topology.
 `jax.vmap` and bounded `jax.lax.map` compose directly, so LMX needs no ensemble
 API. Choose the chunk size from measured accelerator memory; each row retains
-its own exact production derivative.
+its own exact production derivative. For spatial parallelism, pass
+`num_devices` to `evolve_extruded_fields`; generic rectangular, layered, and
+straight-pipe fields shard an evenly divisible axial mesh, including inside
+`jax.value_and_grad`. Small global coarse solves remain replicated while the
+full 3-D state stays partitioned. Specialized ALEX B1 sharding remains gated.
 Geometry, material layout, step count, and checkpoint width are static. Choose
 the case timestep for the largest field and conductivity scales in the design
 domain so every differentiated evaluation uses the same stable recurrence.
