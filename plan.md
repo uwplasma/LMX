@@ -3066,3 +3066,37 @@ surface, measurements, validation, decision, and next action.
   convergence study before considering deeper history or a coupled steady
   root solve. Keep specialized B2 differentiation unavailable until the primal
   balance and convergence contracts pass.
+
+### 2026-08-29 — localize the B2 momentum defect and reject an inconsistent preconditioner
+
+- A term-by-term audit of the accepted 101x65x65 coarse B2 recurrence finds no
+  hidden Anderson singularity or stationwise flow correction large enough to
+  explain the plateau. At step 3 the largest normalized axial residual is
+  `3.2047` at the inlet and an interior maximum of `2.204895` remains near the
+  downstream wall. The interior contributions are approximately zero
+  convection, `2.20591` negative-diffusion action, zero explicit stress, zero
+  Lorentz force, and `-0.001013` pressure action. The fixed-flow cell
+  correction is confined to the inlet at this precision; it is about
+  `1e-14` at the penultimate station.
+- Doubling the physical pseudo-step from the magnetic stability value worsens
+  the step-32 update to `0.0051469` and the momentum defect to `5.9913`, so the
+  magnetic bound is active. A controlled reaction-stabilized trial used the
+  same B1-style fixed-point identity, a `0.01` pseudo-step, and no changed
+  physics gate. It reached a step-32 update of `0.0390474103` and a momentum
+  defect of `46.4474689`; every experimental source edit was then removed.
+  The trial changed the momentum inverse without changing the pressure Schur
+  mobility, so it is evidence against that inconsistent split, not against a
+  compatible steady or pseudo-transient method.
+- The remaining numerical task is a compatible coupled root solve: momentum,
+  pressure constraint, conservative mass flux, potential, and Lorentz force
+  must share one residual and one deliberately matched preconditioner. LMX
+  will not add another general nonlinear solver. SOLVAX 0.18 already owns
+  matrix-free pseudo-transient Newton--Krylov with a positive mass metric,
+  consistent shifted preconditioner, globalization, finite work limits, and
+  implicit-root differentiation. The next gate is a reduced B2 proof that
+  composes this API, compares the converged discrete residual and memory with
+  the retained recurrence, and fails closed before any production switch.
+- No source, test, or runtime lane was retained from this investigation. The
+  existing underscore modules remain private geometry/operator owners behind
+  `lmx.fringing`; numerical globalization and Krylov policy remain SOLVAX
+  responsibilities.
