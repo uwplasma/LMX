@@ -331,6 +331,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     progress = []
     solution = solve_extruded_inductionless(
         replace(problem, case=case, profile=profile),
+        num_devices=1,
         progress_callback=progress.append,
         checkpoint_interval=1,
     )
@@ -398,6 +399,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     resumed = solve_extruded_inductionless(
         continuation_problem,
         initial_bundle=restart.bundle,
+        num_devices=1,
     )
     assert restart.metadata["restart_schema"] == "extruded_anderson_v1"
     for name in (

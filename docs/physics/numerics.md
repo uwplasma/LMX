@@ -12,10 +12,12 @@ projection, enforces the prescribed flow constraint when present, and resolves
 electric current closure. Gauge constraints remove the constant nullspace of
 pressure and electric potential.
 
-The production B2 fixed-point residual uses the prescribed mean flow velocity
-and induced-potential scale to balance its velocity and electric blocks before
-Anderson mixing. Numerical safety limits are guardrails, not state scales, and
-therefore do not enter the residual norm.
+The production B2 accelerator acts only on the three mechanical velocity
+components and their conservative compact face fluxes. One electric solve then
+closes the accepted velocity before current, Lorentz force, charge balance, and
+momentum defect are evaluated. This keeps every diagnostic and restart field on
+the same accepted state, avoids a second electric solve, and removes electric
+potential from the acceleration history.
 
 B2 couples momentum and pressure with a conservative SIMPLE-style correction.
 For each frozen Lorentz field, two pressure--momentum correctors apply
@@ -32,8 +34,9 @@ momentum predictor. The pressure operator and reconstructed face flux use the
 same distance-weighted harmonic interpolation on nonuniform cells. The fixed
 pressure relaxation stabilizes the segregated correction without adding a
 second field history, and two correctors give the selected production balance
-between physical defect reduction and runtime. Electric closure and Lorentz
-reconstruction then use the corrected conservative velocity. This follows the
+between physical defect reduction and runtime. Mechanical acceleration is
+applied after those correctors; electric closure and Lorentz reconstruction
+then use the accepted conservative velocity. This follows the
 pressure-correction structure of SIMPLE and its consistent refinements while
 retaining LMX's MHD-specific residual and boundary contracts.
 

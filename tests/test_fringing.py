@@ -272,11 +272,10 @@ def test_extruded_histories_are_terminal_strided_and_restartable():
         use_b2=False,
         velocity=zeros,
         velocity_scale=0.75,
-        potential_scale=1.0,
         forcing=1.0,
     )
     assert restored[5] == 4
-    assert restored[-2][:, 0, 0, 0].tolist() == [0.75, 0.75, 0.75, 1.0]
+    assert restored[-2][:, 0, 0, 0].tolist() == [0.75, 0.75, 0.75]
 
 
 def _with_analytic_field(problem, *, name, field_fn):

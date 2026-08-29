@@ -3731,3 +3731,63 @@ surface, measurements, validation, decision, and next action.
   accelerator state and is the next candidate for both convergence and code/
   memory trimming. The office GPU endpoint timed out again, so no GPU claim is
   added.
+
+### 2026-08-29 — close electric current on the accepted B2 state
+
+- Decision D-048 makes the B2 fixed-point accelerator purely mechanical. The
+  pressure--momentum map returns corrected velocity, pressure, and compact
+  conservative face fluxes; depth-two Anderson or Aitken then accepts velocity
+  and flux; one electric solve closes that accepted velocity. Current, Lorentz
+  force, charge balance, momentum defect, update history, checkpoints, and the
+  returned fields now describe exactly the same state. No second electric
+  solve or electric-potential accelerator history is retained.
+- Restart accelerator fields fall from four 3-D components to three. Exact
+  reduced-case restart equivalence passes, and the production 101x65x65
+  step-16 and step-32 restart files are 55 MiB rather than the prior 63 MiB
+  Anderson artifact. The step-32 artifact has SHA-256
+  `7bd19f6812f414b438589fb93b0d0f2991f4e055ac45d9bc92d86116c4990f22`.
+- On the canonical 12-step B2 case, the accepted-state method takes 107.75
+  seconds and reaches momentum defect `0.32724041`, accepted update
+  `0.06554252`, divergence `7.35e-5`, and charge residual `2.33e-4`. The
+  previous mixed-potential state reached defect `0.34404766` in 107.9 seconds,
+  so the consistent closure improves the early physical defect by about 4.9%
+  at unchanged runtime. A fresh continuation reaches defect `0.26976903` at
+  step 16 and then decreases monotonically from `0.25759419` to `0.22754770`
+  over steps 17--32 while charge remains `2.45e-4`. The accepted update still
+  oscillates, so terminal B2 convergence and specialized B2 derivatives remain
+  open; no production claim is promoted.
+- The user-facing surface remains only `lmx.fringing`. Its three underscore
+  modules are live private mathematical owners for shared mapped operators,
+  rectangular/B2 operators, and cylindrical operators—not additional APIs or
+  legacy copies. They remain subject to line and ownership budgets: generic
+  solver algebra moves to SOLVAX when it can be geometry-independent, and LMX
+  retains geometry metrics, boundary equations, MHD coupling, and physical
+  acceptance. Deleting the filenames by concatenating their 4,288 lines into
+  the 1,716-line public module would not trim code and would create a 6,004-line
+  mega-module. The next trim therefore removes repeated recurrences and direct
+  private-test coupling first, then fuses a private owner only if its remaining
+  mathematical boundary no longer earns a file.
+- The complete six-worker local gate passes all 501 tests in 169.47 seconds
+  (170.8 seconds end to end) with 95.27% combined line/branch coverage on
+  Python 3.11.14, JAX/JAXLIB 0.9.2, and SOLVAX 0.18.0. Coverage and JUnit
+  SHA-256 digests are
+  `d1aef698fc7029ba16073083277eebb914bd478e6942018668c9d2922f977edb`
+  and `5cbe5a7d25302da3853124b320430d2edd5a5ce55bfb8a917735832bef4748cb`.
+  Ruff, formatting, byte compilation, architecture/import budgets, all seven
+  curated workflows, Sphinx HTML and external links with warnings as errors,
+  isolated build, Twine, distribution inspection, and clean-wheel primal and
+  gradient smoke pass. The wheel is 146,369 bytes and the sdist is 139,151
+  bytes, with SHA-256 digests
+  `db04d3d8d659781dc1fc188657dad7ff699ba5234a6a29dadfa351ba46f60a29`
+  and `a0ceb9af7c9113235d814d6dfe334a2c32b7bab4ae8da72a87fa21ce2bcdac50`.
+- The first pinned external-smoke attempt exposed two stale explicit JIT
+  sharding arities after the four-to-three-field reduction. Both input and
+  output contracts are corrected, and the ordinary reduced B2 physics/restart
+  test now executes with `num_devices=1`, so the sharded B2 path is covered on
+  every local gate rather than only by the Docker integration.
+- Package source is 14,796 audit lines across 15 modules; fringing source is
+  6,004 lines and this tranche removes four net fringing lines while correcting
+  the accepted-state algorithm. Next action: commit the immutable candidate,
+  repeat the pinned FreeMHD Docker smoke, merge locally, then start the
+  recurrence/private-test-coupling trim without removing 3-D, B1/B2, pipe,
+  layered-wall, restart, sharding, or differentiation capability.
