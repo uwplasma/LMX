@@ -9,7 +9,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from .mesh import StructuredMesh
-from .specs import EXTRUDED_HISTORY_WIDTHS, Diagnostics, MHDState, Solution
+from .specs import EXTRUDED_HISTORY_WIDTHS, EXTRUDED_RESULT_FIELDS, Diagnostics, MHDState, Solution
 from .validation import extract_midplane_profile
 
 _DIAGNOSTIC_FIELDS = tuple(item.name for item in fields(Diagnostics))
@@ -29,10 +29,7 @@ _B2_ANDERSON_FIELDS = (
     "anderson_mapped_flux",
     "anderson_mapped_inlet",
 )
-_EXTRUDED_ARRAY_FIELDS = """x y z field_scale u v w p phi jx jy jz lorentz_x lorentz_y lorentz_z
-residual volumetric_flow_rate mean_velocity axial_current wall_current_leakage current_scaled_pressure_proxy
-charge_balance_residual boundary_current_residual""".split()
-_EXTRUDED_FIELD_NAMES = tuple(_EXTRUDED_ARRAY_FIELDS[4:15])
+_EXTRUDED_FIELD_NAMES = EXTRUDED_RESULT_FIELDS[4:15]
 
 
 def _portable_path(path: str | Path, *, relative_to: str | Path | None = None) -> str:
@@ -254,13 +251,7 @@ def write_extruded_solution_npz(solution, case, path: str | Path) -> Path:
     np.savez_compressed(
         path,
         metadata_json=json.dumps(metadata),
-        **{name: np.asarray(getattr(bundle, name)) for name in _EXTRUDED_ARRAY_FIELDS},
-        axial_pressure_loss_gradient=np.asarray(
-            getattr(bundle, "axial_pressure_loss_gradient", np.zeros_like(bundle.x))
-        ),
-        transverse_pressure_difference=np.asarray(
-            getattr(bundle, "transverse_pressure_difference", np.zeros_like(bundle.x))
-        ),
+        **{name: np.asarray(getattr(bundle, name)) for name in EXTRUDED_RESULT_FIELDS},
         validation_station_count=np.asarray(validation.station_count),
         validation_max_residual=np.asarray(validation.max_residual),
         validation_max_charge_balance_residual=np.asarray(validation.max_charge_balance_residual),
@@ -356,7 +347,7 @@ def write_extruded_bundle_restart_npz(
         path,
         metadata_json=json.dumps(metadata),
         station_history_json=json.dumps(station_history),
-        **{name: np.asarray(getattr(bundle, name)) for name in _EXTRUDED_ARRAY_FIELDS},
+        **{name: np.asarray(getattr(bundle, name)) for name in EXTRUDED_RESULT_FIELDS},
         rho_phi_plus=np.asarray(rho_phi_plus) if has_compact_flux else np.zeros(0),
         rho_phi_inlet=np.asarray(rho_phi_inlet) if has_compact_flux else np.zeros(0),
         aitken_residual=np.asarray(aitken_state[0])
@@ -365,12 +356,6 @@ def write_extruded_bundle_restart_npz(
         aitken_relaxation=np.asarray(aitken_state[1] if aitken_state is not None else 1.0),
         steady_streak=np.asarray(aitken_state[2] if aitken_state is not None else stopping_state[1]),
         **dict(zip(_B2_ANDERSON_FIELDS, anderson_arrays, strict=True)),
-        axial_pressure_loss_gradient=np.asarray(
-            getattr(bundle, "axial_pressure_loss_gradient", np.zeros_like(bundle.x))
-        ),
-        transverse_pressure_difference=np.asarray(
-            getattr(bundle, "transverse_pressure_difference", np.zeros_like(bundle.x))
-        ),
         **{
             name: np.asarray(getattr(bundle, name, np.zeros((0, width)) if width else np.zeros(0)))
             for name, width in EXTRUDED_HISTORY_WIDTHS
@@ -507,7 +492,7 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
         ):
             raise ValueError("B2 Anderson restart state has inconsistent shape")
         bundle = ExtrudedFieldBundle(
-            **{name: jnp.asarray(data[name]) for name in _EXTRUDED_ARRAY_FIELDS},
+            **{name: jnp.asarray(data[name]) for name in EXTRUDED_RESULT_FIELDS},
             rho_phi_plus=jnp.asarray(data["rho_phi_plus"]) if has_plus else None,
             rho_phi_inlet=jnp.asarray(data["rho_phi_inlet"]) if has_inlet else None,
             aitken_state=(
@@ -527,12 +512,6 @@ def load_extruded_restart_bundle(path: str | Path) -> ExtrudedRestartBundle:
             ),
             geometry_kind=str(metadata.get("geometry_kind", "unknown")),
             solver_kind=str(metadata.get("solver_kind", "extruded_inductionless")),
-            axial_pressure_loss_gradient=jnp.asarray(
-                _load_optional_array(data, "axial_pressure_loss_gradient")
-            ),
-            transverse_pressure_difference=jnp.asarray(
-                _load_optional_array(data, "transverse_pressure_difference")
-            ),
             **histories,
         )
         for field, _ in diagnostic_fields:
