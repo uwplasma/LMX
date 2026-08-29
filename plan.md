@@ -965,7 +965,15 @@ purpose.
 
 ### Phase 4 — simplify and optimize the supported solver
 
-- [x] Review every supported source function for ownership and necessity.
+- [ ] Finish the function-level ownership and necessity audit. The first pass
+  removed rejected solver lanes and decomposed the 3-D monolith, but the live
+  fringing implementation still contains 7,087 lines and one 1,662-line
+  orchestration function. Keep `lmx.fringing` as the only public surface while
+  removing test-only helpers and duplicate recurrences; no private owner may
+  remain merely because the monolith was split. Reduce the largest private
+  module below 1,500 lines, target 1,200, and split functions by physical phase
+  until no production solve is one monolithic function. Do not increase the
+  private-file count to meet a line-length metric.
 - [x] Reuse coefficients, factors, preconditioners, and initial guesses.
 - [x] Make full histories opt-in and remove plot-only work from solves.
 - [x] Consolidate JIT boundaries and eliminate hot-path host transfers.

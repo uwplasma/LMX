@@ -25,7 +25,6 @@ from lmx._fringing_common import (
     _shard_extruded_fields,
     _spacing_vector,
     _thin_wall_interface_mean,
-    _variable_coefficient_residual_3d,
 )
 from lmx._fringing_duct import (
     _conservative_current_diagnostics_3d,
@@ -528,14 +527,17 @@ def test_nonuniform_variable_poisson_reconstructs_discrete_manufactured_field():
         + (fz[:, :, 1:] - fz[:, :, :-1]) / jnp.diff(z_faces)[None, None, :]
     )
     assert current_divergence[:, 1:-1, 1:-1] == pytest.approx(0.0, abs=1.0e-12)
-    rhs = _variable_coefficient_residual_3d(
-        manufactured,
-        jnp.zeros_like(manufactured),
-        conductivity,
-        dx=0.4,
-        dy=jnp.diff(y_faces),
-        dz=jnp.diff(z_faces),
-    )
+
+    def manufactured_rhs(coefficient):
+        neighbors = common_impl._neighbor_fields(
+            manufactured, mode_x="neumann", mode_y="neumann", mode_z="neumann"
+        )
+        coefficients = common_impl._variable_diffusion_coefficients_3d(
+            coefficient, dx=0.4, dy=jnp.diff(y_faces), dz=jnp.diff(z_faces)
+        )
+        return sum(c * (neighbor - manufactured) for c, neighbor in zip(coefficients, neighbors))
+
+    rhs = manufactured_rhs(conductivity)
     expected = manufactured - jnp.mean(manufactured)
     solved_result = _solvax_pressure_poisson_duct(
         rhs,
@@ -564,14 +566,7 @@ def test_nonuniform_variable_poisson_reconstructs_discrete_manufactured_field():
     assert float(solvax_local_residual) < 1.0e-8
     assert float(jnp.max(jnp.abs(solvax_solved - expected))) < 1.0e-8
 
-    projection_rhs = _variable_coefficient_residual_3d(
-        manufactured,
-        jnp.zeros_like(manufactured),
-        jnp.ones_like(manufactured),
-        dx=0.4,
-        dy=jnp.diff(y_faces),
-        dz=jnp.diff(z_faces),
-    )
+    projection_rhs = manufactured_rhs(jnp.ones_like(manufactured))
     projection = _projection_pressure_correction_3d(
         projection_rhs,
         dx=0.4,
@@ -1648,13 +1643,11 @@ def test_pipe_face_gradient_divergence_is_compatible_symmetric_and_jittable():
 
 @pytest.mark.timeout(300)
 def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow():
-    nx, nr, ntheta = 5, 3, 8
-    r_faces = jnp.asarray([0.0, 0.2, 0.55, 1.0])
+    nx, nr, ntheta = 3, 2, 4
+    r_faces = jnp.asarray([0.0, 0.4, 1.0])
     r_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
     dtheta = 2.0 * jnp.pi / ntheta
-    # This tiny manufactured system reaches the normalized physical gates
-    # within 32 steps; a larger budget only lengthens routine coverage runs.
-    inner_iterations = 32
+    inner_iterations = 24
     shape = (nx, nr, ntheta)
     x = jnp.linspace(-1.0, 1.0, nx)[:, None, None]
     radius = r_centers[None, :, None]
@@ -1683,11 +1676,11 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow():
 
     unit_response = inverse(jnp.ones(shape))
 
-    def steady_project(**kwargs):
+    def steady_project(scale=1.0, **kwargs):
         return _steady_stokes_projection_pipe(
-            inverse(u),
-            inverse(v),
-            inverse(w),
+            inverse(scale * u),
+            inverse(scale * v),
+            inverse(scale * w),
             jnp.ones(shape),
             unit_response,
             cell_area,
@@ -1698,23 +1691,32 @@ def test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow():
             r_centers=r_centers,
             dtheta=dtheta,
             pressure_iterations=inner_iterations,
-            pressure_tolerance=1.0e-9,
-            restart=24,
+            pressure_tolerance=1.0e-10,
+            restart=12,
             max_restarts=3,
             apply_momentum_inverse_components=lambda forces: jnp.stack(
                 tuple(inverse(force) for force in forces)
             ),
-            physical_tolerance=1.0e-7,
+            physical_tolerance=1.0e-9,
             **kwargs,
         )
 
     steady_result = steady_project()
-    assert steady_result[-3] < 1.0e-7
+    assert steady_result[-3] < 1.0e-9
     cross_section_area = jnp.mean(jnp.sum(cell_area, axis=(1, 2)))
-    assert steady_result[-2] / cross_section_area < 1.0e-7
+    assert steady_result[-2] / cross_section_area < 1.0e-9
     assert steady_result[-1].converged
-    assert steady_result[-1].residual_norm < 1.0e-7
-    assert bool(steady_result[-1].converged)
+    assert steady_result[-1].residual_norm < 1.0e-9
+
+    def projected_energy(scale):
+        return jnp.mean(steady_project(scale)[0] ** 2)
+
+    projected_energy = jax.jit(projected_energy)
+    epsilon = 1.0e-3
+    gradient = jax.grad(projected_energy)(1.0)
+    finite_difference = (projected_energy(1.0 + epsilon) - projected_energy(1.0 - epsilon)) / (2 * epsilon)
+    assert gradient == pytest.approx(finite_difference, rel=1.0e-3, abs=1.0e-8)
+    assert jax.jvp(projected_energy, (1.0,), (0.37,))[1] == pytest.approx(0.37 * gradient, rel=1.0e-7)
     with pytest.raises(ValueError, match="retained-modal coefficients"):
         steady_project(modal_stabilization=True)
 
