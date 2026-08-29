@@ -15,7 +15,6 @@ from lmx.mesh import (
     face_average_x,
     face_average_z,
     face_divergence,
-    generate_bent_pipe_mesh,
     generate_layered_duct_mesh,
     generate_layered_duct_mesh_from_fluid_faces,
     generate_multilayer_duct_mesh,
@@ -138,17 +137,6 @@ def test_pipe_ogrid_rejects_inconsistent_wall_request(wall_thickness, wall_cells
 def test_pipe_ogrid_rejects_nonpositive_domain_or_resolution(kwargs):
     with pytest.raises(ValueError, match="positive"):
         generate_pipe_ogrid_mesh(**kwargs)
-
-
-def test_bent_pipe_points_follow_curved_centerline():
-    mesh = generate_bent_pipe_mesh(tube_radius=0.2, bend_radius=1.0, bend_angle=1.0, nx=4, nr=4, ntheta=8)
-    assert mesh.point_coordinates is not None
-    start = mesh.point_coordinates[0, 0, 0]
-    end = mesh.point_coordinates[-1, 0, 0]
-    assert float(start[0]) == pytest.approx(0.0)
-    assert float(start[1]) == pytest.approx(0.0)
-    assert float(end[0]) > 0.0
-    assert float(end[1]) > 0.0
 
 
 def test_moderate_ha_rect_mesh_clusters_boundary_layers():

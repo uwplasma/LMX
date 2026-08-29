@@ -12,7 +12,7 @@ validation result.
 | Rectangular 3-D fringe | manufactured operators, projection, restart, refinement, FreeMHD B2 | active validation; each artifact states the gates it passes |
 | Straight-pipe 3-D fringe | production-field and derivative parity, mapped operators, fixed flow, annular current, Benchmark B1 data | differentiable generic core accepted; external production validation requires the complete matched gate |
 | Periodic Q2D | analytical decay, energy identity, spectral incompressibility, spatial refinement, CPU/GPU parity | verified for the documented SM82 model and numerical gates |
-| Bent pipe and magnetic obstacle | mapped/conservation tests and internal observables | development applications, not externally validated benchmarks |
+| Magnetic obstacle | divergence-free field sampling, conservation, symmetry, and bounded-response observables | development application, not an externally validated benchmark |
 
 For 2-D cases, `validation_summary` reports convergence, current continuity,
 gauge, interface, flow, and profile metrics. `hartmann_validation` compares
