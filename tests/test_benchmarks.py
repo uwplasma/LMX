@@ -381,7 +381,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
             continuation_problem,
             initial_bundle=replace(restart.bundle, rho_phi_inlet=None),
         )
-    with pytest.raises(ValueError, match="momentum-defect contract"):
+    with pytest.raises(ValueError, match="momentum-defect history"):
         solve_extruded_inductionless(
             continuation_problem,
             initial_bundle=replace(
