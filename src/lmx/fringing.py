@@ -608,7 +608,7 @@ def solve_extruded_inductionless(
     bundle = _solve_extruded_projection(problem, **projection_kwargs)
     require_finite(
         "3-D fringing solve",
-        **{name: getattr(bundle, name) for name in _EXTRUDED_NUMERICAL_RESULTS if hasattr(bundle, name)},
+        **{name: getattr(bundle, name) for name in _EXTRUDED_NUMERICAL_RESULTS},
     )
     station_history = _bundle_station_history(bundle)
     validation = validate_extruded_inductionless_solution(bundle, station_history=station_history)

@@ -229,14 +229,12 @@ def _solvax_implicit_momentum_duct(
     dz: jnp.ndarray,
     iterations: int,
     tolerance: float,
-    prescribed_inlet: bool = True,
     frozen_setup=None,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Solve one frozen, conservative three-component momentum system.
 
     ``force`` includes explicit deviatoric stresses and body forces.  The inlet
-    is prescribed and the outlet is zero-gradient; ``prescribed_inlet=False``
-    retains the boundary-neutral diffusion limit.  Affine terms stay outside GMRES.
+    is prescribed and the outlet is zero-gradient. Affine terms stay outside GMRES.
     """
 
     shape = velocity.shape
@@ -255,7 +253,6 @@ def _solvax_implicit_momentum_duct(
         boundary_velocity,
         widths,
         dx=dx,
-        prescribed_inlet=prescribed_inlet,
     )
     _, coefficients, diffusion_sink, inlet_sink, weights, _ = setup
     inlet_cells = jnp.arange(shape[0])[:, None, None] == 0
@@ -310,18 +307,13 @@ def _cell_limited_least_squares_gradient_duct(
     field: jnp.ndarray,
     boundary_values: tuple[jnp.ndarray, ...],
     widths: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
-    *,
-    axial_neighbours: tuple[jnp.ndarray, jnp.ndarray] | None = None,
 ) -> tuple[jnp.ndarray, ...]:
-    """Return limited gradients; optional axial neighbours are cell-aligned."""
+    """Return cell-limited least-squares gradients."""
     gradients, neighbours = [], []
     for axis, width in enumerate(widths):
         values = jnp.moveaxis(field, axis, 0)
-        if axis == 0 and axial_neighbours is not None:
-            lo, hi = axial_neighbours
-        else:
-            lo = jnp.concatenate((boundary_values[2 * axis][None], values[:-1]))
-            hi = jnp.concatenate((values[1:], boundary_values[2 * axis + 1][None]))
+        lo = jnp.concatenate((boundary_values[2 * axis][None], values[:-1]))
+        hi = jnp.concatenate((values[1:], boundary_values[2 * axis + 1][None]))
         centers = 0.5 * (width[:-1] + width[1:])
         trailing = (None,) * (values.ndim - 1)
         dm = jnp.concatenate((0.5 * width[:1], centers))[(slice(None), *trailing)]
@@ -354,9 +346,8 @@ def _explicit_deviatoric_stress_duct(
     widths: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
     *,
     gradient: jnp.ndarray | None = None,
-    axial_tractions: tuple[jnp.ndarray, jnp.ndarray] | None = None,
 ) -> jnp.ndarray:
-    """Return limited ``div(mu*dev2(T(grad(U))))``; injections are cell-aligned."""
+    """Return limited ``div(mu*dev2(T(grad(U))))``."""
     if gradient is None:
         gradient = jnp.stack(
             _cell_limited_least_squares_gradient_duct(velocity, boundary_velocity, widths), axis=-2
@@ -370,9 +361,6 @@ def _explicit_deviatoric_stress_duct(
 
     correction = jnp.zeros_like(velocity)
     for axis, width in enumerate(widths):
-        if axis == 0 and axial_tractions is not None:
-            correction += (axial_tractions[1] - axial_tractions[0]) / width[:, None, None, None]
-            continue
         cell_traction = traction(gradient, dynamic_viscosity, axis)
         patch_tractions = []
         for side, index in ((0, 0), (1, -1)):
@@ -441,27 +429,12 @@ def _limited_linear_convection_matrix_action_duct(
     weights,
     boundary_values,
     widths,
-    *,
-    neighbours: tuple[jnp.ndarray, jnp.ndarray] | None = None,
-    axial_fluxes: tuple[jnp.ndarray, jnp.ndarray] | None = None,
-    axial_weights: tuple[jnp.ndarray, jnp.ndarray] | None = None,
 ) -> jnp.ndarray:
-    """Return divergence; optional axial pairs are cell-aligned and indivisible."""
-    supplied = tuple(value is not None for value in (neighbours, axial_fluxes, axial_weights))
-    if any(supplied) and not all(supplied):
-        raise ValueError("neighbours, axial_fluxes, and axial_weights must be supplied together")
+    """Return the limited-linear convection divergence."""
     dx, dy, dz = widths
     volume = dx[:, None, None] * dy[None, :, None] * dz[None, None, :]
     action = jnp.zeros_like(field)
     for axis, (face_flux, weight) in enumerate(zip(rho_phi, weights, strict=True)):
-        if axis == 0 and axial_fluxes is not None:
-            assert neighbours is not None and axial_weights is not None
-            west = axial_weights[0][..., None] * neighbours[0] + (1.0 - axial_weights[0][..., None]) * field
-            east = axial_weights[1][..., None] * field + (1.0 - axial_weights[1][..., None]) * neighbours[1]
-            action += (axial_fluxes[1][..., None] * east - axial_fluxes[0][..., None] * west) / volume[
-                ..., None
-            ]
-            continue
         values = jnp.moveaxis(field, axis, 0)
         weight = jnp.moveaxis(weight, axis, 0)[..., None]
         interpolated = weight * values[:-1] + (1.0 - weight) * values[1:]
@@ -482,7 +455,6 @@ def _frozen_duct_momentum_setup(
     widths,
     *,
     dx,
-    prescribed_inlet=True,
 ):
     """Own frozen diffusion, limiter, and packed velocity/q gradients."""
     q = jnp.sum(velocity**2, axis=-1)
@@ -504,11 +476,7 @@ def _frozen_duct_momentum_setup(
             cells = tuple(cells)
             wall_sink = wall_sink.at[cells].add(dynamic_viscosity[cells] / (0.5 * width[index] ** 2))
     inlet_cells = jnp.arange(density.shape[0])[:, None, None] == 0
-    inlet_sink = (
-        jnp.where(inlet_cells, 2.0 * dynamic_viscosity[0] / dx**2, 0.0)
-        if prescribed_inlet
-        else jnp.zeros_like(density)
-    )
+    inlet_sink = jnp.where(inlet_cells, 2.0 * dynamic_viscosity[0] / dx**2, 0.0)
     weights = _limited_linear_vector_face_weights_duct(
         velocity, rho_phi, boundary_velocity, widths, gradient=tuple(value[..., 3] for value in gradients)
     )
