@@ -1342,6 +1342,29 @@ def test_mixed_face_flux_projection_recovers_coefficients_and_boundary_flow():
     assert jnp.ptp(flow_adjustment[..., 0], axis=(1, 2)) == pytest.approx(0.0)
     assert jnp.sum(projected[0] * 0.25, axis=(1, 2)) == pytest.approx(0.2)
 
+    # The pressure operator and reconstructed face correction must use the
+    # same variable coefficient on a nonuniform mesh.
+    mobility = 0.02 + 0.01 * jnp.arange(16, dtype=float).reshape(shape)
+    nonuniform = _face_flux_pressure_projection_duct(
+        zeros,
+        zeros,
+        zeros,
+        jnp.ones(shape),
+        jnp.ones(shape, dtype=bool),
+        inlet_flow_rate=0.2,
+        momentum_mobility=mobility,
+        dt=0.1,
+        dx=dx,
+        dy=jnp.asarray([0.2, 0.8]),
+        dz=jnp.asarray([0.7, 0.3]),
+        iterations=200,
+        tolerance=1.0e-10,
+    )
+    nfx, nfy, nfz = duct_impl._unpack_duct_mass_flux(jnp.stack(nonuniform[7:10]), nonuniform[10])
+    nonuniform_divergence = jnp.diff(nfx, axis=0) + jnp.diff(nfy, axis=1) + jnp.diff(nfz, axis=2)
+    assert nonuniform[5] < 1.0e-8
+    assert jnp.max(jnp.abs(nonuniform_divergence)) < 1.0e-10
+
 
 def test_face_flux_projection_requires_nonempty_rectangular_fluid_mask():
     empty = jnp.zeros((3, 4, 4), dtype=bool)
