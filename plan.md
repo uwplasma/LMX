@@ -3803,3 +3803,40 @@ surface, measurements, validation, decision, and next action.
   candidate locally, then start the
   recurrence/private-test-coupling trim without removing 3-D, B1/B2, pipe,
   layered-wall, restart, sharding, or differentiation capability.
+
+### 2026-08-29 — remove private fringing solver scaffolding
+
+- Removed the unused injectable `_system_solve` lane from cylindrical
+  diffusion and fused its single-use 48-line proxy into the only owning pipe
+  solve. The resulting function still assembles the mapped cylindrical volume,
+  wall/reaction sink, axial/radial additive line preconditioner, and calls
+  SOLVAX `pcg_linear_solve` with the same primal and transpose tolerances. No
+  geometry, boundary condition, numerical option, public API, or derivative
+  path changes.
+- Fused the single-use cross-duct pressure-tap kernel into its validated owner.
+  The same array-only wall reduction remains sharding-compatible, while the
+  redundant call boundary and misleading second “kernel” owner are gone.
+- This tranche adds 29 source lines and removes 76, a net reduction of 47.
+  Private/public fringing source falls from 6,004 to 5,957 lines;
+  `_fringing_common.py` falls from 1,293 to 1,277 and `_fringing_pipe.py` from
+  1,483 to 1,452. Package source falls from 14,796 to 14,749 audit lines across
+  the same 15 modules. The wheel falls from 146,369 to 146,152 bytes and the
+  sdist from 139,151 to 138,931 bytes.
+- The complete six-worker local gate passes all 501 tests in 178.23 seconds
+  (179.7 seconds end to end) with 95.29% combined line/branch coverage on
+  Python 3.11.14, JAX/JAXLIB 0.9.2, and SOLVAX 0.18.0. Coverage and JUnit
+  SHA-256 digests are
+  `1775b1812079f1623ec1d7c1e450c147f80696b36d6999df75395e936dc36df1`
+  and `353cdc5a10a256d3f63e9489ef3761e232fde442a9fb1a41a9e6c2b1425e04ae`.
+  Ruff, formatting, byte compilation, architecture/import budgets, curated
+  workflows, Sphinx HTML and external links with warnings as errors, isolated
+  build, Twine, distribution inspection, and clean-wheel primal/gradient smoke
+  pass. Distribution SHA-256 digests are
+  `fe5031fde275e67e484e6bf827f591c36c881ce9b119a2d891954996dda5663a`
+  and `714b1f4fafa6bb446d666bc6a690153086beaef96afddd37e7cb791ee43d7b36`.
+- The three underscore modules remain because shared mapped, rectangular, and
+  cylindrical mathematics are still independently live. Their names do not
+  excuse their size: the next pass audits single-consumer B2 runtime assembly,
+  repeated generic duct/pipe recurrences, and private-only test imports. A file
+  will be deleted when that work leaves no coherent mathematical owner, not by
+  concatenating unchanged code into `fringing.py`.

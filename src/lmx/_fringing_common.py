@@ -707,22 +707,6 @@ def _cross_duct_pressure_difference(
 
     if len(active_mask.addressable_shards) == 1 and not bool(jnp.any(active_mask)):
         raise ValueError("Pressure difference requires active fluid boundary cells")
-    return _cross_duct_pressure_difference_kernel(
-        p,
-        active_mask,
-        magnetic_axis=magnetic_axis,
-        side_axis=side_axis,
-    )
-
-
-def _cross_duct_pressure_difference_kernel(
-    p: jnp.ndarray,
-    active_mask: jnp.ndarray,
-    *,
-    magnetic_axis: int,
-    side_axis: int,
-) -> jnp.ndarray:
-    """JIT the wall-tap reductions so every device produces its local rows."""
 
     def high_wall_midpoint(wall_axis: int) -> jnp.ndarray:
         orthogonal_axis = 2 if wall_axis == 1 else 1
