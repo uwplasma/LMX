@@ -801,35 +801,6 @@ def _gauge_invariant_scalar_update(
     return jnp.max(jnp.abs(delta)) / max(scale, 1.0e-20)
 
 
-def _variable_coefficient_residual_3d(
-    field: jnp.ndarray,
-    rhs: jnp.ndarray,
-    conductivity: jnp.ndarray,
-    *,
-    dx: float,
-    dy: float | jnp.ndarray,
-    dz: float | jnp.ndarray,
-) -> jnp.ndarray:
-    x_west, x_east, y_south, y_north, z_bottom, z_top = _neighbor_fields(
-        field,
-        mode_x="neumann",
-        mode_y="neumann",
-        mode_z="neumann",
-    )
-    coef_x_w, coef_x_e, coef_y_s, coef_y_n, coef_z_b, coef_z_t = _variable_diffusion_coefficients_3d(
-        conductivity, dx=dx, dy=dy, dz=dz
-    )
-    operator = (
-        coef_x_w * (x_west - field)
-        + coef_x_e * (x_east - field)
-        + coef_y_s * (y_south - field)
-        + coef_y_n * (y_north - field)
-        + coef_z_b * (z_bottom - field)
-        + coef_z_t * (z_top - field)
-    )
-    return operator - rhs
-
-
 def _variable_diffusion_coefficients_3d(
     conductivity: jnp.ndarray,
     *,
