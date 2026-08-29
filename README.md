@@ -1,162 +1,185 @@
 # LMX
 
-[![PyPI](https://img.shields.io/pypi/v/lmx.svg)](https://pypi.org/project/lmx/)
-[![Python](https://img.shields.io/pypi/pyversions/lmx.svg)](https://pypi.org/project/lmx/)
+[![Python](https://img.shields.io/badge/python-3.10--3.13-3776ab.svg)](https://www.python.org/)
 [![CI](https://img.shields.io/github/actions/workflow/status/uwplasma/LMX/ci.yml?branch=main&label=ci)](https://github.com/uwplasma/LMX/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/readthedocs/lmx/latest?label=docs)](https://lmx.readthedocs.io/)
 [![License](https://img.shields.io/github/license/uwplasma/LMX)](LICENSE)
 
-LMX solves inductionless liquid-metal magnetohydrodynamics in ducts with JAX.
-It covers fully developed Hartmann, Shercliff, and Hunt flows, three-dimensional
-extruded ducts and pipes in spatially varying magnetic fields, and periodic Q2D
-vortex dynamics with Hartmann-layer damping. LMX owns the MHD models, boundary
-conditions, coupling, diagnostics, and validation;
-[SOLVAX](https://github.com/uwplasma/SOLVAX) supplies reusable linear and
-fixed-point algorithms and their memory-efficient derivatives. The Q2D and
-finite 3-D field cores support gradient-based design with checkpointed reverse
-passes instead of retaining complete trajectories.
+LMX is a compact JAX code for inductionless liquid-metal magnetohydrodynamics
+in ducts. Use it for analytical-reference Hartmann, Shercliff, and Hunt flow;
+three-dimensional straight ducts and pipes in spatially varying magnetic
+fields; periodic Q2D vortex dynamics; and differentiable field, wall, and
+fixed-topology geometry studies. LMX owns the MHD equations, boundary
+conditions, coupling, diagnostics, and validation. [SOLVAX](https://github.com/uwplasma/SOLVAX)
+owns reusable linear, fixed-point, preconditioning, and implicit-derivative
+algorithms.
 
-![Analytical duct profiles](docs/_static/analytic_velocity_profiles.webp)
+![Full-profile analytical validation for Hartmann, Shercliff, and Hunt ducts](docs/_static/analytic_velocity_profiles.webp)
 
-## Install
+## Choose where to start
 
-```console
-python -m pip install lmx
-lmx --help
-```
+| Your problem | Start with | Why |
+|---|---|---|
+| Learn the API or check an installation | `lmx examples/hartmann_case.toml` | Small stable solve with an analytical profile |
+| Fully developed rectangular or layered duct | `python examples/hartmann_example.py` or `hunt_example.py` | Velocity, potential, current, Lorentz force, conservation, and convergence |
+| Three-dimensional field entry/exit or magnetic obstacle | `python examples/fringing_benchmark_demo.py` | Editable axial field, 3-D duct fields, face-flux projection, and station diagnostics |
+| Conducting or insulating blanket wall stack | `python examples/li_aln_wall_stack_example.py` | Explicit material layers and interface-current checks |
+| Gradient-based field, wall, or geometry design | `python examples/variable_field_extruded_demo.py` | Production 3-D fields, checked gradients, and bounded optimization |
+| Depth-averaged strong-field dynamics | `python examples/q2d_turbulence_demo.py` | Q2D vorticity, energy/enstrophy histories, poster, and optional movie |
 
-LMX supports Python 3.10–3.13. JAX selects the CPU by default; install the
-appropriate accelerator wheel using the
-[JAX installation guide](https://docs.jax.dev/en/latest/installation.html).
-Plots are optional: `python -m pip install "lmx[visualization]"`.
+The first three fully developed examples are stable portable entry points. The
+wall, 3-D, design, and Q2D examples are research-stage workflows: they exercise
+real supported equations, but their small default meshes are demonstrations,
+not publication validation.
 
-## Solve a duct
+## Install and run
 
-```python
-import lmx
-
-case = lmx.make_hartmann_case(ha=5.0, ny=8, nz=8)
-result = lmx.solve(case)
-
-assert result.converged, result.status
-print(result.steps, result.residual)
-```
-
-The case object contains the geometry, materials, imposed field, boundary
-conditions, time stepping, solver controls, and output policy. The result
-contains the final fields, convergence status, iteration counts, and physical
-diagnostics. The same workflow is available from TOML:
+LMX is currently installed from source; there is no LMX release on PyPI yet.
 
 ```console
+git clone https://github.com/uwplasma/LMX.git
+cd LMX
+python -m pip install -e ".[visualization]"
 lmx examples/hartmann_case.toml
 ```
 
-## Solve a three-dimensional fringe
+Or use the same API from Python:
 
 ```python
 import lmx
-from lmx.fringing import build_square_duct_extruded_problem
 
-problem = build_square_duct_extruded_problem(
-    ha_peak=20.0,
-    width=2.0,
-    height=2.0,
-    length=6.0,
-    nx_stations=21,
-    ny=24,
-    nz=24,
-)
-result = lmx.solve(problem)
+case = lmx.make_hartmann_case(ha=20.0, ny=48, nz=48)
+result = lmx.solve(case)
 
-print(result.converged, result.validation.max_charge_balance_residual)
+print(result.status, result.steps, result.residual)
+print(result.diagnostics.charge_balance_residual_history[-1])
 ```
 
-The 3-D formulation solves electric-potential/current closure, Lorentz force,
-momentum transport, and face-flux pressure projection on rectangular,
-layered-duct, and straight-pipe meshes. Analytic and tabulated vector fields
-use the same problem interface.
+JAX selects the CPU by default. Install the accelerator-specific JAX wheel by
+following the [JAX installation guide](https://docs.jax.dev/en/latest/installation.html).
 
-Generic rectangular/layered ducts and straight pipes also expose their
-production finite-step fields for optimization. SOLVAX differentiates electric
-closure implicitly and checkpoints both projection iterations and the outer
-recurrence. Pass `num_devices` to shard generic rectangular, layered, or pipe
-fields over an evenly divisible axial mesh inside the same primal/gradient API:
+## Run the examples
 
-```python
-import jax
-import jax.numpy as jnp
-from lmx.fringing import (
-    build_layered_duct_extruded_problem,
-    evolve_extruded_fields,
-    extruded_engineering_objectives,
-)
+Every maintained example is a single editable file and writes generated output
+under the ignored `artifacts/examples/` directory.
 
-design_problem = build_layered_duct_extruded_problem(
-    nx_stations=7, ny=6, nz=6, wall_cells=1
-)
+| Command | Typical output | Intended use |
+|---|---|---|
+| `lmx examples/hartmann_case.toml` | terminal solution and diagnostics | fastest CLI start |
+| `python examples/hartmann_example.py` | analytical error and conservation record | first Python solve |
+| `python examples/hunt_example.py` | layered conducting-wall result | fully developed wall physics |
+| `python examples/li_aln_wall_stack_example.py` | wall comparison, plots, diagnostics | edit material layers |
+| `python examples/fringing_benchmark_demo.py` | 3-D field/flow plots and conservation JSON | edit a spatially varying field problem |
+| `python examples/variable_field_extruded_demo.py` | gradient check, 41-step optimization curve, controls, metrics | adapt a differentiable design problem |
+| `python examples/q2d_turbulence_demo.py` | 41 retained frames, decay curve, poster, optional MP4 | evolve or differentiate Q2D flow |
 
-
-def fringe_response(parameters):
-    field_coefficients = parameters[:7]
-    material_scale, geometry_scale = parameters[7:9], parameters[9:]
-    fields = evolve_extruded_fields(
-        design_problem,
-        magnetic_field_scale=field_coefficients,
-        material_conductivity_scale=material_scale,
-        geometry_scale=geometry_scale,
-        steps=8,
-    )
-    objectives = extruded_engineering_objectives(
-        design_problem, fields, geometry_scale=geometry_scale
-    )
-    return objectives["pumping_power"] + 0.1 * objectives["flow_nonuniformity"]
-
-
-value, gradient = jax.jit(jax.value_and_grad(fringe_response))(jnp.ones(12))
-```
-
-Run `python examples/variable_field_extruded_demo.py` for a bounded design
-study that preserves the mean imposed field while optimizing its axial shape,
-wall conductivity, and fixed-topology duct dimensions. The script checks the
-complete objective gradient against centered differences and writes the
-controls, metrics, convergence trace, and figure beneath `artifacts/examples/`.
-
-![Three-dimensional fringing-field result](docs/_static/fringing_solver_family.webp)
+Use the linked tutorial in [`examples/catalog.toml`](examples/catalog.toml) for
+the equations, parameters, expected outputs, and evidence status of each file.
 
 ![Differentiable field, wall, and geometry design](docs/_static/blanket_design_optimization.webp)
 
-## Differentiate a steady duct
+The design figure's middle curve contains all 41 optimization iterates. The
+left panel shows the seven actual axial design stations; they are control
+points, not a claimed mesh-convergence curve.
 
-`solve_fully_developed_fields` exposes the same coefficient assembly,
-potential closure, momentum solve, boundary treatment, and current recovery as
-the production steady solver for rectangular Hartmann and Shercliff ducts and
-layered Hunt ducts. SOLVAX differentiates the converged affine coupling with
-tangent or transposed solves, without retaining its Krylov or coupling
-iterations.
+## Apply LMX to your problem
+
+An LMX study has four explicit layers:
+
+1. Choose the closest retained model: fully developed 2-D, generic extruded
+   3-D duct/pipe, or periodic Q2D.
+2. Define geometry, material regions, imposed field, forcing, and numerical
+   controls with immutable case objects or a convenience builder.
+3. Solve and inspect termination together with mass, charge, interface-current,
+   and momentum/energy diagnostics.
+4. Establish mesh, tolerance, and external-code independence for the observable
+   you intend to publish. A portable example result is not that evidence.
+
+For example, start a layered 3-D duct with a smooth transverse fringe, then
+edit only the quantities that define your experiment:
+
+```python
+from dataclasses import replace
+
+import lmx
+from lmx.fringing import (
+    build_layered_duct_extruded_problem,
+    smooth_fringing_profile,
+)
+
+problem = build_layered_duct_extruded_problem(
+    ha_peak=30.0,
+    width=2.0,
+    height=1.4,
+    length=8.0,
+    nx_stations=41,
+    ny=40,
+    nz=32,
+    wall_cells=3,
+    wall_thickness=0.08,
+)
+profile = smooth_fringing_profile(
+    length=8.0,
+    nx=41,
+    entry_center=2.0,
+    exit_center=6.0,
+    transition_width=0.3,
+    axis="z",
+)
+problem = replace(
+    problem,
+    case=replace(problem.case, forcing=0.8),
+    profile=profile,
+)
+result = lmx.solve(problem)
+
+print(result.status)
+print(result.validation.max_divergence_residual)
+print(result.validation.max_charge_balance_residual)
+print(result.validation.net_boundary_current_residual)
+```
+
+Use `build_square_duct_extruded_problem` for an insulating rectangular duct,
+`build_layered_duct_extruded_problem` for explicit wall regions,
+`build_pipe_ogrid_extruded_problem` for a straight conducting pipe, and
+`build_extruded_problem_from_case` when you already have a complete `CaseSpec`.
+Analytic and tabulated divergence-free imposed fields share the same solve
+interface. Restart, NPZ, CSV, VTK/ParaView, and plotting helpers are documented
+in the [output guide](https://lmx.readthedocs.io/en/latest/how_to/restart_and_output.html).
+
+### Differentiate a design response
+
+Generic rectangular/layered ducts and straight pipes expose the same finite
+production recurrence through `evolve_extruded_fields`. Continuous forcing,
+imposed-field coefficients, fluid/wall conductivity, and fixed-topology
+geometry scales can reach field outputs and engineering objectives. SOLVAX
+uses implicit electric derivatives and checkpointed finite recurrences so the
+reverse pass does not retain every solver iteration.
 
 ```python
 import jax
 import jax.numpy as jnp
-import lmx
-
-case = lmx.make_hartmann_case(ha=20, ny=48, nz=48)
+from lmx.fringing import evolve_extruded_fields, extruded_engineering_objectives
 
 
-def mean_velocity(field_scale):
-    velocity, *_ = lmx.solve_fully_developed_fields(
-        case, magnetic_field_scale=field_scale
+def pumping_power(field_scale):
+    fields = evolve_extruded_fields(
+        problem,
+        magnetic_field_scale=field_scale,
+        steps=8,
     )
-    return jnp.mean(velocity)
+    return extruded_engineering_objectives(problem, fields)["pumping_power"]
 
 
-value, derivative = jax.jit(jax.value_and_grad(mean_velocity))(1.0)
+value, gradient = jax.jit(jax.value_and_grad(pumping_power))(jnp.ones(41))
 ```
 
-Mesh topology, material-region layout, boundary kinds, and solver controls are
-static. Pressure forcing and magnetic-field scale are currently continuous;
-fixed-flow steady derivatives remain gated work.
+Pass `num_devices` to shard a generic 3-D field evolution over an evenly
+divisible axial mesh. Treat mesh, topology, discrete boundary kinds, iteration
+counts, and sharding layout as static controls; independently check selected
+gradients before using them in an optimizer.
 
-## Evolve a Q2D flow
+### Evolve Q2D flow
 
 ```python
 import lmx
@@ -169,84 +192,51 @@ case = lmx.make_q2d_case(
 )
 result = lmx.solve(case)
 
-print(result.converged, result.diagnostics.energy_budget_residual)
+print(result.status, result.diagnostics.energy_budget_residual)
 ```
 
-The compact Q2D path uses dealiased Fourier vorticity evolution and a released
-SOLVAX periodic Poisson inversion. It reports energy, enstrophy, divergence,
-Courant number, and energy-budget closure.
+`evolve_q2d` exposes continuous state, forcing, length, viscosity, Hartmann
+friction, and timestep inputs through a checkpointed finite evolution.
 
-For optimization, `evolve_q2d` returns only traced JAX fields. Continuous
-state, forcing, length, viscosity, friction, and timestep inputs differentiate
-through the same finite evolution; the reverse pass checkpoints the trajectory
-with `O(sqrt(steps))` retained state by default.
+![Q2D vorticity and 41-frame kinetic-energy decay](docs/_static/q2d_vortex_decay.webp)
 
-```python
-import jax
+## Capability and evidence status
 
-
-def response(friction):
-    return lmx.evolve_q2d(
-        case.initial_vorticity,
-        viscosity=case.viscosity,
-        hartmann_friction=friction,
-        dt=case.dt,
-        steps=case.steps,
-    )[0].var()
-
-
-value, derivative = jax.value_and_grad(response)(case.hartmann_friction)
-```
-
-![Q2D vortex decay](docs/_static/q2d_vortex_decay.webp)
-
-## Capabilities and evidence
-
-| Capability | Interface | Evidence |
+| Capability | Public interface | Current evidence/status |
 |---|---|---|
-| Hartmann, Shercliff, and Hunt flow | `lmx.make_*_case`, `solve` | analytical profiles, conservation, power balance, mesh convergence |
-| Differentiable steady rectangular/layered ducts | `solve_fully_developed_fields` | production-field parity, forcing identity, magnetic-scale finite difference, implicit Krylov adjoint |
-| Conducting and insulating wall layers | `WallLayer`, layered mesh builders | interface-current and layer-resolution gates |
-| 3-D rectangular/layered fringing fields | `solve_extruded_inductionless`, `evolve_extruded_fields` | production-field parity, station-wise field gradients, engineering objectives, manufactured operators, projection, finite differences, JVP/VJP, bounded reverse memory, two-device sharded primal/gradient parity, Benchmark B2 |
-| 3-D straight-pipe fringing fields | `solve_extruded_inductionless`, `evolve_extruded_fields` | production-field parity, conducting-annulus material and geometry gradients, JVP/VJP, batched evaluation, bounded reverse memory, two-device sharded primal parity, mapped current closure, fixed-flow and Benchmark B1 gates |
-| Periodic Q2D flow | `Q2DProblem`, `make_q2d_case`, `solve`, `evolve_q2d` | analytical decay/gradients, energy identity, spatial refinement, bounded reverse memory, measured CPU/GPU parity |
-| FreeMHD comparison | `validation/freemhd.py`, validation scripts | pinned case contracts, native-output observers, executable Docker workflow |
-| Meshes and analytic/tabulated fields | `lmx.mesh` | geometry, divergence, and interpolation tests |
+| Hartmann, Shercliff, Hunt ducts | `make_*_case`, `solve` | analytical profiles, conservation, power balance, and mesh refinement; stable |
+| Differentiable steady ducts | `solve_fully_developed_fields` | production parity, finite differences, and implicit Krylov adjoints; supported envelope |
+| Generic 3-D ducts and straight pipes | `solve_extruded_inductionless` | manufactured operators, mass/current closure, restart, field gradients, and sharded correctness; research stage |
+| Differentiable generic 3-D fields | `evolve_extruded_fields`, `extruded_engineering_objectives` | JVP/VJP, finite differences, batched evaluation, and bounded reverse memory; research stage |
+| Periodic Q2D | `make_q2d_case`, `solve`, `evolve_q2d` | decay identities, energy closure, refinement, and bounded reverse memory; research stage |
+| ALEX B1/B2 | benchmark builders and validation scripts | frozen contracts and reduced/internal gates; B2 FreeMHD smoke passes, production acceptance remains open |
+| Accelerator and multi-device execution | JAX backend plus `num_devices` | portable/sharded correctness exists; real A4000 speed and strong-scaling claims remain open |
 
-Validation status and tolerances are stated in the
-[validation guide](https://lmx.readthedocs.io/en/latest/validation/index.html).
-Internal diagnostics are not presented as external validation.
+LMX does not currently claim free-surface MHD, full magnetic induction, thermal
+coupling, general 3-D turbulence, curved-pipe physics, or production-accepted
+ALEX B1/B2 design gradients. FreeMHD is an independently executed validation
+comparator, not an LMX dependency.
 
 ## Documentation
 
-- [Install and run](https://lmx.readthedocs.io/en/latest/getting_started/install.html)
-- [First 2-D solve](https://lmx.readthedocs.io/en/latest/getting_started/first_run.html)
-- [3-D fringing tutorial](https://lmx.readthedocs.io/en/latest/tutorials/fringing.html)
-- [Q2D vortex tutorial](https://lmx.readthedocs.io/en/latest/tutorials/q2d.html)
+- [Install and first run](https://lmx.readthedocs.io/en/latest/getting_started/install.html)
+- [Fully developed ducts](https://lmx.readthedocs.io/en/latest/tutorials/fully_developed.html)
+- [Three-dimensional fringing fields](https://lmx.readthedocs.io/en/latest/tutorials/fringing.html)
 - [Walls and imposed fields](https://lmx.readthedocs.io/en/latest/tutorials/walls_and_fields.html)
-- [Equations and assumptions](https://lmx.readthedocs.io/en/latest/physics/equations.html)
-- [Numerical methods and SOLVAX boundary](https://lmx.readthedocs.io/en/latest/physics/numerics.html)
+- [Differentiable design](https://lmx.readthedocs.io/en/latest/tutorials/differentiation.html)
+- [Q2D vortex dynamics](https://lmx.readthedocs.io/en/latest/tutorials/q2d.html)
+- [Equations and numerical methods](https://lmx.readthedocs.io/en/latest/physics/equations.html)
+- [Validation matrix](https://lmx.readthedocs.io/en/latest/validation/index.html)
 - [Python API](https://lmx.readthedocs.io/en/latest/reference/api.html)
-- [CLI and TOML schema](https://lmx.readthedocs.io/en/latest/reference/cli.html)
 
-Runnable scripts in [`examples/`](examples/) are deliberately small and write
-their artifacts under an ignored `artifacts/` directory.
-
-## Development
+## Development and citation
 
 ```console
-git clone https://github.com/uwplasma/LMX.git
-cd LMX
 python -m pip install -e ".[dev,docs]"
-python scripts/run_full_test_suite.py
+python scripts/run_full_test_suite.py --changed-from HEAD
 python -m sphinx -W -b html docs docs/_build/html
 ```
 
-Tests require at least 95% combined line/branch coverage. A release also gates
-package size, lazy import behavior, distribution contents, analytical physics,
-3-D conservation, and the pinned external-validation contract.
-
-## Cite
-
-Use the version or commit that produced the result. Citation metadata is in
-[`CITATION.cff`](CITATION.cff).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for evidence boundaries and the complete
+candidate gate. Cite the exact release or commit that produced a result;
+metadata is in [CITATION.cff](CITATION.cff).
