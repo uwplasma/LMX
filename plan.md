@@ -2943,3 +2943,56 @@ surface, measurements, validation, decision, and next action.
   B1, and B2 capabilities; delete or fuse only with physics, derivative,
   runtime, and memory evidence. Then diagnose the B2 production plateau and
   execute the frozen coarse/medium/fine campaign without weakening its gates.
+
+### 2026-08-29 — remove private fringing testbeds and stale restart lanes
+
+- Commit `093d5960979ac64bb23a40605cb01e505f16f49d` begins the function-level
+  audit behind the public `lmx.fringing` facade. The underscore modules remain
+  private implementation owners, not additional APIs, and their existence is
+  not considered completion of the slimming goal. This tranche removes
+  parameter switches that no production caller used: neutral duct inlets,
+  injected axial neighbours/tractions/fluxes, externally supplied diffusion
+  coefficients, alternate Laplacian boundary modes, pipe block-Jacobi axial
+  decoupling, and a component-inverse test hook. Production boundary
+  conditions, conservative duct/pipe operators, 3-D field evolution, B1/B2,
+  restarts, fixed flow, differentiation, and FreeMHD comparison remain.
+- Restart restoration now accepts only the current typed bundle contract. B2
+  checkpoints must contain complete momentum-defect, pressure-linear, CFL,
+  stopping, and accelerator state instead of fabricating placeholder histories
+  for obsolete bundles. Generic duct restarts continue to omit B2-only history
+  truthfully. Public result validation likewise checks the complete current
+  numerical bundle rather than silently filtering missing attributes.
+- The change adds 90 lines and removes 335. Package source falls by 77 lines
+  from 14,845 to 14,768; the five fringing files fall from 6,576 to 6,499.
+  `_fringing_common.py`, `_fringing_duct.py`, `_fringing_pipe.py`, and
+  `_fringing_solver.py` are 1,314, 1,461, 1,483, and 1,498 lines respectively;
+  the 743-line `fringing.py` remains the sole public surface. Test source falls
+  by 168 lines to 11,781 after two duplicated ad hoc bundle mocks are replaced
+  by one complete typed fixture. No module, test file, script, example, or
+  public export is added. The isolated wheel is 146,402 bytes and the tracked
+  checkout is 1,782,353 bytes, both well below the 10 MB target.
+- All 500 tests pass in 176.82 seconds on Python 3.11.14/JAX 0.9.2/SOLVAX
+  0.18.0 with 95.41% combined line/branch coverage. Coverage and JUnit SHA-256
+  digests are
+  `505e1005c46af8a3cdd696705ef9e98dd05a59a685f7b7197c27d4ff57c92d19`
+  and `ca8d07c7ba940912c6bbaeba8a38b28426f1ec8bdaf70d427d841e35e6ce649e`.
+  Changed duct, pipe, wrapper, primal, JVP, and VJP gates also pass on Python
+  3.10.21/JAX 0.6.2 and Python 3.13.9/JAX 0.11.1.
+- Ruff check/format, byte compilation, architecture/import budgets, Sphinx HTML
+  and external-link builds with warnings as errors, isolated build, Twine,
+  wheel, and sdist inspection pass. The pinned FreeMHD Docker smoke passes
+  contract, artifact, execution, observation, comparison, and schema checks
+  with zero failed checks and pressure L-infinity/RMS differences
+  `0.010917245284750786`/`0.004517977100484136`. Report and record SHA-256
+  digests are
+  `49fcb194e86d189b07fc8bc825f7e6bd23c4d6ab0d370805c049fa906bc31ba1`
+  and `6cad316c71ef82c4ea79793dc1f2bd645aed8a6d27be7c9601914ebf132f7ce7`.
+  `acceptance_pass=false` remains correct for the smoke-only role.
+- Next action: audit the remaining large recurrence/finalization functions for
+  measurable duplicate work and allocations, especially the shared pipe/duct
+  orchestration in `_fringing_solver.py`. Fuse private owners only when the
+  result has clearer ownership or less runtime/memory; moving thousands of
+  implementation lines into `fringing.py` would enlarge the public module
+  without simplifying the code. In parallel, diagnose the B2 production
+  plateau and run the frozen mesh/tolerance campaign without weakening its
+  numerical or external-validation gates.
