@@ -3100,3 +3100,40 @@ surface, measurements, validation, decision, and next action.
   existing underscore modules remain private geometry/operator owners behind
   `lmx.fringing`; numerical globalization and Krylov policy remain SOLVAX
   responsibilities.
+
+### 2026-08-29 — expose the exact B2 production map to SOLVAX composition
+
+- The retained B2 predictor, mixed pressure projection, conservative compact
+  flux reconstruction, electric solve, Lorentz reconstruction, and momentum
+  defect now compose in one pure `lmx.b2.map` named call inside the existing
+  orchestration. The Python recurrence consumes that same map, so its state,
+  restart, diagnostics, sharding, and stopping contracts remain unchanged.
+  This adds no public API, module, file, solver, parameter, or experimental
+  runtime lane.
+- A temporary, subsequently deleted proof passed the complete B2 state and
+  compact mass flux to `solvax.pseudo_transient_continuation` as the exact map
+  residual. On the retained 5x5x5 reduced case, six SOLVAX nonlinear steps
+  reduced the algebraic residual norm from `35108.8026` to `0.0312687`, with
+  five accepted steps and 38 Krylov iterations. The resulting maximum map
+  update was `0.00621063` and the physical momentum defect was `0.0364371`.
+  The existing six-step recurrence reached `0.0168165` and `0.0472907` on the
+  same case. This is proof of numerical viability only; it is not production
+  runtime, memory, convergence, or derivative evidence.
+- The production-switch gate remains fail-closed. First supply the coupled
+  pressure/momentum shifted preconditioner, scaled physical residual norm,
+  exact restart state for the adaptive pseudo-time method, implicit JVP/VJP
+  residual tests, and peak-memory measurement. Then require a material
+  improvement in update and momentum balance on the 101x65x65 coarse case
+  without exceeding the current runtime budget. Until those gates pass, the
+  public B2 path keeps its current recurrence and specialized B2 derivatives
+  remain unavailable.
+- The extraction adds 72 source lines and removes 83. `_fringing_solver.py`
+  falls from 1,498 to 1,490 lines, total package source falls from 14,768 to
+  14,760 lines, and the repository remains at 16 modules and 28 root exports.
+  The exact candidate passes all 500 tests in 179.80 seconds with 95.44%
+  combined line/branch coverage. Coverage and JUnit SHA-256 digests are
+  `199399ddc13978a2a4d73760618b0712fbaa97c4d1beb19be3620700a61fad1f`
+  and `04977053027389e90328faeae5702f2ac5d19df8050c9fac3dfedb5ebd570173`.
+  Ruff check/format, byte compilation, architecture/import budgets, Sphinx
+  HTML and link checking with warnings as errors, isolated build, Twine, wheel,
+  and sdist inspection also pass. The wheel is 146,565 bytes.
