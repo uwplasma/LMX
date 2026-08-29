@@ -106,6 +106,28 @@ reports signed pressure drop, outlet flow rate, wall-current-density RMS, and a
 smooth recirculation fraction. Its wall-current quantity is a cell-centered
 design proxy; use the conservative boundary-flux diagnostics for validation.
 
+## Reproduce a bounded field and wall design
+
+```console
+python examples/variable_field_extruded_demo.py
+```
+
+The executable study uses seven axial field coefficients with an exactly fixed
+mean and one wall-conductivity scale constrained to 0.5–1.5. Its normalized
+loss balances pumping-power magnitude, outlet nonuniformity, wall-current RMS,
+and a flow-preservation penalty. The example runs 40 compiled gradient steps
+and independently checks every design derivative with centered differences.
+
+On the portable 7×6×6 demonstration mesh, the loss falls from 0.900 to 0.611,
+pumping-power magnitude falls by 55%, wall-current RMS falls by 46%, and flow
+changes by 0.067%; outlet nonuniformity rises by about 6%, making the tradeoff
+visible rather than hiding it in the aggregate loss. This is workflow and
+derivative evidence, not a resolution-independent blanket optimum. A physical
+claim requires mesh refinement, uncertainty bands, production GPU evidence,
+and independent B1/B2 validation.
+
+![Bounded field and wall design](../_static/blanket_design_optimization.webp)
+
 ## Transient Q2D response
 
 For a time-dependent field objective, call the field-only core:

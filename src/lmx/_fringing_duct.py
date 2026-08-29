@@ -203,8 +203,8 @@ def _solvax_pressure_poisson_duct(
         rtol=effective_rtol,
         atol=effective_atol,
         max_steps=iterations,
-        transpose_rtol=tolerance,
-        transpose_atol=tolerance,
+        transpose_rtol=max(tolerance, 1.0e-12),
+        transpose_atol=max(tolerance, 1.0e-12),
         transpose_max_steps=iterations,
         single_reduction=single_reduction,
     )
