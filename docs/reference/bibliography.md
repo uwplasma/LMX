@@ -15,6 +15,10 @@ Core references used by the implemented models and validation contracts include:
 - S. Smolentsev, R. Moreau, L. Bühler, and C. Mistrangelo, “MHD thermofluid
   issues of liquid-metal blankets,” *Fusion Engineering and Design*, 2010,
   [doi:10.1016/j.fusengdes.2010.02.038](https://doi.org/10.1016/j.fusengdes.2010.02.038).
+- I. Celik et al., “Procedure for estimation and reporting of uncertainty due
+  to discretization in CFD applications,” *Journal of Fluids Engineering* 130,
+  2008, [doi:10.1115/1.2960953](https://doi.org/10.1115/1.2960953) — the
+  three-grid observed-order and Grid Convergence Index reporting convention.
 - J. Sommeria and R. Moreau, “Why, how, and when, MHD turbulence becomes
   two-dimensional,” *Journal of Fluid Mechanics* 118, 1982,
   [doi:10.1017/S0022112082001177](https://doi.org/10.1017/S0022112082001177) —

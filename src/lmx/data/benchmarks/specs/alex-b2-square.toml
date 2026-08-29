@@ -266,6 +266,7 @@ steady_steps_min = 3
 steady_residual_uncertainty_fraction_max = 0.05
 mass_balance_max = 1.0e-3
 current_balance_max = 1.0e-3
+momentum_balance_max = 1.0e-3
 interface_current_max = 1.0e-3
 power_balance_max = 1.0e-3
 tolerance_independence_factor = 0.5
