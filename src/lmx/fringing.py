@@ -1154,17 +1154,25 @@ def _solve_duct_projection(
             rho_phi_plus, rho_phi_inlet = flux
             emf = common._cross((u0, v0, w0), (bx, by, bz))
             _, _, _, lorentz_x0, lorentz_y0, lorentz_z0 = lorentz_operator(phi0, sigma, *emf, bx, by, bz)
-            velocity, momentum_force = (
-                pack_vector(u0, v0, w0),
-                pack_vector(lorentz_x0 + forcing, lorentz_y0, lorentz_z0),
-            )
-            velocity_fluid, _, momentum_converged, momentum_mobility = momentum_solve(
-                velocity, momentum_force, rho, nu, rho_phi_plus, rho_phi_inlet
-            )
-            predicted = embed_velocity(velocity_fluid, fluid_mask)
-            projection = mixed_boundary_projection(*predicted, p0, rho, fluid_mask, momentum_mobility)
-            u1, v1, w1, pressure = projection[:4]
-            mapped_flux = pack_flux(*projection[7:10])
+            momentum_force = pack_vector(lorentz_x0 + forcing, lorentz_y0, lorentz_z0)
+            u1, v1, w1, pressure = u0, v0, w0, p0
+            mapped_flux, mapped_inlet = rho_phi_plus, rho_phi_inlet
+            for _ in range(common.ALEX_B2_PRESSURE_CORRECTORS):
+                velocity_fluid, _, momentum_converged, momentum_mobility = momentum_solve(
+                    pack_vector(u1, v1, w1),
+                    momentum_force,
+                    rho,
+                    nu,
+                    mapped_flux,
+                    mapped_inlet,
+                    pressure,
+                )
+                predicted = embed_velocity(velocity_fluid, fluid_mask)
+                projection = mixed_boundary_projection(
+                    *predicted, pressure, rho, fluid_mask, momentum_mobility
+                )
+                u1, v1, w1, pressure = projection[:4]
+                mapped_flux, mapped_inlet = pack_flux(*projection[7:10]), projection[10]
             emf = common._cross((u1, v1, w1), (bx, by, bz))
             electric = electric_solve(emf_operator(sigma, *emf, fluid_mask), phi0, sigma, fluid_mask)
             potential = electric[0]
@@ -1176,12 +1184,12 @@ def _solve_duct_projection(
                 rho,
                 nu,
                 mapped_flux,
-                projection[10],
+                mapped_inlet,
                 pressure,
             )
             return (
                 (u1, v1, w1, jnp.where(fluid_mask, pressure, 0.0), potential),
-                (mapped_flux, projection[10]),
+                (mapped_flux, mapped_inlet),
                 (
                     (jx0, jy0, jz0, div_j0, lorentz_x1, lorentz_y1, lorentz_z1),
                     (projection[4], projection[5], projection[6]),
@@ -1314,7 +1322,8 @@ def _solve_duct_projection(
         courant_by_step.append((dt if use_alex_b2_finite_volume else -1.0, *map(float, step_courant)))
         update_residual = max(u_update, v_update, w_update, pressure_update, potential_update)
         stopping_residual = (
-            max(u_update, v_update, w_update) / (inverse_electromagnetic_scale * dt)
+            max(u_update, v_update, w_update)
+            / (inverse_electromagnetic_scale * dt * common.ALEX_B2_PRESSURE_CORRECTORS)
             if use_alex_b2_finite_volume
             else update_residual
         )

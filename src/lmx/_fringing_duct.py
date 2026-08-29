@@ -21,6 +21,7 @@ from solvax import (
 
 from ._fringing_common import (
     _MIXED_AXIAL_PRESSURE_MODE,
+    ALEX_B2_PRESSURE_RELAXATION,
     ALEX_BALANCE_TOLERANCE,
     _axial_mean_preconditioner_3d,
     _coerce_spacing_vector,
@@ -639,6 +640,38 @@ def _duct_pressure_face_corrections(
     return correction_x, *transverse
 
 
+def _cell_pressure_correction_duct(correction_x, correction_y, correction_z, *, field_sharding=None):
+    """Interpolate conservative face pressure corrections to cell centres."""
+    correction_x_west = _neighbor_fields(
+        correction_x, mode_x="neumann", mode_y="neumann", mode_z="neumann", sharding=field_sharding
+    )[0]
+    correction_x_west = jnp.where(
+        jnp.arange(correction_x.shape[0])[:, None, None] == 0, 0.0, correction_x_west
+    )
+    return jnp.stack(
+        (
+            0.5 * (correction_x_west + correction_x),
+            0.5 * (correction_y[:, :-1] + correction_y[:, 1:]),
+            0.5 * (correction_z[:, :, :-1] + correction_z[:, :, 1:]),
+        ),
+        axis=-1,
+    )
+
+
+def _duct_pressure_force(pressure, *, dx, dy, dz, field_sharding=None):
+    """Return the cell pressure force from the conservative face gradient."""
+    corrections = _duct_pressure_face_corrections(
+        pressure,
+        jnp.ones_like(pressure),
+        dx=dx,
+        dy=dy,
+        dz=dz,
+        mixed_axial_pressure=True,
+        field_sharding=field_sharding,
+    )
+    return _cell_pressure_correction_duct(*corrections, field_sharding=field_sharding)
+
+
 def _face_flux_pressure_projection_duct(
     u: jnp.ndarray,
     v: jnp.ndarray,
@@ -653,7 +686,7 @@ def _face_flux_pressure_projection_duct(
     iterations: int,
     tolerance: float,
     fluid_bounds: tuple[int, int, int, int] | None = None,
-    initial_pressure: jnp.ndarray | None = None,
+    base_pressure: jnp.ndarray | None = None,
     single_reduction: bool = False,
     include_axial_line: bool = True,
     inlet_flow_rate: float | None = None,
@@ -711,16 +744,21 @@ def _face_flux_pressure_projection_duct(
         dz=dzs,
         iterations=iterations,
         tolerance=tolerance,
-        initial_field=(None if initial_pressure is None else initial_pressure[:, y0:y1, z0:z1]),
+        initial_field=None,
         single_reduction=single_reduction,
         include_axial_line=include_axial_line,
         axial_pressure_mode=(_MIXED_AXIAL_PRESSURE_MODE if mixed_axial_pressure else "neumann"),
         field_sharding=field_sharding,
     )
-    pressure = pressure_result[0]
+    pressure_correction = pressure_result[0]
+    pressure = (
+        pressure_correction
+        if base_pressure is None
+        else (base_pressure[:, y0:y1, z0:z1] + ALEX_B2_PRESSURE_RELAXATION * pressure_correction)
+    )
 
     correction_x, correction_y, correction_z = _duct_pressure_face_corrections(
-        pressure,
+        pressure_correction,
         mobility,
         dx=dx,
         dy=dys,
@@ -737,10 +775,12 @@ def _face_flux_pressure_projection_duct(
         + (wf[:, :, 1:] - wf[:, :, :-1]) / dzs[None, None, :]
     )
     # Reconstruct only pressure correction; reconstructing the predictor filters it.
-    correction_x_west = axial_minus(correction_x, jnp.zeros_like(uf_inlet))
-    projected_u = us + 0.5 * (correction_x_west + correction_x)
-    projected_v = vs + 0.5 * (correction_y[:, :-1, :] + correction_y[:, 1:, :])
-    projected_w = ws + 0.5 * (correction_z[:, :, :-1] + correction_z[:, :, 1:])
+    cell_correction = _cell_pressure_correction_duct(
+        correction_x, correction_y, correction_z, field_sharding=field_sharding
+    )
+    projected_u, projected_v, projected_w = jnp.moveaxis(
+        jnp.stack((us, vs, ws), axis=-1) + cell_correction, -1, 0
+    )
     if mixed_axial_pressure:
         cell_flow = jnp.sum(projected_u * face_area, axis=(1, 2))
         projected_u += ((target - cell_flow) / jnp.sum(face_area))[:, None, None]
@@ -839,28 +879,9 @@ def _duct_momentum_defect(
         velocity, dynamic_viscosity, boundary_velocity, widths, gradient=gradient
     )
 
-    mobility = dt / jnp.maximum(density, 1.0e-20)
-    correction_x, correction_y, correction_z = _duct_pressure_face_corrections(
-        pressure, mobility, dx=dx, dy=dy, dz=dz, mixed_axial_pressure=True, field_sharding=field_sharding
-    )
-    correction_x_west = _neighbor_fields(
-        correction_x, mode_x="neumann", mode_y="neumann", mode_z="neumann", sharding=field_sharding
-    )[0]
-    correction_x_west = jnp.where(inlet_cells, 0.0, correction_x_west)
-    pressure_velocity = jnp.stack(
-        (
-            0.5 * (correction_x_west + correction_x),
-            0.5 * (correction_y[:, :-1] + correction_y[:, 1:]),
-            0.5 * (correction_z[:, :, :-1] + correction_z[:, :, 1:]),
-        ),
-        axis=-1,
-    )
+    pressure_force = _duct_pressure_force(pressure, dx=dx, dy=dy, dz=dz, field_sharding=field_sharding)
     residual = (
-        convection
-        - diffusion
-        - deviatoric_stress
-        - lorentz_force.at[..., 0].add(forcing)
-        - density[..., None] * pressure_velocity / dt
+        convection - diffusion - deviatoric_stress - lorentz_force.at[..., 0].add(forcing) - pressure_force
     )
     component_maxima = jnp.max(jnp.abs(residual), axis=(0, 1, 2)) / force_scale
     return jnp.concatenate((component_maxima, jnp.max(component_maxima)[None]))
@@ -1045,7 +1066,7 @@ def _b2_momentum_functions(
             velocity, density, inlet, dx=dx, dy=local_dy, dz=local_dz, sharding=field_sharding
         )
 
-    def momentum_solve(velocity, force, density, viscosity, rho_phi_plus, rho_phi_inlet):
+    def momentum_solve(velocity, force, density, viscosity, rho_phi_plus, rho_phi_inlet, pressure):
         local_velocity, local_density, local_viscosity = (
             field[:, y0:y1, z0:z1] for field in (velocity, density, viscosity)
         )
@@ -1059,6 +1080,13 @@ def _b2_momentum_functions(
         )
         local_force = force[:, y0:y1, z0:z1] + _explicit_deviatoric_stress_duct(
             local_velocity, setup[0], boundary_velocity, widths, gradient=setup[-1]
+        )
+        local_force += _duct_pressure_force(
+            pressure[:, y0:y1, z0:z1],
+            dx=dx,
+            dy=local_dy,
+            dz=local_dz,
+            field_sharding=field_sharding,
         )
         solved = _solvax_implicit_momentum_duct(
             local_velocity,
@@ -1164,7 +1192,9 @@ def _jit_b2_momentum_functions(
     shardings = (
         ((field_sharding,) * 4, (field_sharding,) * 3 + (replicated_sharding,)),
         (
-            (vector_sharding,) * 2 + (field_sharding,) * 2 + (flux_sharding, replicated_sharding),
+            (vector_sharding,) * 2
+            + (field_sharding,) * 2
+            + (flux_sharding, replicated_sharding, field_sharding),
             (vector_sharding, replicated_sharding, replicated_sharding, field_sharding),
         ),
         (
@@ -1342,7 +1372,7 @@ def _b2_coupling_functions(
             iterations=projection_iterations,
             tolerance=projection_tolerance,
             fluid_bounds=fluid_bounds,
-            initial_pressure=pressure,
+            base_pressure=pressure,
             single_reduction=field_sharding is not None,
             include_axial_line=False,
             field_sharding=field_sharding,
