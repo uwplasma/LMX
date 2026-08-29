@@ -3331,6 +3331,11 @@ surface, measurements, validation, decision, and next action.
   146,089-byte wheel and a 138,760-byte sdist; their SHA-256 digests are
   `17fdf4447c0e512b790ecfd6c918997f2f1effc1d370635ebe33712e00060ff4`
   and `7f16d01169e39164e4d8a07eb766abfe575e92182bb3f52c8d3cea9e7b714662`.
+- PR #34 created the metadata, documentation, link, compatibility, and pinned
+  FreeMHD checks, but GitHub rejected every sampled job before its first step
+  with the account payment/spending-limit annotation. This is unavailable
+  hosted execution, not numerical evidence; the complete local gates above are
+  the merge authority under the approved temporary policy.
 - Next action: continue function-level common/duct/pipe trimming only where it
   removes actual work or duplication with measured physics, derivative,
   runtime, and memory equivalence. Resume the coupled B2 pressure/electric
