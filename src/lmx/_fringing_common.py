@@ -331,7 +331,7 @@ def _restore_duct_iteration_state(
     case: CaseSpec,
     use_b2: bool,
     velocity: jnp.ndarray,
-    velocity_limit: float,
+    velocity_scale: float,
     potential_scale: float,
     forcing: float,
 ):
@@ -408,7 +408,7 @@ def _restore_duct_iteration_state(
                 raise ValueError("B2 restart Anderson field state has inconsistent shape")
 
     fixed_scale = jnp.asarray(
-        [velocity_limit, velocity_limit, velocity_limit, potential_scale], dtype=velocity.dtype
+        [velocity_scale, velocity_scale, velocity_scale, potential_scale], dtype=velocity.dtype
     )[:, None, None, None]
     return (
         *histories,
