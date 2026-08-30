@@ -58,12 +58,12 @@ of the gates below or remove work from its critical path.
 | 6 | Release qualification | blocked by gates 1--5 and GitHub billing | one commit passes complete validation, clean install/clone, docs, package, citation, and release artifact checks | no repeated release matrix before the candidate is feature-complete |
 
 Everything else in this document is specification, completed evidence, or
-historical engineering log. The next numerical experiment is exactly one
-fixed-work Schur defect-correction candidate using the production frozen
-momentum response and retained pressure solve on the reduced fixture. It earns
-one exact step-152 comparison only after beating the retained reduced map in
-both physical defect and warm time. Failure deletes the experiment and closes
-that algorithmic branch; it does not create another user option.
+historical engineering log. Predictor, projection, and transient block
+corrections are exhausted. The next numerical change is the square steady B2
+residual specified in the final work-log entry: audit units and scales, verify
+reduced Jacobian rank, and only then integrate the coupled momentum, mass,
+pressure, electric, fixed-flow, and Lorentz equations. It does not create a
+second public solver family or another user-facing control lane.
 
 The numerical policy is fixed for these priorities: converged linear and steady
 systems use implicit derivatives; finite trajectories use selective
@@ -4228,3 +4228,31 @@ surface, measurements, validation, decision, and next action.
   integration, that residual must pass term-by-term scale/units and reduced
   Jacobian-rank audits; SOLVAX then owns globalization and implicit
   tangent/transpose solves.
+
+### 2026-08-29 — make the README an executable user path
+
+- Replaced the descriptive four-layer adaptation list with one copyable
+  Hartmann study that constructs physics, geometry, materials, mesh, and
+  output; solves through the common API; fails closed on termination; compares
+  the full profile to the analytical solution; and writes ParaView, CSV, and
+  restart-capable NPZ artifacts. The exact 16x16 script converges in 13 steps
+  with terminal residual `9.1258e-9`, profile L2 error `0.03742`, and charge
+  residual `6.09e-19`.
+- Routed modifications through a compact code/evidence table and the single
+  maintained `hartmann_example.py` rather than adding another example file.
+  Fringing, extruded differentiation, and Q2D are explicitly advanced
+  research workflows instead of appearing as the first general-use recipe.
+- Reduced the README fringing construction from a 41x40x32 study-sized case to
+  the maintained portable 7x6x6 workflow and made its evidence boundary
+  explicit. Its bounded demonstration reports `step_limit`, residual
+  `1.2280e-4`, mass residual `1.4838e-5`, charge residual `4.29e-14`, and
+  boundary-current residual `2.38e-17`; users are instructed to require
+  convergence plus mesh/work independence before accepting observables.
+- Corrected the active-plan pointer so it no longer schedules either of the
+  already rejected transient correction candidates. The sole next numerical
+  change is the audited square steady B2 residual; this documentation tranche
+  does not reopen broad trimming or another solver experiment.
+- The documentation-only gate passes: all 18 Sphinx sources build with warnings
+  as errors, the architecture audit remains at 15 modules, 14,793 package
+  lines, 28 root exports, and seven curated examples, and the change-aware
+  selector correctly schedules no Python suite for `README.md` and `plan.md`.
