@@ -27,12 +27,12 @@ algorithms.
 | Gradient-based field, wall, or geometry design | `python examples/variable_field_extruded_demo.py` | Production 3-D fields, checked gradients, and bounded optimization |
 | Depth-averaged strong-field dynamics | `python examples/q2d_turbulence_demo.py` | Q2D vorticity, energy/enstrophy histories, poster, and optional movie |
 
-The first three fully developed examples are stable portable entry points. The
+The CLI, Hartmann, and Hunt workflows are stable portable entry points. The
 wall, 3-D, design, and Q2D examples are research-stage workflows: they exercise
 real supported equations, but their small default meshes are demonstrations,
 not publication validation.
 
-## Install and run
+## Install
 
 LMX is currently installed from source; there is no LMX release on PyPI yet.
 
@@ -43,20 +43,73 @@ python -m pip install -e ".[visualization]"
 lmx examples/hartmann_case.toml
 ```
 
-Or use the same API from Python:
+The last command is a complete smoke test. It should finish with a terminal
+status and conservation diagnostics. JAX selects the CPU by default. Install
+the accelerator-specific JAX wheel by following the
+[JAX installation guide](https://docs.jax.dev/en/latest/installation.html).
+
+## Build your first study
+
+The script below constructs an insulating Hartmann duct, solves it, rejects an
+unfinished solve, compares the full centerline with the analytical solution,
+and writes fields and profiles. Save it as `first_study.py` and run
+`python first_study.py`.
 
 ```python
+from pathlib import Path
+
 import lmx
+from lmx.io import write_solution_outputs
+from lmx.validation import hartmann_validation
 
-case = lmx.make_hartmann_case(ha=20.0, ny=48, nz=48)
-result = lmx.solve(case)
+ha = 10.0
+output_dir = Path("artifacts/first-study")
 
-print(result.status, result.steps, result.residual)
-print(result.diagnostics.charge_balance_residual_history[-1])
+# 1. Define the physics, geometry, materials, mesh, and output location.
+case = lmx.make_hartmann_case(
+    ha=ha,
+    width=2.0,
+    height=2.0,
+    ny=16,
+    nz=16,
+    conductivity=1.0,
+    density=1.0,
+    viscosity=1.0,
+    output_dir=str(output_dir),
+)
+
+# 2. Solve through the common API and fail closed on an incomplete run.
+solution = lmx.solve(case)
+if not solution.converged:
+    raise RuntimeError(
+        f"solve ended with {solution.status!r} after {solution.steps} steps"
+    )
+
+# 3. Validate the observable that matters for this reference problem.
+comparison = hartmann_validation(solution, ha)
+charge = float(solution.diagnostics.charge_balance_residual_history[-1])
+
+# 4. Save ParaView fields, CSV profiles, and a restart-capable NPZ file.
+generated = write_solution_outputs(solution, case, output_dir)
+
+print(f"status={solution.status}, residual={solution.residual:.3e}")
+print(f"profile L2 error={comparison.l2_error:.3e}, charge={charge:.3e}")
+print({kind: [str(path) for path in paths] for kind, paths in generated.items()})
 ```
 
-JAX selects the CPU by default. Install the accelerator-specific JAX wheel by
-following the [JAX installation guide](https://docs.jax.dev/en/latest/installation.html).
+To turn this into a research case, change one layer at a time and keep the
+validation step beside the solve:
+
+| Change | Code to use | Evidence to add |
+|---|---|---|
+| Field strength or mesh | `make_hartmann_case(ha=..., ny=..., nz=...)` | observable versus at least three mesh levels |
+| Forcing or solver controls | `dataclasses.replace(case, forcing=..., time_stepper=...)` | tolerance and iteration independence |
+| Conducting wall layers | `make_hunt_case(...)` or `generate_multilayer_duct_mesh(...)` | interface-current and wall-resolution checks |
+| Your post-processing | `solution.fields` and `solution.diagnostics` | units, normalization, and an acceptance threshold |
+
+The fully worked [`examples/hartmann_example.py`](examples/hartmann_example.py)
+adds editable numerical controls, JSON reporting, analytical curves, and plot
+generation without introducing another API.
 
 ## Run the examples
 
@@ -82,21 +135,13 @@ The design figure's middle curve contains all 41 optimization iterates. The
 left panel shows the seven actual axial design stations; they are control
 points, not a claimed mesh-convergence curve.
 
-## Apply LMX to your problem
+## Advanced: 3-D fringing and extruded fields
 
-An LMX study has four explicit layers:
-
-1. Choose the closest retained model: fully developed 2-D, generic extruded
-   3-D duct/pipe, or periodic Q2D.
-2. Define geometry, material regions, imposed field, forcing, and numerical
-   controls with immutable case objects or a convenience builder.
-3. Solve and inspect termination together with mass, charge, interface-current,
-   and momentum/energy diagnostics.
-4. Establish mesh, tolerance, and external-code independence for the observable
-   you intend to publish. A portable example result is not that evidence.
-
-For example, start a layered 3-D duct with a smooth transverse fringe, then
-edit only the quantities that define your experiment:
+Use the extruded API after the fully developed workflow is familiar. It adds
+axial velocity components, pressure projection, spatially varying imposed
+fields, explicit wall regions, restart state, and stationwise conservation
+checks. The following script constructs the problem, replaces its field and
+forcing, solves it, and checks its three principal conservation diagnostics:
 
 ```python
 from dataclasses import replace
@@ -108,22 +153,25 @@ from lmx.fringing import (
 )
 
 problem = build_layered_duct_extruded_problem(
-    ha_peak=30.0,
+    ha_peak=6.0,
     width=2.0,
     height=1.4,
-    length=8.0,
-    nx_stations=41,
-    ny=40,
-    nz=32,
-    wall_cells=3,
+    length=3.0,
+    nx_stations=7,
+    ny=6,
+    nz=6,
+    wall_cells=1,
     wall_thickness=0.08,
+    entry_center=0.75,
+    exit_center=2.25,
+    transition_width=0.25,
 )
 profile = smooth_fringing_profile(
-    length=8.0,
-    nx=41,
-    entry_center=2.0,
-    exit_center=6.0,
-    transition_width=0.3,
+    length=3.0,
+    nx=7,
+    entry_center=0.75,
+    exit_center=2.25,
+    transition_width=0.25,
     axis="z",
 )
 problem = replace(
@@ -133,11 +181,20 @@ problem = replace(
 )
 result = lmx.solve(problem)
 
-print(result.status)
-print(result.validation.max_divergence_residual)
-print(result.validation.max_charge_balance_residual)
-print(result.validation.net_boundary_current_residual)
+checks = {
+    "status": result.status,
+    "residual": result.residual,
+    "mass": result.validation.max_divergence_residual,
+    "charge": result.validation.max_charge_balance_residual,
+    "boundary_current": result.validation.net_boundary_current_residual,
+}
+print(checks)
 ```
+
+This mesh is intentionally small enough for a portable demonstration. Its
+bounded solve may report `step_limit`; do not treat that state as an accepted
+steady result. Increase the mesh and work limits together, perform mesh and
+tolerance studies, and require `result.converged` for production observables.
 
 Use `build_square_duct_extruded_problem` for an insulating rectangular duct,
 `build_layered_duct_extruded_problem` for explicit wall regions,
@@ -147,7 +204,7 @@ Analytic and tabulated divergence-free imposed fields share the same solve
 interface. Restart, NPZ, CSV, VTK/ParaView, and plotting helpers are documented
 in the [output guide](https://lmx.readthedocs.io/en/latest/how_to/restart_and_output.html).
 
-### Differentiate a design response
+### Advanced: differentiate a design response
 
 Generic rectangular/layered ducts and straight pipes expose the same finite
 production recurrence through `evolve_extruded_fields`. Continuous forcing,
@@ -179,7 +236,7 @@ divisible axial mesh. Treat mesh, topology, discrete boundary kinds, iteration
 counts, and sharding layout as static controls; independently check selected
 gradients before using them in an optimizer.
 
-### Evolve Q2D flow
+### Advanced: evolve Q2D flow
 
 ```python
 import lmx
