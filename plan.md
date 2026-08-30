@@ -4256,3 +4256,8 @@ surface, measurements, validation, decision, and next action.
   as errors, the architecture audit remains at 15 modules, 14,793 package
   lines, 28 root exports, and seven curated examples, and the change-aware
   selector correctly schedules no Python suite for `README.md` and `plan.md`.
+- PR #53's CI, documentation, and external-validation entry jobs each ended in
+  two to three seconds without executing a step. All three annotations report
+  the account payment/spending-limit condition and every downstream job was
+  skipped, so the complete local documentation gate is merge authority under
+  the active temporary policy.
