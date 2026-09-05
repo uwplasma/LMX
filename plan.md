@@ -575,8 +575,8 @@ Cache by OS/Python/JAX/SOLVAX/config with correct invalidation; cold profiles
 must bypass compilation cache. Combine disjoint full-shard coverage and fail
 on missing evidence. Keep inexpensive literature/physics tests in PRs.
 
-Billing prevents hosted execution; it is an operational blocker, not a
-numerical performance issue. Never hide failed checks. A maintainer-authorized
+Hosted execution is available: PR #54 passed on 2026-09-04 after the audit's
+billing-blocked runs. Never hide failed checks. A maintainer-authorized
 local-evidence exception applies only when annotations prove jobs never
 started and equivalent gates pass on the exact source. It does not waive real
 failures, SOLVAX coverage or final reproducibility. Do not merge new algorithm
@@ -646,16 +646,32 @@ method/data before freezing its benchmark.
   commit `83cfe56`; its hosted checks passed. Billing is not blocking new runs.
 - Active branch: `codex/q2d-input-precision`; base: `83cfe56`.
 - User approved this roadmap on 2026-09-04 and requested it be pushed.
-- Active M0 work: shared Q2D real-dtype promotion at both public entry points,
-  analytic mixed-precision/JVP/VJP tests and documentation; not yet qualified.
+- M0 Q2D work is pushed in [PR #55](https://github.com/uwplasma/LMX/pull/55),
+  initial source `8afa612`: shared real-dtype promotion, analytic field/AD
+  regressions and executable documentation. Local qualification passed;
+  hosted CI exposed a B2 single-device sharding assumption and two compile
+  timeouts. Follow-up fixes require new hosted qualification before merging.
 - Qualification found SOLVAX 0.17 cannot collect the existing Schur tests.
-  Package minimum and CI pins now agree on 0.19; full qualification must run
-  on that version. Initial 0.17 run is failed evidence, not usable coverage.
+  Package minimum and CI pins now agree on 0.19. Full local qualification on
+  that version passed. Initial 0.17 results are failed evidence, not coverage.
 - Next physical work: F2. Define pressure-tap versus boundary/body-force work
   before changing `extruded_engineering_objectives`; avoid double counting
   prescribed pressure forcing. Include transient storage and geometry scaling.
-- Existing evidence: 501 tests / 95.22% on unchanged numerical source;
-  updated README/Q2D snippets, Sphinx, architecture and local links pass.
+  Use pressure–velocity quadrature, not mean pressure times flow when profiles
+  vary; distinguish cell-center tap planes from actual domain boundaries.
+- Current local evidence: 507 tests / 95.22%, 259.9 s end-to-end; Q2D 100%.
+  Python 3.11.14 / JAX 0.10.2 / SOLVAX 0.19.0. Ruff, architecture/import,
+  standalone Q2D snippet, Sphinx, isolated build and Twine passed. Reproduce:
+  `.venv/bin/python scripts/run_full_test_suite.py --coverage-xml artifacts/q2d-precision-coverage.xml --junit-xml artifacts/q2d-precision-junit.xml`.
+  [Qualification record](https://github.com/uwplasma/LMX/pull/55#issuecomment-5549401799).
+- CI repair: B2 treats non-mesh single-device placement as unpartitioned;
+  sharding AD reuses the primal's reduced controls and inherits thread limits.
+  Move the heavy B1 AD case to the lighter physics shard without dropping it.
+  Cold-test limits are 120 s for sharding / 300 s for B1; the 540 s shard
+  budget remains unchanged. Follow-up local gate: 28 affected tests passed in
+  39.9 s. Collection proves 508 CI cases covered exactly once (335 support,
+  49 fringing, 124 physics; includes one curated case excluded locally).
+  Measure the new hosted run; do not infer cold speedup from cached local runs.
 - Raw profiles are local ignored artifacts, not available from a fresh clone.
   All headline results and limitations are recorded in sections 2–3.
 - Before resuming: fetch origin, inspect branch/PR status and working-tree
@@ -671,4 +687,5 @@ evidence, unresolved gate and next action. Keep this active plan below about
 |---|---|---|
 | 2026-09-04 | Source/docs/tests/history/literature review; fresh 501-test/95.22% gate; architecture/docs passed; normal clone 3.56 MiB; CPU and real one-/two-GPU traces/profiles/parity | F1–F13 recorded; production B1/B2, objective correctness, actual peak-memory campaign and full device-design gradients remain open |
 | 2026-09-04 | Replaced 4,263-line historical plan with this evidence-led roadmap; repaired README gradient shape, standalone Q2D snippet and contributor link; qualified generic momentum, pump-work and Q2D acceptance claims | M0 documentation partially addressed; begin physical-objective/dtype regression work in PR A. No new PDE/SOLVAX algorithm or blanket result certified |
-| 2026-09-04 | Roadmap merged in #54 with passing hosted checks. M0 Q2D promotion and six additional cases implemented; test budget explicitly raised 11,950→12,010 (57 lines), no new files/API. Corrected minimum/CI SOLVAX 0.17→0.19 after Schur import failure | Qualification in progress; initial run: 454 pass, 3 budget failures, 1 collection error, invalid 87.15% coverage. Requalify on 0.19. F2 and Q2D energy acceptance remain open; no SOLVAX algorithm change |
+| 2026-09-04 | #54 merged; #55 Q2D precision fix: 507 local tests / 95.22%, Q2D 100%, 259.9 s on SOLVAX 0.19. Six additional cases; test budget 11,950→12,010 (57 lines), no new files/API. Minimum/CI SOLVAX corrected to 0.19 | Initial 0.17 run failed (454 pass, 3 budget failures, 1 collection error); successful complete rerun supersedes it. Hosted #55 gates govern merge. F2 and Q2D energy acceptance remain open; no SOLVAX algorithm change |
+| 2026-09-04 | Hosted #55 found a single-device B2 assumption and cold compile timeouts. Fixed the type guard, reused reduced sharding AD controls/thread limits and redistributed B1. 28 affected local tests pass (39.9 s); all 508 CI cases partition exactly once | New hosted coverage required before #55 merges. No numerical assertions/tolerances removed; cached local timings are not a cold CI speed claim |

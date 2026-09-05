@@ -132,7 +132,7 @@ def _mock_extruded_bundle(*, geometry_kind: str, stations: int) -> ExtrudedField
     )
 
 
-@pytest.mark.timeout(180)
+@pytest.mark.timeout(300)
 def test_alex_b1_production_map_has_bounded_implicit_gradient():
     problem = build_benchmark_b_problem("B1-fringing-pipe", mesh_level="coarse")
     case = replace(
@@ -1844,7 +1844,7 @@ def test_extruded_sharding_validates_placement_and_supported_paths(
         assert jnp.all(placed[0] == 1)
 
 
-@pytest.mark.timeout(60)
+@pytest.mark.timeout(120)
 def test_generic_extruded_sharding_matches_primal_and_gradient_on_two_devices():
     root = Path(__file__).resolve().parents[1]
     code = """
@@ -1889,10 +1889,11 @@ for problem in problems:
     assert len(sharded[0].addressable_shards) == 2
     assert all(part.data.shape[0] == 2 for part in sharded[0].addressable_shards)
     if problem.case.geometry.kind == "rect_duct":
+        duct_problem = problem
         solved = solve_extruded_inductionless(problem, num_devices=2)
         assert len(solved.bundle.u.addressable_shards) == 2
 
-problem = problems[0]
+problem = duct_problem
 parameters = jnp.ones(5)
 def objective(values, devices):
     fields = evolve_extruded_fields(
@@ -1915,9 +1916,9 @@ np.testing.assert_allclose(reference[1], sharded[1], rtol=2.0e-8, atol=2.0e-14)
         "JAX_ENABLE_X64": "true",
         "JAX_PLATFORMS": "cpu",
         "PYTHONPATH": str(root / "src"),
-        "XLA_FLAGS": "--xla_force_host_platform_device_count=2",
+        "XLA_FLAGS": f"{os.environ.get('XLA_FLAGS', '')} --xla_force_host_platform_device_count=2",
     }
-    subprocess.run([sys.executable, "-c", code], cwd=root, env=environment, timeout=60, check=True)
+    subprocess.run([sys.executable, "-c", code], cwd=root, env=environment, timeout=120, check=True)
 
 
 def test_fringing_profile_and_constant_field_builders():
