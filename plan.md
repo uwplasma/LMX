@@ -642,10 +642,18 @@ method/data before freezing its benchmark.
 
 ### Resume checkpoint
 
-- Active branch: `codex/research-roadmap-20260904`; base: audited `d85fb5b`.
+- Roadmap merged as [PR #54](https://github.com/uwplasma/LMX/pull/54),
+  commit `83cfe56`; its hosted checks passed. Billing is not blocking new runs.
+- Active branch: `codex/q2d-input-precision`; base: `83cfe56`.
 - User approved this roadmap on 2026-09-04 and requested it be pushed.
-- Next work: M0 / PR A. Start with objective definitions and Q2D dtype
-  regression tests; numerical fixes must not be inferred from documentation.
+- Active M0 work: shared Q2D real-dtype promotion at both public entry points,
+  analytic mixed-precision/JVP/VJP tests and documentation; not yet qualified.
+- Qualification found SOLVAX 0.17 cannot collect the existing Schur tests.
+  Package minimum and CI pins now agree on 0.19; full qualification must run
+  on that version. Initial 0.17 run is failed evidence, not usable coverage.
+- Next physical work: F2. Define pressure-tap versus boundary/body-force work
+  before changing `extruded_engineering_objectives`; avoid double counting
+  prescribed pressure forcing. Include transient storage and geometry scaling.
 - Existing evidence: 501 tests / 95.22% on unchanged numerical source;
   updated README/Q2D snippets, Sphinx, architecture and local links pass.
 - Raw profiles are local ignored artifacts, not available from a fresh clone.
@@ -663,3 +671,4 @@ evidence, unresolved gate and next action. Keep this active plan below about
 |---|---|---|
 | 2026-09-04 | Source/docs/tests/history/literature review; fresh 501-test/95.22% gate; architecture/docs passed; normal clone 3.56 MiB; CPU and real one-/two-GPU traces/profiles/parity | F1–F13 recorded; production B1/B2, objective correctness, actual peak-memory campaign and full device-design gradients remain open |
 | 2026-09-04 | Replaced 4,263-line historical plan with this evidence-led roadmap; repaired README gradient shape, standalone Q2D snippet and contributor link; qualified generic momentum, pump-work and Q2D acceptance claims | M0 documentation partially addressed; begin physical-objective/dtype regression work in PR A. No new PDE/SOLVAX algorithm or blanket result certified |
+| 2026-09-04 | Roadmap merged in #54 with passing hosted checks. M0 Q2D promotion and six additional cases implemented; test budget explicitly raised 11,950→12,010 (57 lines), no new files/API. Corrected minimum/CI SOLVAX 0.17→0.19 after Schur import failure | Qualification in progress; initial run: 454 pass, 3 budget failures, 1 collection error, invalid 87.15% coverage. Requalify on 0.19. F2 and Q2D energy acceptance remain open; no SOLVAX algorithm change |
