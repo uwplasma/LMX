@@ -861,9 +861,20 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
     zero_velocity = jnp.zeros_like(velocity)
     compact_flux = jnp.zeros((3, *shape))
     lorentz = jnp.broadcast_to(jnp.asarray([1.0, 2.0, 3.0]), velocity.shape)
+    production_defect = duct_impl._b2_momentum_functions(
+        case=SimpleNamespace(forcing=0.0),
+        shape=shape,
+        fluid_bounds=(0, shape[1], 0, shape[2]),
+        metric=(dt, dx, dy, dz),
+        target_flow_rate=1.0,
+        electromagnetic_force_scale=2.0,
+        momentum_iterations=10,
+        momentum_tolerance=1e-10,
+        field_sharding=None,
+    )[2]
 
     def defect(scale):
-        return duct_impl._duct_momentum_defect(
+        return production_defect(
             zero_velocity,
             scale * lorentz,
             jnp.ones(shape),
@@ -871,17 +882,29 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
             compact_flux,
             jnp.zeros(shape[1:]),
             jnp.zeros(shape),
-            forcing=0.0,
-            force_scale=2.0,
-            dt=dt,
-            dx=dx,
-            dy=dy,
-            dz=dz,
         )
 
     expected_defect = jnp.asarray([0.5, 1.0, 1.5, 1.5])
     assert jax.jit(defect)(1.0) == pytest.approx(expected_defect)
     assert jax.jvp(defect, (1.0,), (1.0,))[1] == pytest.approx(expected_defect)
+
+    def residual(force):
+        return duct_impl._duct_momentum_residual(
+            zero_velocity,
+            force,
+            jnp.ones(shape),
+            jnp.zeros(shape),
+            compact_flux,
+            jnp.zeros(shape[1:]),
+            jnp.zeros(shape),
+            forcing=0.5,
+            dx=dx,
+            dy=dy,
+            dz=dz,
+        )
+
+    np.testing.assert_allclose(residual(lorentz), -lorentz.at[..., 0].add(0.5), atol=1e-12)
+    np.testing.assert_allclose(jax.jvp(residual, (lorentz,), (lorentz,))[1], -lorentz, atol=1e-12)
 
 
 def test_limited_linear_vector_convection_matches_manufactured_conservation_and_autodiff():
@@ -920,7 +943,7 @@ def test_limited_linear_vector_convection_matches_manufactured_conservation_and_
     )
     q = jnp.sum(velocity**2, axis=-1)
     q_patches = tuple(jnp.sum(value**2, axis=-1) for value in boundary_velocity)
-    least_squares = duct_impl._cell_limited_least_squares_gradient_duct
+    least_squares = duct_impl._least_squares_gradient_duct
     gradients = least_squares(q, q_patches, (dx, dy, dz))
     j, k = 3, 1
 
@@ -1005,7 +1028,7 @@ def test_explicit_deviatoric_stress_matches_independent_finite_volume_oracle():
     patches = (np.zeros((*shape[1:], 3)), velocity[-1], zero_y, zero_y, zero_z, zero_z)
 
     def reference(field, boundary):
-        gradients, neighbours = [], []
+        gradients = []
         for axis, width in enumerate(widths):
             values = np.moveaxis(field, axis, 0)
             lo = np.concatenate((boundary[2 * axis][None], values[:-1]))
@@ -1018,26 +1041,7 @@ def test_explicit_deviatoric_stress_matches_independent_finite_volume_oracle():
             gradients.append(
                 np.moveaxis((wm * (values - lo) / dm + wp * (hi - values) / dp) / (wm + wp), 0, axis)
             )
-            neighbours.extend((np.moveaxis(lo, 0, axis), np.moveaxis(hi, 0, axis)))
-        local = np.stack((field, *neighbours))
-        minimum, maximum, limiter = local.min(0), local.max(0), np.ones_like(field)
-        for axis, (gradient, width) in enumerate(zip(gradients, widths, strict=True)):
-            reshape = [1, 1, 1, 1]
-            reshape[axis] = shape[axis]
-            for extrapolate in (
-                -0.5 * width.reshape(reshape) * gradient,
-                0.5 * width.reshape(reshape) * gradient,
-            ):
-                delta = np.where(extrapolate > 0, maximum - field, minimum - field)
-                limiter = np.minimum(
-                    limiter,
-                    np.where(
-                        abs(extrapolate) > 1e-15,
-                        np.minimum(delta / np.where(abs(extrapolate) > 1e-15, extrapolate, 1), 1),
-                        1,
-                    ),
-                )
-        gradient = np.stack(tuple(limiter * value for value in gradients), axis=-2)
+        gradient = np.stack(gradients, axis=-2)
         result, eye = np.zeros_like(field), np.eye(3)
         for axis, width in enumerate(widths):
 
@@ -1073,6 +1077,7 @@ def test_explicit_deviatoric_stress_matches_independent_finite_volume_oracle():
     expected = reference(velocity, patches)
     assert jax.jit(evaluate)(1.0) == pytest.approx(expected, abs=2.0e-6)
     assert jax.jvp(evaluate, (1.0,), (1.0,))[1] == pytest.approx(expected, abs=3.0e-6)
+    assert jax.jvp(evaluate, (0.0,), (1.0,))[1] == pytest.approx(expected, abs=3.0e-6)
 
     uniform = (jnp.full((5,), 0.2), jnp.full((4,), 0.3), jnp.full((3,), 0.4))
     profile = jnp.arange(12.0).reshape(4, 3) / 20.0
@@ -1133,8 +1138,8 @@ def test_frozen_momentum_setup_preserves_primal_jvp_and_vjp():
             q_patches,
         )
         scalar = tuple(
-            duct_impl._cell_limited_least_squares_gradient_duct(field, boundary, widths)
-            for field, boundary in zip(fields, boundary_fields, strict=True)
+            duct_impl._least_squares_gradient_duct(field, boundary, widths, limit=index == 3)
+            for index, (field, boundary) in enumerate(zip(fields, boundary_fields, strict=True))
         )
         gradient = jnp.stack(tuple(jnp.stack(value, axis=-1) for value in scalar[:3]), axis=-1)
         weights = duct_impl._limited_linear_vector_face_weights_duct(
@@ -1284,6 +1289,46 @@ def test_duct_pressure_operator_has_independent_energy_and_rank_contract(mixed):
     np.testing.assert_allclose(operator(jnp.ones(size)), oracle @ np.ones(size), atol=1e-12)
     gradient = jax.jit(jax.grad(lambda p: 0.5 * jnp.vdot(p, operator(p))))(pressure)
     np.testing.assert_allclose(gradient, oracle @ pressure, atol=1e-12)
+
+
+def test_b2_stokes_residual_has_consistent_resting_jacobian():
+    shape, size = (3, 3, 3), 27
+    density, widths = jnp.ones(shape), jnp.ones(3)
+
+    def residual(state):
+        velocity, pressure = state[: 3 * size].reshape((*shape, 3)), state[3 * size :].reshape(shape)
+        momentum = duct_impl._duct_momentum_residual(
+            velocity,
+            jnp.zeros_like(velocity),
+            density,
+            density,
+            jnp.zeros((3, *shape)),
+            jnp.zeros(shape[1:]),
+            pressure,
+            forcing=0.0,
+            dx=1.0,
+            dy=widths,
+            dz=widths,
+        )
+        continuity = duct_impl._duct_velocity_divergence(
+            velocity,
+            jnp.zeros(shape[1:]),
+            dx=1.0,
+            dy=widths,
+            dz=widths,
+        )
+        return jnp.concatenate((momentum.ravel(), continuity.ravel()))
+
+    state = jnp.zeros(4 * size)
+    matrix = np.asarray(jax.jacfwd(residual)(state))
+    assert np.isfinite(matrix).all() and np.linalg.matrix_rank(matrix, tol=1e-10) == 4 * size
+    # Mixed outlet pressure removes the gauge; pressure and continuity are adjoints.
+    np.testing.assert_allclose(matrix[: 3 * size, 3 * size :], -matrix[3 * size :, : 3 * size].T, atol=1e-12)
+    direction = jnp.sin(jnp.arange(4 * size) + 0.2)
+    tangent = matrix @ direction
+    for step in (1e-3, 1e-5, 1e-7):
+        difference = (residual(state + step * direction) - residual(state - step * direction)) / (2 * step)
+        np.testing.assert_allclose(difference, tangent, rtol=1e-10, atol=1e-12)
 
 
 def test_nonuniform_face_flux_projection_closes_discrete_divergence():

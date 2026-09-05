@@ -325,12 +325,14 @@ def _solvax_implicit_momentum_duct(
     return solved.reshape(shape), residual, converged
 
 
-def _cell_limited_least_squares_gradient_duct(
+def _least_squares_gradient_duct(
     field: jnp.ndarray,
     boundary_values: tuple[jnp.ndarray, ...],
     widths: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
+    *,
+    limit: bool | jnp.ndarray = True,
 ) -> tuple[jnp.ndarray, ...]:
-    """Return cell-limited least-squares gradients."""
+    """Return least-squares gradients, limiting only selected field components."""
     gradients, neighbours = [], []
     for axis, width in enumerate(widths):
         values = jnp.moveaxis(field, axis, 0)
@@ -346,6 +348,8 @@ def _cell_limited_least_squares_gradient_duct(
         gradient = (lo_weight * (values - lo) / dm + hi_weight * (hi - values) / dp) / (lo_weight + hi_weight)
         gradients.append(jnp.moveaxis(gradient, 0, axis))
         neighbours.extend((jnp.moveaxis(lo, 0, axis), jnp.moveaxis(hi, 0, axis)))
+    if limit is False:
+        return tuple(gradients)
     local = jnp.stack((field, *neighbours))
     minimum, maximum = jnp.min(local, axis=0), jnp.max(local, axis=0)
     limiter = jnp.ones_like(field)
@@ -358,7 +362,7 @@ def _cell_limited_least_squares_gradient_duct(
             ratio = delta / jnp.where(jnp.abs(extrapolate) > 1.0e-15, extrapolate, 1.0)
             bounded = jnp.where(jnp.abs(extrapolate) > 1.0e-15, jnp.minimum(ratio, 1.0), 1.0)
             limiter = jnp.minimum(limiter, bounded)
-    return tuple(limiter * gradient for gradient in gradients)
+    return tuple(jnp.where(limit, limiter, 1.0) * gradient for gradient in gradients)
 
 
 def _explicit_deviatoric_stress_duct(
@@ -369,10 +373,10 @@ def _explicit_deviatoric_stress_duct(
     *,
     gradient: jnp.ndarray | None = None,
 ) -> jnp.ndarray:
-    """Return limited ``div(mu*dev2(T(grad(U))))``."""
+    """Return Newtonian ``div(mu*dev2(T(grad(U))))`` without slope limiting."""
     if gradient is None:
         gradient = jnp.stack(
-            _cell_limited_least_squares_gradient_duct(velocity, boundary_velocity, widths), axis=-2
+            _least_squares_gradient_duct(velocity, boundary_velocity, widths, limit=False), axis=-2
         )
     identity = jnp.eye(3, dtype=velocity.dtype)
 
@@ -423,7 +427,7 @@ def _limited_linear_vector_face_weights_duct(
     q = jnp.sum(velocity**2, axis=-1)
     gradients = gradient
     if gradients is None:
-        gradients = _cell_limited_least_squares_gradient_duct(
+        gradients = _least_squares_gradient_duct(
             q, tuple(jnp.sum(value**2, axis=-1) for value in boundary_velocity), widths
         )
     weights = []
@@ -485,7 +489,9 @@ def _frozen_duct_momentum_setup(
         jnp.concatenate((patch, jnp.sum(patch**2, axis=-1, keepdims=True)), axis=-1)
         for patch in boundary_velocity
     )
-    gradients = _cell_limited_least_squares_gradient_duct(packed, packed_patches, widths)
+    gradients = _least_squares_gradient_duct(
+        packed, packed_patches, widths, limit=jnp.asarray([False, False, False, True])
+    )
     dynamic_viscosity = density * viscosity
     coefficients = _variable_diffusion_coefficients_3d(
         dynamic_viscosity, dx=dx, dy=widths[1], dz=widths[2], validated_spacing=True
@@ -884,7 +890,7 @@ def _face_flux_pressure_projection_duct(
     )
 
 
-def _duct_momentum_defect(
+def _duct_momentum_residual(
     velocity: jnp.ndarray,
     lorentz_force: jnp.ndarray,
     density: jnp.ndarray,
@@ -894,14 +900,12 @@ def _duct_momentum_defect(
     pressure: jnp.ndarray,
     *,
     forcing: float,
-    force_scale: float,
-    dt: float,
     dx: float,
     dy: jnp.ndarray,
     dz: jnp.ndarray,
     field_sharding: NamedSharding | None = None,
 ) -> jnp.ndarray:
-    """Return componentwise and total post-map electromagnetic momentum defects."""
+    """Return the signed steady momentum residual in force-density units."""
 
     shape = velocity.shape
     dx_widths = jnp.full((shape[0],), dx, dtype=velocity.dtype)
@@ -926,11 +930,7 @@ def _duct_momentum_defect(
     )
 
     pressure_force = _duct_pressure_force(pressure, dx=dx, dy=dy, dz=dz, field_sharding=field_sharding)
-    residual = (
-        convection - diffusion - deviatoric_stress - lorentz_force.at[..., 0].add(forcing) - pressure_force
-    )
-    component_maxima = jnp.max(jnp.abs(residual), axis=(0, 1, 2)) / force_scale
-    return jnp.concatenate((component_maxima, jnp.max(component_maxima)[None]))
+    return convection - diffusion - deviatoric_stress - lorentz_force.at[..., 0].add(forcing) - pressure_force
 
 
 def _conservative_current_fluxes_3d(
@@ -1156,7 +1156,7 @@ def _b2_momentum_functions(
         return (*solved, momentum_mobility)
 
     def momentum_defect(velocity, force, density, viscosity, rho_phi_plus, rho_phi_inlet, pressure):
-        return _duct_momentum_defect(
+        residual = _duct_momentum_residual(
             velocity[:, y0:y1, z0:z1],
             force[:, y0:y1, z0:z1],
             density[:, y0:y1, z0:z1],
@@ -1165,13 +1165,13 @@ def _b2_momentum_functions(
             rho_phi_inlet,
             pressure[:, y0:y1, z0:z1],
             forcing=float(case.forcing),
-            force_scale=electromagnetic_force_scale,
-            dt=dt,
             dx=dx,
             dy=local_dy,
             dz=local_dz,
             field_sharding=field_sharding,
         )
+        maxima = jnp.max(jnp.abs(residual), axis=(0, 1, 2)) / electromagnetic_force_scale
+        return jnp.concatenate((maxima, jnp.max(maxima)[None]))
 
     def embed_velocity(local_velocity, mask):
         embedded = jnp.pad(local_velocity, ((0, 0), (y0, ny - y1), (z0, nz - z1), (0, 0)))
