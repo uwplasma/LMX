@@ -677,9 +677,15 @@ method/data before freezing its benchmark.
   the forced-device flag yields two devices, appending yields one. Correct
   ordering preserves thread limits; full sharding/AD test with the CI flags
   passes locally in 24.6 s. Require fresh hosted coverage before merge.
-- Next F2 tranche is pushed on `codex/pressure-tap-work` at `ca16b0e`, based on
-  `d5823b8`. Its pressure-tap flux-work regression and docs pass; no total pump
-  work claim. Rebase onto qualified main after #55; do not lose this branch.
+- At `b9a6beb`, all 49 fringing cases pass (423.08 s, sharding 71.92 s), as do
+  physics/docs/architecture/FreeMHD. Support twice has 334 passes plus a 60 s
+  design-example timeout. Set only that subprocess limit to 120 s; preserve
+  all 41 iterates, gradient/physics assertions and the 540 s whole-shard budget.
+  Cold local example passes in 35.1 s; earlier hosted example passed in 43.58 s.
+  This is timeout robustness, not a speedup. Require fresh hosted coverage.
+- Next F2 tranche is pushed on `codex/pressure-tap-work`, based on `d5823b8`.
+  Its 33 affected tests pass in 100.9 s and clean docs pass; no total pump-work
+  claim. Rebase onto qualified main after #55; do not lose this branch.
 - Raw profiles are local ignored artifacts, not available from a fresh clone.
   All headline results and limitations are recorded in sections 2–3.
 - Before resuming: fetch origin, inspect branch/PR status and working-tree
