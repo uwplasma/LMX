@@ -1000,6 +1000,7 @@ def build_benchmark_b_problem(
         ),
         solver=SolverConfig(
             kind="extruded_inductionless",
+            extruded_formulation="b1_finite_volume" if case_id == "B1-fringing-pipe" else "b2_finite_volume",
             coupling_iterations=64,
             coupling_tolerance=float(spec["solver"]["steady_residual_max"]),
             coupling_acceleration=str(spec["solver"]["coupling_acceleration"]),

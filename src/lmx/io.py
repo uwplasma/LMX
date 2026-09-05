@@ -247,6 +247,7 @@ def write_extruded_solution_npz(solution, case, path: str | Path) -> Path:
         "solver_kind": case.solver.kind,
         "station_count": int(bundle.x.shape[0]),
         "description": "LMX extruded inductionless solution dump",
+        "extruded_formulation": case.solver.extruded_formulation,
     }
     np.savez_compressed(
         path,
@@ -342,6 +343,7 @@ def write_extruded_bundle_restart_npz(
         "station_count": int(bundle.x.shape[0]),
         "restart_schema": restart_schema,
         "stopping_state": list(stopping_state),
+        "extruded_formulation": case.solver.extruded_formulation,
     }
     np.savez_compressed(
         path,
@@ -559,6 +561,9 @@ def validate_restart_bundle(
 def validate_extruded_restart_bundle(bundle: ExtrudedRestartBundle, *, case) -> None:
     from .mesh import _cross_section_mesh
 
+    formulation = bundle.metadata.get("extruded_formulation", "stokes_projection")
+    if formulation != case.solver.extruded_formulation:
+        raise ValueError("Extruded restart formulation does not match the current solver")
     if bundle.geometry_kind not in {"unknown", case.geometry.kind}:
         raise ValueError(
             f"Extruded restart geometry_kind {bundle.geometry_kind!r} does not match current case geometry {case.geometry.kind!r}"

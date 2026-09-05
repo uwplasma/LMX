@@ -42,7 +42,7 @@ jobs:
             exit 0
           fi
           changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
-          if grep -Eq '^(src/lmx/|validation/|tests/|examples/|pyproject\.toml$|MANIFEST\.in$)' <<< "$changed"; then
+          if grep -Eq '^(\.github/|src/lmx/|validation/|tests/|examples/|pyproject\.toml$|MANIFEST\.in$)' <<< "$changed"; then
             echo "full=true" >> "$GITHUB_OUTPUT"
             echo "targeted=false" >> "$GITHUB_OUTPUT"
           elif grep -Eq '^scripts/' <<< "$changed"; then

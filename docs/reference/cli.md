@@ -42,3 +42,12 @@ The schema maps directly to the Python dataclasses:
 Start from `examples/hartmann_case.toml`. Unknown keys, inconsistent geometry,
 nonphysical material values, and unsupported solver combinations fail during
 configuration rather than entering the numerical solve.
+
+For extruded flow, `[solver].extruded_formulation` explicitly selects
+`"stokes_projection"` (default), `"b1_finite_volume"` (ALEX pipe), or
+`"b2_finite_volume"` (ALEX layered duct). Benchmark builders set their own
+formulation. Names are labels and do not select equations. The B1/B2 options
+retain the benchmark-specific boundary, material and numerical contracts;
+selecting one is not certification for arbitrary research conditions.
+Restart metadata must match the selected formulation; unspecified formulation
+metadata is accepted only for `stokes_projection`.

@@ -246,6 +246,7 @@ def test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite():
     # smallest mesh that still closes every production-path conservation gate.
     case = replace(
         problem.case,
+        name="research_pipe",
         geometry=replace(
             problem.case.geometry,
             nx=7,
@@ -324,6 +325,7 @@ def test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly(tmp_pa
     problem = build_benchmark_b_problem("B2-fringing-square", mesh_level="coarse")
     case = replace(
         problem.case,
+        name="research_duct",
         geometry=replace(
             problem.case.geometry,
             nx=5,
