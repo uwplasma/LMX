@@ -38,3 +38,12 @@ coverage must remain above 95% at the source-candidate boundary.
 Public functions need type annotations and docstrings that state units, shapes,
 defaults, return semantics, and failure modes. Keep user documentation focused
 on the supported current interface.
+
+## PR qualification efficiency
+
+CI workflow/action changes trigger full numerical qualification. Documentation
+and FreeMHD selectors include their own workflow/setup dependencies. Each PR's
+documentation and external-validation workflows cancel superseded heads within
+separate concurrency groups; scheduled and manual runs retain distinct groups.
+Current-head checks, numerical tolerances and the combined coverage gate are
+never waived to shorten the queue. Runner queue time is separate from test time.
