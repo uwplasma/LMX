@@ -119,6 +119,12 @@ the same bounded reverse-memory contract.
 reports signed pressure drop, outlet flow rate, wall-current-density RMS, and a
 smooth recirculation fraction. Its wall-current quantity is a cell-centered
 design proxy; use the conservative boundary-flux diagnostics for validation.
+Its `pumping_power` quantity is pressure-tap difference times flow and excludes
+prescribed body-drive work. It is not a certified total pump-work objective;
+do not interpret reductions in this quantity as blanket pumping efficiency.
+Generic evolution omits convective momentum transport and holds base magnetic
+samples fixed under geometry scaling. Live field resampling and complete
+coil/equilibrium/shape derivatives are outside this interface's contract.
 
 For a straight pipe, construct the problem with
 `build_pipe_ogrid_extruded_problem`, pass `(fluid, wall)` conductivity scales
@@ -156,16 +162,19 @@ and independent B1/B2 validation.
 For a time-dependent field objective, call the field-only core:
 
 ```python
+import jax
 import jax.numpy as jnp
 import lmx
 
+jax.config.update("jax_enable_x64", True)
 case = lmx.make_q2d_case(shape=(32, 32), steps=80)
+initial_vorticity = case.initial_vorticity.astype(jnp.float64)
 
 
 def objective(parameters):
     viscosity, friction = parameters
     vorticity, _, _ = lmx.evolve_q2d(
-        case.initial_vorticity,
+        initial_vorticity,
         viscosity=viscosity,
         hartmann_friction=friction,
         dt=case.dt,
@@ -175,10 +184,11 @@ def objective(parameters):
 
 
 value, gradient = jax.value_and_grad(objective)(
-    jnp.asarray([case.viscosity, case.hartmann_friction])
+    jnp.asarray([case.viscosity, case.hartmann_friction], dtype=jnp.float64)
 )
 ```
 
+Keep state and continuous parameter dtypes consistent throughout time stepping.
 This derivative is exact for the finite dealiased IFRK4 evolution. Its default
 SOLVAX checkpoint schedule stores `O(sqrt(steps))` trajectory states instead of
 the full tape. The analytical decay, JVP/VJP identity, and compiled reverse

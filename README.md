@@ -133,7 +133,9 @@ the equations, parameters, expected outputs, and evidence status of each file.
 
 The design figure's middle curve contains all 41 optimization iterates. The
 left panel shows the seven actual axial design stations; they are control
-points, not a claimed mesh-convergence curve.
+points, not a claimed mesh-convergence curve. Its pressure-drop-based loss
+does not include prescribed body-drive work and must not be interpreted as
+physical blanket pumping efficiency.
 
 ## Advanced: 3-D fringing and extruded fields
 
@@ -216,20 +218,26 @@ reverse pass does not retain every solver iteration.
 ```python
 import jax
 import jax.numpy as jnp
-from lmx.fringing import evolve_extruded_fields, extruded_engineering_objectives
+from lmx.fringing import evolve_extruded_fields
 
 
-def pumping_power(field_scale):
+def mean_squared_velocity(field_scale):
     fields = evolve_extruded_fields(
         problem,
         magnetic_field_scale=field_scale,
         steps=8,
     )
-    return extruded_engineering_objectives(problem, fields)["pumping_power"]
+    return jnp.mean(fields[0] ** 2)
 
 
-value, gradient = jax.jit(jax.value_and_grad(pumping_power))(jnp.ones(41))
+field_scale = jnp.ones_like(problem.profile.field_scale)
+value, gradient = jax.jit(jax.value_and_grad(mean_squared_velocity))(field_scale)
 ```
+
+This is a finite-step model response, not a converged steady design objective.
+Generic 3-D evolution omits convective momentum transport. Its sampled base
+field is fixed: geometry scaling does not resample a live coil or equilibrium
+field, so these derivatives are not full coil or moving-channel sensitivities.
 
 Pass `num_devices` to shard a generic 3-D field evolution over an evenly
 divisible axial mesh. Treat mesh, topology, discrete boundary kinds, iteration

@@ -2,8 +2,9 @@
 
 LMX solves incompressible, inductionless liquid-metal MHD. The magnetic
 Reynolds number is assumed small, so the imposed magnetic field $\mathbf B$ is
-not evolved. With density $\rho$, kinematic viscosity $\nu$, conductivity
-$\sigma$, pressure $p$, and body drive $\mathbf f$:
+not evolved. The full isothermal formulation below uses density $\rho$,
+kinematic viscosity $\nu$, conductivity $\sigma$, pressure $p$, and body drive
+$\mathbf f$. The implemented model reductions are described below it:
 
 $$
 \nabla\cdot\mathbf u = 0,
@@ -29,15 +30,21 @@ $$
 $$
 
 Fully developed models set $\mathbf u=(u(y,z),0,0)$ and solve the coupled
-cross-section equations. The extruded model retains all three velocity,
-current, and Lorentz-force components and enforces incompressibility by a
-face-flux pressure projection.
+cross-section equations. Extruded models retain all three velocity, current,
+and Lorentz-force components. The generic duct and pipe recurrences omit
+$\mathbf u\cdot\nabla\mathbf u$ and use a collocated projection with flow
+adjustments; they are Stokes-like models, not general inertial 3-D flow.
+Specialized ALEX paths use separate finite-volume momentum and pressure
+operators. Their reduced verification and open production-acceptance gates
+are distinguished in the [validation matrix](../validation/index.md).
 
 No-slip walls set velocity to zero. Insulating walls impose zero normal
 current. Conducting solid regions solve potential with their own conductivity
 and enforce potential and normal-current continuity at interfaces. Pipe meshes
-use cylindrical/mapped metrics; rectangular meshes use nonuniform Cartesian
-finite-volume metrics.
+use cylindrical/mapped electric metrics; rectangular electric operators use
+nonuniform Cartesian finite-volume metrics. Generic momentum uses a distinct
+discretization: electric closure alone does not establish nonuniform or
+cylindrical vector-momentum consistency.
 
 Common dimensionless groups are
 
@@ -76,6 +83,9 @@ $$
 \frac{dE}{dt}=-2\nu Z-\frac{2E}{\tau_H}+\langle\psi f_\omega\rangle.
 $$
 
-LMX evaluates this identity as a terminal numerical gate. The Q2D model is a
+LMX reports a numerical defect for this identity; it is not an enforced
+terminal acceptance criterion in `solve_q2d`. A `completed` status must not
+substitute for checking the energy budget and mesh/time refinement.
+The Q2D model is a
 depth-averaged strong-field approximation; it does not resolve Hartmann-layer
 profiles or replace the 3-D formulation in fringing regions.

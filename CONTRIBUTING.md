@@ -8,7 +8,7 @@ before a validation, differentiability, or performance claim.
 1. Read [plan.md](plan.md) for the current milestone and scope boundary.
 2. Check the [documentation index](docs/index.md),
    [example catalog](examples/catalog.toml), and
-   [benchmark matrix](docs/benchmark_matrix.md) for the capability's stability
+   [benchmark matrix](docs/validation/index.md) for the capability's stability
    and existing unit, verification, and workflow evidence.
 3. Discuss changes that alter equations, normalization, boundary conditions,
    benchmark tolerances, or the stable API in a GitHub issue before implementation.
