@@ -644,9 +644,11 @@ method/data before freezing its benchmark.
 
 - Main is #57 merge `d18fefc`; #54–#57 passed all applicable exact-head gates.
   Q2D acceptance is explicit, pressure-tap flux work is available; F2 remains open.
-- Pending stack: #58 `ede81ec` → #59 `a3ddfad` → #60 `75b0ef4` →
-  #61 `f25ec90` → #62 `d53da86`. Qualify/merge in order, rebase each successor onto main,
-  preserve its tests/log, and require exact-head hosted coverage/FreeMHD gates.
+- Integration PR #63 contains #58 `ede81ec`, #59 `a3ddfad`, #60 `75b0ef4`,
+  #61 `f25ec90`, and #62 `d53da86`, all preserved as ancestor commits.
+  Target main directly; require exact-head full hosted coverage/docs/FreeMHD.
+  After #63 merges, close superseded #58–#62 with its merge link. This avoids
+  serial rebase/qualification of the same combined tree; keep them open until then.
   Jobs have been queued for runners; some scope/impact jobs now progress.
   Never restart solely for queue delay or waive gates using prior-head results.
 - #58: body-drive work and stored kinetic energy use the tap-center slab;
@@ -680,11 +682,16 @@ method/data before freezing its benchmark.
   Add per-PR cancellation to docs/FreeMHD, keeping workflows independent and
   non-PR runs distinct. Workflow/action changes trigger numerical qualification;
   docs/FreeMHD selectors cover their own setup and physical-input dependencies.
-  Seven actual-shell selector/policy tests pass in 0.40 s; Ruff/format/audit pass.
+  Eleven real-Git-diff cases exercise all three workflow selectors (33 shell
+  executions) in 1.24 s, including Q2D/external exclusions and B2 markers.
+  No new files; test allowance 12,400 matches the combined inventory.
   YAML parses for all changed workflows. One inventory comparison failed while
   docs/log were being edited; stable-tree rerun passed all 35 config tests (5.73 s).
   Six obsolete docs/FreeMHD runs on #59/#61/#62 were confirmed cancelled;
   current-head and main runs were preserved. No numerical gates relaxed.
+  Full combined local qualification: 532 passed, 95.28% coverage, 129.7 s.
+  Reproduce: `scripts/run_full_test_suite.py --coverage-xml artifacts/ci-stack-coverage.xml --junit-xml artifacts/ci-stack-junit.xml`.
+  #59 numerical shards and FreeMHD passed; integration #63 still needs its gates.
 - Next M1: nonuniform pressure/continuity compatibility, advection limiter
   transitions and electromagnetic closure before a production B2 campaign.
   Uniform checkerboard diagnostic: interior |DG|=0 vs compact |L|=4.
