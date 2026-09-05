@@ -842,7 +842,7 @@ def _projection_pressure_correction_3d(
     dz: float | jnp.ndarray,
     iterations: int,
 ) -> jnp.ndarray:
-    """Apply the validated collocated projection with bounded exact reverse mode."""
+    """Relax the compact Neumann Poisson stencil with checkpointed reverse mode."""
 
     dy_widths = _spacing_vector(dy, rhs.shape[1], dtype=rhs.dtype)
     dz_widths = _spacing_vector(dz, rhs.shape[2], dtype=rhs.dtype)

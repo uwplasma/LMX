@@ -86,7 +86,7 @@ metric. No history rewrite is currently necessary.
 | F4 | Generic layered momentum uses uniform spacing while electric closure uses actual widths; pipe diffusion applies scalar cylindrical Laplacians componentwise | Audit nonuniform and vector-metric/cross terms using continuous manufactured solutions |
 | F5 | Traced generic evolution freezes imposed-field samples; geometry scaling does not resample live global fields | Differentiate field location, basis, geometry and coil/equilibrium parameters together |
 | F6 | Tabulation converts through NumPy, silently extrapolates and reconstructs uniform axial stations | Traceable in-domain SI field protocol; use actual mesh coordinates |
-| F7 | Generic recurrence clips velocity and adjusts stationwise flow | Audit physical consistency, energy and differentiability; never hide residual failure |
+| F7 | Generic recurrence clips velocity, adjusts stationwise flow, and uses a compact Poisson stencil inconsistent with its centered divergence/gradient composition | Audit physical consistency and energy; require one compatible coupled residual |
 | F8 | No accepted terminal B2 steady primal/adjoint | Certify the physical residual, not a small iteration update |
 | F9 | Q2D energy defect is reported, not the advertised terminal gate; mixed weak/strong dtypes can break checkpointed evolution | Explicit completion/acceptance and dtype policies, with workflow tests |
 | F10 | Specialized B1 sharding is unsupported; Q2D has no dedicated spatial-shard path; generic two-GPU runs slow down | Close documented restrictions and measure useful scaling |
