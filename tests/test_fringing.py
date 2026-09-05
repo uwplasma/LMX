@@ -297,8 +297,10 @@ def test_extruded_formulation_dispatch_ignores_case_name(monkeypatch, formulatio
         solver=replace(problem.case.solver, extruded_formulation=formulation),
     )
     monkeypatch.setattr(fringing_impl, "_cross_section_mesh", lambda case: None)
+
     def dispatch(problem, mesh, finite_volume, runtime):
         return finite_volume
+
     monkeypatch.setattr(fringing_impl, "_solve_pipe_projection", dispatch)
     monkeypatch.setattr(fringing_impl, "_solve_duct_projection", dispatch)
     for name in ("my_research", "alex_b2-fringing-square_custom", "alex_unrelated"):
