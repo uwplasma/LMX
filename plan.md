@@ -644,45 +644,36 @@ method/data before freezing its benchmark.
 
 - Roadmap merged as [PR #54](https://github.com/uwplasma/LMX/pull/54),
   commit `83cfe56`; its hosted checks passed. Billing is not blocking new runs.
-- Active F2 branch: `codex/pressure-tap-work`, based on #55 head `d5823b8`.
-  Rebase its small tranche onto main after #55 is qualified and merged.
+- Active F2 branch: `codex/pressure-tap-work`, rebased onto main `c226c3b`.
   Adds only pressure-tap flux work, not total pump work. 33 affected tests,
   including all example runners and duct/pipe/layered AD callers, pass in
   100.9 s; clean warning-as-error docs pass after using a MyST label reference.
   Architecture allowance 12,010→12,035 covers 23 scientific test lines; no new files.
 - User approved this roadmap on 2026-09-04 and requested it be pushed.
-- M0 Q2D work is pushed in [PR #55](https://github.com/uwplasma/LMX/pull/55),
-  initial source `8afa612`: shared real-dtype promotion, analytic field/AD
-  regressions and executable documentation. Local qualification passed;
-  hosted CI exposed a B2 single-device sharding assumption and two compile
-  timeouts. Follow-up fixes require new hosted qualification before merging.
+- [PR #55](https://github.com/uwplasma/LMX/pull/55) merged as `c226c3b` after
+  all gates passed at `4d34431`: real-dtype promotion, analytic field/AD tests,
+  B2 single-device guard, CI grouping/flag ordering and timeout robustness.
+  Hosted run `33947048844` passes the combined ≥95% coverage gate; support
+  6m18s, fringing 5m05s, physics 4m34s; docs/architecture and pinned FreeMHD
+  (4m53s, run `33947048854`) pass. These are job durations, not solver speedups.
 - Qualification found SOLVAX 0.17 cannot collect the existing Schur tests.
   Package minimum and CI pins now agree on 0.19. Full local qualification on
   that version passed. Initial 0.17 results are failed evidence, not coverage.
-- Next physical work: F2. Define pressure-tap versus boundary/body-force work
-  before changing `extruded_engineering_objectives`; avoid double counting
-  prescribed pressure forcing. Include transient storage and geometry scaling.
-  Use pressure–velocity quadrature, not mean pressure times flow when profiles
-  vary; distinguish cell-center tap planes from actual domain boundaries.
+- Next physical work: complete F2 with a consistent control volume for actual
+  drive work, storage, viscous/Joule/electrical flux terms and geometry AD.
+  Pass the forcing actually used by evolution; do not double count prescribed
+  pressure forcing. The tap-flux metric alone does not close F2 or certify the
+  generic recurrence's energy balance. Then implement Q2D energy acceptance.
 - Current local evidence: 507 tests / 95.22%, 259.9 s end-to-end; Q2D 100%.
   Python 3.11.14 / JAX 0.10.2 / SOLVAX 0.19.0. Ruff, architecture/import,
   standalone Q2D snippet, Sphinx, isolated build and Twine passed. Reproduce:
   `.venv/bin/python scripts/run_full_test_suite.py --coverage-xml artifacts/q2d-precision-coverage.xml --junit-xml artifacts/q2d-precision-junit.xml`.
   [Qualification record](https://github.com/uwplasma/LMX/pull/55#issuecomment-5549401799).
-- CI repair: B2 treats non-mesh single-device placement as unpartitioned;
-  sharding AD reuses the primal's reduced controls and inherits thread limits.
-  Move the heavy B1 AD case to the lighter physics shard without dropping it.
-  Cold-test limits are 120 s for sharding / 300 s for B1; the 540 s shard
-  budget remains unchanged. Follow-up local gate: 28 affected tests passed in
-  39.9 s. Collection proves 508 CI cases covered exactly once (335 support,
-  49 fringing, 124 physics; includes one curated case excluded locally).
-  #55 fix `b9a6beb` prepends forced-device XLA flags before bare thread options.
-  Run `33946313887`: 49 fringing cases pass (423.08 s; sharding 71.92 s),
-  physics/docs/architecture pass; FreeMHD passes in 5m44s. Support: 334 pass,
-  unchanged design example exceeds its 60 s subprocess limit. One failed-job
-  retry is running; require support and combined coverage before merging.
-  Cold local example with CI flags passes in 35.1 s. If the timeout repeats,
-  fix the harness; do not retry indefinitely or waive the 540 s shard budget.
+- CI collection covers 508 cases exactly once (335 support, 49 fringing,
+  124 physics). The 540 s shard budget and physical assertions remain intact.
+  The example's 60 s subprocess limit failed twice; its 120 s limit qualified
+  successfully. Cold local example: 35.1 s. Earlier failed runs are preserved
+  in #55, not waived. M4 still owes controlled performance/CI optimization.
 - Raw profiles are local ignored artifacts, not available from a fresh clone.
   All headline results and limitations are recorded in sections 2–3.
 - Before resuming: fetch origin, inspect branch/PR status and working-tree
@@ -700,3 +691,4 @@ evidence, unresolved gate and next action. Keep this active plan below about
 | 2026-09-04 | Replaced 4,263-line historical plan with this evidence-led roadmap; repaired README gradient shape, standalone Q2D snippet and contributor link; qualified generic momentum, pump-work and Q2D acceptance claims | M0 documentation partially addressed; begin physical-objective/dtype regression work in PR A. No new PDE/SOLVAX algorithm or blanket result certified |
 | 2026-09-04 | #54 merged; #55 Q2D precision fix: 507 local tests / 95.22%, Q2D 100%, 259.9 s on SOLVAX 0.19. Six additional cases; test budget 11,950→12,010 (57 lines), no new files/API. Minimum/CI SOLVAX corrected to 0.19 | Initial 0.17 run failed (454 pass, 3 budget failures, 1 collection error); successful complete rerun supersedes it. Hosted #55 gates govern merge. F2 and Q2D energy acceptance remain open; no SOLVAX algorithm change |
 | 2026-09-04 | Hosted #55 found a single-device B2 assumption and cold compile timeouts. Fixed the type guard, reused reduced sharding AD controls/thread limits and redistributed B1. 28 affected local tests pass (39.9 s); all 508 CI cases partition exactly once | New hosted coverage required before #55 merges. No numerical assertions/tolerances removed; cached local timings are not a cold CI speed claim |
+| 2026-09-05 | #55 merged after all exact-head hosted gates and ≥95% coverage passed. Pressure-tap flux-work tranche rebased onto main; 33 affected local tests and clean docs pass | F2 still requires drive/storage/dissipation work on one control volume. Qualify the pressure-work PR before merge; M1–M9 remain open |
