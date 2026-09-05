@@ -652,7 +652,7 @@ method/data before freezing its benchmark.
   including three geometries and analytic parameter/geometry derivatives.
   Original hosted head passed all numerical shards and FreeMHD (5m36s);
   require rebased-head gates before merge. This does not certify energy closure.
-- Active branch `codex/pressure-operator-contract` is stacked on #58.
+- #59, `codex/pressure-operator-contract`, is stacked on #58; hosted gates queued.
   Independent 18-cell pressure transmissibility oracle verifies weighted
   symmetry, positive energy, rank 17 Neumann / 18 mixed and reverse derivatives.
   Generic checkerboard exposes |DG|=0 versus compact |L|=4 on interior cells;
@@ -670,15 +670,21 @@ method/data before freezing its benchmark.
   clean warning-as-error Sphinx passed. Python 3.11.14 / JAX 0.10.2 / SOLVAX 0.19.
   Reproduce with `scripts/run_full_test_suite.py --coverage-xml artifacts/viscous-residual-coverage.xml --junit-xml artifacts/viscous-residual-junit.xml`.
   Qualification is specific to that source; hosted stacked-head gates follow.
-- Next: qualify/merge #58, then rebase this tranche onto main and qualify/merge.
-  Combined tests occupy 12,230 lines (allowance 12,235), no new files. Continue M1 with
-  nonuniform coupled compatibility, advective limiter transitions and electric
-  closure. F2 still needs viscous/Joule/electrical flux and storage-rate balance.
+- Active `codex/nonuniform-face-interpolation` is stacked on #59 `a3ddfad`.
+  Share distance-weighted normal-face interpolation between mass initialization
+  and the pressure predictor; remove the test-only divergence wrapper. Package
+  shrinks 23 lines, no new files. Five affected operator/projection tests pass;
+  reduced B2 boundary/restart test also passes (9.41 s).
+  affine face values, interior divergence and geometry JVP have analytic checks.
+  Clean Sphinx/Ruff/audit pass; 12,247 test lines, allowance 12,250.
+  Qualify/merge #58 then #59 before rebasing/qualifying this numerical tranche.
+  Continue M1 coupled compatibility/advection/electric closure; F2 energy open.
   Do not launch a production B2 campaign before tiny-system proof; M1–M9 open.
 - Nonuniform diagnostic: reuse the resting test with dy=dz=[0.4,0.8,1.3],
   dx=1 and volume-weight each residual row. Float64 rank/FD checks pass but
   max |Wm G + (Wc D)^T|=0.3714285714. Arithmetic face averaging and cell
-  pressure-force reconstruction are not weighted adjoints; resolve before M1.
+  pressure-force reconstruction were not weighted adjoints. Linear interpolation
+  fixes affine consistency, not this energy identity; resolve before closing M1.
 - SOLVAX minimum/CI pins are 0.19 because 0.17 lacks the used Schur export.
   No SOLVAX algorithm changes in these tranches. The 540 s CI shard budget and
   physics tolerances remain intact; prior #55 CI evidence is in its PR.

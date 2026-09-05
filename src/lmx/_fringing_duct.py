@@ -580,34 +580,13 @@ def _initialize_duct_mass_flux(velocity, density, inlet_velocity, *, dx, dy, dz,
     momentum = density[..., None] * velocity
     area_x = dy[:, None] * dz[None, :]
     inlet = density[0] * inlet_velocity[..., 0] * area_x
-    axial = momentum[..., 0]
-    plus_x = (
-        0.5
-        * (
-            axial
-            + _neighbor_fields(
-                axial, mode_x="neumann", mode_y="neumann", mode_z="neumann", sharding=sharding
-            )[1]
-        )
-        * area_x
+    plus_x, plus_y, plus_z = _duct_velocity_faces(momentum, dy=dy, dz=dz, field_sharding=sharding)
+    return (
+        plus_x * area_x,
+        plus_y[:, 1:] * (dx * dz[None, None, :]),
+        plus_z[:, :, 1:] * (dx * dy[None, :, None]),
+        inlet,
     )
-    wy = (dy[1:] / (dy[:-1] + dy[1:]))[None, :, None]
-    plus_y = jnp.concatenate(
-        (
-            wy * momentum[:, :-1, :, 1] + (1.0 - wy) * momentum[:, 1:, :, 1],
-            jnp.zeros_like(momentum[:, :1, :, 1]),
-        ),
-        axis=1,
-    ) * (dx * dz[None, None, :])
-    wz = (dz[1:] / (dz[:-1] + dz[1:]))[None, None, :]
-    plus_z = jnp.concatenate(
-        (
-            wz * momentum[:, :, :-1, 2] + (1.0 - wz) * momentum[:, :, 1:, 2],
-            jnp.zeros_like(momentum[:, :, :1, 2]),
-        ),
-        axis=2,
-    ) * (dx * dy[None, :, None])
-    return plus_x, plus_y, plus_z, inlet
 
 
 def _flow_rate_inlet_profile(axial_velocity, face_area, target):
@@ -684,20 +663,20 @@ def _duct_face_divergence(plus_x, inlet_x, plus_y, plus_z, *, dx, dy, dz, field_
     )
 
 
-def _duct_velocity_divergence(velocity, inlet_x, *, dx, dy, dz, field_sharding=None):
-    """Map cell velocity to the conservative mixed-boundary divergence."""
+def _duct_velocity_faces(velocity, *, dy, dz, field_sharding=None):
+    """Interpolate normal components to faces; transverse wall fluxes are zero."""
     u, v, w = jnp.moveaxis(velocity, -1, 0)
     east = _neighbor_fields(u, mode_x="neumann", mode_y="neumann", mode_z="neumann", sharding=field_sharding)[
         1
     ]
     plus_x = 0.5 * (u + east)
     plus_y = jnp.zeros((u.shape[0], u.shape[1] + 1, u.shape[2]), dtype=u.dtype)
-    plus_y = plus_y.at[:, 1:-1].set(0.5 * (v[:, 1:] + v[:, :-1]))
+    wy = (dy[1:] / (dy[:-1] + dy[1:]))[None, :, None]
+    plus_y = plus_y.at[:, 1:-1].set(wy * v[:, :-1] + (1.0 - wy) * v[:, 1:])
     plus_z = jnp.zeros((u.shape[0], u.shape[1], u.shape[2] + 1), dtype=u.dtype)
-    plus_z = plus_z.at[:, :, 1:-1].set(0.5 * (w[:, :, 1:] + w[:, :, :-1]))
-    return _duct_face_divergence(
-        plus_x, inlet_x, plus_y, plus_z, dx=dx, dy=dy, dz=dz, field_sharding=field_sharding
-    )
+    wz = (dz[1:] / (dz[:-1] + dz[1:]))[None, None, :]
+    plus_z = plus_z.at[:, :, 1:-1].set(wz * w[:, :, :-1] + (1.0 - wz) * w[:, :, 1:])
+    return plus_x, plus_y, plus_z
 
 
 def _cell_pressure_correction_duct(correction_x, correction_y, correction_z, *, field_sharding=None):
@@ -773,12 +752,10 @@ def _face_flux_pressure_projection_duct(
             value, mode_x="neumann", mode_y="neumann", mode_z="neumann", sharding=field_sharding
         )[:2]
 
-    uf_plus = 0.5 * (us + axial_neighbors(us)[1])
+    uf_plus, vf, wf = _duct_velocity_faces(
+        jnp.stack((us, vs, ws), axis=-1), dy=dys, dz=dzs, field_sharding=field_sharding
+    )
     uf_inlet = us[0]
-    vf = jnp.zeros((nx, ny + 1, nz), dtype=v.dtype)
-    vf = vf.at[:, 1:-1, :].set(0.5 * (vs[:, 1:, :] + vs[:, :-1, :]))
-    wf = jnp.zeros((nx, ny, nz + 1), dtype=w.dtype)
-    wf = wf.at[:, :, 1:-1].set(0.5 * (ws[:, :, 1:] + ws[:, :, :-1]))
     face_area = dys[:, None] * dzs[None, :]
     if inlet_flow_rate is not None:
         target = jnp.asarray(inlet_flow_rate, dtype=u.dtype)
