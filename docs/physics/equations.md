@@ -58,6 +58,34 @@ $$
 The inductionless model requires $Rm\ll1$. Geometry length, field orientation,
 wall conductance ratio, and velocity scale must accompany any reported value.
 
+(pressure-taps-and-mechanical-work)=
+## Pressure taps and mechanical work
+
+For outward normal $\mathbf n$, pressure supplies power
+$-\int_{\partial V}p\mathbf u\cdot\mathbf n\,dA$ to a control volume;
+see the [MIT integral energy derivation](https://ocw.mit.edu/courses/16-01-unified-engineering-i-ii-iii-iv-fall-2005-spring-2006/017b07723e0687d3025ba25a4f5d50ee_f12_sp.pdf).
+The extruded reducer's `pressure_tap_flux_power` evaluates only the two
+cell-center tap-plane contributions with fluid-area quadrature:
+
+$$
+P_{\rm taps}=\sum_i A_i(p_{0i}u_{0i}-p_{Ni}u_{Ni}).
+$$
+
+It differs from `pumping_power`, $(\bar p_0-\bar p_N)Q_N$, for correlated
+nonuniform pressure/velocity profiles or unequal station flows. A pressure
+gauge shift $p\mapsto p+c$ changes $P_{\rm taps}$ by $c(Q_0-Q_N)$; check mass
+balance before interpreting it. Both quantities have power units when inputs
+are SI, but neither is certified total pump power.
+
+A complete mechanical balance also needs body-drive work
+$\int_V\mathbf f\cdot\mathbf u\,dV$, kinetic-energy storage, viscous and
+electrical work, and any advective boundary flux of the chosen model. Use
+one common control volume: whole-domain body work cannot simply be added to
+cell-center tap work. A prescribed pressure gradient represented as body drive
+must not also be counted as boundary pressure work. Fixed-flow constraints
+require their imposed-drive work. These terms and a discrete balance are not
+yet supplied by this reducer; the generic recurrence is not energy certified.
+
 ## Quasi-two-dimensional model
 
 For a strong uniform field normal to a shallow flow plane, the basic

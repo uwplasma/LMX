@@ -644,7 +644,11 @@ method/data before freezing its benchmark.
 
 - Roadmap merged as [PR #54](https://github.com/uwplasma/LMX/pull/54),
   commit `83cfe56`; its hosted checks passed. Billing is not blocking new runs.
-- Active branch: `codex/q2d-input-precision`; base: `83cfe56`.
+- Active F2 branch: `codex/pressure-tap-work`, based on #55 head `d5823b8`.
+  Rebase its small tranche onto main after #55 is qualified and merged.
+  Adds only pressure-tap flux work, not total pump work. Its analytic/JIT/AD
+  regression and warning-as-error docs pass; architecture test allowance
+  12,010→12,035 accommodates 23 scientific assertion/helper lines, no new files.
 - User approved this roadmap on 2026-09-04 and requested it be pushed.
 - M0 Q2D work is pushed in [PR #55](https://github.com/uwplasma/LMX/pull/55),
   initial source `8afa612`: shared real-dtype promotion, analytic field/AD
@@ -672,20 +676,8 @@ method/data before freezing its benchmark.
   39.9 s. Collection proves 508 CI cases covered exactly once (335 support,
   49 fringing, 124 physics; includes one curated case excluded locally).
   Hosted `33945919241`: support/physics pass; fringing has 48 passes and one
-  failure (only one device visible). FreeMHD passes in 5m10s. Reproduced locally:
-  XLA stops parsing flags after bare `intra_op_parallelism_threads=1`; prepending
-  the forced-device flag yields two devices, appending yields one. Correct
-  ordering preserves thread limits; full sharding/AD test with the CI flags
-  passes locally in 24.6 s. Require fresh hosted coverage before merge.
-- At `b9a6beb`, all 49 fringing cases pass (423.08 s, sharding 71.92 s), as do
-  physics/docs/architecture/FreeMHD. Support twice has 334 passes plus a 60 s
-  design-example timeout. Set only that subprocess limit to 120 s; preserve
-  all 41 iterates, gradient/physics assertions and the 540 s whole-shard budget.
-  Cold local example passes in 35.1 s; earlier hosted example passed in 43.58 s.
-  This is timeout robustness, not a speedup. Require fresh hosted coverage.
-- Next F2 tranche is pushed on `codex/pressure-tap-work`, based on `d5823b8`.
-  Its 33 affected tests pass in 100.9 s and clean docs pass; no total pump-work
-  claim. Rebase onto qualified main after #55; do not lose this branch.
+  failure (only one device visible). FreeMHD passes in 5m10s. Fix inherited
+  XLA flag ordering in #55, then require new hosted coverage before merging.
 - Raw profiles are local ignored artifacts, not available from a fresh clone.
   All headline results and limitations are recorded in sections 2–3.
 - Before resuming: fetch origin, inspect branch/PR status and working-tree

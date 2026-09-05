@@ -2195,11 +2195,34 @@ def test_extruded_engineering_objectives_have_physical_conventions_and_gradients
     assert values["pressure_drop"] == pytest.approx(2.0)
     assert values["flow_rate"] == pytest.approx(4.0)
     assert values["pumping_power"] == pytest.approx(8.0)
+    assert values["pressure_tap_flux_power"] == pytest.approx(8.0)
     assert values["flow_nonuniformity"] == pytest.approx(0.0, abs=1.0e-12)
     assert values["wall_current_density_rms"] == pytest.approx(3.0, abs=2.0e-6)
     assert values["recirculation_fraction"] == pytest.approx(0.0, abs=1.0e-12)
     assert jax.grad(lambda speed: objectives(speed)["pumping_power"])(1.0) == pytest.approx(8.0)
     assert jax.grad(lambda scale: objectives(1.0, scale)["flow_rate"])(1.0) == pytest.approx(8.0)
+    # Independent surface-work quadrature: area=4, mean(q)=0, mean(q**2)=2/3.
+    q = jnp.broadcast_to(jnp.asarray([-1.0, 0.0, 1.0])[None, :, None], shape)
+
+    def tap_work(speed=1.0, scale=1.0, gauge=0.0, outlet_scale=1.0):
+        u = (speed * (1.0 + q)).at[-1].multiply(outlet_scale)
+        p = (pressure + gauge).at[0].add(q[0])
+        return extruded_engineering_objectives(
+            problem, (u, zeros, zeros, p, *(zeros,) * 4), geometry_scale=scale
+        )
+
+    assert tap_work()["pumping_power"] == pytest.approx(8.0)
+    assert tap_work()["pressure_tap_flux_power"] == pytest.approx(32.0 / 3.0)
+    assert tap_work(gauge=7.0)["pressure_tap_flux_power"] == pytest.approx(32.0 / 3.0)
+    assert jax.jit(jax.grad(lambda speed: tap_work(speed)["pressure_tap_flux_power"]))(1.0) == pytest.approx(
+        32.0 / 3.0
+    )
+    assert jax.grad(lambda scale: tap_work(scale=scale)["pressure_tap_flux_power"])(1.0) == pytest.approx(
+        64.0 / 3.0
+    )
+    assert jax.grad(lambda gauge: tap_work(gauge=gauge, outlet_scale=2.0)["pressure_tap_flux_power"])(
+        0.0
+    ) == pytest.approx(-4.0)
     pipe = build_pipe_ogrid_extruded_problem(nx_stations=3, nr=3, ntheta=8)
     pipe_shape = (3, 3, 8)
     pipe_fields = (jnp.ones(pipe_shape),) + (jnp.zeros(pipe_shape),) * 10
