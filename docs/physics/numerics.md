@@ -45,6 +45,22 @@ Coupled residual, boundary-work and continuum-refinement checks remain needed.
 
 ## B2 pressure and momentum coupling
 
+The Newtonian viscous stress uses unlimited least-squares velocity gradients:
+at fixed viscosity its discrete action is linear in velocity and boundary
+data. Advective reconstruction still limits its speed-squared gradient. The
+packed setup selects these components separately without duplicating the
+gradient implementation. Limiting the viscous gradient would introduce
+direction-dependent derivatives at a resting state, despite a linear
+constitutive law.
+
+`_duct_momentum_residual` retains signed field residuals in force-density
+units; acceptance diagnostics reduce that same residual to normalized maxima.
+A 3×3×3 resting, constant-viscosity, zero-advection mechanical test checks its
+108×108 automatic Jacobian, full rank with fixed outlet pressure, the pressure/
+continuity adjoint relation, and directional differences down to $10^{-7}$.
+This Stokes-limit check does not certify finite-advection limiter transitions,
+the electromagnetic coupled residual, or a converged B2 steady state.
+
 The production B2 accelerator acts only on the three mechanical velocity
 components and their conservative compact face fluxes. One electric solve then
 closes the accepted velocity before current, Lorentz force, charge balance, and
