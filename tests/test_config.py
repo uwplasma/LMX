@@ -85,42 +85,71 @@ kind = "no_slip"
 
 
 @pytest.mark.parametrize(
-    "changed,full,targeted",
+    "changed,full,targeted,docs,external",
     [
-        (".github/workflows/ci.yml", "true", "false"),
-        (".github/actions/setup-lmx/action.yml", "true", "false"),
-        ("src/lmx/mesh.py", "true", "false"),
-        ("tests/test_mesh.py", "true", "false"),
-        ("scripts/run_full_test_suite.py", "false", "true"),
-        ("docs/index.md", "false", "false"),
-        ("README.md", "false", "false"),
+        (".github/workflows/ci.yml", "true", "false", "false", "false"),
+        (".github/workflows/docs.yml", "true", "false", "true", "false"),
+        (".github/workflows/external-validation.yml", "true", "false", "false", "true"),
+        (".github/actions/setup-lmx/action.yml", "true", "false", "true", "true"),
+        ("src/lmx/mesh.py", "true", "false", "true", "true"),
+        ("src/lmx/q2d.py", "true", "false", "true", "false"),
+        ("src/lmx/validation.py", "true", "false", "true", "true"),
+        ("tests/test_mesh.py", "true", "false", "false", "false"),
+        ("scripts/run_full_test_suite.py", "false", "true", "false", "false"),
+        ("docs/index.md", "false", "false", "true", "false"),
+        ("README.md", "false", "false", "true", "false"),
     ],
 )
-def test_ci_scope_and_superseded_work_policy(tmp_path, changed, full, targeted):
+def test_ci_scope_and_superseded_work_policy(tmp_path, changed, full, targeted, docs, external):
     root = Path(__file__).resolve().parents[1] / ".github/workflows"
-    workflow = (root / "ci.yml").read_text()
-    script = textwrap.dedent(workflow.split("run: |\n", 1)[1].split("\n  quality:", 1)[0])
-    script = script.replace("${{ github.event_name }}", "pull_request").replace(
-        'changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")',
-        'changed="$LMX_TEST_CHANGED"',
-    )
-    output = tmp_path / "outputs"
-    subprocess.run(
-        ["bash", "-e", "-c", script],
-        check=True,
-        env={
-            **os.environ,
-            "GITHUB_OUTPUT": str(output),
-            "LMX_TEST_CHANGED": changed,
-        },
-    )
-    assert dict(line.split("=", 1) for line in output.read_text().splitlines()) == {
-        "full": full,
-        "targeted": targeted,
-    }
+
+    def git(*args):
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "user.name=LMX test",
+                "-c",
+                "user.email=test@example.invalid",
+                "-c",
+                "core.hooksPath=/dev/null",
+                "-c",
+                "commit.gpgsign=false",
+                *args,
+            ],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+        )
+
+    git("init", "-q")
+    git("commit", "--allow-empty", "-qm", "baseline")
+    git("update-ref", "refs/remotes/origin/main", "HEAD")
+    path = tmp_path / changed
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("BENCHMARK_B\n")
+    git("add", changed)
+    git("commit", "-qm", "candidate")
     groups = set()
-    for name in ("ci", "docs", "external-validation"):
-        policy = (root / f"{name}.yml").read_text().split("concurrency:\n", 1)[1].split("\n\n", 1)[0]
+    for name, expected in (
+        ("ci", {"full": full, "targeted": targeted}),
+        ("docs", {"docs": docs}),
+        ("external-validation", {"b2": external}),
+    ):
+        workflow = (root / f"{name}.yml").read_text()
+        script = textwrap.dedent(workflow.split("run: |\n", 1)[1].split("\n\n  ", 1)[0])
+        script = script.replace("${{ github.event_name }}", "pull_request").replace(
+            "${{ github.base_ref }}", "main"
+        )
+        output = tmp_path / f"{name}.outputs"
+        subprocess.run(
+            ["bash", "-e", "-o", "pipefail", "-c", script],
+            cwd=tmp_path,
+            check=True,
+            env={**os.environ, "GITHUB_OUTPUT": str(output)},
+        )
+        assert dict(line.split("=", 1) for line in output.read_text().splitlines()) == expected
+        policy = workflow.split("concurrency:\n", 1)[1].split("\n\n", 1)[0]
         assert "cancel-in-progress: true" in policy and "github.event.pull_request.number" in policy
         group = policy.split("group: ", 1)[1].splitlines()[0]
         assert group not in groups
