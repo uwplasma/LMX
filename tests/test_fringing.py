@@ -793,11 +793,13 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
     pressure_force = jax.jacfwd(lambda p: (volume[..., None] * dt * pressure(p)).reshape(-1))(
         jnp.zeros(shape)
     ).reshape((velocity.size, scalar.size))
-    divergence = jax.jacfwd(
-        lambda value: duct_impl._duct_velocity_divergence(
-            value.reshape(velocity.shape), jnp.zeros_like(velocity[0, ..., 0]), dx=dx, dy=dy, dz=dz
-        ).reshape(-1)
-    )(jnp.zeros(velocity.size))
+    def cell_divergence(value):
+        fx, fy, fz = duct_impl._duct_velocity_faces(value.reshape(velocity.shape), dy=dy, dz=dz)
+        return duct_impl._duct_face_divergence(
+            fx, jnp.zeros_like(fx[0]), fy, fz, dx=dx, dy=dy, dz=dz
+        ).ravel()
+
+    divergence = jax.jacfwd(cell_divergence)(jnp.zeros(velocity.size))
     a_inverse = lambda value: jnp.linalg.solve(matrix, value)  # noqa: E731
     schur = divergence @ a_inverse(pressure_force)
     block = jnp.block([[matrix, pressure_force], [divergence, jnp.zeros((scalar.size,) * 2)]])
@@ -1310,12 +1312,9 @@ def test_b2_stokes_residual_has_consistent_resting_jacobian():
             dy=widths,
             dz=widths,
         )
-        continuity = duct_impl._duct_velocity_divergence(
-            velocity,
-            jnp.zeros(shape[1:]),
-            dx=1.0,
-            dy=widths,
-            dz=widths,
+        fx, fy, fz = duct_impl._duct_velocity_faces(velocity, dy=widths, dz=widths)
+        continuity = duct_impl._duct_face_divergence(
+            fx, jnp.zeros(shape[1:]), fy, fz, dx=1.0, dy=widths, dz=widths
         )
         return jnp.concatenate((momentum.ravel(), continuity.ravel()))
 
@@ -1335,6 +1334,24 @@ def test_nonuniform_face_flux_projection_closes_discrete_divergence():
     nx, ny, nz = 5, 6, 5
     dy = jnp.asarray([0.2, 0.3, 0.45, 0.4, 0.35, 0.3])
     dz = jnp.asarray([0.25, 0.4, 0.5, 0.45, 0.3])
+    # Continuous affine fields must interpolate exactly to actual internal faces.
+    def affine_faces(scale):
+        yc, zc = jnp.cumsum(scale * dy) - scale * dy / 2, jnp.cumsum(dz) - dz / 2
+        velocity = jnp.zeros((nx, ny, nz, 3)).at[..., 1].set(2 * yc[None, :, None])
+        velocity = velocity.at[..., 2].set(3 * zc[None, None, :])
+        return duct_impl._duct_velocity_faces(velocity, dy=scale * dy, dz=dz)
+
+    faces, tangent = jax.jvp(affine_faces, (jnp.asarray(1.0),), (jnp.asarray(1.0),))
+    expected_y = np.broadcast_to(2 * np.cumsum(dy)[:-1][None, :, None], (nx, ny - 1, nz))
+    expected_z = np.broadcast_to(3 * np.cumsum(dz)[:-1][None, None, :], (nx, ny, nz - 1))
+    np.testing.assert_allclose(faces[1][:, 1:-1], expected_y, atol=1e-12)
+    np.testing.assert_allclose(faces[2][:, :, 1:-1], expected_z, atol=1e-12)
+    np.testing.assert_allclose(tangent[1][:, 1:-1], expected_y, atol=1e-12)
+    np.testing.assert_allclose(tangent[2], 0.0, atol=1e-12)
+    affine_divergence = duct_impl._duct_face_divergence(
+        faces[0], jnp.zeros((ny, nz)), *faces[1:], dx=0.25, dy=dy, dz=dz
+    )
+    np.testing.assert_allclose(affine_divergence[:, 1:-1, 1:-1], 5.0, atol=1e-12)
     x = jnp.linspace(0.0, 1.0, nx).reshape(nx, 1, 1)
     y = jnp.linspace(-1.0, 1.0, ny).reshape(1, ny, 1)
     z = jnp.linspace(-1.0, 1.0, nz).reshape(1, 1, nz)
