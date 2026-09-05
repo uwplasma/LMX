@@ -86,7 +86,7 @@ metric. No history rewrite is currently necessary.
 | F4 | Generic layered momentum uses uniform spacing while electric closure uses actual widths; pipe diffusion applies scalar cylindrical Laplacians componentwise | Audit nonuniform and vector-metric/cross terms using continuous manufactured solutions |
 | F5 | Traced generic evolution freezes imposed-field samples; geometry scaling does not resample live global fields | Differentiate field location, basis, geometry and coil/equilibrium parameters together |
 | F6 | Tabulation converts through NumPy, silently extrapolates and reconstructs uniform axial stations | Traceable in-domain SI field protocol; use actual mesh coordinates |
-| F7 | Generic recurrence clips velocity and adjusts stationwise flow | Audit physical consistency, energy and differentiability; never hide residual failure |
+| F7 | Generic recurrence clips velocity, adjusts stationwise flow, and uses a compact Poisson stencil inconsistent with its centered divergence/gradient composition | Audit physical consistency and energy; require one compatible coupled residual |
 | F8 | No accepted terminal B2 steady primal/adjoint | Certify the physical residual, not a small iteration update |
 | F9 | Q2D energy defect is reported, not the advertised terminal gate; mixed weak/strong dtypes can break checkpointed evolution | Explicit completion/acceptance and dtype policies, with workflow tests |
 | F10 | Specialized B1 sharding is unsupported; Q2D has no dedicated spatial-shard path; generic two-GPU runs slow down | Close documented restrictions and measure useful scaling |
@@ -642,60 +642,49 @@ method/data before freezing its benchmark.
 
 ### Resume checkpoint
 
-- Roadmap merged as [PR #54](https://github.com/uwplasma/LMX/pull/54),
-  commit `83cfe56`; its hosted checks passed. Billing is not blocking new runs.
-- #56 merged as `1b6cfc8`: hosted `33969565351` passes all shards and ≥95%
-  coverage; docs/architecture pass and pinned FreeMHD passes in 5m28s.
-- Active branch: `codex/tap-control-volume-work`, rebased onto #57 merge `d18fefc`.
-  Adds axial body-drive work and kinetic energy on the same tap-center slab
-  using fluid area and trapezoidal axial quadrature, with explicit force override.
-  30 affected tests pass in 31.8 s: three geometries, solids excluded, exact
-  balanced work, quadrature error and force/velocity/geometry derivatives.
-  Clean docs, Ruff/architecture and usage snippet pass. Small driven duct:
-  tap pressure work ~0, body work 0.01135355, kinetic energy 2.23790e-5.
-  Requalify this rebased head against main; no PDE was changed.
-  Combined test allowance is 12,135 for 12,128 lines; no new files.
-- [PR #57](https://github.com/uwplasma/LMX/pull/57), `codex/q2d-energy-acceptance`,
-  independently adds energy tolerance/scale-aware normalization and host status.
-  Eight Q2D tests pass (36.65 s, 100% module coverage), clean docs and the
-  41-frame user example pass. Merged as `d18fefc` after all applicable hosted gates and ≥95% coverage.
-  Original #58 head passed physics/fringing/support and FreeMHD (5m36s);
-  the rebased head must pass again before merge.
-- Next M1 tranche is committed/pushed as `ca78f9c` on
-  `codex/pressure-operator-contract`: independent pressure matrix and corrected
-  unlimited Newtonian viscous gradients; 510 local tests / 95.22% in 138.7 s.
-  Rebase after #58; retain its tests and checkpoint, then require hosted gates.
-- User approved this roadmap on 2026-09-04 and requested it be pushed.
-- [PR #55](https://github.com/uwplasma/LMX/pull/55) merged as `c226c3b` after
-  all gates passed at `4d34431`: real-dtype promotion, analytic field/AD tests,
-  B2 single-device guard, CI grouping/flag ordering and timeout robustness.
-  Hosted run `33947048844` passes the combined ≥95% coverage gate; support
-  6m18s, fringing 5m05s, physics 4m34s; docs/architecture and pinned FreeMHD
-  (4m53s, run `33947048854`) pass. These are job durations, not solver speedups.
-- Qualification found SOLVAX 0.17 cannot collect the existing Schur tests.
-  Package minimum and CI pins now agree on 0.19. Full local qualification on
-  that version passed. Initial 0.17 results are failed evidence, not coverage.
-- Next physical work: complete F2 with a consistent control volume for actual
-  drive work, storage, viscous/Joule/electrical flux terms and geometry AD.
-  Pass the forcing actually used by evolution; do not double count prescribed
-  pressure forcing. The tap-flux metric alone does not close F2 or certify the
-  generic recurrence's energy balance. Q2D energy acceptance is implemented in
-  #57 pending hosted qualification. M1–M9 remain open.
-- Current local evidence: 507 tests / 95.22%, 259.9 s end-to-end; Q2D 100%.
-  Python 3.11.14 / JAX 0.10.2 / SOLVAX 0.19.0. Ruff, architecture/import,
-  standalone Q2D snippet, Sphinx, isolated build and Twine passed. Reproduce:
-  `.venv/bin/python scripts/run_full_test_suite.py --coverage-xml artifacts/q2d-precision-coverage.xml --junit-xml artifacts/q2d-precision-junit.xml`.
-  [Qualification record](https://github.com/uwplasma/LMX/pull/55#issuecomment-5549401799).
-- CI collection covers 508 cases exactly once (335 support, 49 fringing,
-  124 physics). The 540 s shard budget and physical assertions remain intact.
-  The example's 60 s subprocess limit failed twice; its 120 s limit qualified
-  successfully. Cold local example: 35.1 s. Earlier failed runs are preserved
-  in #55, not waived. M4 still owes controlled performance/CI optimization.
-- Raw profiles are local ignored artifacts, not available from a fresh clone.
-  All headline results and limitations are recorded in sections 2–3.
-- Before resuming: fetch origin, inspect branch/PR status and working-tree
-  changes, then read this checkpoint. Preserve unrelated edits. Record each
-  completed tranche and push its checkpoint; never rely on chat history alone.
+- Roadmap #54, dtype/CI #55 and pressure-flux #56 are merged. All applicable
+  exact-head hosted gates passed, including ≥95% coverage and triggered FreeMHD.
+  #57 merged as `d18fefc`: Q2D energy acceptance, no evolution/AD change.
+  Eight Q2D tests give 100% module coverage; 41-frame example passes.
+- #58, `codex/tap-control-volume-work`, rebased onto #57 as `ede81ec`.
+  Body-drive work and kinetic energy use the same tap-center slab, explicit
+  forcing override and fluid-only quadrature. Thirty affected tests pass (31.8 s),
+  including three geometries and analytic parameter/geometry derivatives.
+  Original hosted head passed all numerical shards and FreeMHD (5m36s);
+  require rebased-head gates before merge. This does not certify energy closure.
+- Active branch `codex/pressure-operator-contract` is stacked on #58.
+  Independent 18-cell pressure transmissibility oracle verifies weighted
+  symmetry, positive energy, rank 17 Neumann / 18 mixed and reverse derivatives.
+  Generic checkerboard exposes |DG|=0 versus compact |L|=4 on interior cells;
+  F7 and numerical documentation distinguish the inconsistent generic stencil.
+- Signed B2 momentum residual supplies normalized diagnostics without duplicate
+  equations. The resting 108-unknown Stokes test exposed a 7.8858% Jacobian
+  mismatch caused by limiting viscous gradients. Newtonian velocity gradients
+  are now unlimited; advective speed gradients retain limiting in the packed
+  calculation. Independent stress quadrature, full rank, pressure/continuity
+  adjoint blocks and three centered-difference steps pass.
+  This changes viscous discretization; require hosted numerical/FreeMHD gates.
+  It certifies only the uniform resting mechanical block, not finite-advection,
+  electromagnetic closure, accepted B2 convergence or a steady adjoint.
+- Before stacking: full local suite 510 passed, 95.22% coverage, 138.7 s;
+  clean warning-as-error Sphinx passed. Python 3.11.14 / JAX 0.10.2 / SOLVAX 0.19.
+  Reproduce with `scripts/run_full_test_suite.py --coverage-xml artifacts/viscous-residual-coverage.xml --junit-xml artifacts/viscous-residual-junit.xml`.
+  Qualification is specific to that source; hosted stacked-head gates follow.
+- Next: qualify/merge #58, then rebase this tranche onto main and qualify/merge.
+  Combined tests occupy 12,230 lines (allowance 12,235), no new files. Continue M1 with
+  nonuniform coupled compatibility, advective limiter transitions and electric
+  closure. F2 still needs viscous/Joule/electrical flux and storage-rate balance.
+  Do not launch a production B2 campaign before tiny-system proof; M1–M9 open.
+- Nonuniform diagnostic: reuse the resting test with dy=dz=[0.4,0.8,1.3],
+  dx=1 and volume-weight each residual row. Float64 rank/FD checks pass but
+  max |Wm G + (Wc D)^T|=0.3714285714. Arithmetic face averaging and cell
+  pressure-force reconstruction are not weighted adjoints; resolve before M1.
+- SOLVAX minimum/CI pins are 0.19 because 0.17 lacks the used Schur export.
+  No SOLVAX algorithm changes in these tranches. The 540 s CI shard budget and
+  physics tolerances remain intact; prior #55 CI evidence is in its PR.
+- Raw audit profiles remain ignored local artifacts; public evidence packaging
+  remains open. Before resuming fetch origin, inspect PRs and working-tree
+  changes, preserve unrelated edits, and record/push each completed tranche.
 
 Keep at most ten substantive entries. Older evidence becomes immutable
 commit/PR/artifact links, not another tracked log. Each entry records work,
