@@ -111,9 +111,15 @@ $$
 \frac{dE}{dt}=-2\nu Z-\frac{2E}{\tau_H}+\langle\psi f_\omega\rangle.
 $$
 
-LMX reports a numerical defect for this identity; it is not an enforced
-terminal acceptance criterion in `solve_q2d`. A `completed` status must not
-substitute for checking the energy budget and mesh/time refinement.
+`solve_q2d` enforces `energy_budget_tolerance` (default $10^{-3}$) on the
+absolute integrated defect divided by the larger of initial energy and
+absolute integrated power, with the smallest positive normal working-dtype
+value as a zero-energy floor. An absolute machine-epsilon floor would hide
+relative defects in small-amplitude flows.
+Power is integrated by the trapezoidal rule at every time step, independently
+of saved-frame stride. This diagnostic has second-order quadrature error even
+when the IFRK4 field evolution is more accurate. Refine the time step when it
+fails; `completed` still does not certify mesh independence or steady flow.
 The Q2D model is a
 depth-averaged strong-field approximation; it does not resolve Hartmann-layer
 profiles or replace the 3-D formulation in fringing regions.

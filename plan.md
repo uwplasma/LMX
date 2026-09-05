@@ -644,11 +644,21 @@ method/data before freezing its benchmark.
 
 - Roadmap merged as [PR #54](https://github.com/uwplasma/LMX/pull/54),
   commit `83cfe56`; its hosted checks passed. Billing is not blocking new runs.
-- Active F2 branch: `codex/pressure-tap-work`, rebased onto main `c226c3b`.
-  Adds only pressure-tap flux work, not total pump work. 33 affected tests,
-  including all example runners and duct/pipe/layered AD callers, pass in
-  100.9 s; clean warning-as-error docs pass after using a MyST label reference.
-  Architecture allowance 12,010→12,035 covers 23 scientific test lines; no new files.
+- #56 merged as `1b6cfc8`; hosted run `33969565351` passes all three shards
+  and ≥95% combined coverage, docs/architecture; FreeMHD passes in 5m28s.
+- Active branch `codex/q2d-energy-acceptance`, based on `1b6cfc8`: finite,
+  positive configurable energy tolerance (default 1e-3), Courant precedence,
+  finite diagnostics, and a scale-aware zero-energy floor. No IFRK4/AD change.
+  Eight Q2D cases pass in 36.65 s with 100% module line/branch coverage;
+  analytic budget/refinement, small-amplitude float32, exact threshold and
+  unchanged rejected fields tested. Clean docs/Ruff/architecture pass.
+  User example completes with 41 frames/movie and energy defect 4.94767e-6.
+  Test allowance 12,035→12,085 covers 49 scientific test lines; no new files.
+- F2 body-work/storage tranche is saved on `codex/tap-control-volume-work`.
+  Rebase its two commits after #56 `10ab3a8` onto main, then open its PR.
+  30 affected tests pass in 31.8 s, including three geometries and exact
+  work/storage/geometry derivatives; docs and usage snippet pass. It integrates
+  the tap-center slab, not the whole domain, and does not certify energy closure.
 - User approved this roadmap on 2026-09-04 and requested it be pushed.
 - [PR #55](https://github.com/uwplasma/LMX/pull/55) merged as `c226c3b` after
   all gates passed at `4d34431`: real-dtype promotion, analytic field/AD tests,
@@ -663,7 +673,8 @@ method/data before freezing its benchmark.
   drive work, storage, viscous/Joule/electrical flux terms and geometry AD.
   Pass the forcing actually used by evolution; do not double count prescribed
   pressure forcing. The tap-flux metric alone does not close F2 or certify the
-  generic recurrence's energy balance. Then implement Q2D energy acceptance.
+  generic recurrence's energy balance. Q2D acceptance is implemented pending
+  hosted qualification, not a replacement for M1–M9.
 - Current local evidence: 507 tests / 95.22%, 259.9 s end-to-end; Q2D 100%.
   Python 3.11.14 / JAX 0.10.2 / SOLVAX 0.19.0. Ruff, architecture/import,
   standalone Q2D snippet, Sphinx, isolated build and Twine passed. Reproduce:

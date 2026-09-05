@@ -249,6 +249,11 @@ gradients before using them in an optimizer.
 
 ### Advanced: evolve Q2D flow
 
+Q2D host solves accept a trajectory only when its Courant and energy-budget
+checks pass. Set `energy_budget_tolerance` on the case (default `1e-3`);
+`converged` means accepted finite evolution, not steady flow. See the
+[acceptance policy](docs/tutorials/q2d.md#interpretation).
+
 ```python
 import lmx
 
