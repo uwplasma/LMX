@@ -671,7 +671,15 @@ method/data before freezing its benchmark.
   budget remains unchanged. Follow-up local gate: 28 affected tests passed in
   39.9 s. Collection proves 508 CI cases covered exactly once (335 support,
   49 fringing, 124 physics; includes one curated case excluded locally).
-  Measure the new hosted run; do not infer cold speedup from cached local runs.
+  Hosted `33945919241`: support/physics pass; fringing has 48 passes and one
+  failure (only one device visible). FreeMHD passes in 5m10s. Reproduced locally:
+  XLA stops parsing flags after bare `intra_op_parallelism_threads=1`; prepending
+  the forced-device flag yields two devices, appending yields one. Correct
+  ordering preserves thread limits; full sharding/AD test with the CI flags
+  passes locally in 24.6 s. Require fresh hosted coverage before merge.
+- Next F2 tranche is pushed on `codex/pressure-tap-work` at `ca16b0e`, based on
+  `d5823b8`. Its pressure-tap flux-work regression and docs pass; no total pump
+  work claim. Rebase onto qualified main after #55; do not lose this branch.
 - Raw profiles are local ignored artifacts, not available from a fresh clone.
   All headline results and limitations are recorded in sections 2–3.
 - Before resuming: fetch origin, inspect branch/PR status and working-tree

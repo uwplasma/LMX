@@ -1916,7 +1916,7 @@ np.testing.assert_allclose(reference[1], sharded[1], rtol=2.0e-8, atol=2.0e-14)
         "JAX_ENABLE_X64": "true",
         "JAX_PLATFORMS": "cpu",
         "PYTHONPATH": str(root / "src"),
-        "XLA_FLAGS": f"{os.environ.get('XLA_FLAGS', '')} --xla_force_host_platform_device_count=2",
+        "XLA_FLAGS": f"--xla_force_host_platform_device_count=2 {os.environ.get('XLA_FLAGS', '')}",
     }
     subprocess.run([sys.executable, "-c", code], cwd=root, env=environment, timeout=120, check=True)
 
