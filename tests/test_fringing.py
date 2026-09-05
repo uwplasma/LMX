@@ -2242,6 +2242,54 @@ def test_extruded_engineering_objectives_have_physical_conventions_and_gradients
         extruded_engineering_objectives(problem, (zeros,) * 11, smoothing=0.0)
 
 
+@pytest.mark.parametrize(
+    "builder, grid, area",
+    [
+        (build_square_duct_extruded_problem, dict(ny=3, nz=3), 4.0),
+        (build_layered_duct_extruded_problem, dict(ny=3, nz=3, wall_cells=1), 4.0),
+        (build_pipe_ogrid_extruded_problem, dict(nr=3, ntheta=8), np.pi),
+    ],
+)
+def test_tap_work_and_storage_share_a_control_volume_and_exact_derivatives(builder, grid, area):
+    problem = builder(nx_stations=4, length=3.0, **grid)
+    case = replace(
+        problem.case, regions=tuple(replace(region, density=2.0) for region in problem.case.regions)
+    )
+    problem = replace(problem, case=case)
+    mesh = _cross_section_mesh(case)
+    shape = (4, *mesh.yz_shape)
+    ones, zeros = jnp.ones(shape), jnp.zeros(shape)
+    # Uniform velocity, rho=2, and dp/dx=f: boundary and body work cancel.
+    # Exact slab volume is A * (L - dx), not the whole-domain A * L.
+    volume = area * 2.25
+
+    def work(parameters):
+        force, speed, scale = parameters
+        pressure = jnp.broadcast_to(force * scale * mesh.x_centers[:, None, None], shape)
+        fields = (speed * ones, ones, 2 * ones, pressure, *(zeros,) * 4)
+        return extruded_engineering_objectives(problem, fields, forcing=force, geometry_scale=scale)
+
+    parameters = jnp.asarray([5.0, 3.0, 1.0])
+    values = jax.jit(work)(parameters)
+    assert values["tap_body_drive_power"] == pytest.approx(15 * volume)
+    assert values["pressure_tap_flux_power"] == pytest.approx(-15 * volume)
+    assert values["tap_kinetic_energy"] == pytest.approx(14 * volume)
+    gradient = jax.jit(jax.grad(lambda parameters: work(parameters)["tap_body_drive_power"]))(parameters)
+    np.testing.assert_allclose(gradient, volume * np.asarray([3.0, 5.0, 45.0]), rtol=1e-12)
+    gradient = jax.grad(lambda parameters: work(parameters)["tap_kinetic_energy"])(parameters)
+    np.testing.assert_allclose(gradient, volume * np.asarray([0.0, 6.0, 42.0]), atol=1e-12)
+    default = extruded_engineering_objectives(problem, (3 * ones, ones, 2 * ones, *(zeros,) * 5))
+    assert default["tap_body_drive_power"] == pytest.approx(case.forcing * 3 * volume)
+    x = jnp.broadcast_to(mesh.x_centers[:, None, None], shape)
+    linear = extruded_engineering_objectives(problem, (x, *(zeros,) * 7))
+    a, b, dx = 0.375, 2.625, 0.75
+    assert linear["tap_body_drive_power"] == pytest.approx(case.forcing * area * (b**2 - a**2) / 2)
+    # For rho=2 and u=x, the trapezoidal energy error is exactly A*(b-a)*dx²/6.
+    assert linear["tap_kinetic_energy"] == pytest.approx(area * ((b**3 - a**3) / 3 + (b - a) * dx**2 / 6))
+    with pytest.raises(ValueError, match="scalar axial force"):
+        extruded_engineering_objectives(problem, (ones,) * 8, forcing=jnp.ones(2))
+
+
 def test_cross_section_mesh_supports_pipe_ogrid_geometry():
     problem = build_square_duct_extruded_problem(nx_stations=3, ny=4, nz=4)
     pipe_case = replace(
