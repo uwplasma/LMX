@@ -645,7 +645,7 @@ method/data before freezing its benchmark.
 - Main is #57 merge `d18fefc`; #54–#57 passed all applicable exact-head gates.
   Q2D acceptance is explicit, pressure-tap flux work is available; F2 remains open.
 - Pending stack: #58 `ede81ec` → #59 `a3ddfad` → #60 `75b0ef4` →
-  #61 `d56b22b`. Qualify/merge in order, rebase each successor onto main,
+  #61 `f25ec90` → #62 `d53da86`. Qualify/merge in order, rebase each successor onto main,
   preserve its tests/log, and require exact-head hosted coverage/FreeMHD gates.
   Jobs have been queued for runners; some scope/impact jobs now progress.
   Never restart solely for queue delay or waive gates using prior-head results.
@@ -664,7 +664,7 @@ method/data before freezing its benchmark.
   renamed production B1/B2 cases pass and restart identity is checked.
   Full combined-stack local gate: 520 passed / 95.24% / 144.4 s; docs pass.
   Reproduce: `scripts/run_full_test_suite.py --coverage-xml artifacts/explicit-formulation-coverage.xml --junit-xml artifacts/explicit-formulation-junit.xml`.
-- Active `codex/bounded-field-tables` is based on #61 `d56b22b`.
+- #62 `codex/bounded-field-tables` is based on #61; formatting also checked.
   F6: honor supplied axial coordinates, reject extrapolation/nonfinite queries,
   validate table axes/components, load once, interpolate vector components
   together. Five distinct affected tests pass; fringing/table group 16.55 s.
@@ -676,6 +676,15 @@ method/data before freezing its benchmark.
   separate component calls 24.57 ms median vs vector call 7.63 ms, matching
   outputs at 1e-13. Excludes I/O/compilation; not a solver speedup claim.
   Host-side table sampling is not live coil/geometry AD; M5 remains open.
+- Active `codex/ci-superseded-work` is based on #62 `d53da86`.
+  Add per-PR cancellation to docs/FreeMHD, keeping workflows independent and
+  non-PR runs distinct. Workflow/action changes trigger numerical qualification;
+  docs/FreeMHD selectors cover their own setup and physical-input dependencies.
+  Seven actual-shell selector/policy tests pass in 0.40 s; Ruff/format/audit pass.
+  YAML parses for all changed workflows. One inventory comparison failed while
+  docs/log were being edited; stable-tree rerun passed all 35 config tests (5.73 s).
+  Six obsolete docs/FreeMHD runs on #59/#61/#62 were confirmed cancelled;
+  current-head and main runs were preserved. No numerical gates relaxed.
 - Next M1: nonuniform pressure/continuity compatibility, advection limiter
   transitions and electromagnetic closure before a production B2 campaign.
   Uniform checkerboard diagnostic: interior |DG|=0 vs compact |L|=4.

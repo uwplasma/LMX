@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import tarfile
+import textwrap
 import zipfile
 from pathlib import Path
 
@@ -81,6 +82,49 @@ kind = "no_slip"
 """.strip()
     )
     return path
+
+
+@pytest.mark.parametrize(
+    "changed,full,targeted",
+    [
+        (".github/workflows/ci.yml", "true", "false"),
+        (".github/actions/setup-lmx/action.yml", "true", "false"),
+        ("src/lmx/mesh.py", "true", "false"),
+        ("tests/test_mesh.py", "true", "false"),
+        ("scripts/run_full_test_suite.py", "false", "true"),
+        ("docs/index.md", "false", "false"),
+        ("README.md", "false", "false"),
+    ],
+)
+def test_ci_scope_and_superseded_work_policy(tmp_path, changed, full, targeted):
+    root = Path(__file__).resolve().parents[1] / ".github/workflows"
+    workflow = (root / "ci.yml").read_text()
+    script = textwrap.dedent(workflow.split("run: |\n", 1)[1].split("\n  quality:", 1)[0])
+    script = script.replace("${{ github.event_name }}", "pull_request").replace(
+        'changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")',
+        'changed="$LMX_TEST_CHANGED"',
+    )
+    output = tmp_path / "outputs"
+    subprocess.run(
+        ["bash", "-e", "-c", script],
+        check=True,
+        env={
+            **os.environ,
+            "GITHUB_OUTPUT": str(output),
+            "LMX_TEST_CHANGED": changed,
+        },
+    )
+    assert dict(line.split("=", 1) for line in output.read_text().splitlines()) == {
+        "full": full,
+        "targeted": targeted,
+    }
+    groups = set()
+    for name in ("ci", "docs", "external-validation"):
+        policy = (root / f"{name}.yml").read_text().split("concurrency:\n", 1)[1].split("\n\n", 1)[0]
+        assert "cancel-in-progress: true" in policy and "github.event.pull_request.number" in policy
+        group = policy.split("group: ", 1)[1].splitlines()[0]
+        assert group not in groups
+        groups.add(group)
 
 
 def test_load_run_config_reads_complete_toml(tmp_path: Path):
