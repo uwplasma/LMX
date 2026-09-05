@@ -43,6 +43,16 @@ zero in the interior while the compact Laplacian has magnitude four. Thus a
 small compact Poisson residual does not certify projected cell divergence.
 Coupled residual, boundary-work and continuum-refinement checks remain needed.
 
+The face pressure solve also satisfies a weighted projection check on a
+nonuniform grid with variable mobility. For face-normal predictor $v$, correction
+$g$, and free-face weights $H_f=A_f(h_L/(2m_L)+h_R/(2m_R))$, tests verify
+$(v+g)^THg=0$ and $\|v\|_H^2=\|v+g\|_H^2+\|g\|_H^2$ to solver tolerance.
+At the outlet only the interior half-cell contributes to $H_f$.
+The checks use zero prescribed boundary flux or a zero-pressure outlet, without
+external pressure work. This is an inverse-mobility norm: it does not certify
+physical kinetic energy for arbitrary momentum mobility, nor energy behavior
+after face-to-cell reconstruction or stationwise flow adjustment.
+
 ## B2 pressure and momentum coupling
 
 `SolverConfig.extruded_formulation` selects the numerical formulation explicitly.
