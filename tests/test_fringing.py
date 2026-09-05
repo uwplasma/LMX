@@ -1229,6 +1229,63 @@ def test_compact_duct_mass_flux_initializer_matches_fv_faces():
     assert jnp.allclose(tangent[-1], initialized_inlet)
 
 
+@pytest.mark.parametrize("mixed", [False, True])
+def test_duct_pressure_operator_has_independent_energy_and_rank_contract(mixed):
+    # Two-point transmissibilities: A=B.T*T*B, with an outlet Dirichlet term.
+    shape = (3, 3, 2)
+    size = int(np.prod(shape))
+    widths = (np.full(3, 0.4), np.asarray([0.2, 0.35, 0.45]), np.asarray([0.3, 0.7]))
+    mobility = 0.7 + np.arange(size).reshape(shape) / size
+    volume = widths[0][:, None, None] * widths[1][None, :, None] * widths[2][None, None, :]
+    oracle = np.zeros((size, size))
+    for cell in np.ndindex(shape):
+        i = np.ravel_multi_index(cell, shape)
+        for axis in range(3):
+            if cell[axis] + 1 == shape[axis]:
+                continue
+            neighbor = list(cell)
+            neighbor[axis] += 1
+            neighbor = tuple(neighbor)
+            j = np.ravel_multi_index(neighbor, shape)
+            area = volume[cell] / widths[axis][cell[axis]]
+            resistance = 0.5 * (
+                widths[axis][cell[axis]] / mobility[cell] + widths[axis][neighbor[axis]] / mobility[neighbor]
+            )
+            oracle[np.ix_([i, j], [i, j])] += area / resistance * np.asarray([[1.0, -1.0], [-1.0, 1.0]])
+        if mixed and cell[0] == shape[0] - 1:
+            oracle[i, i] += volume[cell] * mobility[cell] / (0.5 * widths[0][-1] ** 2)
+
+    def operator(pressure):
+        x, y, z = duct_impl._duct_pressure_face_corrections(
+            pressure.reshape(shape),
+            jnp.asarray(mobility),
+            dx=0.4,
+            dy=jnp.asarray(widths[1]),
+            dz=jnp.asarray(widths[2]),
+            mixed_axial_pressure=mixed,
+        )
+        divergence = duct_impl._duct_face_divergence(
+            x,
+            jnp.zeros(shape[1:]),
+            y,
+            z,
+            dx=0.4,
+            dy=jnp.asarray(widths[1]),
+            dz=jnp.asarray(widths[2]),
+        )
+        return (volume * divergence).ravel()
+
+    pressure = jnp.sin(jnp.arange(size, dtype=jnp.float64))
+    matrix = np.asarray(jax.jacfwd(operator)(pressure))
+    np.testing.assert_allclose(matrix, oracle, atol=1e-12)
+    np.testing.assert_allclose(matrix, matrix.T, atol=1e-12)
+    assert np.linalg.matrix_rank(matrix, tol=1e-10) == size - (not mixed)
+    assert np.linalg.eigvalsh(matrix).min() >= -1e-12
+    np.testing.assert_allclose(operator(jnp.ones(size)), oracle @ np.ones(size), atol=1e-12)
+    gradient = jax.jit(jax.grad(lambda p: 0.5 * jnp.vdot(p, operator(p))))(pressure)
+    np.testing.assert_allclose(gradient, oracle @ pressure, atol=1e-12)
+
+
 def test_nonuniform_face_flux_projection_closes_discrete_divergence():
     nx, ny, nz = 5, 6, 5
     dy = jnp.asarray([0.2, 0.3, 0.45, 0.4, 0.35, 0.3])
