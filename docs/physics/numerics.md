@@ -45,6 +45,15 @@ Coupled residual, boundary-work and continuum-refinement checks remain needed.
 
 ## B2 pressure and momentum coupling
 
+The mass-flux initializer and pressure predictor share distance-weighted linear
+interpolation of normal cell components to faces. For adjacent widths $h_L,h_R$,
+$u_f=(h_Ru_L+h_Lu_R)/(h_L+h_R)$; internal affine fields and their geometry
+derivatives are exact. Transverse wall fluxes are zero and the axial outlet
+extrapolates the terminal cell. Face-flux divergence is conservative, but this
+does not establish a weighted adjoint relation for the reconstructed cell
+pressure force on nonuniform grids. Energy compatibility requires that separate
+operator contract; see [Santos et al., §2–3](https://www.scipedia.com/wd/images/2/22/Draft_Sanchez_Pinedo_5754368871854_paper.pdf).
+
 The Newtonian viscous stress uses unlimited least-squares velocity gradients:
 at fixed viscosity its discrete action is linear in velocity and boundary
 data. Advective reconstruction still limits its speed-squared gradient. The
