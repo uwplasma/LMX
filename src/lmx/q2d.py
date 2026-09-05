@@ -18,13 +18,24 @@ from .specs import require_finite
 __all__ = ["Q2DDiagnostics", "Q2DProblem", "Q2DResult", "evolve_q2d", "make_q2d_case", "solve_q2d"]
 
 
+def _state_arrays(initial_vorticity, forcing, *coefficients):
+    """Choose one real working dtype before constructing a loop carry."""
+    vorticity = jnp.asarray(initial_vorticity)
+    forcing = jnp.zeros_like(vorticity) if forcing is None else jnp.asarray(forcing)
+    dtype = jnp.result_type(vorticity, forcing, *coefficients, jnp.float32)
+    if not jnp.issubdtype(dtype, jnp.floating):
+        raise ValueError("Q2D state, forcing, and coefficients must be real")
+    return vorticity.astype(dtype), forcing.astype(dtype)
+
+
 @dataclass(frozen=True)
 class Q2DProblem:
     """Periodic Sommeria--Moreau vorticity problem.
 
     ``forcing`` is a vorticity source. The linear Hartmann-layer closure is
     ``-hartmann_friction * vorticity``; lengths, viscosity, time, and forcing
-    must use one consistent unit system.
+    must use one consistent unit system. All inputs determine a common real
+    working dtype through JAX promotion, with at least float32 precision.
     """
 
     initial_vorticity: jax.Array
@@ -38,12 +49,13 @@ class Q2DProblem:
     adjoint_checkpoint_size: int | None = None
 
     def __post_init__(self) -> None:
-        vorticity = jnp.asarray(self.initial_vorticity)
-        vorticity = vorticity.astype(jnp.result_type(vorticity, jnp.float32))
-        forcing = (
-            jnp.zeros_like(vorticity)
-            if self.forcing is None
-            else jnp.asarray(self.forcing, dtype=vorticity.dtype)
+        vorticity, forcing = _state_arrays(
+            self.initial_vorticity,
+            self.forcing,
+            *self.length,
+            self.viscosity,
+            self.hartmann_friction,
+            self.dt,
         )
         if vorticity.ndim != 2 or min(vorticity.shape) < 4:
             raise ValueError("initial_vorticity must be a 2-D array with at least four points per axis")
@@ -252,10 +264,13 @@ def evolve_q2d(
     Array state, forcing, domain lengths, viscosity, Hartmann friction, and
     timestep are differentiable. ``steps`` and ``adjoint_checkpoint_size`` are
     static controls; the default checkpoint schedule retains
-    ``O(sqrt(steps))`` trajectory states in reverse mode.
+    ``O(sqrt(steps))`` trajectory states in reverse mode. State, forcing and
+    coefficients use JAX's common real dtype, with at least float32 precision;
+    float64 requires enabling JAX x64 before constructing inputs.
     """
-    initial_vorticity = jnp.asarray(initial_vorticity)
-    forcing = jnp.zeros_like(initial_vorticity) if forcing is None else jnp.asarray(forcing)
+    initial_vorticity, forcing = _state_arrays(
+        initial_vorticity, forcing, *length, viscosity, hartmann_friction, dt
+    )
     return _evolve(
         initial_vorticity,
         forcing,

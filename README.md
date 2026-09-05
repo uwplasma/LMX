@@ -12,7 +12,7 @@ fields; periodic Q2D vortex dynamics; and differentiable field, wall, and
 fixed-topology geometry studies. LMX owns the MHD equations, boundary
 conditions, coupling, diagnostics, and validation. [SOLVAX](https://github.com/uwplasma/SOLVAX)
 owns reusable linear, fixed-point, preconditioning, and implicit-derivative
-algorithms.
+algorithms. The tested minimum SOLVAX version is 0.19.
 
 ![Full-profile analytical validation for Hartmann, Shercliff, and Hunt ducts](docs/_static/analytic_velocity_profiles.webp)
 
@@ -262,6 +262,8 @@ print(result.status, result.diagnostics.energy_budget_residual)
 
 `evolve_q2d` exposes continuous state, forcing, length, viscosity, Hartmann
 friction, and timestep inputs through a checkpointed finite evolution.
+Q2D inputs share a real working dtype through JAX promotion, with at least
+float32 precision. Enable JAX x64 before constructing float64 inputs.
 
 ![Q2D vorticity and 41-frame kinetic-energy decay](docs/_static/q2d_vortex_decay.webp)
 
