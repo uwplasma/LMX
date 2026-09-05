@@ -666,11 +666,9 @@ method/data before freezing its benchmark.
   This changes viscous discretization; require hosted numerical/FreeMHD gates.
   It certifies only the uniform resting mechanical block, not finite-advection,
   electromagnetic closure, accepted B2 convergence or a steady adjoint.
-- Before stacking: full local suite 510 passed, 95.22% coverage, 138.7 s;
-  clean warning-as-error Sphinx passed. Python 3.11.14 / JAX 0.10.2 / SOLVAX 0.19.
-  Reproduce with `scripts/run_full_test_suite.py --coverage-xml artifacts/viscous-residual-coverage.xml --junit-xml artifacts/viscous-residual-junit.xml`.
-  Qualification is specific to that source; hosted stacked-head gates follow.
-- Active `codex/nonuniform-face-interpolation` is stacked on #59 `a3ddfad`.
+- #59 before stacking: 510 local tests, 95.22% coverage, 138.7 s; clean docs.
+  Artifacts: `artifacts/viscous-residual-{coverage,junit}.xml`.
+- #60, `codex/nonuniform-face-interpolation`, is stacked on #59 `a3ddfad`.
   Share distance-weighted normal-face interpolation between mass initialization
   and the pressure predictor; remove the test-only divergence wrapper. Package
   shrinks 23 lines, no new files. Five affected operator/projection tests pass;
@@ -680,6 +678,15 @@ method/data before freezing its benchmark.
   Qualify/merge #58 then #59 before rebasing/qualifying this numerical tranche.
   Continue M1 coupled compatibility/advection/electric closure; F2 energy open.
   Do not launch a production B2 campaign before tiny-system proof; M1–M9 open.
+- Active `codex/explicit-extruded-formulation` is stacked on #60 `75b0ef4`.
+  F3: explicit SolverConfig/TOML formulation replaces name-prefix dispatch.
+  Renamed B1/B2 production checks pass; restart metadata rejects mismatches.
+  Three dispatch tests and 28 config tests pass; IO/B1/B2 targeted checks pass.
+  Initial three architecture failures were the test allowance, now 12,295.
+  README/reference/numerics updated; clean Sphinx and Ruff pass.
+  Full combined-stack local gate: 520 passed, 95.24% coverage, 144.4 s.
+  Reproduce: `scripts/run_full_test_suite.py --coverage-xml artifacts/explicit-formulation-coverage.xml --junit-xml artifacts/explicit-formulation-junit.xml`.
+  Hosted qualification remains required; #58–#60 have queued jobs, no runner.
 - Nonuniform diagnostic: reuse the resting test with dy=dz=[0.4,0.8,1.3],
   dx=1 and volume-weight each residual row. Float64 rank/FD checks pass but
   max |Wm G + (Wc D)^T|=0.3714285714. Arithmetic face averaging and cell

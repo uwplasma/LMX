@@ -144,6 +144,11 @@ that tap-to-tap slab; pass the force density and geometry used by evolution.
 
 ## Advanced: 3-D fringing and extruded fields
 
+Generic builders use `SolverConfig.extruded_formulation="stokes_projection"`;
+ALEX benchmark builders explicitly select their B1/B2 finite-volume formulation.
+Case names are labels, never equation selectors. These formulations retain the
+[documented model limits](https://uwplasma.github.io/LMX/physics/numerics.html).
+
 Use the extruded API after the fully developed workflow is familiar. It adds
 axial velocity components, pressure projection, spatially varying imposed
 fields, explicit wall regions, restart state, and stationwise conservation

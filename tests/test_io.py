@@ -564,6 +564,11 @@ def test_validate_extruded_restart_bundle_rejects_solver_case_and_resolution_mis
         validate_extruded_restart_bundle(bundle, case=case)
 
     good_solver = SimpleNamespace(**{**bundle.__dict__, "solver_kind": "extruded_inductionless"})
+    incompatible = SimpleNamespace(
+        **{**good_solver.__dict__, "metadata": {"extruded_formulation": "b2_finite_volume"}}
+    )
+    with pytest.raises(ValueError, match="formulation"):
+        validate_extruded_restart_bundle(incompatible, case=case)
     with pytest.raises(ValueError, match="Extruded restart case"):
         validate_extruded_restart_bundle(good_solver, case=case)
 

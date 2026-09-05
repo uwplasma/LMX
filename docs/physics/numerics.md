@@ -45,6 +45,12 @@ Coupled residual, boundary-work and continuum-refinement checks remain needed.
 
 ## B2 pressure and momentum coupling
 
+`SolverConfig.extruded_formulation` selects the numerical formulation explicitly.
+The benchmark builders select `b1_finite_volume` or `b2_finite_volume`; generic
+builders default to `stokes_projection`. Renaming a case does not alter its
+equations. B1 requires pipe geometry and B2 a layered duct; the formulation
+does not relax their documented boundary, derivative or sharding restrictions.
+
 The mass-flux initializer and pressure predictor share distance-weighted linear
 interpolation of normal cell components to faces. For adjacent widths $h_L,h_R$,
 $u_f=(h_Ru_L+h_Lu_R)/(h_L+h_R)$; internal affine fields and their geometry
