@@ -1651,8 +1651,8 @@ def extruded_engineering_objectives(
     """Reduce differentiable 3-D fields to scalar design objectives.
 
     Values retain the units of ``problem``. Pass the same fixed-topology
-    ``geometry_scale`` used to evolve the fields. Lower is better except for
-    flow rate; wall current is a cell-centered design proxy, not a validation
+    ``geometry_scale`` used to evolve the fields. Wall current is a
+    cell-centered design proxy, not a validation
     flux. ``pressure_tap_flux_power`` integrates inlet-minus-outlet ``p*u``
     on the first/last cell-center planes. ``pumping_power`` is only mean
     pressure drop times outlet flow. Neither includes body-drive work or
