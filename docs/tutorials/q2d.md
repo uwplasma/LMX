@@ -90,8 +90,19 @@ is reported separately because the present periodic Q2D state is not sharded.
 
 The solver reports kinetic energy, enstrophy, the integrated energy-budget
 residual, spectral velocity divergence, and maximum Courant number. A result is
-complete only when every field is finite and the Courant number does not exceed
-one.
+accepted (`status == "completed"`, `converged == True`) only when fields and
+diagnostics are finite, maximum Courant number is at most one, and the
+normalized energy-budget residual is at most `energy_budget_tolerance`
+(default `1e-3`). This is finite-trajectory acceptance, not steady convergence.
+
+Set the tolerance on `Q2DProblem` or `make_q2d_case`. An energy-budget failure
+returns the computed fields with status `energy_budget_exceeded`; a Courant
+failure takes precedence. Non-finite fields or diagnostics raise an error.
+The budget uses a time-step-by-time-step trapezoidal integral, whose error
+is second order even for an accurately evolved mode. Refine the time step
+and check the [energy normalization](../physics/equations.md) before relaxing
+the tolerance. `evolve_q2d` is a traced field kernel and performs no host
+acceptance check; qualify optimization trajectories with `solve_q2d`.
 
 SM82 is a basic quasi-two-dimensional closure, not a general replacement for
 the three-dimensional inductionless solver. Use the 3-D model for developing

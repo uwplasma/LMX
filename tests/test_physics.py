@@ -662,6 +662,55 @@ def test_q2d_real_dtype_floor_and_weak_scalar_defaults():
 
 
 @pytest.mark.physics
+def test_q2d_energy_acceptance_matches_modal_budget_and_time_refinement():
+    residuals = []
+    for dt, steps in ((0.25, 8), (0.125, 16), (0.02, 100)):
+        case = make_q2d_case(
+            shape=(8, 8), viscosity=jnp.float64(0.1), hartmann_friction=1.0, dt=dt, steps=steps
+        )
+        result = solve_q2d(case)
+        # E/E0=exp(-2*(nu*k²+friction)*t); exact trap sum of the physical rate.
+        energy = np.exp(-2.4 * dt * np.arange(steps + 1))
+        budget = -1.2 * dt * np.sum(energy[:-1] + energy[1:])
+        expected = abs(energy[-1] - 1 - budget) / max(1, abs(budget))
+        assert result.diagnostics.energy_budget_residual == pytest.approx(expected, rel=2e-5, abs=2e-7)
+        assert result.diagnostics.max_courant < 1
+        assert result.converged == (expected <= case.energy_budget_tolerance)
+        assert result.status == ("completed" if result.converged else "energy_budget_exceeded")
+        residuals.append(result.diagnostics.energy_budget_residual)
+    assert 3.8 < residuals[0] / residuals[1] < 4.1
+    assert residuals[-1] < 1e-3 < residuals[1]
+    for amplitude in (1e-4, 1.0):
+        scaled = solve_q2d(
+            make_q2d_case(
+                shape=(8, 8),
+                amplitude=amplitude,
+                viscosity=jnp.float32(0.1),
+                hartmann_friction=1.0,
+                dt=0.25,
+                steps=8,
+            )
+        )
+        assert not scaled.converged
+        assert scaled.diagnostics.energy_budget_residual == pytest.approx(residuals[0], rel=3e-5)
+    boundary = solve_q2d(replace(case, energy_budget_tolerance=result.diagnostics.energy_budget_residual))
+    rejected = solve_q2d(
+        replace(case, energy_budget_tolerance=0.5 * result.diagnostics.energy_budget_residual)
+    )
+    assert boundary.converged and rejected.status == "energy_budget_exceeded"
+    np.testing.assert_array_equal(rejected.vorticity, result.vorticity)
+    relaxed = solve_q2d(
+        make_q2d_case(
+            shape=(8, 8), viscosity=0.1, hartmann_friction=1.0, dt=0.25, steps=8, energy_budget_tolerance=0.1
+        )
+    )
+    assert relaxed.converged
+    for tolerance in (0.0, -1.0, np.inf, np.nan):
+        with pytest.raises(ValueError, match="energy_budget_tolerance"):
+            make_q2d_case(shape=(8, 8), energy_budget_tolerance=tolerance)
+
+
+@pytest.mark.physics
 def test_q2d_model_contract_refinement_and_failures():
     case = make_q2d_case(
         shape=(18, 18),
