@@ -136,6 +136,9 @@ left panel shows the seven actual axial design stations; they are control
 points, not a claimed mesh-convergence curve. Its pressure-drop-based loss
 does not include prescribed body-drive work and must not be interpreted as
 physical blanket pumping efficiency.
+For nonuniform profiles, `pressure_tap_flux_power` integrates pressure times
+velocity at the tap planes; it too excludes body-drive work. See the
+[work conventions](docs/physics/equations.md#pressure-taps-and-mechanical-work).
 
 ## Advanced: 3-D fringing and extruded fields
 
