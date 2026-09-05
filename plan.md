@@ -646,9 +646,10 @@ method/data before freezing its benchmark.
   commit `83cfe56`; its hosted checks passed. Billing is not blocking new runs.
 - Active F2 branch: `codex/pressure-tap-work`, based on #55 head `d5823b8`.
   Rebase its small tranche onto main after #55 is qualified and merged.
-  Adds only pressure-tap flux work, not total pump work. Its analytic/JIT/AD
-  regression and warning-as-error docs pass; architecture test allowance
-  12,010→12,035 accommodates 23 scientific assertion/helper lines, no new files.
+  Adds only pressure-tap flux work, not total pump work. 33 affected tests,
+  including all example runners and duct/pipe/layered AD callers, pass in
+  100.9 s; clean warning-as-error docs pass after using a MyST label reference.
+  Architecture allowance 12,010→12,035 covers 23 scientific test lines; no new files.
 - User approved this roadmap on 2026-09-04 and requested it be pushed.
 - M0 Q2D work is pushed in [PR #55](https://github.com/uwplasma/LMX/pull/55),
   initial source `8afa612`: shared real-dtype promotion, analytic field/AD
@@ -676,8 +677,9 @@ method/data before freezing its benchmark.
   39.9 s. Collection proves 508 CI cases covered exactly once (335 support,
   49 fringing, 124 physics; includes one curated case excluded locally).
   Hosted `33945919241`: support/physics pass; fringing has 48 passes and one
-  failure (only one device visible). FreeMHD passes in 5m10s. Fix inherited
-  XLA flag ordering in #55, then require new hosted coverage before merging.
+  failure (only one device visible). FreeMHD passes in 5m10s. #55 fix `b9a6beb`
+  prepends forced-device XLA flags before bare thread options; exact CI flags
+  pass locally (24.6 s). Await run `33946313887` and fresh combined coverage.
 - Raw profiles are local ignored artifacts, not available from a fresh clone.
   All headline results and limitations are recorded in sections 2–3.
 - Before resuming: fetch origin, inspect branch/PR status and working-tree
