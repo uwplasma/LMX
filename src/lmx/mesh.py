@@ -950,13 +950,21 @@ def load_tabulated_field(path: str | Path) -> dict[str, np.ndarray]:
     with np.load(source) as payload:
         data = {key: np.asarray(payload[key], dtype=float) for key in payload.files}
     required_2d = {"y", "z", "bx", "by", "bz"}
-    required_3d = {"x", "y", "z", "bx", "by", "bz"}
-    keys = set(data)
-    if required_3d.issubset(keys):
-        return data
-    if required_2d.issubset(keys):
-        return data
-    raise ValueError("Tabulated magnetic-field NPZ must contain either y/z/bx/by/bz or x/y/z/bx/by/bz arrays")
+    if not required_2d.issubset(data):
+        raise ValueError(
+            "Tabulated magnetic-field NPZ must contain either y/z/bx/by/bz or x/y/z/bx/by/bz arrays"
+        )
+    axes = tuple(data[name] for name in (("x", "y", "z") if "x" in data else ("y", "z")))
+    if any(a.ndim != 1 or a.size < 2 or not np.isfinite(a).all() or not (np.diff(a) > 0).all() for a in axes):
+        raise ValueError(
+            "Field-table axes must be finite, strictly increasing vectors with at least two points"
+        )
+    if any(
+        data[key].shape != tuple(a.size for a in axes) or not np.isfinite(data[key]).all()
+        for key in ("bx", "by", "bz")
+    ):
+        raise ValueError("Field-table components must be finite and match the coordinate-grid shape")
+    return data
 
 
 def sample_tabulated_cross_section_field(
@@ -989,13 +997,11 @@ def _interpolate_tabulated_field(data: dict[str, np.ndarray], **coordinates: np.
     axes = tuple(np.asarray(data[name], dtype=float) for name in coordinates)
     values = tuple(np.asarray(value, dtype=float) for value in coordinates.values())
     points = np.stack([value.reshape(-1) for value in values], axis=-1)
-    components = [
-        np.asarray(
-            RegularGridInterpolator(axes, data[key], bounds_error=False, fill_value=None)(points)
-        ).reshape(values[0].shape)
-        for key in ("bx", "by", "bz")
-    ]
-    return np.stack(components, axis=-1)
+    if any(not np.isfinite(q).all() or np.any(q < a[0]) or np.any(q > a[-1]) for a, q in zip(axes, values)):
+        raise ValueError("Field-table queries must be finite and inside the tabulated domain")
+    field = np.stack([data[key] for key in ("bx", "by", "bz")], axis=-1)
+    sampled = RegularGridInterpolator(axes, field, bounds_error=False, fill_value=jnp.nan)(points)
+    return np.asarray(sampled).reshape((*values[0].shape, 3))
 
 
 def _cross_section_mesh(case: CaseSpec) -> StructuredMesh:
@@ -1083,14 +1089,14 @@ def _sample_station_magnetic_field(
     if case.magnetic_field.kind == "tabulated":
         if case.magnetic_field.table_path is None:
             raise ValueError("Tabulated magnetic field requires table_path")
-        has_x = "x" in load_tabulated_field(case.magnetic_field.table_path)
-        x_coords = np.asarray(case.geometry.length * jnp.linspace(0.0, 1.0, nx), dtype=float)
-        sampled = sample_tabulated_field_volume(
-            case.magnetic_field.table_path,
-            x=np.broadcast_to(x_coords[:, None, None], shape),
-            y=np.broadcast_to(np.asarray(y)[None], shape),
-            z=np.broadcast_to(np.asarray(z)[None], shape),
-        )
-        sampled = sampled if has_x else sampled * np.asarray(field_scale[:, None, None, None])
+        data = load_tabulated_field(case.magnetic_field.table_path)
+        coordinates = {
+            "y": np.broadcast_to(np.asarray(y)[None], shape),
+            "z": np.broadcast_to(np.asarray(z)[None], shape),
+        }
+        if "x" in data:
+            coordinates = {"x": np.broadcast_to(np.asarray(x)[:, None, None], shape), **coordinates}
+        sampled = _interpolate_tabulated_field(data, **coordinates)
+        sampled = sampled if "x" in data else sampled * np.asarray(field_scale[:, None, None, None])
         return tuple(jnp.asarray(sampled[..., index], dtype=float) for index in range(3))
     raise ValueError(f"Unsupported magnetic-field kind {case.magnetic_field.kind!r}")
