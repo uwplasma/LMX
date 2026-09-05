@@ -671,7 +671,7 @@ method/data before freezing its benchmark.
   Reproduce with `scripts/run_full_test_suite.py --coverage-xml artifacts/viscous-residual-coverage.xml --junit-xml artifacts/viscous-residual-junit.xml`.
   Qualification is specific to that source; hosted stacked-head gates follow.
 - Next: qualify/merge #58, then rebase this tranche onto main and qualify/merge.
-  Preserve all test groups; recompute the combined allowance. Continue M1 with
+  Combined tests occupy 12,230 lines (allowance 12,235), no new files. Continue M1 with
   nonuniform coupled compatibility, advective limiter transitions and electric
   closure. F2 still needs viscous/Joule/electrical flux and storage-rate balance.
   Do not launch a production B2 campaign before tiny-system proof; M1–M9 open.
