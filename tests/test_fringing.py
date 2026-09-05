@@ -315,6 +315,20 @@ def test_extruded_formulation_dispatch_ignores_case_name(monkeypatch, formulatio
         replace(case.solver, extruded_formulation="typo")
 
 
+def test_pipe_field_sampling_uses_shifted_mesh_centres():
+    problem = build_pipe_ogrid_extruded_problem(nx_stations=3, nr=2, ntheta=4, length=3.0)
+    case = replace(problem.case, geometry=replace(problem.case.geometry, axial_origin=-2.0))
+
+    def field(x, y, z):
+        expected = jnp.broadcast_to(jnp.asarray([-1.5, -0.5, 0.5])[:, None, None], x.shape)
+        np.testing.assert_allclose(x, expected, atol=1e-12)
+        raise RuntimeError("physical stations checked")
+
+    problem = replace(problem, case=case, profile=replace(problem.profile, volume_field=field))
+    with pytest.raises(RuntimeError, match="physical stations checked"):
+        solve_extruded_inductionless(problem)
+
+
 def test_b2_canonical_shell_widths_remove_realization_thickness():
     nominal = jnp.asarray([0.01, 0.01, 0.4, 0.4, 0.4, 0.4, 0.4, 0.01, 0.01])
     confirmation = nominal.at[:2].divide(2.0).at[-2:].divide(2.0)
