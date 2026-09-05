@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import partial
+from math import isfinite
 
 import jax
 import jax.numpy as jnp
@@ -36,6 +37,8 @@ class Q2DProblem:
     ``-hartmann_friction * vorticity``; lengths, viscosity, time, and forcing
     must use one consistent unit system. All inputs determine a common real
     working dtype through JAX promotion, with at least float32 precision.
+    ``energy_budget_tolerance`` bounds the normalized trapezoidal energy
+    defect for host acceptance; it does not change the numerical trajectory.
     """
 
     initial_vorticity: jax.Array
@@ -47,6 +50,7 @@ class Q2DProblem:
     steps: int = 100
     history_stride: int = 0
     adjoint_checkpoint_size: int | None = None
+    energy_budget_tolerance: float = 1.0e-3
 
     def __post_init__(self) -> None:
         vorticity, forcing = _state_arrays(
@@ -69,6 +73,8 @@ class Q2DProblem:
             raise ValueError("dt and steps must be positive and history_stride non-negative")
         if self.adjoint_checkpoint_size is not None and self.adjoint_checkpoint_size < 1:
             raise ValueError("adjoint_checkpoint_size must be positive")
+        if not isfinite(self.energy_budget_tolerance) or self.energy_budget_tolerance <= 0:
+            raise ValueError("energy_budget_tolerance must be finite and positive")
         object.__setattr__(self, "initial_vorticity", vorticity)
         object.__setattr__(self, "forcing", forcing)
 
@@ -112,6 +118,7 @@ class Q2DResult:
 
     @property
     def converged(self) -> bool:
+        """Whether the finite trajectory passed acceptance, not steady convergence."""
         return self.status == "completed"
 
     @property
@@ -130,6 +137,7 @@ def make_q2d_case(
     dt: float = 1.0e-2,
     steps: int = 100,
     history_stride: int = 0,
+    energy_budget_tolerance: float = 1.0e-3,
 ) -> Q2DProblem:
     """Build a Taylor--Green decay case with an analytical exponential rate."""
 
@@ -147,6 +155,7 @@ def make_q2d_case(
         dt=dt,
         steps=steps,
         history_stride=history_stride,
+        energy_budget_tolerance=energy_budget_tolerance,
     )
 
 
@@ -284,7 +293,7 @@ def evolve_q2d(
 
 
 def solve_q2d(problem: Q2DProblem) -> Q2DResult:
-    """Solve a periodic Q2D problem with dealiased Fourier IFRK4 evolution."""
+    """Evolve IFRK4 fields and enforce Courant and normalized energy-budget gates."""
 
     shape, dtype = problem.initial_vorticity.shape, problem.initial_vorticity.dtype
     omega_hat, forcing_hat, eigenvalues, kx, ky, dealias, decay, spacing = _setup(
@@ -342,11 +351,25 @@ def solve_q2d(problem: Q2DProblem) -> Q2DResult:
     psi_hat, ux, uy = _flow(omega_hat, eigenvalues, kx, ky)
     vorticity = jnp.fft.ifftn(omega_hat).real
     budget_residual = jnp.abs(final[0] - initial[0] - budget) / jnp.maximum(
-        jnp.maximum(initial[0], jnp.abs(budget)), jnp.finfo(vorticity.dtype).eps
+        jnp.maximum(initial[0], jnp.abs(budget)), jnp.finfo(vorticity.dtype).tiny
     )
-    require_finite("Q2D solve", vorticity=vorticity, ux=ux, uy=uy, psi=psi_hat)
+    require_finite(
+        "Q2D solve",
+        vorticity=vorticity,
+        ux=ux,
+        uy=uy,
+        psi=psi_hat,
+        diagnostics=jnp.asarray((*initial, *final, budget_residual, max_courant)),
+    )
     diagnostics = Q2DDiagnostics(
         *(float(value) for value in (initial[0], final[0], final[1], budget_residual, final[2], max_courant))
+    )
+    status = (
+        "courant_limit_exceeded"
+        if diagnostics.max_courant > 1.0
+        else "energy_budget_exceeded"
+        if diagnostics.energy_budget_residual > problem.energy_budget_tolerance
+        else "completed"
     )
     return Q2DResult(
         problem=problem,
@@ -358,5 +381,5 @@ def solve_q2d(problem: Q2DProblem) -> Q2DResult:
         frame_times=jnp.asarray(frame_steps) * problem.dt,
         vorticity_history=(jnp.stack(frames) if frames else jnp.zeros((0, *shape), dtype=vorticity.dtype)),
         diagnostics=diagnostics,
-        status="completed" if diagnostics.max_courant <= 1.0 else "courant_limit_exceeded",
+        status=status,
     )
