@@ -1652,7 +1652,10 @@ def extruded_engineering_objectives(
     Values retain the units of ``problem``. Pass the same fixed-topology
     ``geometry_scale`` used to evolve the fields. Lower is better except for
     flow rate; wall current is a cell-centered design proxy, not a validation
-    flux.
+    flux. ``pressure_tap_flux_power`` integrates inlet-minus-outlet ``p*u``
+    on the first/last cell-center planes. ``pumping_power`` is only mean
+    pressure drop times outlet flow. Neither includes body-drive work or
+    certifies total pump power. Unequal tap flows make the flux gauge dependent.
     """
     geometry_kind = problem.case.geometry.kind
     if geometry_kind not in {"rect_duct", "layered_duct", "pipe_ogrid"}:
@@ -1710,6 +1713,7 @@ def extruded_engineering_objectives(
         "pressure_drop": pressure_drop,
         "flow_rate": flow[-1],
         "pumping_power": pressure_drop * flow[-1],
+        "pressure_tap_flux_power": jnp.sum(weights * (pressure[0] * u[0] - pressure[-1] * u[-1])),
         "flow_nonuniformity": flow_nonuniformity,
         "wall_current_density_rms": wall_current_rms,
         "recirculation_fraction": recirculation_fraction,

@@ -122,6 +122,11 @@ design proxy; use the conservative boundary-flux diagnostics for validation.
 Its `pumping_power` quantity is pressure-tap difference times flow and excludes
 prescribed body-drive work. It is not a certified total pump-work objective;
 do not interpret reductions in this quantity as blanket pumping efficiency.
+For nonuniform profiles, `pressure_tap_flux_power` instead integrates pressure
+times axial velocity at each tap, with inlet-minus-outlet sign. These are
+cell-center planes, not reconstructed domain boundaries. See the
+{ref}`work conventions <pressure-taps-and-mechanical-work>`
+for gauge dependence and the additional terms needed for a pump-work balance.
 Generic evolution omits convective momentum transport and holds base magnetic
 samples fixed under geometry scaling. Live field resampling and complete
 coil/equilibrium/shape derivatives are outside this interface's contract.
