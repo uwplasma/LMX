@@ -675,6 +675,10 @@ method/data before freezing its benchmark.
   nonuniform coupled compatibility, advective limiter transitions and electric
   closure. F2 still needs viscous/Joule/electrical flux and storage-rate balance.
   Do not launch a production B2 campaign before tiny-system proof; M1–M9 open.
+- Nonuniform diagnostic: reuse the resting test with dy=dz=[0.4,0.8,1.3],
+  dx=1 and volume-weight each residual row. Float64 rank/FD checks pass but
+  max |Wm G + (Wc D)^T|=0.3714285714. Arithmetic face averaging and cell
+  pressure-force reconstruction are not weighted adjoints; resolve before M1.
 - SOLVAX minimum/CI pins are 0.19 because 0.17 lacks the used Schur export.
   No SOLVAX algorithm changes in these tranches. The 540 s CI shard budget and
   physics tolerances remain intact; prior #55 CI evidence is in its PR.
