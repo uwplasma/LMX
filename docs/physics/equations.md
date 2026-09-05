@@ -77,6 +77,15 @@ gauge shift $p\mapsto p+c$ changes $P_{\rm taps}$ by $c(Q_0-Q_N)$; check mass
 balance before interpreting it. Both quantities have power units when inputs
 are SI, but neither is certified total pump power.
 
+`tap_body_drive_power` integrates the scalar axial force density times axial
+velocity, and `tap_kinetic_energy` integrates $\rho|\mathbf u|^2/2$, over
+the **same slab between tap centers**. They use the fluid-area weights above
+and trapezoidal axial quadrature. For uniform axial cells, the two outer half
+cells are excluded; the slab length is $L-\Delta x$. Kinetic energy is a state
+quantity, not its time derivative. Pass `forcing=` when overriding the case
+drive in `evolve_extruded_fields`, and pass the same `geometry_scale` to both
+functions. Force density is in N/m³ for SI inputs, giving watts and joules.
+
 A complete mechanical balance also needs body-drive work
 $\int_V\mathbf f\cdot\mathbf u\,dV$, kinetic-energy storage, viscous and
 electrical work, and any advective boundary flux of the chosen model. Use
@@ -84,7 +93,7 @@ one common control volume: whole-domain body work cannot simply be added to
 cell-center tap work. A prescribed pressure gradient represented as body drive
 must not also be counted as boundary pressure work. Fixed-flow constraints
 require their imposed-drive work. These terms and a discrete balance are not
-yet supplied by this reducer; the generic recurrence is not energy certified.
+fully supplied by this reducer; the generic recurrence is not energy certified.
 
 ## Quasi-two-dimensional model
 
