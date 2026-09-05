@@ -10,6 +10,7 @@ import sys
 import tempfile
 import time
 
+_HEAVY_FRINGING_TEST = "test_alex_b1_production_map_has_bounded_implicit_gradient"
 _TEST_SHARDS = {
     "support": (
         "tests/test_cli.py",
@@ -24,10 +25,14 @@ _TEST_SHARDS = {
         "tests/test_example_runner.py",
     ),
     "fringing": ("tests/test_fringing.py",),
-    "physics": ("tests/test_physics.py", "tests/test_solver.py"),
+    "physics": (
+        "tests/test_physics.py",
+        "tests/test_solver.py",
+        f"tests/test_fringing.py::{_HEAVY_FRINGING_TEST}",
+    ),
 }
 
-_ALL_TESTS = tuple(dict.fromkeys(path for shard in _TEST_SHARDS.values() for path in shard))
+_ALL_TESTS = tuple(dict.fromkeys(path.split("::")[0] for shard in _TEST_SHARDS.values() for path in shard))
 _CHANGE_TEST_NAMES = {
     "__init__": "config cli example_runner",
     "__main__": "cli",
@@ -200,6 +205,8 @@ def main(argv: list[str] | None = None) -> int:
     if not args.shard and not selected_tests:
         command.extend(("-m", "not curated"))
     command.extend(_TEST_SHARDS[args.shard] if args.shard else selected_tests or ["tests"])
+    if args.shard == "fringing":
+        command.extend(("-k", f"not {_HEAVY_FRINGING_TEST}"))
 
     environment = _test_environment()
     environment.setdefault("MPLBACKEND", "Agg")

@@ -1296,7 +1296,7 @@ def _prepare_b2_momentum_runtime(
 
     u, v, w = velocity
     y0, y1, z0, z1 = fluid_bounds
-    field_sharding = u.sharding if num_devices is not None else None
+    field_sharding = u.sharding if num_devices is not None and isinstance(u.sharding, NamedSharding) else None
     replicated = None if field_sharding is None else NamedSharding(field_sharding.mesh, P())
     flux_sharding = (
         None if field_sharding is None else NamedSharding(field_sharding.mesh, P(None, "x", None, None))

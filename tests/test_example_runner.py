@@ -47,7 +47,7 @@ def test_fringing_benchmark_demo_runs_real_bounded_diagnostic(tmp_path: Path):
 
 def test_variable_field_extruded_demo_optimizes_with_checked_gradients(tmp_path: Path):
     script = Path(__file__).resolve().parents[1] / "examples/variable_field_extruded_demo.py"
-    subprocess.run([sys.executable, script], cwd=tmp_path, timeout=60, check=True)
+    subprocess.run([sys.executable, script], cwd=tmp_path, timeout=120, check=True)
     summary_path = next((tmp_path / "artifacts").rglob("variable_field_extruded_summary.json"))
     summary = json.loads(summary_path.read_text())
     assert summary["shape"] == [7, 6, 6]

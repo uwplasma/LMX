@@ -14,7 +14,7 @@ keywords = ["magnetohydrodynamics", "liquid-metal", "jax", "differentiable-simul
 dependencies = [
   "jax",
   "numpy",
-  "solvax>=0.17,<1",
+  "solvax>=0.19,<1",
   "tomli; python_version < '3.11'",
 ]
 classifiers = [

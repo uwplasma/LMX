@@ -168,13 +168,12 @@ import lmx
 
 jax.config.update("jax_enable_x64", True)
 case = lmx.make_q2d_case(shape=(32, 32), steps=80)
-initial_vorticity = case.initial_vorticity.astype(jnp.float64)
 
 
 def objective(parameters):
     viscosity, friction = parameters
     vorticity, _, _ = lmx.evolve_q2d(
-        initial_vorticity,
+        case.initial_vorticity,
         viscosity=viscosity,
         hartmann_friction=friction,
         dt=case.dt,
@@ -188,7 +187,12 @@ value, gradient = jax.value_and_grad(objective)(
 )
 ```
 
-Keep state and continuous parameter dtypes consistent throughout time stepping.
+The state, forcing and continuous coefficients determine one working dtype
+through [JAX type promotion](https://docs.jax.dev/en/latest/101/type_promotion.html),
+with at least float32 precision. Explicit float64 parameters promote a float32
+initial state when x64 is enabled; weak Python scalar defaults preserve a
+float32 state. Both `Q2DProblem` and `evolve_q2d` use this policy and reject
+complex physical inputs. No manual cast of the initial state is required.
 This derivative is exact for the finite dealiased IFRK4 evolution. Its default
 SOLVAX checkpoint schedule stores `O(sqrt(steps))` trajectory states instead of
 the full tape. The analytical decay, JVP/VJP identity, and compiled reverse

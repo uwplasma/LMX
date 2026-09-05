@@ -605,6 +605,63 @@ def test_shercliff_field_scale_gradient_matches_finite_difference():
 
 
 @pytest.mark.physics
+@pytest.mark.parametrize("control", ["forcing", "length", "viscosity", "hartmann_friction", "dt"])
+def test_q2d_mixed_precision_matches_analytic_fields_and_derivatives(control):
+    coordinate = 2.0 * jnp.pi * jnp.arange(8) / 8
+    initial = (jnp.sin(coordinate[:, None]) * jnp.sin(coordinate[None, :])).astype(jnp.float32)
+
+    def inputs(value):
+        parameters = dict(length=(2.0 * np.pi,) * 2, viscosity=0.02, hartmann_friction=0.1, dt=0.01)
+        if control == "forcing":
+            parameters[control] = 0.03 * value * initial
+        elif control == "length":
+            parameters[control] = (2.0 * np.pi * value, 2.0 * np.pi)
+        else:
+            parameters[control] *= value
+        return parameters
+
+    def objective(value):
+        return jnp.mean(lmx.evolve_q2d(initial, **inputs(value), steps=4)[0] ** 2)
+
+    def analytic(value):
+        parameters = inputs(value)
+        rate = parameters["viscosity"] * sum((2.0 * np.pi / side) ** 2 for side in parameters["length"])
+        rate += parameters["hartmann_friction"]
+        time = 4 * parameters["dt"]
+        decay = jnp.exp(-rate * time)
+        source = 0.03 * value if control == "forcing" else 0.0
+        return initial * (decay + source * (-jnp.expm1(-rate * time)) / rate)
+
+    value = jnp.asarray(1.1, dtype=jnp.float64)
+    fields = jax.jit(lambda x: lmx.evolve_q2d(initial, **inputs(x), steps=4))(value)
+    result = solve_q2d(Q2DProblem(initial, **inputs(value), steps=4, history_stride=2))
+    assert result.problem.initial_vorticity.dtype == result.problem.forcing.dtype == jnp.float64
+    assert all(field.dtype == jnp.float64 for field in fields)
+    assert result.vorticity == pytest.approx(fields[0], abs=1.0e-12)
+    assert fields[0] == pytest.approx(analytic(value), abs=2.0e-8)
+    actual = jax.jit(jax.value_and_grad(objective))(value)
+    expected = jax.value_and_grad(lambda x: jnp.mean(analytic(x) ** 2))(value)
+    assert np.asarray(actual) == pytest.approx(np.asarray(expected), rel=2.0e-6, abs=1.0e-10)
+    tangent = jax.jvp(objective, (value,), (jnp.ones_like(value),))[1]
+    assert tangent == pytest.approx(actual[1], rel=1.0e-9, abs=1.0e-12)
+
+
+@pytest.mark.physics
+def test_q2d_real_dtype_floor_and_weak_scalar_defaults():
+    for dtype in (jnp.int32, jnp.float32, jnp.float64):
+        initial = jnp.zeros((4, 4), dtype=dtype)
+        expected = jnp.result_type(dtype, jnp.float32)
+        case = Q2DProblem(initial, steps=1)
+        assert case.initial_vorticity.dtype == expected
+        assert lmx.evolve_q2d(initial, steps=1)[0].dtype == expected
+    initial = jnp.zeros((4, 4), dtype=jnp.complex64)
+    with pytest.raises(ValueError, match="must be real"):
+        Q2DProblem(initial)
+    with pytest.raises(ValueError, match="must be real"):
+        lmx.evolve_q2d(initial)
+
+
+@pytest.mark.physics
 def test_q2d_model_contract_refinement_and_failures():
     case = make_q2d_case(
         shape=(18, 18),
@@ -633,7 +690,7 @@ def test_q2d_model_contract_refinement_and_failures():
 
     x = jnp.arange(18) * 2.0 * jnp.pi / 18
     initial = (jnp.sin(x[:, None]) * jnp.cos(2.0 * x[None, :])).astype(jnp.float32)
-    forcing = 0.03 * jnp.cos(3.0 * x[:, None] - x[None, :])
+    forcing = (0.03 * jnp.cos(3.0 * x[:, None] - x[None, :])).astype(jnp.float32)
     forced = solve_q2d(
         Q2DProblem(
             initial,
