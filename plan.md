@@ -642,62 +642,53 @@ method/data before freezing its benchmark.
 
 ### Resume checkpoint
 
-- Roadmap #54, dtype/CI #55 and pressure-flux #56 are merged. All applicable
-  exact-head hosted gates passed, including ≥95% coverage and triggered FreeMHD.
-  #57 merged as `d18fefc`: Q2D energy acceptance, no evolution/AD change.
-  Eight Q2D tests give 100% module coverage; 41-frame example passes.
-- #58, `codex/tap-control-volume-work`, rebased onto #57 as `ede81ec`.
-  Body-drive work and kinetic energy use the same tap-center slab, explicit
-  forcing override and fluid-only quadrature. Thirty affected tests pass (31.8 s),
-  including three geometries and analytic parameter/geometry derivatives.
-  Original hosted head passed all numerical shards and FreeMHD (5m36s);
-  require rebased-head gates before merge. This does not certify energy closure.
-- #59, `codex/pressure-operator-contract`, is stacked on #58; hosted gates queued.
-  Independent 18-cell pressure transmissibility oracle verifies weighted
-  symmetry, positive energy, rank 17 Neumann / 18 mixed and reverse derivatives.
-  Generic checkerboard exposes |DG|=0 versus compact |L|=4 on interior cells;
-  F7 and numerical documentation distinguish the inconsistent generic stencil.
-- Signed B2 momentum residual supplies normalized diagnostics without duplicate
-  equations. The resting 108-unknown Stokes test exposed a 7.8858% Jacobian
-  mismatch caused by limiting viscous gradients. Newtonian velocity gradients
-  are now unlimited; advective speed gradients retain limiting in the packed
-  calculation. Independent stress quadrature, full rank, pressure/continuity
-  adjoint blocks and three centered-difference steps pass.
-  This changes viscous discretization; require hosted numerical/FreeMHD gates.
-  It certifies only the uniform resting mechanical block, not finite-advection,
-  electromagnetic closure, accepted B2 convergence or a steady adjoint.
-- #59 before stacking: 510 local tests, 95.22% coverage, 138.7 s; clean docs.
-  Artifacts: `artifacts/viscous-residual-{coverage,junit}.xml`.
-- #60, `codex/nonuniform-face-interpolation`, is stacked on #59 `a3ddfad`.
-  Share distance-weighted normal-face interpolation between mass initialization
-  and the pressure predictor; remove the test-only divergence wrapper. Package
-  shrinks 23 lines, no new files. Five affected operator/projection tests pass;
-  reduced B2 boundary/restart test also passes (9.41 s).
-  affine face values, interior divergence and geometry JVP have analytic checks.
-  Clean Sphinx/Ruff/audit pass; 12,247 test lines, allowance 12,250.
-  Qualify/merge #58 then #59 before rebasing/qualifying this numerical tranche.
-  Continue M1 coupled compatibility/advection/electric closure; F2 energy open.
-  Do not launch a production B2 campaign before tiny-system proof; M1–M9 open.
-- Active `codex/explicit-extruded-formulation` is stacked on #60 `75b0ef4`.
-  F3: explicit SolverConfig/TOML formulation replaces name-prefix dispatch.
-  Renamed B1/B2 production checks pass; restart metadata rejects mismatches.
-  Three dispatch tests and 28 config tests pass; IO/B1/B2 targeted checks pass.
-  Initial three architecture failures were the test allowance, now 12,295.
-  README/reference/numerics updated; clean Sphinx and Ruff pass.
-  Full combined-stack local gate: 520 passed, 95.24% coverage, 144.4 s.
+- Main is #57 merge `d18fefc`; #54–#57 passed all applicable exact-head gates.
+  Q2D acceptance is explicit, pressure-tap flux work is available; F2 remains open.
+- Pending stack: #58 `ede81ec` → #59 `a3ddfad` → #60 `75b0ef4` →
+  #61 `d56b22b`. Qualify/merge in order, rebase each successor onto main,
+  preserve its tests/log, and require exact-head hosted coverage/FreeMHD gates.
+  Jobs have been queued for runners; some scope/impact jobs now progress.
+  Never restart solely for queue delay or waive gates using prior-head results.
+- #58: body-drive work and stored kinetic energy use the tap-center slab;
+  three geometries and force/velocity/geometry derivatives tested. Original
+  head passed numerical shards and FreeMHD; rebased head must qualify.
+- #59: independent 18-cell pressure oracle verifies weighted symmetry,
+  positive energy, rank 17 Neumann / 18 mixed and AD. Signed B2 momentum
+  residual supplies diagnostic norms. Unlimited Newtonian velocity gradients
+  fix a 7.8858% resting Jacobian mismatch; advective gradients stay limited.
+  Resting 108-unknown uniform Stokes rank/adjoint/FD checks pass, not full B2.
+- #60: shared distance-weighted face interpolation fixes affine consistency;
+  23 fewer package lines, no files added; geometry JVP and B2 restart pass.
+  Nonuniform energy compatibility is separate and remains open.
+- #61: explicit SolverConfig/TOML formulation replaces name-based dispatch;
+  renamed production B1/B2 cases pass and restart identity is checked.
+  Full combined-stack local gate: 520 passed / 95.24% / 144.4 s; docs pass.
   Reproduce: `scripts/run_full_test_suite.py --coverage-xml artifacts/explicit-formulation-coverage.xml --junit-xml artifacts/explicit-formulation-junit.xml`.
-  Hosted qualification remains required; #58–#60 have queued jobs, no runner.
-- Nonuniform diagnostic: reuse the resting test with dy=dz=[0.4,0.8,1.3],
-  dx=1 and volume-weight each residual row. Float64 rank/FD checks pass but
-  max |Wm G + (Wc D)^T|=0.3714285714. Arithmetic face averaging and cell
-  pressure-force reconstruction were not weighted adjoints. Linear interpolation
-  fixes affine consistency, not this energy identity; resolve before closing M1.
-- SOLVAX minimum/CI pins are 0.19 because 0.17 lacks the used Schur export.
-  No SOLVAX algorithm changes in these tranches. The 540 s CI shard budget and
-  physics tolerances remain intact; prior #55 CI evidence is in its PR.
-- Raw audit profiles remain ignored local artifacts; public evidence packaging
-  remains open. Before resuming fetch origin, inspect PRs and working-tree
-  changes, preserve unrelated edits, and record/push each completed tranche.
+- Active `codex/bounded-field-tables` is based on #61 `d56b22b`.
+  F6: honor supplied axial coordinates, reject extrapolation/nonfinite queries,
+  validate table axes/components, load once, interpolate vector components
+  together. Five distinct affected tests pass; fringing/table group 16.55 s.
+  Both wall/field tutorial snippets execute; clean Sphinx/Ruff/audit pass.
+  Pipe caller now supplies mesh cell centres rather than profile stations;
+  shifted-origin sampling and production/AD parity tests pass (47.72 s).
+  No new files; test allowance 12,330 covers these additional checks.
+  Warm local float64 interpolation (17³ table, 25³ queries, 10 samples):
+  separate component calls 24.57 ms median vs vector call 7.63 ms, matching
+  outputs at 1e-13. Excludes I/O/compilation; not a solver speedup claim.
+  Host-side table sampling is not live coil/geometry AD; M5 remains open.
+- Next M1: nonuniform pressure/continuity compatibility, advection limiter
+  transitions and electromagnetic closure before a production B2 campaign.
+  Uniform checkerboard diagnostic: interior |DG|=0 vs compact |L|=4.
+  Pre-#60 nonuniform resting test (dy=dz=[0.4,0.8,1.3], dx=1):
+  weighted pressure/continuity defect 0.3714285714 despite full rank/FD parity.
+  Affine consistency alone does not close that energy identity.
+- F2 still needs consistent viscous/Joule/electrical flux and storage-rate
+  balance. M1–M9 remain open; no accepted B2 steady primal/adjoint is claimed.
+  SOLVAX minimum/CI pins 0.19; no algorithm changes in these LMX tranches.
+  Python 3.11.14 / JAX 0.10.2 locally. CI shard budget stays 540 s.
+- Raw profiles remain local ignored artifacts; public packaging remains open.
+  Resume by fetching origin, inspecting PR/working-tree state, preserving
+  unrelated edits, and recording/pushing evidence and next steps here.
 
 Keep at most ten substantive entries. Older evidence becomes immutable
 commit/PR/artifact links, not another tracked log. Each entry records work,
