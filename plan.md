@@ -1,6 +1,6 @@
 # LMX research and engineering plan
 
-Status: active · Revised: 2026-09-04
+Status: active · Revised: 2026-09-05
 Audited source: `d85fb5b73931688deb5161b0c049346c868935b9`
 
 This is the single forward roadmap, acceptance register and compact work log.
@@ -178,7 +178,7 @@ Use these IDs in PRs. “Implemented” alone never closes a milestone.
 
 | ID | Deliverable | Status/dependency | Exit gate |
 |---|---|---|---|
-| M0 | Truthful model contracts and physical objectives | Next | F1–F3/F9/F11 scoped; executable entry points; no unsupported pump/steady claims |
+| M0 | Truthful model contracts and physical objectives | In progress | F1–F3/F9/F11 scoped; executable entry points; no unsupported pump/steady claims |
 | M1 | Conservative consistent 3D residual and B2 steady primal | Open; M0 definitions | Rank/MMS/physical convergence and frozen B2 refinement gates |
 | M2 | Efficient implicit 3D derivatives | Open; accepted residual for B2 | Tangent/adjoint/Taylor, failure semantics and bounded-memory evidence |
 | M3 | Independent B1/B2 and regime validation | B1 setup can start now | Matched inputs, independent runs, refinement and uncertainty |
@@ -676,10 +676,13 @@ method/data before freezing its benchmark.
   budget remains unchanged. Follow-up local gate: 28 affected tests passed in
   39.9 s. Collection proves 508 CI cases covered exactly once (335 support,
   49 fringing, 124 physics; includes one curated case excluded locally).
-  Hosted `33945919241`: support/physics pass; fringing has 48 passes and one
-  failure (only one device visible). FreeMHD passes in 5m10s. #55 fix `b9a6beb`
-  prepends forced-device XLA flags before bare thread options; exact CI flags
-  pass locally (24.6 s). Await run `33946313887` and fresh combined coverage.
+  #55 fix `b9a6beb` prepends forced-device XLA flags before bare thread options.
+  Run `33946313887`: 49 fringing cases pass (423.08 s; sharding 71.92 s),
+  physics/docs/architecture pass; FreeMHD passes in 5m44s. Support: 334 pass,
+  unchanged design example exceeds its 60 s subprocess limit. One failed-job
+  retry is running; require support and combined coverage before merging.
+  Cold local example with CI flags passes in 35.1 s. If the timeout repeats,
+  fix the harness; do not retry indefinitely or waive the 540 s shard budget.
 - Raw profiles are local ignored artifacts, not available from a fresh clone.
   All headline results and limitations are recorded in sections 2–3.
 - Before resuming: fetch origin, inspect branch/PR status and working-tree
