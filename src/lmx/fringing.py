@@ -81,21 +81,18 @@ def _solve_extruded_projection(
     case = problem.case
     with jax.ensure_compile_time_eval():
         mesh = _cross_section_mesh(case)
-    use_alex_b2_finite_volume = (
-        case.name.startswith("alex_b2-fringing-square_") and case.geometry.kind == "layered_duct"
+    formulation = case.solver.extruded_formulation
+    use_alex_b2_finite_volume = formulation == "b2_finite_volume"
+    use_alex_b1_finite_volume = formulation == "b1_finite_volume"
+    required_geometry = {"b1_finite_volume": "pipe_ogrid", "b2_finite_volume": "layered_duct"}.get(
+        formulation
     )
-    use_alex_b1_finite_volume = (
-        case.name.startswith("alex_b1-fringing-pipe_") and case.geometry.kind == "pipe_ogrid"
-    )
+    if required_geometry is not None and case.geometry.kind != required_geometry:
+        raise ValueError(f"{formulation} requires {required_geometry} geometry")
     if design_parameters is not None and (
         case.geometry.kind not in {"rect_duct", "layered_duct", "pipe_ogrid"} or use_alex_b2_finite_volume
     ):
         raise NotImplementedError("differentiable extruded fields do not yet support ALEX B2")
-    if case.name.startswith("alex_") and not (use_alex_b1_finite_volume or use_alex_b2_finite_volume):
-        raise NotImplementedError(
-            "Unsupported ALEX production case; only the frozen B1 pipe and B2 square "
-            "finite-volume paths are implemented"
-        )
     if num_devices is not None and num_devices > 1 and use_alex_b1_finite_volume:
         raise NotImplementedError("Production spatial sharding does not yet support ALEX B1")
     if (

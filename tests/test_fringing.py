@@ -281,6 +281,38 @@ def _with_integration_budget(problem):
     return replace(problem, case=case)
 
 
+@pytest.mark.parametrize(
+    "formulation,geometry",
+    [
+        ("stokes_projection", "rect_duct"),
+        ("b1_finite_volume", "pipe_ogrid"),
+        ("b2_finite_volume", "layered_duct"),
+    ],
+)
+def test_extruded_formulation_dispatch_ignores_case_name(monkeypatch, formulation, geometry):
+    problem = build_square_duct_extruded_problem()
+    case = replace(
+        problem.case,
+        geometry=replace(problem.case.geometry, kind=geometry),
+        solver=replace(problem.case.solver, extruded_formulation=formulation),
+    )
+    monkeypatch.setattr(fringing_impl, "_cross_section_mesh", lambda case: None)
+    def dispatch(problem, mesh, finite_volume, runtime):
+        return finite_volume
+    monkeypatch.setattr(fringing_impl, "_solve_pipe_projection", dispatch)
+    monkeypatch.setattr(fringing_impl, "_solve_duct_projection", dispatch)
+    for name in ("my_research", "alex_b2-fringing-square_custom", "alex_unrelated"):
+        assert fringing_impl._solve_extruded_projection(replace(problem, case=replace(case, name=name))) == (
+            formulation != "stokes_projection"
+        )
+    if formulation != "stokes_projection":
+        invalid = replace(case, geometry=replace(case.geometry, kind="rect_duct"))
+        with pytest.raises(ValueError, match="requires"):
+            fringing_impl._solve_extruded_projection(replace(problem, case=invalid))
+    with pytest.raises(ValueError, match="Unsupported extruded formulation"):
+        replace(case.solver, extruded_formulation="typo")
+
+
 def test_b2_canonical_shell_widths_remove_realization_thickness():
     nominal = jnp.asarray([0.01, 0.01, 0.4, 0.4, 0.4, 0.4, 0.4, 0.01, 0.01])
     confirmation = nominal.at[:2].divide(2.0).at[-2:].divide(2.0)
@@ -793,11 +825,10 @@ def test_implicit_duct_momentum_matches_dense_diffusion_and_autodiff(monkeypatch
     pressure_force = jax.jacfwd(lambda p: (volume[..., None] * dt * pressure(p)).reshape(-1))(
         jnp.zeros(shape)
     ).reshape((velocity.size, scalar.size))
+
     def cell_divergence(value):
         fx, fy, fz = duct_impl._duct_velocity_faces(value.reshape(velocity.shape), dy=dy, dz=dz)
-        return duct_impl._duct_face_divergence(
-            fx, jnp.zeros_like(fx[0]), fy, fz, dx=dx, dy=dy, dz=dz
-        ).ravel()
+        return duct_impl._duct_face_divergence(fx, jnp.zeros_like(fx[0]), fy, fz, dx=dx, dy=dy, dz=dz).ravel()
 
     divergence = jax.jacfwd(cell_divergence)(jnp.zeros(velocity.size))
     a_inverse = lambda value: jnp.linalg.solve(matrix, value)  # noqa: E731
@@ -1334,6 +1365,7 @@ def test_nonuniform_face_flux_projection_closes_discrete_divergence():
     nx, ny, nz = 5, 6, 5
     dy = jnp.asarray([0.2, 0.3, 0.45, 0.4, 0.35, 0.3])
     dz = jnp.asarray([0.25, 0.4, 0.5, 0.45, 0.3])
+
     # Continuous affine fields must interpolate exactly to actual internal faces.
     def affine_faces(scale):
         yc, zc = jnp.cumsum(scale * dy) - scale * dy / 2, jnp.cumsum(dz) - dz / 2
