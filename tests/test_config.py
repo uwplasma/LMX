@@ -222,7 +222,8 @@ side = "max"
     assert len(config.case.boundary_conditions) == 4
 
 
-def test_load_run_config_reads_extruded_fringing_controls(tmp_path: Path):
+@pytest.mark.parametrize("formulation", ["stokes_projection", "b1_finite_volume", "b2_finite_volume"])
+def test_load_run_config_reads_extruded_fringing_controls(tmp_path: Path, formulation):
     input_file = tmp_path / "fringing.toml"
     input_file.write_text(
         """
@@ -268,12 +269,13 @@ viscosity = 0.05
 [[boundary_conditions]]
 name = "wall"
 kind = "no_slip"
-""".strip()
+""".strip().replace('mode = "steady"', f'mode = "steady"\nextruded_formulation = "{formulation}"')
     )
 
     config = load_run_config(input_file)
 
     assert config.case.solver.kind == "extruded_inductionless"
+    assert config.case.solver.extruded_formulation == formulation
     assert config.fringing.enabled is True
     assert config.fringing.entry_center == pytest.approx(1.0)
     assert config.fringing.exit_center == pytest.approx(4.0)
@@ -286,6 +288,7 @@ kind = "no_slip"
     [
         ({"magnetic_kind": "analytic"}, "analytic magnetic-field"),
         ({"solver": 'kind = "invalid"'}, "Unsupported solver kind"),
+        ({"solver": 'extruded_formulation = "invalid"'}, "Unsupported extruded formulation"),
         ({"geometry_kind": None}, "Missing required TOML key 'kind'"),
         ({"geometry_extra": "wall_thickness = [0.1, 0.2]"}, "must have length 4"),
         ({"solver": 'mode = "invalid"'}, "Unsupported solve mode"),
