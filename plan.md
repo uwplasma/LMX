@@ -678,7 +678,7 @@ method/data before freezing its benchmark.
   separate component calls 24.57 ms median vs vector call 7.63 ms, matching
   outputs at 1e-13. Excludes I/O/compilation; not a solver speedup claim.
   Host-side table sampling is not live coil/geometry AD; M5 remains open.
-- Active `codex/ci-superseded-work` is based on #62 `d53da86`.
+- Integration `codex/ci-superseded-work` (#63, `1cef392`) is based on #62.
   Add per-PR cancellation to docs/FreeMHD, keeping workflows independent and
   non-PR runs distinct. Workflow/action changes trigger numerical qualification;
   docs/FreeMHD selectors cover their own setup and physical-input dependencies.
@@ -692,6 +692,12 @@ method/data before freezing its benchmark.
   Full combined local qualification: 532 passed, 95.28% coverage, 129.7 s.
   Reproduce: `scripts/run_full_test_suite.py --coverage-xml artifacts/ci-stack-coverage.xml --junit-xml artifacts/ci-stack-junit.xml`.
   #59 numerical shards and FreeMHD passed; integration #63 still needs its gates.
+- Active `codex/face-projection-energy` is based on #63 `1cef392`, kept separate
+  so it does not restart batch qualification. The actual pressure solve/correction
+  passes orthogonality, Pythagorean identity and contraction in the independent
+  inverse-mobility face metric for both boundary variants (2 tests, 7.14 s).
+  No PDE/API changes; 48 test lines, allowance 12,450. This is not a certificate
+  for physical cell energy or flow equalization. Rebase/qualify after #63 merges.
 - Next M1: nonuniform pressure/continuity compatibility, advection limiter
   transitions and electromagnetic closure before a production B2 campaign.
   Uniform checkerboard diagnostic: interior |DG|=0 vs compact |L|=4.

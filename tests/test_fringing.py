@@ -1339,6 +1339,54 @@ def test_duct_pressure_operator_has_independent_energy_and_rank_contract(mixed):
     gradient = jax.jit(jax.grad(lambda p: 0.5 * jnp.vdot(p, operator(p))))(pressure)
     np.testing.assert_allclose(gradient, oracle @ pressure, atol=1e-12)
 
+    # A closed/zero-pressure-boundary projection is orthogonal in the face
+    # inverse-mobility metric area * integral(1/mobility ds), not the unweighted norm.
+    weights = []
+    for axis, width in enumerate(widths):
+        inverse = np.moveaxis(1 / mobility, axis, 0)
+        area = np.moveaxis(volume / width.reshape(tuple(-1 if i == axis else 1 for i in range(3))), axis, 0)
+        metric = np.zeros((inverse.shape[0] + 1, *inverse.shape[1:]))
+        metric[1:-1] = (
+            area[:-1] * 0.5 * (width[:-1, None, None] * inverse[:-1] + width[1:, None, None] * inverse[1:])
+        )
+        if axis == 0:
+            if mixed:
+                metric[-1] = area[-1] * 0.5 * width[-1] * inverse[-1]
+            metric = metric[1:]
+        weights.append(jnp.asarray(np.moveaxis(metric, 0, axis)))
+    predictor = tuple(
+        jnp.where(w > 0, jnp.sin(jnp.arange(w.size).reshape(w.shape) + 0.3), 0) for w in weights
+    )
+    divergence = duct_impl._duct_face_divergence(
+        predictor[0], jnp.zeros(shape[1:]), *predictor[1:], dx=0.4, dy=widths[1], dz=widths[2]
+    )
+    solved, residual, converged, *_ = _solvax_pressure_poisson_duct(
+        divergence,
+        jnp.asarray(mobility),
+        dx=0.4,
+        dy=widths[1],
+        dz=widths[2],
+        iterations=300,
+        tolerance=1e-11,
+        axial_pressure_mode=duct_impl._MIXED_AXIAL_PRESSURE_MODE if mixed else "neumann",
+    )
+    assert bool(converged) and residual < 1e-9
+    correction = duct_impl._duct_pressure_face_corrections(
+        solved,
+        jnp.asarray(mobility),
+        dx=0.4,
+        dy=widths[1],
+        dz=widths[2],
+        mixed_axial_pressure=mixed,
+    )
+    projected = tuple(v + g for v, g in zip(predictor, correction))
+    dot = lambda a, b: sum(jnp.sum(w * u * v) for w, u, v in zip(weights, a, b))  # noqa: E731
+    np.testing.assert_allclose(dot(projected, correction), 0.0, atol=1e-9)
+    np.testing.assert_allclose(
+        dot(projected, projected) + dot(correction, correction), dot(predictor, predictor), atol=2e-9
+    )
+    assert dot(projected, projected) < dot(predictor, predictor)
+
 
 def test_b2_stokes_residual_has_consistent_resting_jacobian():
     shape, size = (3, 3, 3), 27
