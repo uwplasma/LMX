@@ -171,7 +171,7 @@ def _solve_pipe_projection(
             bx, by, bz = _sample_station_magnetic_field(
                 case,
                 field_scale=field_scale,
-                x=problem.profile.x,
+                x=base_x,
                 y=base_rr[0] * jnp.cos(static_theta_grid[0]),
                 z=base_rr[0] * jnp.sin(static_theta_grid[0]),
                 volume_field=problem.profile.volume_field,

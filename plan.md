@@ -669,7 +669,9 @@ method/data before freezing its benchmark.
   validate table axes/components, load once, interpolate vector components
   together. Five distinct affected tests pass; fringing/table group 16.55 s.
   Both wall/field tutorial snippets execute; clean Sphinx/Ruff/audit pass.
-  No new files; 12,311 test lines with allowance 12,315.
+  Pipe caller now supplies mesh cell centres rather than profile stations;
+  shifted-origin sampling and production/AD parity tests pass (47.72 s).
+  No new files; test allowance 12,330 covers these additional checks.
   Warm local float64 interpolation (17³ table, 25³ queries, 10 samples):
   separate component calls 24.57 ms median vs vector call 7.63 ms, matching
   outputs at 1e-13. Excludes I/O/compilation; not a solver speedup claim.
