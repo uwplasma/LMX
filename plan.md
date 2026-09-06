@@ -55,6 +55,7 @@ methods/software paper. They stay out of the package and out of user docs.
 | B2 steady state | momentum defect 0.138 versus the 1e-3 target after 60 commits on 2026-08-29 | The specialised lane did not converge; do not continue it |
 | Showcase media | three WebP posters (152 KB); Q2D demo is a 64², 160-step laminar decay; no movie in the repo or docs | Does not yet meet the "engaging plots and movies" goal |
 | Office GPU host | unreachable on 2026-09-06 (SSH timeout); last measured 2026-09-04 | GPU campaign needs the host back |
+| FreeMHD comparator (local Mac, x86 emulation) | pinned image builds in ~15 min; B2 smoke passes in 17 s with pressure RMS 0.0031 / max 0.0068 (bounds 0.16 / 0.32), acceptance withheld by role; FreeMHD source must be cloned on a case-sensitive volume or the tree hash refuses it | Bundled Shercliff/Hunt demos run only ten steps (endTime 1e-5 s) and return the initial profile: install checks, not validators |
 
 ## 3. Decisions
 
