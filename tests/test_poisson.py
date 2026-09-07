@@ -166,3 +166,75 @@ def test_factorization_refuses_an_operator_that_is_not_symmetric(monkeypatch):
     monkeypatch.setattr(poisson, "assemble_axis_laplacian", asymmetric)
     with pytest.raises(ValueError, match="not symmetric under the cell widths"):
         poisson.fast_diagonal_poisson(SMALL, (FIXED, FIXED, FIXED))
+
+
+@pytest.mark.parametrize(
+    ("offset", "conditions", "name"),
+    [
+        ((0.0, CENTER, CENTER), (WRAPPED, WALL, WRAPPED), "periodic-face"),
+        ((CENTER, 0.0, CENTER), (WRAPPED, WALL, WRAPPED), "walled-face"),
+        ((CENTER, CENTER, CENTER), (WRAPPED, WALL, WRAPPED), "cell-centred"),
+    ],
+    ids=["periodic-face", "walled-face", "cell-centred"],
+)
+def test_the_helmholtz_factorization_inverts_its_operator(offset, conditions, name):
+    """A staggered implicit viscous solve, checked against the stencil it factorizes."""
+    from lmx.ops import staggered_laplacian
+    from lmx.poisson import fast_diagonal_helmholtz, free_slice
+
+    del name
+    grid = Grid(uniform_faces(4, 0.0, 1.0), geometric_faces(8, -1.0, 1.0, 1.15), uniform_faces(4, -1.0, 1.0))
+    coefficient = 0.05
+    factorization = fast_diagonal_helmholtz(grid, offset, conditions, shift=1.0, coefficient=coefficient)
+    generator = np.random.default_rng(0)
+    rhs = Field(jnp.asarray(generator.normal(size=grid.offset_shape(offset))), offset, grid)
+    solution = factorization.solve(rhs)
+    applied = solution.data - coefficient * staggered_laplacian(solution, conditions).data
+    free = tuple(free_slice(grid, axis, offset[axis], conditions[axis]) for axis in range(3))
+    residual = np.max(np.abs(np.asarray(applied)[free] - np.asarray(rhs.data)[free]))
+    assert residual < 1e-12
+
+
+def test_the_helmholtz_solve_leaves_prescribed_entries_at_zero():
+    """Wall faces are boundary data the caller owns, not unknowns to set."""
+    from lmx.poisson import fast_diagonal_helmholtz
+
+    grid = Grid(uniform_faces(4, 0.0, 1.0), uniform_faces(6, -1.0, 1.0), uniform_faces(4, -1.0, 1.0))
+    offset, conditions = (CENTER, 0.0, CENTER), (WRAPPED, WALL, WRAPPED)
+    factorization = fast_diagonal_helmholtz(grid, offset, conditions, shift=1.0, coefficient=0.1)
+    rhs = Field(jnp.ones(grid.offset_shape(offset)), offset, grid)
+    solution = np.asarray(factorization.solve(rhs).data)
+    assert np.all(solution[:, 0, :] == 0.0)
+    assert np.all(solution[:, -1, :] == 0.0)
+    assert np.any(solution[:, 1:-1, :] != 0.0)
+
+
+def test_the_helmholtz_factorization_validates_its_inputs():
+    from lmx.poisson import fast_diagonal_helmholtz
+
+    grid = Grid(*(uniform_faces(4, 0.0, 1.0) for _ in range(3)))
+    with pytest.raises(ValueError, match="one boundary condition per axis"):
+        fast_diagonal_helmholtz(grid, (CENTER,) * 3, (WALL, WALL))
+    with pytest.raises(ValueError, match="inhomogeneous boundary data"):
+        fast_diagonal_helmholtz(grid, (CENTER,) * 3, (BoundaryCondition(DIRICHLET, lower=1.0), WALL, WALL))
+    factorization = fast_diagonal_helmholtz(grid, (CENTER,) * 3, (WALL, WALL, WALL))
+    with pytest.raises(ValueError, match="match the factorized position"):
+        factorization.solve(Field(jnp.zeros(grid.face_shape(0)), (0.0, CENTER, CENTER), grid))
+
+
+def test_the_helmholtz_factorization_refuses_an_asymmetric_operator(monkeypatch):
+    """The same tripwire as the scalar case, for the staggered assembly."""
+    import lmx.poisson as poisson
+
+    grid = Grid(*(uniform_faces(4, 0.0, 1.0) for _ in range(3)))
+
+    original = poisson.assemble_staggered_axis_operator
+
+    def asymmetric(grid_, axis, offset, condition):
+        operator = original(grid_, axis, offset, condition)
+        operator[0, 1] += 5.0
+        return operator
+
+    monkeypatch.setattr(poisson, "assemble_staggered_axis_operator", asymmetric)
+    with pytest.raises(ValueError, match="not symmetric under its cell weights"):
+        poisson.fast_diagonal_helmholtz(grid, (CENTER,) * 3, (WALL, WALL, WALL))
