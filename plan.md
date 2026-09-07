@@ -389,7 +389,7 @@ Effort in person-weeks for one developer with agents. Tracks marked ∥ run in
 parallel. Every phase ends with a PR that adds its figure to the gallery and its
 rows to the validation matrix. "Implemented" closes nothing; the exit column does.
 
-### Phase 0 — Integration and hygiene (week 1)
+### Phase 0 — Integration and hygiene (week 1) — **complete 2026-09-07**
 
 | Step | Action | Exit |
 |---|---|---|
@@ -399,6 +399,13 @@ rows to the validation matrix. "Implemented" closes nothing; the exit column doe
 | 0.4 | Freeze the B1/B2 lane (D2): no new work; tag `lmx-b2-lane-v1` at `main` | tag pushed; CONTRIBUTING notes the freeze |
 | 0.5 | Fix local coverage source (`--cov=src/lmx`), adopt markers `unit`/`regression`/`slow`/`gpu`/`external`, split CI as in Section 9, add `docs/adr/0001-plan-adoption.md` … `0004-process.md`, `ROADMAP.md` (one page) | PR CI ≤ 8 min; nightly workflow file present (may run only when the box is up) |
 | 0.6 | README as merged with this plan; examples table and gallery point to real assets | README ≤ 120 lines; quickstart executes |
+
+Landed as #69 (0.1), #73 (0.2), #79 (0.3), #77 (0.4), #80 with #84 (0.5) and
+#72 (0.6). Measured at the close: the reverse derivative is finite at rest and
+in flow, a 600-step request runs 600 steps, the suite is green with x64 on and
+off, `lmx-b2-lane-v1` is tagged, and the pull-request lane runs four disjoint
+jobs (unit 2m02s; regression fringing, physics 4m16s and support 2m41s) inside
+the eight-minute target with the pinned FreeMHD comparison at 5m11s.
 
 ### Phase 1 — The new 3-D core (weeks 2–5, ∥ with 2, 3, 3b)
 
@@ -659,3 +666,5 @@ Process: pyOpenSci README guide · JOSS review criteria · Google small CLs · D
 | Date | Work | Next |
 |---|---|---|
 | 2026-09-06 | Review of code, tests, PRs #1–#66, CI and FreeMHD Docker; five literature/software surveys; fresh runs (508/508 tests, seven examples, Hunt sweep to Ha 1000, Q2D 256², 3-D step-control bug, FreeMHD B2 smoke); #63 merged, #58–#62 closed; #64/#65/#66 reconciled into this plan; README and showcase assets | Phase 0.1: fix the VJP NaN; 0.2–0.6 in parallel |
+| 2026-09-07 | Phase 0 closed: #69, #72, #73, #77, #79 merged; #80 was raised against #79's branch rather than `main`, so #84 landed the same commits on `main`. The pull-request regression tier had been killed by a 420-second budget with a 120-second per-test timeout while the slowest case needs 73 s locally; a tier and a file shard may now be combined and the tier runs as three disjoint shards at the 300-second timeout the other lanes use. A new check compares the shard entries against the files on disk in both directions, after an unsharded new test file made its module report zero combined coverage | Phase 1.3: face currents, Ohm's law and the face Lorentz force |
+| 2026-09-07 | Phase 1.1 and 1.2 opened as #81, #82 and #83: `lmx.grid` (staggered grid, three stretching families, `wall_resolving_faces`), `lmx.bc` and `lmx.ops` (ghost-cell wall conditions; gradient and divergence exact discrete adjoints to a relative 1e-14 on a stretched mesh), and `lmx.poisson` (fast diagonalization; inverts the assembled operator to 1e-11 under four boundary combinations and matches a dense solve to 1e-12). Two accuracy properties are now pinned by test instead of implicit: the two-point wall flux is first order and keeps the operator symmetric, and the stretched interior gradient is centred between cell centres. Full local suite 614 passed in 124 s at 97.2% line coverage, with the four new modules at 100% line and branch | Merge the stack, then Phase 1.3 |
