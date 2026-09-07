@@ -286,6 +286,25 @@ over 8, 16 and 32 cells across the channel. Convective transport is omitted;
 that is the Stokes limit, appropriate at blanket interaction parameters and
 stated rather than implied.
 
+## Running the step as one compiled trajectory
+
+A Python loop around the projection step dispatches every operation from the
+host. On an accelerator that is the difference between a queue the device can run
+ahead on and a round trip per step, and it is why the audit that opened this plan
+found one GPU slower than a laptop CPU on a small duct. `lmx.timeloop` compiles
+the whole run with `jax.lax.scan` instead. Measured on this laptop's CPU, 200
+steps of a 4x16x16 duct take 3.58 s through the host loop and 0.44 s through the
+scan, an **8x speedup before any accelerator is involved**; the 32-cell case gives
+the same ratio, because what is removed is per-step dispatch rather than
+arithmetic.
+
+The step body is wrapped in `jax.checkpoint`, so reverse mode keeps one state per
+step and recomputes each step's interior rather than storing every intermediate.
+Diagnostics leave as scan outputs, so a run reports its divergence residual and
+kinetic-energy history without synchronising mid-trajectory. A test greps the
+step and loop sources for `float(`, `bool(`, `device_get` and `.item()`: one of
+those inside the loop would serialise the queue and undo the change.
+
 ## LMX and SOLVAX
 
 LMX owns:
