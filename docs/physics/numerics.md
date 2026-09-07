@@ -152,6 +152,105 @@ $fL$ and the hydraulic power is $fLQ$. That is the isothermal power of a fully
 developed segment. It excludes entry and exit losses, manifolds and all thermal
 effects, so it is not a blanket pumping budget.
 
+## Staggered grid and wall-resolving coordinates
+
+`lmx.grid` supplies the geometry the plan's conservative 3-D core is being built
+on. A `Grid` stores strictly increasing face coordinates per axis as host-side
+metadata: it is hashable and never traced, so stencil bookkeeping and any
+eigendecomposition happen once at trace time. A `Field` pairs a traced array with
+its staggered offset, where `CENTER` places the value at the cell centre along an
+axis and `FACE` places it on the lower face; a face field therefore carries one
+extra entry on that axis. This is the marker-and-cell layout, for which the
+normal velocity already lives where a conservative face flux needs it.
+
+High-Hartmann ducts require the mesh to resolve two very different layers: the
+Hartmann layer scales as $a/Ha$ and the side layer as $a/\sqrt{Ha}$. Three
+coordinate families are available. `uniform_faces` is the unstretched control,
+`geometric_faces` grows successive cells by a fixed ratio, and `tanh_faces`
+clusters symmetrically at both walls. `wall_resolving_faces` inverts the
+requirement directly: given a layer thickness it places a requested number of
+cells inside the layer while bounding the growth ratio, and raises when the cell
+count cannot meet the request rather than returning an unresolved mesh.
+
+`lmx.bc` expresses a wall condition once, as the ghost value that reproduces it,
+and `lmx.ops` differences every face with the same expression. A cell-centred
+value sits half a cell from the wall, so a prescribed value $g$ needs
+$p_{\rm ghost}=2g-p_0$ and a prescribed normal derivative $q$ needs
+$p_{\rm ghost}=p_0\mp q\,\Delta x_0$.
+
+`face_gradient` maps a cell field to the faces normal to one axis and
+`divergence` maps three face fields back to cells as the net flux per unit
+volume. Under the cell volumes and the face weights $A_f d_f$ these are exact
+discrete adjoints,
+
+$$
+\langle p,\nabla\!\cdot\mathbf u\rangle_V=-\langle\mathbf u,\nabla p\rangle_{Ad},
+$$
+
+for a wall-impermeable flux; the test suite checks this to a relative 1e-14 on a
+stretched mesh. That identity is what makes a projection idempotent and stops the
+Lorentz force doing spurious work in the core of a high-Hartmann duct.
+
+Two accuracy properties are deliberate and pinned by test rather than left
+implicit. The wall flux is the two-point difference $(p_0-g)/(\Delta x_0/2)$,
+first order at the wall, because that stencil is what keeps the assembled
+Laplacian symmetric and the fluxes conservative. On a stretched mesh the interior
+two-point gradient is centred between cell centres rather than on the face, so
+its truncation error is first order in the spacing change; solution order there
+is a manufactured-solution question and is verified in the step that owns it.
+
+`lmx.poisson` inverts that Laplacian directly. On a tensor-product grid the
+operator is the Kronecker sum of three one-dimensional operators, each symmetric
+once the cell widths are folded in, so diagonalizing them on the host reduces a
+solve to three tensor contractions and one elementwise divide. The one-dimensional
+operators are read out of `lmx.ops` by applying the assembled Laplacian to unit
+vectors, so the factorization cannot drift away from the stencil the rest of the
+code uses.
+
+The consequences matter for this code in particular: the cost does not grow with
+the Hartmann number the way an iteration count does, the answer is exact to
+round-off instead of to a tolerance, and the solve is a linear map, so it
+differentiates without taping any iteration. A pure Neumann or fully periodic
+problem is singular; the constant is removed from the right-hand side and the
+returned field has zero volume-weighted mean. Inhomogeneous boundary data is
+affine rather than linear and belongs in the right-hand side, so a condition
+carrying a value is refused instead of silently linearized. A guard rejects any
+axis operator that is not symmetric under the cell widths, which is the tripwire
+that a future three-point wall stencil would trip.
+
+`lmx.em` builds the electric coupling on those operators, following Ni et al.
+Its rule is that one face-normal current
+
+$$
+J_{n,f}=\sigma_f\left[-\frac{\phi_N-\phi_P}{d_{PN}}
++(\mathbf u_f\times\mathbf B_f)\cdot\mathbf n_f\right]
+$$
+
+is the single source of truth: the potential equation is the divergence of
+exactly that flux and the Lorentz force is rebuilt from the same numbers. The
+reason is quantitative. In the core the momentum balance is
+$-\nabla p+\mathbf J\times\mathbf B=0$ to $O(Ha^{-2})$, so an $O(\Delta)$
+inconsistency between the two parts of $\mathbf J$ is amplified by $Ha^2$ and
+appears as a spurious core current.
+
+The force uses Ni's face form,
+
+$$
+(\mathbf J\times\mathbf B)_c=\frac{1}{\Omega_c}\sum_f J_{n,f}\,s_f\,
+(\mathbf r_f-\mathbf r_c)\times\mathbf B_f,
+$$
+
+which never forms a cell-centred current vector and samples the magnetic field on
+the faces, so it remains correct where the field varies along the duct. Face
+conductivity is the distance-weighted harmonic mean, the series resistance of the
+two half-cells and therefore the right average across a fluid-wall jump; the
+arithmetic mean would let a poorly conducting wall draw too much current.
+
+These modules supply geometry, operators, the scalar solve and the electric
+coupling. The momentum discretization and the time loop follow in their own plan
+steps, and the existing fully developed and extruded solvers continue to use
+`lmx.mesh` until those land.
+
 ## LMX and SOLVAX
 
 LMX owns:
