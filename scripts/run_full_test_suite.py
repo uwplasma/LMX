@@ -38,7 +38,6 @@ _TEST_SHARDS = {
         "tests/test_design.py",
         "tests/test_grid.py",
         "tests/test_ops.py",
-        "tests/test_core3d.py",
         "tests/test_staggered_laplacian.py",
         "tests/test_poisson.py",
         "tests/test_em.py",
@@ -46,6 +45,7 @@ _TEST_SHARDS = {
     ),
     "fringing": ("tests/test_fringing.py",),
     "physics": (
+        "tests/test_core3d.py",
         "tests/test_physics.py",
         "tests/test_q2d_identities.py",
         "tests/test_solver.py",

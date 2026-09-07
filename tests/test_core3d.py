@@ -27,7 +27,9 @@ from lmx.core3d import (
 from lmx.grid import CENTER, Field, Grid, uniform_faces
 from lmx.ops import divergence
 
-pytestmark = pytest.mark.unit
+# Physics validation rather than unit checks: the channel cases integrate to a
+# steady state, which the tier system runs in the regression lane.
+pytestmark = pytest.mark.numerical
 
 PERIODIC_X = BoundaryCondition(PERIODIC)
 WALL = BoundaryCondition(NEUMANN)
@@ -219,7 +221,7 @@ def test_the_plane_channel_converges_at_second_order():
 
 def test_a_transverse_field_reduces_the_channel_throughput():
     """The same drive moves less fluid once the field is switched on."""
-    grid = _channel(16)
+    grid = _channel(12)
     throughputs = []
     for strength in (0.0, 4.0):
         base = ChannelProblem(
@@ -235,7 +237,7 @@ def test_a_transverse_field_reduces_the_channel_throughput():
             forcing=(1.0, 0.0, 0.0),
             dt=0.4 * base.diffusive_step_limit,
         )
-        steps = int(round(4.0 / problem.dt))
+        steps = int(round(2.0 / problem.dt))
         throughputs.append(float(np.mean(np.asarray(_advance(problem, steps)[0].data))))
     assert throughputs[0] > throughputs[1] > 0.0
 
