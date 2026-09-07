@@ -347,7 +347,7 @@ def magnetic_field_components(
     if spec.kind == "constant":
         bx, by, bz = spec.value or (0.0, 0.0, 0.0)
         shape = yc.shape
-        field = (jnp.full(shape, bx), jnp.full(shape, by), jnp.full(shape, bz))
+        field = tuple(jnp.full(shape, b, dtype=yc.dtype) for b in (bx, by, bz))
     elif spec.kind == "analytic":
         if spec.fn is None:
             raise ValueError("Analytic magnetic field requires fn")
@@ -369,7 +369,7 @@ def magnetic_field_components(
     else:
         raise ValueError(f"Unsupported magnetic-field kind {spec.kind!r}")
     scale = magnetic_ramp_scale(spec, time)
-    return field[0] * scale, field[1] * scale, field[2] * scale
+    return tuple(jnp.asarray(component * scale, dtype=yc.dtype) for component in field)
 
 
 def region_lookup(regions: tuple[RegionSpec, ...]) -> dict[str, RegionSpec]:
@@ -414,9 +414,9 @@ def build_material_fields(case: CaseSpec, mesh: StructuredMesh) -> MaterialField
     solid = solid_candidates[0] if solid_candidates else fluid
     fluid_mask = mesh.fluid_mask if mesh.fluid_mask is not None else jnp.ones(mesh.yz_shape, dtype=bool)
 
-    conductivity = jnp.full(mesh.yz_shape, fluid.conductivity, dtype=float)
-    density = jnp.full(mesh.yz_shape, fluid.density or 1.0, dtype=float)
-    viscosity = jnp.full(mesh.yz_shape, fluid.viscosity or 1.0, dtype=float)
+    conductivity = jnp.full(mesh.yz_shape, fluid.conductivity, dtype=case.dtype)
+    density = jnp.full(mesh.yz_shape, fluid.density or 1.0, dtype=case.dtype)
+    viscosity = jnp.full(mesh.yz_shape, fluid.viscosity or 1.0, dtype=case.dtype)
 
     if solid_candidates:
         side_assignments: list[tuple[str, RegionSpec]] = []
@@ -470,7 +470,7 @@ def build_material_fields(case: CaseSpec, mesh: StructuredMesh) -> MaterialField
             viscosity = jnp.where(fluid_mask, viscosity, solid.viscosity or fluid.viscosity or 1.0)
 
     if mesh.sigma is not None:
-        explicit_sigma = jnp.asarray(mesh.sigma, dtype=float)
+        explicit_sigma = jnp.asarray(mesh.sigma, dtype=case.dtype)
         if explicit_sigma.shape != mesh.yz_shape:
             raise ValueError("mesh.sigma must have the same shape as the mesh cross-section")
         conductivity = explicit_sigma

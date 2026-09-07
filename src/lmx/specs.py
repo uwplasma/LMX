@@ -3,11 +3,13 @@ from __future__ import annotations
 import math
 import sys
 import time
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, TextIO
 
 import jax.numpy as jnp
+from jax import config as jax_config
 
 try:
     import tomllib
@@ -169,6 +171,21 @@ class CaseSpec:
     reference_pressure_gradient: float = -1.0
     reference_phi_cell: tuple[int, int] = (0, 0)
     notes: str = ""
+    dtype: str = "float64"
+
+    def __post_init__(self):
+        if self.dtype not in ("float32", "float64"):
+            raise ValueError("case dtype must be 'float32' or 'float64'")
+        if self.dtype == "float64" and not jax_config.x64_enabled:
+            warnings.warn(
+                "Call lmx.enable_x64() before constructing float64 cases or meshes; "
+                "case construction is activating float64 implicitly.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            from . import enable_x64
+
+            enable_x64()
 
     @property
     def output_dir(self) -> Path | None:
@@ -667,6 +684,7 @@ def load_run_config(path: str | Path) -> RunConfig:
         reference_pressure_gradient=float(case_table.get("reference_pressure_gradient", -1.0)),
         reference_phi_cell=_optional_tuple(case_table, "reference_phi_cell", length=2, cast=int) or (0, 0),
         notes=str(case_table.get("notes", "")),
+        dtype=str(case_table.get("dtype", "float64")),
     )
 
     logging = LoggingSpec(

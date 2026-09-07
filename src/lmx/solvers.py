@@ -1370,7 +1370,7 @@ def _initial_solver_state(
     initial_state: MHDState | None,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray, float]:
     if initial_state is None:
-        initial_u = jnp.where(fluid_mask, case.initial_velocity, 0.0)
+        initial_u = jnp.where(fluid_mask, case.initial_velocity, 0.0).astype(case.dtype)
         initial_u = _enforce_velocity_bc(
             initial_u,
             mesh,
@@ -1380,17 +1380,17 @@ def _initial_solver_state(
         zeros = jnp.zeros_like(initial_u)
         return initial_u, zeros, zeros, zeros, zeros, 0.0
     initial_u = _enforce_velocity_bc(
-        jnp.asarray(initial_state.u),
+        jnp.asarray(initial_state.u, dtype=case.dtype),
         mesh,
         fluid_mask,
         interpolate_direct_fluid_walls=interpolate_direct_fluid_walls,
     )
     return (
         initial_u,
-        jnp.asarray(initial_state.phi),
-        jnp.asarray(initial_state.jy),
-        jnp.asarray(initial_state.jz),
-        jnp.asarray(initial_state.lorentz_x),
+        jnp.asarray(initial_state.phi, dtype=case.dtype),
+        jnp.asarray(initial_state.jy, dtype=case.dtype),
+        jnp.asarray(initial_state.jz, dtype=case.dtype),
+        jnp.asarray(initial_state.lorentz_x, dtype=case.dtype),
         float(initial_state.time),
     )
 

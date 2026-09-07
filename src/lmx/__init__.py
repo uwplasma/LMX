@@ -11,6 +11,7 @@ from __future__ import annotations
 from importlib import import_module
 
 __all__ = [
+    "enable_x64",
     "enable_compilation_cache",
     "make_hartmann_case",
     "make_shercliff_case",
@@ -40,6 +41,13 @@ __all__ = [
     "equivalent_single_layer",
     "nested_wall_layer_resolution_summary",
 ]
+
+
+def enable_x64() -> None:
+    """Enable float64 arrays process-wide; call before constructing meshes or tracing."""
+    from jax import config
+
+    config.update("jax_enable_x64", True)
 
 
 _EXPORTS = {
