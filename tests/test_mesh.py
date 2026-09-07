@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -6,6 +8,7 @@ import pytest
 from lmx.mesh import (
     _broadcast_spacing_y,
     _broadcast_spacing_z,
+    _sample_station_magnetic_field,
     _smooth_boundary_layer_segment,
     center_coordinates,
     center_spacing_y,
@@ -479,17 +482,26 @@ def test_tabulated_field_npz_round_trip_and_sampling(tmp_path):
 
 
 def test_tabulated_field_volume_sampling_supports_3d_npz(tmp_path):
-    x = np.linspace(0.0, 1.0, 5)
+    x = np.asarray([-3.0, -2.0, -0.5, 0.0, 2.0])
     y = np.linspace(-1.0, 1.0, 7)
     z = np.linspace(-0.5, 0.5, 9)
     xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
-    bx = np.sin(yy)
+    bx = 2.0 * xx + yy - zz
     by = -0.25 * zz
     bz = 1.0 + 0.25 * yy
     path = write_tabulated_field_npz(tmp_path / "field3d.npz", x=x, y=y, z=z, bx=bx, by=by, bz=bz)
     sampled = sample_tabulated_field_volume(path, x=xx, y=yy, z=zz)
     assert sampled.shape == xx.shape + (3,)
     assert sampled[..., 0] == pytest.approx(bx)
+    stations = jnp.asarray([-2.4, -0.7, 1.3])
+    grid_y, grid_z = np.meshgrid(y, z, indexing="ij")
+    case = SimpleNamespace(magnetic_field=SimpleNamespace(kind="tabulated", table_path=str(path)))
+    actual = _sample_station_magnetic_field(case, field_scale=jnp.ones(3), x=stations, y=grid_y, z=grid_z)
+    assert actual[0] == pytest.approx(2 * stations[:, None, None] + grid_y[None] - grid_z[None])
+    assert actual[1] == pytest.approx(np.broadcast_to(-0.25 * grid_z, actual[1].shape))
+    for invalid in (-3.01, 2.01, np.nan, np.inf):
+        with pytest.raises(ValueError, match="inside the tabulated domain"):
+            sample_tabulated_field_volume(path, x=np.asarray([invalid]), y=np.zeros(1), z=np.zeros(1))
 
 
 def test_tabulated_field_validation_and_dimension_mismatch_paths(tmp_path):
@@ -518,3 +530,13 @@ def test_tabulated_field_validation_and_dimension_mismatch_paths(tmp_path):
         field2d, x=np.asarray([[0.0]]), y=np.asarray([[0.5]]), z=np.asarray([[0.5]])
     )
     assert sampled.shape == (1, 1, 3)
+    for axis in ([0.0], [0.0, 0.0], [1.0, 0.0], [0.0, np.nan], [[0.0, 1.0]]):
+        np.savez(incomplete, y=axis, z=z, bx=zeros[0], by=zeros[0], bz=zeros[0])
+        with pytest.raises(ValueError, match="axes"):
+            load_tabulated_field(incomplete)
+    for component in (np.zeros((2, 3)), np.full((2, 2), np.nan)):
+        np.savez(incomplete, y=y, z=z, bx=component, by=zeros[0], bz=zeros[0])
+        with pytest.raises(ValueError, match="components"):
+            load_tabulated_field(incomplete)
+    with pytest.raises(ValueError, match="inside the tabulated domain"):
+        sample_tabulated_cross_section_field(field2d, y=np.asarray([1.01]), z=np.asarray([0.5]))

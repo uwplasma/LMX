@@ -127,6 +127,20 @@ times axial velocity at each tap, with inlet-minus-outlet sign. These are
 cell-center planes, not reconstructed domain boundaries. See the
 {ref}`work conventions <pressure-taps-and-mechanical-work>`
 for gauge dependence and the additional terms needed for a pump-work balance.
+Use the same force density and geometry in the evolution and work reduction:
+
+```python
+drive, scale = 1.2, 1.0
+fields = evolve_extruded_fields(problem, forcing=drive, geometry_scale=scale, steps=4)
+metrics = extruded_engineering_objectives(problem, fields, forcing=drive, geometry_scale=scale)
+print(metrics["pressure_tap_flux_power"], metrics["tap_body_drive_power"])
+print(metrics["tap_kinetic_energy"])  # State energy, not a storage rate.
+```
+
+These three quantities use the same tap-to-tap slab. Body work uses the axial
+force density, not acceleration; the kinetic energy includes all three
+velocity components and fluid density. They exclude fixed-flow constraint
+work, and do not by themselves establish a closed mechanical balance.
 Generic evolution omits convective momentum transport and holds base magnetic
 samples fixed under geometry scaling. Live field resampling and complete
 coil/equilibrium/shape derivatives are outside this interface's contract.

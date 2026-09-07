@@ -7,6 +7,10 @@ on:
   workflow_dispatch:
   workflow_call:
 
+concurrency:
+  group: lmx-external-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -37,8 +41,9 @@ jobs:
             echo "b2=true" >> "$GITHUB_OUTPUT"
           elif ! git diff --quiet "$base" -- \
             scripts/run_freemhd_parity_suite.py validation/freemhd.py \
+            .github/workflows/external-validation.yml .github/actions pyproject.toml \
             src/lmx/_fringing_common.py src/lmx/_fringing_duct.py \
-            src/lmx/fringing.py \
+            src/lmx/fringing.py src/lmx/mesh.py src/lmx/physics.py src/lmx/specs.py src/lmx/cases.py src/lmx/io.py \
             src/lmx/data/benchmarks; then
             echo "b2=true" >> "$GITHUB_OUTPUT"
           elif git diff -U0 "$base" -- src/lmx/validation.py | grep -Eq \

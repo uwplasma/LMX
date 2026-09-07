@@ -8,6 +8,10 @@ on:
   workflow_dispatch:
   workflow_call:
 
+concurrency:
+  group: lmx-docs-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   impact:
     runs-on: ubuntu-latest
@@ -23,7 +27,7 @@ jobs:
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
             echo "docs=true" >> "$GITHUB_OUTPUT"
           elif git diff --quiet "origin/${{ github.base_ref }}...HEAD" -- \
-            docs src/lmx README.md pyproject.toml; then
+            docs src/lmx README.md pyproject.toml .github/workflows/docs.yml .github/actions; then
             echo "docs=false" >> "$GITHUB_OUTPUT"
           else
             echo "docs=true" >> "$GITHUB_OUTPUT"
