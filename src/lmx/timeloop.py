@@ -29,7 +29,7 @@ import jax.numpy as jnp
 from .core3d import ChannelProblem, step, zero_velocity
 from .grid import Field
 from .ops import divergence
-from .poisson import FastDiagonalPoisson
+from .poisson import FastDiagonalHelmholtz, FastDiagonalPoisson
 
 __all__ = ["Trajectory", "advance", "trajectory_diagnostics"]
 
@@ -77,13 +77,15 @@ def advance(
     velocity: tuple[Field, Field, Field] | None = None,
     *,
     factorization: FastDiagonalPoisson | None = None,
+    viscous: tuple[FastDiagonalHelmholtz, ...] | None = None,
     checkpoint: bool = True,
 ) -> Trajectory:
     """Run ``steps`` projection steps as one compiled scan.
 
     ``steps`` is static: it fixes the length of the compiled trajectory. The
-    factorization is built once on the host, outside the trace, because its
-    assembly reads concrete arrays.
+    factorizations are built once on the host, outside the trace, because their
+    assembly reads concrete arrays; passing ``viscous`` takes diffusion
+    implicitly, which is what lets a long run choose its step for accuracy.
     """
     if steps < 1:
         raise ValueError("steps must be positive")
@@ -91,7 +93,7 @@ def advance(
     velocity = zero_velocity(problem) if velocity is None else velocity
 
     def single(state, _):
-        updated, pressure, potential = step(state, problem, factorization)
+        updated, pressure, potential = step(state, problem, factorization, viscous)
         return updated, (*trajectory_diagnostics(updated, problem), pressure, potential)
 
     body = jax.checkpoint(single) if checkpoint else single

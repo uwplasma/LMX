@@ -22,7 +22,11 @@ state itself, and the conservative force keeps its own discretization.
 is built on, never from a separately differenced potential. In the core the
 balance is :math:`-\\nabla p + \\mathbf J\\times\\mathbf B = 0` to
 :math:`O(Ha^{-2})`, so any inconsistency between the two is amplified by
-:math:`Ha^2`.
+:math:`Ha^2`. The insulating wall is part of that consistency: the motional term
+is dropped on wall faces by :func:`lmx.em.wall_insulated` before its divergence
+is taken, because the operator that receives it has no wall flux either. Leaving
+it in makes the potential absorb a boundary current the wall cannot carry, and a
+square duct at :math:`Ha=20` then runs at less than half its correct flow rate.
 
 Two constraints must hold before the divergence of a face velocity means
 anything, and both are imposed rather than assumed. A wall-normal component is
@@ -67,7 +71,13 @@ import numpy as np
 
 from .advect import momentum_advection
 from .bc import DIRICHLET, BoundaryCondition
-from .em import face_conductivity, face_current, face_electromotive_force, lorentz_force
+from .em import (
+    face_conductivity,
+    face_current,
+    face_electromotive_force,
+    lorentz_force,
+    wall_insulated,
+)
 from .grid import CENTER, FACE, Field, Grid
 from .ops import divergence, face_gradient, face_interpolate, staggered_laplacian
 from .poisson import (
@@ -269,11 +279,21 @@ def step(
     conductivities = [face_conductivity(sigma, axis, scalar[axis]) for axis in range(3)]
     emfs = [face_electromotive_force(velocity, field, axis, scalar) for axis in range(3)]
     motional = tuple(
-        conductivities[axis].replace_data(conductivities[axis].data * emfs[axis].data) for axis in range(3)
+        wall_insulated(
+            conductivities[axis].replace_data(conductivities[axis].data * emfs[axis].data),
+            axis,
+            scalar[axis],
+        )
+        for axis in range(3)
     )
     potential = factorization.solve(divergence(motional))
     currents = tuple(
-        face_current(potential, conductivities[axis], emfs[axis], axis, scalar[axis]) for axis in range(3)
+        wall_insulated(
+            face_current(potential, conductivities[axis], emfs[axis], axis, scalar[axis]),
+            axis,
+            scalar[axis],
+        )
+        for axis in range(3)
     )
     force = lorentz_force(currents, field, scalar)
 
