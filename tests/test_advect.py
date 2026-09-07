@@ -1,14 +1,13 @@
 """Conservative momentum transport: conservation, order on a stretched mesh, boundedness."""
 
+import jax.numpy as jnp
 import numpy as np
 import pytest
-
-import jax.numpy as jnp
 
 from lmx.advect import advective_step_limit, momentum_advection
 from lmx.bc import DIRICHLET, PERIODIC, BoundaryCondition
 from lmx.core3d import ChannelProblem, step, velocity_offset, zero_velocity
-from lmx.grid import Grid, Field, uniform_faces
+from lmx.grid import Field, Grid, uniform_faces
 
 pytestmark = pytest.mark.unit
 
@@ -52,7 +51,9 @@ def _taylor_green(grid: Grid, component: int) -> tuple[Field, np.ndarray]:
 
 def _uniform(grid: Grid, values: tuple[float, float, float]) -> tuple[Field, Field, Field]:
     return tuple(
-        Field(jnp.full(grid.offset_shape(velocity_offset(component)), value), velocity_offset(component), grid)
+        Field(
+            jnp.full(grid.offset_shape(velocity_offset(component)), value), velocity_offset(component), grid
+        )
         for component, value in enumerate(values)
     )
 

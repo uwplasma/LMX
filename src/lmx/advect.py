@@ -62,8 +62,7 @@ def advective_step_limit(velocity: tuple[Field, Field, Field]) -> jnp.ndarray:
     """Return the convective step limit of a state, ``1 / sum_j max|u_j| / dx_j``."""
     grid = velocity[0].grid
     rate = sum(
-        jnp.max(jnp.abs(field.data)) / float(np.min(grid.widths[axis]))
-        for axis, field in enumerate(velocity)
+        jnp.max(jnp.abs(field.data)) / float(np.min(grid.widths[axis])) for axis, field in enumerate(velocity)
     )
     return 1.0 / rate
 
@@ -167,7 +166,9 @@ def _interpolate(data, axis: int, condition: BoundaryCondition, grid) -> jnp.nda
     """Move a field from cell centres to faces along ``axis``, weighted by distance."""
     padded = pad(data, axis, condition, grid=grid)
     weight = _broadcast(_lower_weight(np.asarray(grid.widths[axis])), axis, data.dtype)
-    return weight * _take(padded, axis, slice(None, -1)) + (1.0 - weight) * _take(padded, axis, slice(1, None))
+    return weight * _take(padded, axis, slice(None, -1)) + (1.0 - weight) * _take(
+        padded, axis, slice(1, None)
+    )
 
 
 def _lower_weight(widths: np.ndarray) -> np.ndarray:
