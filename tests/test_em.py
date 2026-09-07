@@ -13,6 +13,7 @@ from lmx.em import (
     face_current,
     face_electromotive_force,
     lorentz_force,
+    thin_wall_flux,
     wall_insulated,
 )
 from lmx.grid import CENTER, FACE, Field, Grid, geometric_faces, tanh_faces, uniform_faces
@@ -259,3 +260,30 @@ def test_only_an_insulating_wall_is_closed_off():
     insulated = wall_insulated(flux, 1, WALL)
     assert float(jnp.max(jnp.abs(insulated.data[:, 0]))) == 0.0
     assert float(jnp.max(jnp.abs(insulated.data[:, 1:-1]))) == 1.0
+
+
+def test_a_thin_wall_conducts_only_what_the_tangential_potential_drives():
+    """The wall current is the surface Laplacian of the potential on the wall layer."""
+    grid = UNIFORM
+    conditions = (WALL, WALL, WALL)
+    uniform = _cells(grid, lambda x, y, z: 3.0 + 0.0 * x)
+    assert float(jnp.max(jnp.abs(thin_wall_flux(uniform, 1, WALL, 0.05, conditions).data))) < 1e-14
+
+    curved = _cells(grid, lambda x, y, z: z**2)
+    doubled = thin_wall_flux(curved, 1, WALL, 0.10, conditions)
+    driven = thin_wall_flux(curved, 1, WALL, 0.05, conditions)
+    assert float(jnp.max(jnp.abs(driven.data[:, 0]))) > 0.0
+    # The stored value points along the axis, so the two walls carry opposite signs.
+    assert np.allclose(np.asarray(driven.data[:, 0]), -np.asarray(driven.data[:, -1]))
+    assert float(jnp.max(jnp.abs(driven.data[:, 1:-1]))) == 0.0
+    # A wall twice as conductive carries twice the current.
+    assert np.allclose(np.asarray(doubled.data), 2.0 * np.asarray(driven.data))
+
+
+def test_no_wall_conducts_without_a_conductance_or_without_a_wall():
+    grid = UNIFORM
+    conditions = (WALL, WALL, WALL)
+    curved = _cells(grid, lambda x, y, z: z**2)
+    assert float(jnp.max(jnp.abs(thin_wall_flux(curved, 1, WALL, 0.0, conditions).data))) == 0.0
+    periodic = BoundaryCondition("periodic")
+    assert float(jnp.max(jnp.abs(thin_wall_flux(curved, 1, periodic, 0.05, conditions).data))) == 0.0
