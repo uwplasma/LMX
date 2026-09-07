@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Run all or selected LMX tests in parallel within a declared budget."""
+"""Run all or selected LMX tests in parallel within a declared budget.
+
+A tier selects evidence markers and a shard selects files; combining them runs
+one evidence tier over one file group, which keeps each pull-request job inside
+the plan's wall-clock target without dropping any test from the matrix.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +16,13 @@ import tempfile
 import time
 
 _HEAVY_FRINGING_TEST = "test_alex_b1_production_map_has_bounded_implicit_gradient"
+_TEST_TIERS = {
+    "unit": "unit and not (regression or slow or gpu or external)",
+    "regression": "regression and not (slow or gpu or external)",
+    "slow": "slow and not (gpu or external)",
+    "gpu": "gpu",
+    "external": "external",
+}
 _TEST_SHARDS = {
     "support": (
         "tests/test_cli.py",
@@ -64,6 +76,7 @@ _NO_PYTHON_TEST_FILES = {
     "CONTRIBUTING.md",
     "LICENSE",
     "README.md",
+    "ROADMAP.md",
     "plan.md",
 }
 
@@ -148,6 +161,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--no-compilation-cache", action="store_true")
     parser.add_argument("--shard", choices=tuple(_TEST_SHARDS))
+    parser.add_argument("--tier", choices=tuple(_TEST_TIERS))
     parser.add_argument("--coverage-fail-under", type=float, default=95.0)
     parser.add_argument("--coverage-xml", default="coverage.xml")
     parser.add_argument("--junit-xml", default="artifacts/tests/full-suite-junit.xml")
@@ -199,14 +213,16 @@ def main(argv: list[str] | None = None) -> int:
     if coverage:
         command.extend(
             [
-                "--cov=lmx",
+                "--cov=src/lmx",
                 "--cov-branch",
                 "--cov-report=term-missing:skip-covered",
                 f"--cov-report=xml:{args.coverage_xml}",
                 f"--cov-fail-under={args.coverage_fail_under}",
             ]
         )
-    if not args.shard and not selected_tests:
+    if args.tier:
+        command.extend(("-m", _TEST_TIERS[args.tier]))
+    elif not args.shard and not selected_tests:
         command.extend(("-m", "not curated"))
     command.extend(_TEST_SHARDS[args.shard] if args.shard else selected_tests or ["tests"])
     if args.shard == "fringing":

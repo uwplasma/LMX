@@ -23,7 +23,7 @@ uv pip install -e '.[dev,docs]'
 ```
 
 Run the conservative change-aware gate while developing, then the complete
-covered gate once for the source candidate:
+covered gate for release qualification:
 
 ```bash
 .venv/bin/python scripts/run_full_test_suite.py --changed-from HEAD
@@ -31,8 +31,11 @@ covered gate once for the source candidate:
 ```
 
 The first command skips global coverage because a selected subset cannot
-measure it honestly. The complete portable gate must retain at least 95%
-combined line/branch coverage and finish within 600 seconds. Documentation,
+measure it honestly. PRs run disjoint `--tier unit --no-coverage` and
+`--tier regression --no-coverage` selections, with execution budgets of four and
+seven minutes, leaving setup time within the five/eight-minute targets. Queue
+latency is reported separately. Main/release qualification retains at least 95%
+combined line/branch coverage and a 600-second local budget. Documentation,
 package, external-link, Docker, production-mesh, and accelerator gates run only
 when their boundary changes or at scheduled/release qualification. New or
 changed logic should have complete branch coverage unless a documented

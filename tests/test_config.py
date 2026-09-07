@@ -2,6 +2,7 @@ import ast
 import inspect
 import json
 import os
+import re
 import subprocess
 import sys
 import tarfile
@@ -30,6 +31,80 @@ from scripts.audit_architecture import (
 from scripts.run_full_test_suite import _ALL_TESTS, _test_environment, _tests_for_changes
 
 pytestmark = pytest.mark.unit
+
+
+def test_ci_tiers_cover_collection_without_overlapping_pr_work():
+    from scripts.run_full_test_suite import _TEST_TIERS
+
+    def collect(expression):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "tests",
+                "--collect-only",
+                "-o",
+                "addopts=",
+                "-q",
+                "-m",
+                expression,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode in (0, 5), result.stdout + result.stderr
+        return {line for line in result.stdout.splitlines() if line.startswith("tests/") and "::" in line}
+
+    all_tests = collect("")
+    tiers = {name: collect(expression) for name, expression in _TEST_TIERS.items()}
+    assert all_tests and all_tests == set.union(*tiers.values())
+    assert tiers["unit"] and tiers["regression"]
+    assert not tiers["unit"] & tiers["regression"]
+    deferred = tiers["slow"] | tiers["gpu"] | tiers["external"]
+    assert not (tiers["unit"] | tiers["regression"]) & deferred
+
+    workflow = Path(".github/workflows/ci.yml").read_text()
+    for job in ("compatibility", "coverage"):
+        # Read the job condition without relying on its step implementation.
+        condition = workflow.split(f"\n  {job}:\n", 1)[1].split("    if: ", 1)[1].splitlines()[0]
+        assert "github.event_name != 'pull_request'" in condition
+    pr_job = re.split(r"\n  \w[\w-]*:\n", workflow.split("\n  pr-tests:\n", 1)[1])[0]
+    assert "--no-coverage" in pr_job
+    # Heavy evidence must keep a per-test timeout above the slowest recorded case.
+    assert "--test-timeout-seconds 300" in pr_job
+
+    entries = [
+        (
+            block.split("tier: ", 1)[1].splitlines()[0].strip(),
+            block.split("shard: ", 1)[1].splitlines()[0].strip(' "'),
+        )
+        for block in pr_job.split("- tier: ")[1:]
+        for block in ["tier: " + block]
+    ]
+    assert entries, pr_job
+    covered: set[str] = set()
+    for tier, shard in entries:
+        selection = tiers[tier] if not shard else tiers[tier] & _shard_members(all_tests, shard)
+        assert selection, f"PR job {tier}/{shard} selects nothing"
+        assert not covered & selection, f"PR job {tier}/{shard} repeats work"
+        covered |= selection
+    assert covered == tiers["unit"] | tiers["regression"]
+
+
+def _shard_members(all_tests: set[str], shard: str) -> set[str]:
+    """Return the tests a file shard runs, mirroring the runner's own selection."""
+    from scripts.run_full_test_suite import _HEAVY_FRINGING_TEST, _TEST_SHARDS
+
+    entries = _TEST_SHARDS[shard]
+    files = {entry for entry in entries if "::" not in entry}
+    nodes = tuple(entry for entry in entries if "::" in entry)
+    members = {test for test in all_tests if test.split("::", 1)[0] in files}
+    members |= {test for test in all_tests if test.startswith(nodes)} if nodes else set()
+    if shard == "fringing":
+        members -= {test for test in all_tests if _HEAVY_FRINGING_TEST in test}
+    return members
 
 
 @pytest.mark.parametrize("x64", ["false", "true"])
