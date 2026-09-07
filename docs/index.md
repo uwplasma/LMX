@@ -105,4 +105,8 @@ reference/bibliography
 
 develop/architecture
 develop/contributing
+adr/0001-plan-adoption
+adr/0002-core-discretization
+adr/0003-precision-and-derivatives
+adr/0004-process
 ```

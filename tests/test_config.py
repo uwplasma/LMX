@@ -32,6 +32,47 @@ from scripts.run_full_test_suite import _ALL_TESTS, _test_environment, _tests_fo
 pytestmark = pytest.mark.unit
 
 
+def test_ci_tiers_cover_collection_without_overlapping_pr_work():
+    from scripts.run_full_test_suite import _TEST_TIERS
+
+    def collect(expression):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "tests",
+                "--collect-only",
+                "-o",
+                "addopts=",
+                "-q",
+                "-m",
+                expression,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode in (0, 5), result.stdout + result.stderr
+        return {line for line in result.stdout.splitlines() if line.startswith("tests/") and "::" in line}
+
+    all_tests = collect("")
+    tiers = {name: collect(expression) for name, expression in _TEST_TIERS.items()}
+    assert all_tests and all_tests == set.union(*tiers.values())
+    assert tiers["unit"] and tiers["regression"]
+    assert not tiers["unit"] & tiers["regression"]
+    deferred = tiers["slow"] | tiers["gpu"] | tiers["external"]
+    assert not (tiers["unit"] | tiers["regression"]) & deferred
+
+    workflow = Path(".github/workflows/ci.yml").read_text()
+    for job in ("compatibility", "coverage"):
+        # Read the job condition without relying on its step implementation.
+        condition = workflow.split(f"\n  {job}:\n", 1)[1].split("    if: ", 1)[1].splitlines()[0]
+        assert "github.event_name != 'pull_request'" in condition
+    pr_job = workflow.split("\n  pr-tests:\n", 1)[1]
+    assert "--no-coverage" in pr_job and "tier: [unit, regression]" in pr_job
+
+
 @pytest.mark.parametrize("x64", ["false", "true"])
 def test_explicit_precision_in_fresh_process(x64):
     code = """
