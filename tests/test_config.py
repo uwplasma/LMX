@@ -132,6 +132,16 @@ kind = "no_slip"
     return path
 
 
+def test_every_test_file_belongs_to_a_covered_shard():
+    """A file outside every shard never runs in the coverage lane and scores zero."""
+    from scripts.run_full_test_suite import _TEST_SHARDS
+
+    sharded = {entry.split("::", 1)[0] for shard in _TEST_SHARDS.values() for entry in shard}
+    present = {f"tests/{path.name}" for path in Path("tests").glob("test_*.py")}
+    assert present - sharded == set(), "add these files to a shard in _TEST_SHARDS"
+    assert sharded - present == set(), "these shard entries no longer exist"
+
+
 @pytest.mark.parametrize(
     "changed,full,targeted,docs,external",
     [
