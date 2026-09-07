@@ -33,6 +33,7 @@ linkcheck_ignore = [
     r"https://doi\.org/10\.1063/5\.0230242",
     r"https://doi\.org/10\.1145/347837\.347846",
     r"https://doi\.org/10\.1137/10078356X",
+    r"https://doi\.org/10\.1137/S0036142996314044",
     r"https://doi\.org/10\.1073/pnas\.2101784118",
     r"https://doi\.org/10\.1080/01495728408961817",
 ]
