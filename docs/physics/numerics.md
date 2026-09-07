@@ -152,9 +152,37 @@ requirement directly: given a layer thickness it places a requested number of
 cells inside the layer while bounding the growth ratio, and raises when the cell
 count cannot meet the request rather than returning an unresolved mesh.
 
-These coordinates describe geometry only. Operators, boundary conditions and the
-momentum discretization follow in their own plan steps, and the existing fully
-developed and extruded solvers continue to use `lmx.mesh` until those land.
+`lmx.bc` expresses a wall condition once, as the ghost value that reproduces it,
+and `lmx.ops` differences every face with the same expression. A cell-centred
+value sits half a cell from the wall, so a prescribed value $g$ needs
+$p_{\rm ghost}=2g-p_0$ and a prescribed normal derivative $q$ needs
+$p_{\rm ghost}=p_0\mp q\,\Delta x_0$.
+
+`face_gradient` maps a cell field to the faces normal to one axis and
+`divergence` maps three face fields back to cells as the net flux per unit
+volume. Under the cell volumes and the face weights $A_f d_f$ these are exact
+discrete adjoints,
+
+$$
+\langle p,\nabla\!\cdot\mathbf u\rangle_V=-\langle\mathbf u,\nabla p\rangle_{Ad},
+$$
+
+for a wall-impermeable flux; the test suite checks this to a relative 1e-14 on a
+stretched mesh. That identity is what makes a projection idempotent and stops the
+Lorentz force doing spurious work in the core of a high-Hartmann duct.
+
+Two accuracy properties are deliberate and pinned by test rather than left
+implicit. The wall flux is the two-point difference $(p_0-g)/(\Delta x_0/2)$,
+first order at the wall, because that stencil is what keeps the assembled
+Laplacian symmetric and the fluxes conservative. On a stretched mesh the interior
+two-point gradient is centred between cell centres rather than on the face, so
+its truncation error is first order in the spacing change; solution order there
+is a manufactured-solution question and is verified in the step that owns it.
+
+These modules supply geometry and operators only. The momentum discretization,
+the electric coupling and the time loop follow in their own plan steps, and the
+existing fully developed and extruded solvers continue to use `lmx.mesh` until
+those land.
 
 ## LMX and SOLVAX
 

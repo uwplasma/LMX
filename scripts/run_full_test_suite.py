@@ -24,6 +24,7 @@ _TEST_SHARDS = {
         "tests/test_benchmarks.py",
         "tests/test_example_runner.py",
         "tests/test_grid.py",
+        "tests/test_ops.py",
     ),
     "fringing": ("tests/test_fringing.py",),
     "physics": (
@@ -39,7 +40,9 @@ _CHANGE_TEST_NAMES = {
     "__main__": "cli",
     "cases": "config solver physics fringing benchmarks",
     "cli": "cli example_runner",
+    "bc": "ops",
     "grid": "grid",
+    "ops": "ops",
     "io": "io cli fringing freemhd example_runner",
     "mesh": "mesh solver physics fringing benchmarks",
     "physics": "solver physics fringing",
