@@ -248,6 +248,13 @@ def test_cli_returns_nonzero_for_recorded_unconverged_steady_result():
     assert cli._summary_exit_code({"solver_mode": "transient", "converged": False}) == 0
 
 
+@pytest.mark.parametrize("name", ("hartmann", "shercliff", "hunt"))
+def test_fully_developed_cli_resolution_reaches_case(name):
+    case = cli._build_case(SimpleNamespace(case=name, ha=5.0, output=None, ny=5, nz=7))
+    assert (case.geometry.ny, case.geometry.nz) == (5, 7)
+    assert case.reference_phi_cell == ((10, 11) if name == "hunt" else (2, 3))
+
+
 def test_cli_case_builders_reject_unknown_case():
     with pytest.raises(ValueError):
         cli._build_case(SimpleNamespace(case="unknown", ha=5.0, output="out"))

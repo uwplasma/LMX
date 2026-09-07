@@ -287,7 +287,7 @@ def _solve_pipe_projection(
             else None
         )
         if design_parameters is None:
-            outer_steps = min(case.time_stepper.max_steps, max(6, case.solver.coupling_iterations * 2))
+            outer_steps = case.time_stepper.max_steps
         poisson_iterations = (
             case.time_stepper.potential_iterations
             if use_alex_b1_finite_volume
@@ -436,6 +436,8 @@ def _solve_pipe_projection(
             )
         )
         b1_step = None
+        if generic_step is not None and target_flow_rate is None:
+            generic_step = jax.jit(generic_step)
         if use_alex_b1_finite_volume:
             if target_flow_rate is None:
                 raise ValueError("ALEX B1 requires its frozen fixed mean flow rate")
@@ -919,7 +921,7 @@ def _solve_duct_projection(
             )
         fixed_point_velocity_scale = 1.0
     if design_parameters is None:
-        outer_steps = min(case.time_stepper.max_steps, max(6, case.solver.coupling_iterations * 2))
+        outer_steps = case.time_stepper.max_steps
     poisson_iterations = (
         case.time_stepper.potential_iterations
         if use_alex_b2_finite_volume
@@ -974,6 +976,9 @@ def _solve_duct_projection(
                     duct._conservative_current_diagnostics_3d,
                 ),
             )
+
+        if target_flow_rate is None:
+            generic_step = jax.jit(generic_step)
 
     if design_parameters is not None:
         assert generic_step is not None
@@ -1553,6 +1558,9 @@ def solve_extruded_inductionless(
     ``progress_callback`` is called after every outer iteration. Its progress
     object contains a restart-capable bundle at ``checkpoint_interval`` steps
     and on convergence; no checkpoint arrays are materialized otherwise.
+    ``time_stepper.max_steps`` bounds additional outer iterations, including
+    after a restart. Convergence can stop the solve earlier; coupling-iteration
+    settings do not shorten this budget.
 
     ``phase_timing_callback`` is a diagnostic hook that inserts completion
     barriers around B2 solver phases and reports ``(name, wall_seconds)``.
@@ -1607,17 +1615,15 @@ def evolve_extruded_fields(
     be scalar, ``(axial, transverse_y, transverse_z)`` for a duct, or
     ``(axial, radial)`` for a pipe. It maps the fixed reference mesh without
     changing topology or imposed-field samples; callers keep scale factors
-    positive. Step controls are static. SOLVAX supplies implicit elliptic VJPs
+    positive. Step controls are static: exactly ``steps`` updates are performed,
+    defaulting to ``time_stepper.max_steps``, without early convergence stops.
+    SOLVAX supplies implicit elliptic VJPs
     and exact checkpointing. ``num_devices`` shards the axial dimension when
     its cell count is divisible by the requested device count. Specialized
     ALEX B1 sharding and ALEX B2 design fields are not yet exposed here.
     """
 
-    steps = (
-        min(problem.case.time_stepper.max_steps, max(6, problem.case.solver.coupling_iterations * 2))
-        if steps is None
-        else steps
-    )
+    steps = problem.case.time_stepper.max_steps if steps is None else steps
     if steps < 1:
         raise ValueError("steps must be positive")
     if checkpoint_size is not None and checkpoint_size < 1:

@@ -55,13 +55,11 @@ from .validation import (
 
 
 def _build_case(args: argparse.Namespace):
-    if args.case == "hartmann":
-        return make_hartmann_case(ha=args.ha, output_dir=args.output)
-    if args.case == "shercliff":
-        return make_shercliff_case(ha=args.ha, output_dir=args.output)
-    if args.case == "hunt":
-        return make_hunt_case(ha=args.ha, output_dir=args.output)
-    raise ValueError(args.case)
+    builders = {"hartmann": make_hartmann_case, "shercliff": make_shercliff_case, "hunt": make_hunt_case}
+    if args.case not in builders:
+        raise ValueError(args.case)
+    geometry = {key: getattr(args, key) for key in ("width", "height", "ny", "nz") if hasattr(args, key)}
+    return builders[args.case](ha=args.ha, output_dir=args.output, **geometry)
 
 
 def _build_extruded_problem(args: argparse.Namespace):

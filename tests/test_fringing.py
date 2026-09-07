@@ -2149,6 +2149,32 @@ def test_extruded_problem_builders_mark_solver_family(builder, kwargs, geometry_
     assert problem.profile.x.shape == (5,)
 
 
+@pytest.mark.parametrize("pipe", (False, True))
+def test_extruded_step_budget_is_not_capped_by_coupling_iterations(pipe):
+    builder = build_pipe_ogrid_extruded_problem if pipe else build_square_duct_extruded_problem
+    problem = builder(ha_peak=0.0, nx_stations=3, **({"nr": 4, "ntheta": 8} if pipe else {"ny": 3, "nz": 3}))
+    problem = replace(
+        problem,
+        case=replace(
+            problem.case,
+            initial_velocity=0.0,
+            time_stepper=replace(problem.case.time_stepper, dt=1e-5, max_steps=600, potential_iterations=4),
+            solver=replace(problem.case.solver, coupling_iterations=1, coupling_tolerance=0.0),
+        ),
+    )
+    solution = solve_extruded_inductionless(problem)
+    assert solution.steps == 600 and solution.status == "step_limit"
+    fields = evolve_extruded_fields(problem)
+    for actual, name in zip(
+        fields,
+        ("u", "v", "w", "p", "phi", "jx", "jy", "jz", "lorentz_x", "lorentz_y", "lorentz_z"),
+        strict=True,
+    ):
+        np.testing.assert_allclose(actual, getattr(solution.bundle, name), rtol=1e-10, atol=1e-12)
+    resting = solve_extruded_inductionless(replace(problem, case=replace(problem.case, forcing=0.0)))
+    assert resting.steps == 1 and resting.converged
+
+
 def test_extruded_fields_match_production_and_bound_reverse_memory():
     problem = build_square_duct_extruded_problem(
         ha_peak=3.0,
@@ -2671,7 +2697,7 @@ def test_tabulated_magnetic_obstacle_uses_solvax_and_reports_velocity_deficit(
     validation = validate_magnetic_obstacle_baseline(solution, field_ny=41, field_nz=41)
     field_validation = validate_variable_field_extruded_solution(solution, field_ny=41, field_nz=41)
 
-    assert calls["count"] >= 2
+    assert calls["count"] == 1  # The compiled step traces its electric solve once.
     assert solution.bundle.geometry_kind == "rect_duct"
     assert jnp.isfinite(solution.bundle.u).all()
     assert jnp.isfinite(solution.bundle.p).all()
