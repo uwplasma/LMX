@@ -440,8 +440,10 @@ def _limited_linear_vector_face_weights_duct(
         upwind_gradient = jnp.where(internal_flux > 0.0, gradient[:-1], gradient[1:])
         gradcf = upwind_gradient * distance
         guarded = 2000.0 * jnp.sign(gradcf) * jnp.sign(gradf) - 1.0
-        ratio = 2.0 * gradcf / gradf - 1.0
-        r = jnp.where(jnp.abs(gradcf) >= 1000.0 * jnp.abs(gradf), guarded, ratio)
+        use_guard = jnp.abs(gradcf) >= 1000.0 * jnp.abs(gradf)
+        # The inactive quotient must also be finite for reverse-mode autodiff.
+        ratio = 2.0 * gradcf / jnp.where(use_guard, 1.0, gradf) - 1.0
+        r = jnp.where(use_guard, guarded, ratio)
         limited = jnp.clip(2.0 * r, 0.0, 1.0)
         centered = (width[1:] / (width[:-1] + width[1:]))[:, None, None]
         face_weight = limited * centered + (1.0 - limited) * (internal_flux >= 0.0)
