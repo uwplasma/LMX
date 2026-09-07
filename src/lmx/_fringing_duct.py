@@ -412,7 +412,8 @@ def _explicit_deviatoric_stress_duct(
             )
         )
         correction += jnp.moveaxis(jnp.diff(faces, axis=0) / width[:, None, None, None], 0, axis)
-    return correction
+    # Keep constant cotangents out of the compiler's stress-folding path.
+    return jax.lax.optimization_barrier(correction)
 
 
 def _limited_linear_vector_face_weights_duct(

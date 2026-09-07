@@ -78,6 +78,9 @@ reconstruction guards the inactive quotient before division, following the
 [JAX guidance on reverse-mode NaNs](https://docs.jax.dev/en/latest/faq.html#gradients-contain-nan-where-using-where).
 Its switching rule and primal weights are unchanged; the manufactured nonzero
 flow also checks reverse derivatives against directional differences.
+The viscous-stress output has an identity optimization barrier so compiled
+constant-cotangent transposes agree with eager evaluation across supported JAX
+versions; it does not change the stress or introduce a custom derivative.
 This Stokes-limit check does not certify finite-advection limiter transitions,
 the electromagnetic coupled residual, or a converged B2 steady state.
 
