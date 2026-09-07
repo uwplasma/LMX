@@ -25,6 +25,7 @@ _TEST_SHARDS = {
         "tests/test_example_runner.py",
         "tests/test_grid.py",
         "tests/test_ops.py",
+        "tests/test_poisson.py",
     ),
     "fringing": ("tests/test_fringing.py",),
     "physics": (
