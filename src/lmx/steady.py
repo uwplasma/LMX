@@ -32,6 +32,21 @@ residual. That is the part which is stiff -- the viscous term as the mesh is
 refined and the damping as :math:`Ha^2` -- so the Krylov iteration is left with
 the well-conditioned remainder.
 
+The Krylov subspace is deliberately large. Restarted GMRES stagnates on this
+operator once the field is strong: at :math:`Ha=300`, GMRES(60) with sixty
+restarts -- 3600 iterations -- reduces the residual by a factor of forty and
+stops improving, while GMRES(400) converges in 1077. The subspace is what the
+method needs here, not more restarts of a short one.
+
+An anisotropic preconditioner was tried and rejected. Eliminating the potential
+from a fully developed duct leaves :math:`-\\lambda\\,\\partial_b\\nabla^{-2}
+\\partial_b`, whose symbol in the velocity eigenbasis is
+:math:`\\ell_b/\\sum_k\\ell_k`, and folding that into the factorization is nearly
+free. It makes the iteration *worse* -- residual 1.6 against 0.12 at
+:math:`Ha=300` -- because the potential obeys Neumann conditions while the
+velocity obeys Dirichlet ones, so the two do not share an eigenbasis exactly
+where it matters, in the Hartmann layer. The uniform rate is kept.
+
 Failure is raised, never returned. A Newton iteration that stops on its step
 limit, or an adjoint solve that does not converge, would otherwise hand back a
 plausible-looking field and a gradient computed at a point that is not a root.
@@ -163,9 +178,9 @@ def _preconditioner(
     """One projection step, used as the right preconditioner of the Newton system.
 
     ``viscous`` has to be factorized at ``pseudo_step`` and not at the problem's
-    own step: the shift carries the magnetic damping, and a preconditioner built
-    at the wrong step is a different operator, which is what leaves the Krylov
-    iteration stalling as soon as the damping is stiff.
+    own step: a preconditioner built at the wrong step is a different operator,
+    which is what leaves the Krylov iteration stalling as soon as the damping is
+    stiff.
     """
 
     def apply(direction: tuple[Field, Field, Field]) -> tuple[Field, Field, Field]:
@@ -188,9 +203,9 @@ def solve_steady_state(
     pseudo_step: float | None = None,
     forcing=None,
     field_scale=1.0,
-    linear_tolerance: float = 1.0e-4,
-    linear_restart: int = 60,
-    linear_max_restarts: int = 60,
+    linear_tolerance: float = 1.0e-6,
+    linear_restart: int = 400,
+    linear_max_restarts: int = 6,
 ) -> SteadySolution:
     """Find the steady state by matrix-free Newton-Krylov, differentiably.
 

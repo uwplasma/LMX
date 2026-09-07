@@ -18,17 +18,31 @@ pytestmark = pytest.mark.numerical
 PERIODIC_X = BoundaryCondition(PERIODIC)
 WALL = BoundaryCondition(NEUMANN)
 
+# Mean velocity of a unit-forced insulating square duct, from validation.shercliff at the
+# resolution of 64 points per direction, or 96 for Ha 1000, whose layers are thinner. Held as
+# constants so a solver test costs a solve and not a dense spectral factorization;
+# `test_the_reference_values_are_what_the_spectral_solve_returns` regenerates them.
+REFERENCE_FLOW_RATE = {
+    0.0: 0.140577010,
+    5.0: 0.098192820,
+    20.0: 0.038321780,
+    100.0: 0.009054397,
+    300.0: 0.003160369,
+    1000.0: 0.000977900,
+}
 
-def _duct(cells: int, hartmann: float, *, resolve_layers: bool = False, dt: float = 1.0) -> ChannelProblem:
-    if resolve_layers:
+
+def _duct(cells: int, hartmann: float, *, ratio: float | None = None, dt: float = 1.0) -> ChannelProblem:
+    """A square insulating duct; ``ratio`` clusters cells into the two wall layers."""
+    if ratio is None:
+        transverse = spanwise = uniform_faces(cells, -1.0, 1.0)
+    else:
         transverse = wall_resolving_faces(
-            cells, -1.0, 1.0, layer_thickness=1.0 / hartmann, cells_in_layer=6, max_ratio=1.35
+            cells, -1.0, 1.0, layer_thickness=1.0 / hartmann, cells_in_layer=6, max_ratio=ratio
         )
         spanwise = wall_resolving_faces(
-            cells, -1.0, 1.0, layer_thickness=1.0 / np.sqrt(hartmann), cells_in_layer=6, max_ratio=1.35
+            cells, -1.0, 1.0, layer_thickness=1.0 / np.sqrt(hartmann), cells_in_layer=6, max_ratio=ratio
         )
-    else:
-        transverse = spanwise = uniform_faces(cells, -1.0, 1.0)
     return ChannelProblem(
         grid=Grid(uniform_faces(1, 0.0, 1.0), transverse, spanwise),
         conditions=(PERIODIC_X, WALL, WALL),
@@ -76,14 +90,36 @@ def test_the_steady_solve_reproduces_the_marched_state_far_faster():
 
 
 @pytest.mark.parametrize(
-    ("hartmann", "cells", "resolve", "bound"),
-    [(0.0, 16, False, 0.02), (5.0, 32, False, 0.02), (20.0, 32, True, 0.02), (100.0, 48, True, 0.01)],
+    ("hartmann", "cells", "ratio", "bound"),
+    [
+        (0.0, 16, None, 0.02),
+        (5.0, 32, None, 0.02),
+        (20.0, 32, 1.35, 0.02),
+        (100.0, 48, 1.35, 0.01),
+        (300.0, 48, 1.45, 0.02),
+    ],
 )
-def test_the_steady_duct_matches_the_spectral_reference(hartmann, cells, resolve, bound):
-    problem = _duct(cells, hartmann, resolve_layers=resolve)
+def test_the_steady_duct_matches_the_spectral_reference(hartmann, cells, ratio, bound):
+    problem = _duct(cells, hartmann, ratio=ratio)
     solution = solve_steady_state(problem, pseudo_step=1.0e3)
-    exact = flow_rate(hartmann, 48)
+    exact = REFERENCE_FLOW_RATE[hartmann]
     assert abs(_mean(problem, solution.velocity) - exact) / exact < bound
+
+
+@pytest.mark.slow
+def test_the_steady_duct_reaches_hartmann_1000():
+    """The blanket-scale end of the range, where the Hartmann layer is a thousandth wide."""
+    problem = _duct(64, 1000.0, ratio=1.5)
+    solution = solve_steady_state(problem, pseudo_step=1.0e3, tolerance=1.0e-7, linear_restart=600)
+    exact = REFERENCE_FLOW_RATE[1000.0]
+    assert abs(_mean(problem, solution.velocity) - exact) / exact < 0.02
+
+
+@pytest.mark.slow
+def test_the_reference_values_are_what_the_spectral_solve_returns():
+    """The constants above are cached results, so something has to regenerate them."""
+    for hartmann, cached in REFERENCE_FLOW_RATE.items():
+        assert flow_rate(hartmann, 96 if hartmann > 300.0 else 64) == pytest.approx(cached, rel=2e-4)
 
 
 def test_the_adjoint_matches_finite_differences():
