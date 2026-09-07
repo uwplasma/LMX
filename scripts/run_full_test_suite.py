@@ -46,8 +46,8 @@ _TEST_SHARDS = {
         "tests/test_momentum_placement_oracle.py",
     ),
     "fringing": ("tests/test_fringing.py",),
+    "channel": ("tests/test_core3d.py",),
     "physics": (
-        "tests/test_core3d.py",
         "tests/test_physics.py",
         "tests/test_q2d_identities.py",
         "tests/test_solver.py",
