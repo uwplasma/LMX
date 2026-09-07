@@ -48,9 +48,13 @@ rather than by the mesh. Both stiffnesses are gone at that point: the magnetic
 one because it grows as :math:`Ha^2`, the viscous one because it grows as the
 mesh is refined.
 
-The momentum equation omits convective transport. That is the Stokes limit,
-appropriate at the large interaction parameters of a blanket channel, and it is
-stated rather than implied.
+*Convective transport.* ``advection`` selects it: ``"off"`` is the Stokes limit,
+appropriate at the large interaction parameters of a blanket channel and the
+default so that no run acquires a convective step limit by accident;
+``"central"`` is the conservative flux form of :mod:`lmx.advect`, second order on
+a stretched mesh; ``"limited"`` adds the van Leer blend that keeps the thin side
+layers bounded. Transport is explicit, so switching it on bounds the step by
+:func:`lmx.advect.advective_step_limit`.
 """
 
 from __future__ import annotations
@@ -61,6 +65,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from .advect import momentum_advection
 from .bc import DIRICHLET, BoundaryCondition
 from .em import face_conductivity, face_current, face_electromotive_force, lorentz_force
 from .grid import CENTER, FACE, Field, Grid
@@ -84,6 +89,7 @@ __all__ = [
 
 _NO_SLIP = BoundaryCondition(DIRICHLET)
 _INSULATING = BoundaryCondition("neumann")
+_ADVECTION = ("off", "central", "limited")
 
 
 def velocity_offset(component: int) -> tuple[float, float, float]:
@@ -115,6 +121,7 @@ class ChannelProblem:
     magnetic_field: tuple[float, float, float] = (0.0, 0.0, 0.0)
     forcing: tuple[float, float, float] = (0.0, 0.0, 0.0)
     dt: float = 1.0e-3
+    advection: str = "off"
 
     def __post_init__(self) -> None:
         if len(self.conditions) != 3:
@@ -124,6 +131,8 @@ class ChannelProblem:
                 raise ValueError(f"{name} must be positive")
         if float(self.conductivity) < 0.0:
             raise ValueError("conductivity must not be negative")
+        if self.advection not in _ADVECTION:
+            raise ValueError(f"advection must be one of {sorted(_ADVECTION)}, got {self.advection!r}")
 
     @property
     def scalar_conditions(self) -> tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition]:
@@ -269,10 +278,17 @@ def step(
     force = lorentz_force(currents, field, scalar)
 
     velocity_conditions = tuple(velocity_condition(problem.conditions, axis) for axis in range(3))
+    transport = (
+        None
+        if problem.advection == "off"
+        else momentum_advection(velocity, velocity_conditions, limited=problem.advection == "limited")
+    )
     predicted = []
     for component, component_field in enumerate(velocity):
         body = face_interpolate(force[component], component, scalar[component])
         drive = (body.data + problem.forcing[component]) / problem.density
+        if transport is not None:
+            drive = drive - transport[component].data
         rate = problem.damping_rates[component]
         shift = 1.0 + problem.dt * rate
         if viscous is None:
