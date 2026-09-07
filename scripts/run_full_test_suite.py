@@ -52,6 +52,7 @@ _CHANGE_TEST_NAMES = {
     "cases": "config solver physics fringing benchmarks",
     "cli": "cli example_runner",
     "design": "design",
+    "grid": "grid",
     "io": "io cli fringing freemhd example_runner",
     "mesh": "mesh solver physics fringing benchmarks",
     "physics": "solver physics fringing",
