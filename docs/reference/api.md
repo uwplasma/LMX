@@ -1,5 +1,24 @@
 # Python API
 
+`enable_x64` explicitly enables JAX float64 arrays process-wide. Call it before
+constructing meshes or tracing functions; importing LMX does not change precision.
+Case factories and TOML `[case]` accept `dtype="float32"` or `dtype="float64"`
+(default). During the transition, constructing a float64 case with x64 disabled
+enables it with a `DeprecationWarning`; explicit activation avoids that warning.
+The case dtype controls fully developed mesh, material, initial/restart and output
+fields, including compiled derivatives. Float32 is qualified only for the tested
+low-Hartmann cases, not high-Hartmann validation. Supplied meshes are cast to the
+case dtype; casting cannot recover precision lost during their construction.
+See JAX's [dtype and x64 contract](https://docs.jax.dev/en/latest/101/default_dtypes.html).
+
+```python
+import lmx
+
+lmx.enable_x64()
+case = lmx.make_hartmann_case(ha=2, ny=32, nz=32, dtype="float32")
+u, phi, jy, jz, lorentz = lmx.solve_fully_developed_fields(case)
+```
+
 The package root is the small, stable convenience surface. Advanced workflows
 live in the module that owns their concepts.
 

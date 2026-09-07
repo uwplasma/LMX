@@ -7,10 +7,7 @@ from typing import TYPE_CHECKING, Callable, Sequence
 
 import jax.numpy as jnp
 import numpy as np
-from jax import config as jax_config
 from jax.scipy.interpolate import RegularGridInterpolator
-
-jax_config.update("jax_enable_x64", True)
 
 if TYPE_CHECKING:
     from .physics import WallLayer
