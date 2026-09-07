@@ -9,12 +9,15 @@ its electric coupling and its projection at once, against code that shares none
 of them.
 """
 
+import dataclasses
+
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
 from lmx.bc import NEUMANN, PERIODIC, BoundaryCondition
+from lmx.cases import make_hartmann_case, solve_fully_developed_fields
 from lmx.core3d import (
     ChannelProblem,
     enforce_face_constraints,
@@ -24,8 +27,10 @@ from lmx.core3d import (
     velocity_offset,
     zero_velocity,
 )
-from lmx.grid import CENTER, Field, Grid, uniform_faces
+from lmx.grid import CENTER, Field, Grid, uniform_faces, wall_resolving_faces
 from lmx.ops import divergence
+from lmx.timeloop import advance
+from validation.shercliff import flow_rate
 
 # Physics validation rather than unit checks: the channel cases integrate to a
 # steady state, which the tier system runs in the regression lane.
@@ -317,3 +322,92 @@ def test_implicit_viscosity_keeps_second_order_convergence():
     fine, _ = _implicit_channel_error(16, step_multiple=5.0)
     order = np.log2(coarse / fine)
     assert 1.7 < order < 2.3, (coarse, fine, order)
+
+
+# --- Reconciliation with the production solver and an independent reference ---
+#
+# `lmx.solve_fully_developed_fields` solves the same duct on a two-dimensional
+# cross-section mesh with its own operators. Its conventions had to be matched
+# before the two could be compared at all: `GeometrySpec.width` and `height` are
+# the *full* transverse extents, so a `width=height=2` case is the grid
+# `[-1, 1]^2` used here; `CaseSpec.forcing` is the axial pressure gradient
+# `-dp/dx` and enters the momentum equation divided by the density, exactly as
+# `ChannelProblem.forcing` does; and both read `viscosity` as the kinematic one.
+#
+# `validation.shercliff` closes the loop from outside the package: a Chebyshev
+# collocation solve of the governing system, converged to eight digits, sharing
+# no operator with either route.
+
+
+def _duct_mean_velocity(cells: int, hartmann: float, *, resolve_layers: bool = False) -> float:
+    """Return the volume-averaged axial velocity of a steady insulating duct."""
+    if resolve_layers:
+        transverse = wall_resolving_faces(
+            cells, -1.0, 1.0, layer_thickness=1.0 / hartmann, cells_in_layer=6, max_ratio=1.35
+        )
+        spanwise = wall_resolving_faces(
+            cells, -1.0, 1.0, layer_thickness=1.0 / np.sqrt(hartmann), cells_in_layer=6, max_ratio=1.35
+        )
+    else:
+        transverse = spanwise = uniform_faces(cells, -1.0, 1.0)
+    grid = Grid(uniform_faces(1, 0.0, 1.0), transverse, spanwise)
+    problem = ChannelProblem(
+        grid=grid,
+        conditions=(PERIODIC_X, WALL, WALL),
+        conductivity=1.0 if hartmann else 0.0,
+        magnetic_field=(0.0, hartmann, 0.0),
+        forcing=(1.0, 0.0, 0.0),
+        dt=0.02,
+    )
+    velocity = advance(
+        problem,
+        400,
+        factorization=problem.factorization(),
+        viscous=problem.viscous_factorizations(),
+    ).velocity
+    volumes = np.asarray(grid.cell_volumes())[0]
+    return float((np.asarray(velocity[0].data)[0] * volumes).sum() / volumes.sum())
+
+
+def _production_duct(cells: int, hartmann: float) -> np.ndarray:
+    """Solve the same duct through the production fully developed route."""
+    case = make_hartmann_case(ha=hartmann, width=2.0, height=2.0, ny=cells, nz=cells)
+    uniform = dataclasses.replace(case.geometry, target_ha=None)
+    return np.asarray(solve_fully_developed_fields(dataclasses.replace(case, geometry=uniform))[0])
+
+
+def test_the_hydrodynamic_duct_reconciles_with_the_production_solver():
+    """Without a field the two routes agree to well inside their shared truncation error."""
+    cells = 32
+    production = _production_duct(cells, 0.0)
+    grid = Grid(uniform_faces(1, 0.0, 1.0), uniform_faces(cells, -1.0, 1.0), uniform_faces(cells, -1.0, 1.0))
+    problem = ChannelProblem(
+        grid=grid, conditions=(PERIODIC_X, WALL, WALL), conductivity=0.0, forcing=(1.0, 0.0, 0.0), dt=0.02
+    )
+    velocity = advance(
+        problem, 400, factorization=problem.factorization(), viscous=problem.viscous_factorizations()
+    ).velocity
+    new = np.asarray(velocity[0].data)[0]
+    assert np.linalg.norm(new - production) / np.linalg.norm(production) < 5e-3
+    # Both sit within their own discretisation error of the independent reference.
+    exact = flow_rate(0.0, 40)
+    for mean in (float(new.mean()), float(production.mean())):
+        assert abs(mean - exact) / exact < 5e-3
+
+
+def test_the_duct_converges_to_the_spectral_reference_with_a_field():
+    """Second order in the mean velocity, against a reference that shares no code."""
+    exact = flow_rate(5.0, 40)
+    coarse = abs(_duct_mean_velocity(16, 5.0) - exact) / exact
+    fine = abs(_duct_mean_velocity(32, 5.0) - exact) / exact
+    assert fine < 0.02
+    assert np.log2(coarse / fine) > 1.8
+
+
+def test_a_wall_resolving_mesh_reaches_the_reference_flow_rate_at_hartmann_20():
+    """The layers carry the physics, so the mesh has to resolve them rather than be fine."""
+    exact = flow_rate(20.0, 40)
+    resolved = _duct_mean_velocity(32, 20.0, resolve_layers=True)
+    assert abs(resolved - exact) / exact < 0.02
+    # The same cell count spread uniformly cannot resolve the a/Ha layer.
+    assert abs(_duct_mean_velocity(32, 20.0) - exact) / exact > 0.1

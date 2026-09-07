@@ -13,6 +13,7 @@ from lmx.em import (
     face_current,
     face_electromotive_force,
     lorentz_force,
+    wall_insulated,
 )
 from lmx.grid import CENTER, FACE, Field, Grid, geometric_faces, tanh_faces, uniform_faces
 
@@ -235,3 +236,26 @@ def test_electric_helpers_validate_their_inputs():
         face_current(cell, cell, face, 0, WALL)
     with pytest.raises(ValueError, match="electromotive force must live on the same faces"):
         face_current(cell, face, cell, 0, WALL)
+
+
+def test_an_insulating_wall_carries_no_current():
+    """`J.n = 0` is the wall condition, so the closure has to zero the wall faces."""
+    grid = UNIFORM
+    potential = _cells(grid, lambda x, y, z: x + y)
+    conductivity = face_conductivity(_cells(grid, lambda x, y, z: 1.0 + 0.0 * x), 0, WALL)
+    electromotive = _faces(grid, 0, lambda x, y, z: 1.0 + y)
+    current = wall_insulated(face_current(potential, conductivity, electromotive, 0, WALL), 0, WALL)
+    assert float(jnp.max(jnp.abs(current.data[0]))) == 0.0
+    assert float(jnp.max(jnp.abs(current.data[-1]))) == 0.0
+    assert float(jnp.max(jnp.abs(current.data[1:-1]))) > 0.0
+
+
+def test_only_an_insulating_wall_is_closed_off():
+    """A periodic axis has no wall, and a prescribed potential is a conducting one."""
+    grid = UNIFORM
+    flux = _faces(grid, 1, lambda x, y, z: 1.0 + 0.0 * x)
+    assert wall_insulated(flux, 1, BoundaryCondition("periodic")) is flux
+    assert wall_insulated(flux, 1, BoundaryCondition(DIRICHLET)) is flux
+    insulated = wall_insulated(flux, 1, WALL)
+    assert float(jnp.max(jnp.abs(insulated.data[:, 0]))) == 0.0
+    assert float(jnp.max(jnp.abs(insulated.data[:, 1:-1]))) == 1.0
