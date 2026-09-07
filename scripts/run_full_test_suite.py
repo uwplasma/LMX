@@ -47,6 +47,7 @@ _TEST_SHARDS = {
     ),
     "fringing": ("tests/test_fringing.py",),
     "channel": ("tests/test_core3d.py",),
+    "steady": ("tests/test_steady.py",),
     "physics": (
         "tests/test_physics.py",
         "tests/test_q2d_identities.py",
@@ -62,8 +63,9 @@ _CHANGE_TEST_NAMES = {
     "cases": "config solver physics fringing benchmarks",
     "cli": "cli example_runner",
     "advect": "advect core3d",
-    "core3d": "core3d timeloop advect",
+    "core3d": "core3d timeloop advect steady",
     "design": "design",
+    "steady": "steady",
     "bc": "ops",
     "grid": "grid",
     "timeloop": "timeloop",

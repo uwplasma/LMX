@@ -101,7 +101,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [support, fringing, physics, channel]
+        shard: [support, fringing, physics, channel, steady]
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-lmx
@@ -182,6 +182,9 @@ jobs:
             budget: 420
           - tier: regression
             shard: channel
+            budget: 420
+          - tier: regression
+            shard: steady
             budget: 420
           - tier: regression
             shard: support
