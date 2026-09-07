@@ -106,7 +106,11 @@ def _tests_for_changes(paths: tuple[str, ...]) -> tuple[str, ...]:
             selected.append("tests/test_run_benchmark_b_independence.py")
         elif path in {"scripts/run_freemhd_parity_suite.py", "validation/freemhd.py"}:
             selected.append("tests/test_freemhd.py")
-        elif path in {"scripts/audit_architecture.py", "scripts/run_full_test_suite.py"}:
+        elif path in {
+            "scripts/audit_architecture.py",
+            "scripts/run_full_test_suite.py",
+            "scripts/make_showcase_figures.py",
+        }:
             selected.append("tests/test_config.py")
         elif path in {"pyproject.toml", "MANIFEST.in"}:
             selected.append("tests/test_config.py")
