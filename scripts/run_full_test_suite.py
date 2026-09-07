@@ -40,6 +40,7 @@ _TEST_SHARDS = {
         "tests/test_ops.py",
         "tests/test_poisson.py",
         "tests/test_em.py",
+        "tests/test_momentum_placement_oracle.py",
     ),
     "fringing": ("tests/test_fringing.py",),
     "physics": (
