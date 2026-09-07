@@ -32,6 +32,54 @@ from scripts.run_full_test_suite import _ALL_TESTS, _test_environment, _tests_fo
 pytestmark = pytest.mark.unit
 
 
+@pytest.mark.parametrize("x64", ["false", "true"])
+def test_explicit_precision_in_fresh_process(x64):
+    code = """
+import warnings
+import jax
+import jax.numpy as jnp
+import lmx
+from dataclasses import replace
+from lmx import cases, mesh, physics, fringing, q2d
+initial = jax.config.x64_enabled
+assert initial == EXPECTED
+case32 = lmx.make_hartmann_case(ha=2, ny=8, nz=8, dtype="float32")
+assert jax.config.x64_enabled == initial
+values = []
+for dtype in ("float32", "float64"):
+    with warnings.catch_warnings(record=True) as recorded:
+        warnings.simplefilter("always")
+        case = lmx.make_hartmann_case(ha=2, ny=8, nz=8, dtype=dtype)
+    assert len(recorded) == int(dtype == "float64" and not initial)
+    if recorded:
+        assert recorded[0].category is DeprecationWarning
+    grid, materials, _, _ = cases._prepare_fully_developed_case(case)
+    assert grid.y_faces.dtype == materials.conductivity.dtype == case.dtype
+    objective = lambda x: jnp.mean(lmx.solve_fully_developed_fields(case, forcing=x)[0])
+    x = jnp.asarray(1., dtype=case.dtype)
+    value, grad = jax.jit(jax.value_and_grad(objective))(x)
+    tangent = jax.jit(lambda x: jax.jvp(objective, (x,), (jnp.ones_like(x),))[1])(x)
+    assert value.dtype == grad.dtype == tangent.dtype == case.dtype
+    assert bool(jnp.isfinite(grad))
+    # Linear forcing response is an exact derivative oracle at fixed field.
+    assert bool(jnp.allclose(grad, value, rtol=2e-5, atol=1e-7))
+    assert bool(jnp.allclose(grad, tangent, rtol=2e-5, atol=1e-7))
+    values.append(float(value))
+    short = replace(case, time_stepper=replace(case.time_stepper, max_steps=2))
+    result = lmx.solve(short)
+    assert result.state.u.dtype == result.state.phi.dtype == case.dtype
+assert abs(values[0] - values[1]) < 2e-6
+lmx.enable_x64()
+assert jnp.asarray(1.).dtype == jnp.float64
+""".replace("EXPECTED", str(x64 == "true"))
+    subprocess.run(
+        [sys.executable, "-c", code],
+        check=True,
+        timeout=90,
+        env={**os.environ, "JAX_ENABLE_X64": x64},
+    )
+
+
 def _write_minimal_config(
     tmp_path: Path,
     name: str,
@@ -434,6 +482,7 @@ def test_wall_conductivity_rejects_nonpositive_geometry(
 
 
 EXPECTED_ROOT_API = {
+    "enable_x64",
     "enable_compilation_cache",
     "make_hartmann_case",
     "make_shercliff_case",
@@ -492,7 +541,7 @@ def test_stable_root_api_is_small_lazy_and_resolvable(
     assert set(lmx.__all__) == EXPECTED_ROOT_API
     assert EXPECTED_ROOT_API <= set(dir(lmx))
     assert all(callable(getattr(lmx, name)) for name in lmx.__all__)
-    assert all(inspect.getdoc(getattr(lmx, name)) for name in lmx.__all__)
+    assert not [name for name in lmx.__all__ if not inspect.getdoc(getattr(lmx, name))]
     api_reference = Path("docs/reference/api.md").read_text()
     assert all(f"`{name}`" in api_reference for name in lmx.__all__)
 

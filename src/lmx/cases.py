@@ -183,6 +183,7 @@ def make_hartmann_case(
     density: float = 1.0,
     viscosity: float = 1.0,
     output_dir: str | None = None,
+    dtype: str = "float64",
 ) -> CaseSpec:
     """Build an insulating rectangular Hartmann-duct reference case."""
 
@@ -190,6 +191,7 @@ def make_hartmann_case(
     anchor = (ny // 2, nz // 2)
     return CaseSpec(
         name=f"hartmann_ha{int(ha)}",
+        dtype=dtype,
         geometry=GeometrySpec(kind="rect_duct", width=width, height=height, ny=ny, nz=nz, target_ha=ha),
         regions=(RegionSpec("fluid", "fluid", conductivity, density, viscosity),),
         magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, 1.0 * bmag, 0.0)),
@@ -219,6 +221,7 @@ def make_shercliff_case(
     density: float = 1.0,
     viscosity: float = 1.0,
     output_dir: str | None = None,
+    dtype: str = "float64",
 ) -> CaseSpec:
     """Build an all-insulating rectangular Shercliff-duct case."""
 
@@ -226,6 +229,7 @@ def make_shercliff_case(
     anchor = (ny // 2, nz // 2)
     return CaseSpec(
         name=f"shercliff_ha{int(ha)}",
+        dtype=dtype,
         geometry=GeometrySpec(kind="rect_duct", width=width, height=height, ny=ny, nz=nz, target_ha=ha),
         regions=(RegionSpec("fluid", "fluid", conductivity, density, viscosity),),
         magnetic_field=MagneticFieldSpec(kind="constant", value=(0.0, 1.0 * bmag, 0.0)),
@@ -263,6 +267,7 @@ def make_hunt_case(
     density: float = 1.0,
     viscosity: float = 1.0,
     output_dir: str | None = None,
+    dtype: str = "float64",
 ) -> CaseSpec:
     """Build a Hunt duct with conducting Hartmann and insulating side walls."""
 
@@ -284,6 +289,7 @@ def make_hunt_case(
     controls = _hunt_short_transient_controls(ha)
     return CaseSpec(
         name=f"hunt_ha{int(ha)}",
+        dtype=dtype,
         geometry=GeometrySpec(
             kind="layered_duct",
             width=width,
@@ -686,6 +692,13 @@ def _prepare_fully_developed_case(case: CaseSpec, mesh: StructuredMesh | None = 
     """Prepare shared mesh, materials, and potential algebra for field solves."""
 
     mesh = _build_mesh(case) if mesh is None else mesh
+    casts = {
+        name: getattr(mesh, name).astype(case.dtype)
+        for name in ("x_faces", "y_faces", "z_faces", "point_coordinates", "sigma")
+        if getattr(mesh, name) is not None and getattr(mesh, name).dtype != case.dtype
+    }
+    if casts:
+        mesh = replace(mesh, **casts)
     materials = build_material_fields(case, mesh)
     potential_solver = _resolve_potential_solver(case.time_stepper.potential_solver, materials.fluid_mask)
     if potential_solver == "cg" and not _has_uniform_spacing(mesh):
