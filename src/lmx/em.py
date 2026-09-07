@@ -36,7 +36,7 @@ from __future__ import annotations
 import jax.numpy as jnp
 import numpy as np
 
-from .bc import BoundaryCondition, pad
+from .bc import NEUMANN, BoundaryCondition, pad
 from .grid import CENTER, FACE, Field
 from .ops import divergence, face_gradient, face_interpolate
 
@@ -47,6 +47,7 @@ __all__ = [
     "face_current",
     "face_electromotive_force",
     "lorentz_force",
+    "wall_insulated",
 ]
 
 # (normal axis, first transverse axis, second transverse axis) in cyclic order.
@@ -115,6 +116,29 @@ def face_electromotive_force(
     emf = velocity_first.data * field_second.data - velocity_second.data * field_first.data
     offset = tuple(FACE if position == index else CENTER for position in range(3))
     return Field(emf, offset, grid)
+
+
+def wall_insulated(flux: Field, axis: int | str, condition: BoundaryCondition) -> Field:
+    """Zero a face-normal flux on the two boundary faces of an insulating wall.
+
+    An insulating wall carries no current, :math:`\\mathbf J\\cdot\\mathbf n = 0`,
+    and both sides of the potential equation have to say so. The homogeneous
+    Neumann Laplacian already drops the wall faces; unless the motional term is
+    dropped there too, the equation asks the potential to absorb a boundary flux
+    that the operator cannot produce, and the resulting current -- and the
+    Lorentz force built from it -- is wrong wherever a side wall cuts across
+    :math:`\\mathbf u\\times\\mathbf B`.
+
+    Only a Neumann condition names an insulating wall. A prescribed potential
+    is a perfectly conducting one and does carry current, so it is returned
+    untouched, as is a periodic axis, which has no wall at all.
+    """
+    index = flux.grid.axis_index(axis)
+    if condition.kind != NEUMANN:
+        return flux
+    selection = (slice(None),) * index
+    data = flux.data.at[selection + (0,)].set(0.0).at[selection + (-1,)].set(0.0)
+    return flux.replace_data(data)
 
 
 def face_current(
