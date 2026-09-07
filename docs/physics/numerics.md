@@ -132,6 +132,30 @@ the production mesh without spending iterations on roundoff-level pressure
 corrections. Traced 3-D paths retain roundoff-level primal solves where their
 implicit derivatives require them.
 
+## Staggered grid and wall-resolving coordinates
+
+`lmx.grid` supplies the geometry the plan's conservative 3-D core is being built
+on. A `Grid` stores strictly increasing face coordinates per axis as host-side
+metadata: it is hashable and never traced, so stencil bookkeeping and any
+eigendecomposition happen once at trace time. A `Field` pairs a traced array with
+its staggered offset, where `CENTER` places the value at the cell centre along an
+axis and `FACE` places it on the lower face; a face field therefore carries one
+extra entry on that axis. This is the marker-and-cell layout, for which the
+normal velocity already lives where a conservative face flux needs it.
+
+High-Hartmann ducts require the mesh to resolve two very different layers: the
+Hartmann layer scales as $a/Ha$ and the side layer as $a/\sqrt{Ha}$. Three
+coordinate families are available. `uniform_faces` is the unstretched control,
+`geometric_faces` grows successive cells by a fixed ratio, and `tanh_faces`
+clusters symmetrically at both walls. `wall_resolving_faces` inverts the
+requirement directly: given a layer thickness it places a requested number of
+cells inside the layer while bounding the growth ratio, and raises when the cell
+count cannot meet the request rather than returning an unresolved mesh.
+
+These coordinates describe geometry only. Operators, boundary conditions and the
+momentum discretization follow in their own plan steps, and the existing fully
+developed and extruded solvers continue to use `lmx.mesh` until those land.
+
 ## LMX and SOLVAX
 
 LMX owns:
