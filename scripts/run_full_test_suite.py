@@ -35,6 +35,7 @@ _TEST_SHARDS = {
         "tests/test_run_benchmark_b_independence.py",
         "tests/test_benchmarks.py",
         "tests/test_example_runner.py",
+        "tests/test_grid.py",
     ),
     "fringing": ("tests/test_fringing.py",),
     "physics": (
