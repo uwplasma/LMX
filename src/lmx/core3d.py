@@ -32,14 +32,21 @@ flux through the boundary, and with every axis periodic or Neumann the pressure
 has no way to remove that constant: the projection would return a field that is
 still not divergence free.
 
-*Stiffness from viscosity.* Diffusion is explicit, so the step is bounded by
-:attr:`ChannelProblem.diffusive_step_limit`. That limit is reported rather than
-enforced, because a caller sweeping a parameter should see the constraint, not a
-silently clipped step. The two stiffnesses are therefore handled differently on
-purpose: the magnetic one is removed implicitly, since it grows as
-:math:`Ha^2` and would otherwise dominate everything, while the viscous one is
-left explicit and bounded, since it depends only on the mesh. An implicit
-viscous solve is a later step.
+*Stiffness from viscosity.* Diffusion may be taken either way. Left explicit it
+bounds the step by :attr:`ChannelProblem.diffusive_step_limit`, reported rather
+than enforced so a caller sweeping a parameter sees the constraint instead of a
+silently clipped step. Passing the factorizations from
+:meth:`ChannelProblem.viscous_factorizations` to :func:`step` solves
+
+.. math:: \\left[(1+\\Delta t\\,\\lambda)I-\\Delta t\\,\\nu\\nabla^2\\right]\\mathbf u^{*}
+   =(1+\\Delta t\\,\\lambda)\\mathbf u+\\Delta t\\,(\\mathbf F+\\mathbf f)/\\rho,
+
+backward Euler on the viscous term with the damping correction folded into the
+shift. That operator separates exactly as the pressure Laplacian does, so it
+costs three contractions and a divide, and the step is then bounded by accuracy
+rather than by the mesh. Both stiffnesses are gone at that point: the magnetic
+one because it grows as :math:`Ha^2`, the viscous one because it grows as the
+mesh is refined.
 
 The momentum equation omits convective transport. That is the Stokes limit,
 appropriate at the large interaction parameters of a blanket channel, and it is
@@ -58,7 +65,12 @@ from .bc import DIRICHLET, BoundaryCondition
 from .em import face_conductivity, face_current, face_electromotive_force, lorentz_force
 from .grid import CENTER, FACE, Field, Grid
 from .ops import divergence, face_gradient, face_interpolate, staggered_laplacian
-from .poisson import FastDiagonalPoisson, fast_diagonal_poisson
+from .poisson import (
+    FastDiagonalHelmholtz,
+    FastDiagonalPoisson,
+    fast_diagonal_helmholtz,
+    fast_diagonal_poisson,
+)
 
 __all__ = [
     "ChannelProblem",
@@ -145,6 +157,25 @@ class ChannelProblem:
         inverse = sum(1.0 / float(np.min(widths)) ** 2 for widths in self.grid.widths)
         return 1.0 / (2.0 * float(self.viscosity) * inverse)
 
+    def viscous_factorizations(self) -> tuple[FastDiagonalHelmholtz, ...]:
+        """Factorize the implicit viscous operator for each velocity component.
+
+        Build these once on the host and pass them to :func:`step` to take
+        diffusion implicitly. The shift carries the magnetic damping, so one
+        solve removes both stiff terms.
+        """
+        conditions = tuple(velocity_condition(self.conditions, axis) for axis in range(3))
+        return tuple(
+            fast_diagonal_helmholtz(
+                self.grid,
+                velocity_offset(component),
+                conditions,
+                shift=1.0 + float(self.dt) * self.damping_rates[component],
+                coefficient=float(self.dt) * float(self.viscosity),
+            )
+            for component in range(3)
+        )
+
     def factorization(self) -> FastDiagonalPoisson:
         """Factorize the scalar Laplacian shared by the pressure and the potential.
 
@@ -214,8 +245,13 @@ def step(
     velocity: tuple[Field, Field, Field],
     problem: ChannelProblem,
     factorization: FastDiagonalPoisson | None = None,
+    viscous: tuple[FastDiagonalHelmholtz, ...] | None = None,
 ) -> tuple[tuple[Field, Field, Field], Field, Field]:
-    """Advance one projection step and return velocity, pressure and potential."""
+    """Advance one projection step and return velocity, pressure and potential.
+
+    Passing ``viscous`` takes diffusion implicitly and lifts the step off
+    :attr:`ChannelProblem.diffusive_step_limit`.
+    """
     factorization = problem.factorization() if factorization is None else factorization
     scalar = problem.scalar_conditions
     field = tuple(_constant(problem.grid, value) for value in problem.magnetic_field)
@@ -235,13 +271,17 @@ def step(
     velocity_conditions = tuple(velocity_condition(problem.conditions, axis) for axis in range(3))
     predicted = []
     for component, component_field in enumerate(velocity):
-        viscous = staggered_laplacian(component_field, velocity_conditions)
         body = face_interpolate(force[component], component, scalar[component])
-        rhs = problem.viscosity * viscous.data + (body.data + problem.forcing[component]) / problem.density
+        drive = (body.data + problem.forcing[component]) / problem.density
         rate = problem.damping_rates[component]
-        predicted.append(
-            component_field.replace_data(component_field.data + problem.dt * rhs / (1.0 + problem.dt * rate))
-        )
+        shift = 1.0 + problem.dt * rate
+        if viscous is None:
+            diffusion = staggered_laplacian(component_field, velocity_conditions)
+            updated = component_field.data + problem.dt * (problem.viscosity * diffusion.data + drive) / shift
+        else:
+            source = component_field.replace_data(shift * component_field.data + problem.dt * drive)
+            updated = viscous[component].solve(source).data
+        predicted.append(component_field.replace_data(updated))
 
     corrected, pressure = project(tuple(predicted), problem, factorization)
     return corrected, pressure, potential

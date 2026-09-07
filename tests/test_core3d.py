@@ -268,3 +268,52 @@ def test_the_step_differentiates_and_jits():
     size = 1.0e-5
     difference = (kinetic(1.0 + size) - kinetic(1.0 - size)) / (2.0 * size)
     assert gradient == pytest.approx(float(difference), rel=1e-6)
+
+
+def _implicit_channel_error(cells: int, *, step_multiple: float) -> tuple[float, float]:
+    """Integrate the plane channel with implicit viscosity at a chosen step size.
+
+    ``step_multiple`` is the step as a multiple of the explicit stability limit,
+    so a value above one is a step no explicit scheme could take.
+    """
+    grid = _channel(cells)
+    conditions = (PERIODIC_X, WALL, PERIODIC_X)
+    base = ChannelProblem(grid=grid, conditions=conditions, forcing=(1.0, 0.0, 0.0))
+    problem = ChannelProblem(
+        grid=grid,
+        conditions=conditions,
+        forcing=(1.0, 0.0, 0.0),
+        dt=step_multiple * base.diffusive_step_limit,
+    )
+    factorization, viscous = problem.factorization(), problem.viscous_factorizations()
+    velocity = zero_velocity(problem)
+    for _ in range(int(round(4.0 / problem.dt))):
+        velocity, _, _ = step(velocity, problem, factorization, viscous)
+    computed = np.asarray(velocity[0].data)[0, :, 0]
+    y = np.asarray(grid.centers[1])
+    exact = 0.5 * (1.0 - y**2)
+    return float(np.linalg.norm(computed - exact) / np.linalg.norm(exact)), problem.dt
+
+
+def test_implicit_viscosity_is_stable_far_past_the_explicit_limit():
+    """Twenty times the explicit limit: an explicit step would diverge here."""
+    error, used = _implicit_channel_error(16, step_multiple=20.0)
+    reference = ChannelProblem(
+        grid=_channel(16), conditions=(PERIODIC_X, WALL, PERIODIC_X), forcing=(1.0, 0.0, 0.0)
+    )
+    assert used > 10.0 * reference.diffusive_step_limit
+    assert np.isfinite(error) and error < 1.0e-2
+
+
+def test_implicit_and_explicit_viscosity_reach_the_same_steady_state():
+    """The treatment changes the path, not the state the path ends at."""
+    explicit = _poiseuille_error(16)
+    implicit, _ = _implicit_channel_error(16, step_multiple=0.4)
+    assert implicit == pytest.approx(explicit, rel=2.0e-2)
+
+
+def test_implicit_viscosity_keeps_second_order_convergence():
+    coarse, _ = _implicit_channel_error(8, step_multiple=5.0)
+    fine, _ = _implicit_channel_error(16, step_multiple=5.0)
+    order = np.log2(coarse / fine)
+    assert 1.7 < order < 2.3, (coarse, fine, order)
