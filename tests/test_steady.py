@@ -32,8 +32,21 @@ REFERENCE_FLOW_RATE = {
 }
 
 
-def _duct(cells: int, hartmann: float, *, ratio: float | None = None, dt: float = 1.0) -> ChannelProblem:
-    """A square insulating duct; ``ratio`` clusters cells into the two wall layers."""
+def _duct(
+    cells: int,
+    hartmann: float,
+    *,
+    ratio: float | None = None,
+    dt: float = 1.0,
+    conductance: float = 0.0,
+    conductivity: float = 1.0,
+) -> ChannelProblem:
+    """A square duct; ``ratio`` clusters cells into the two wall layers.
+
+    ``conductance`` is the wall conductance ratio of the two walls normal to the
+    field, which is Hunt's configuration. Only ``sigma B^2`` is physical, so the
+    field is scaled to keep the Hartmann number fixed when the conductivity moves.
+    """
     if ratio is None:
         transverse = spanwise = uniform_faces(cells, -1.0, 1.0)
     else:
@@ -46,11 +59,15 @@ def _duct(cells: int, hartmann: float, *, ratio: float | None = None, dt: float 
     return ChannelProblem(
         grid=Grid(uniform_faces(1, 0.0, 1.0), transverse, spanwise),
         conditions=(PERIODIC_X, WALL, WALL),
-        conductivity=1.0 if hartmann else 0.0,
-        magnetic_field=(0.0, hartmann, 0.0),
+        conductivity=conductivity if hartmann else 0.0,
+        magnetic_field=(0.0, hartmann / np.sqrt(conductivity), 0.0),
         forcing=(1.0, 0.0, 0.0),
         dt=dt,
+        wall_conductance=(0.0, conductance, 0.0),
     )
+
+
+HUNT_FLOW_RATE = {0.027: 0.027577890, 0.100: 0.017148080}
 
 
 def _mean(problem: ChannelProblem, velocity) -> float:
@@ -155,3 +172,37 @@ def test_a_solve_that_does_not_converge_raises():
 def test_the_pseudo_step_is_validated():
     with pytest.raises(ValueError, match="pseudo_step must be positive"):
         solve_steady_state(_duct(6, 0.0), pseudo_step=0.0)
+
+
+@pytest.mark.parametrize("conductance", [0.027, 0.100])
+def test_a_hunt_duct_matches_the_spectral_reference(conductance):
+    """Conducting Hartmann walls carry the current the layer would otherwise have to."""
+    problem = _duct(32, 20.0, ratio=1.35, conductance=conductance)
+    rate = _mean(problem, solve_steady_state(problem, pseudo_step=1.0e3).velocity)
+    assert abs(rate - HUNT_FLOW_RATE[conductance]) / HUNT_FLOW_RATE[conductance] < 0.02
+    # A conducting wall short-circuits the Hartmann layer, so it always slows the flow.
+    assert rate < REFERENCE_FLOW_RATE[20.0]
+
+
+def test_a_wall_of_no_conductance_is_the_insulating_duct():
+    """The conducting closure has to collapse onto the one it generalises."""
+    rates = [
+        _mean(problem, solve_steady_state(problem, pseudo_step=100.0).velocity)
+        for problem in (_duct(16, 5.0), _duct(16, 5.0, conductance=0.0))
+    ]
+    assert rates[0] == pytest.approx(rates[1], rel=1e-14)
+
+
+def test_the_answer_follows_the_hartmann_number_and_not_the_conductivity():
+    """Only `sigma B^2` is physical, so the potential has to be scaled by sigma."""
+    rates = [
+        _mean(problem, solve_steady_state(problem, pseudo_step=100.0).velocity)
+        for problem in (_duct(16, 5.0), _duct(16, 5.0, conductivity=4.0))
+    ]
+    assert rates[0] == pytest.approx(rates[1], rel=1e-12)
+
+
+@pytest.mark.slow
+def test_the_hunt_reference_values_are_what_the_spectral_solve_returns():
+    for conductance, cached in HUNT_FLOW_RATE.items():
+        assert flow_rate(20.0, 64, hartmann_wall=conductance) == pytest.approx(cached, rel=2e-4)

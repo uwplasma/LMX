@@ -37,6 +37,7 @@ from .bc import BoundaryCondition, pad
 from .grid import CENTER, FACE, Field, Grid
 
 __all__ = [
+    "axis_divergence",
     "cell_inner_product",
     "divergence",
     "face_distances",
@@ -70,20 +71,28 @@ def face_gradient(field: Field, axis: int | str, condition: BoundaryCondition) -
     return Field(difference / _broadcast(distances, index, field.dtype), offset, grid)
 
 
+def axis_divergence(face: Field, axis: int | str) -> Field:
+    """Return what one face-normal field contributes to the divergence."""
+    grid = face.grid
+    index = grid.axis_index(axis)
+    _require_face(face, index)
+    area = _as_array(grid.face_areas(index), face.dtype)
+    flux = area * face.data
+    contribution = _take(flux, index, slice(1, None)) - _take(flux, index, slice(None, -1))
+    volumes = _as_array(grid.cell_volumes(), face.dtype)
+    return Field(contribution / volumes, (CENTER, CENTER, CENTER), grid)
+
+
 def divergence(faces: tuple[Field, Field, Field]) -> Field:
     """Return the net outward flux per unit volume of three face-normal fields."""
     grid = faces[0].grid
     total = None
     for index, face in enumerate(faces):
-        _require_face(face, index)
         if face.grid != grid:
             raise ValueError("face fields must share one grid")
-        area = _as_array(grid.face_areas(index), face.dtype)
-        flux = area * face.data
-        contribution = _take(flux, index, slice(1, None)) - _take(flux, index, slice(None, -1))
+        contribution = axis_divergence(face, index).data
         total = contribution if total is None else total + contribution
-    volumes = _as_array(grid.cell_volumes(), faces[0].dtype)
-    return Field(total / volumes, (CENTER, CENTER, CENTER), grid)
+    return Field(total, (CENTER, CENTER, CENTER), grid)
 
 
 def laplacian(field: Field, conditions: tuple[BoundaryCondition, ...]) -> Field:
