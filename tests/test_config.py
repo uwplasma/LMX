@@ -614,6 +614,7 @@ def test_change_gate_selects_affected_tests_and_fails_closed() -> None:
     )
     assert _tests_for_changes(("src/lmx/q2d.py", "examples/q2d_vortex.py")) == (
         "tests/test_physics.py",
+        "tests/test_q2d_identities.py",
         "tests/test_example_runner.py",
     )
     assert _tests_for_changes(("tests/test_io.py",)) == ("tests/test_io.py",)

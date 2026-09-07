@@ -46,6 +46,7 @@ _TEST_SHARDS = {
     "fringing": ("tests/test_fringing.py",),
     "physics": (
         "tests/test_physics.py",
+        "tests/test_q2d_identities.py",
         "tests/test_solver.py",
         f"tests/test_fringing.py::{_HEAVY_FRINGING_TEST}",
     ),
@@ -66,7 +67,7 @@ _CHANGE_TEST_NAMES = {
     "io": "io cli fringing freemhd example_runner",
     "mesh": "mesh solver physics fringing benchmarks",
     "physics": "solver physics fringing",
-    "q2d": "physics example_runner",
+    "q2d": "physics q2d_identities example_runner",
     "solvers": "solver physics fringing",
     "specs": "config solver physics fringing benchmarks cli",
     "validation": "benchmarks freemhd physics solver example_runner",
