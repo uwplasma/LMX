@@ -38,7 +38,7 @@ import numpy as np
 
 from .bc import NEUMANN, BoundaryCondition, pad
 from .grid import CENTER, FACE, Field
-from .ops import divergence, face_gradient, face_interpolate
+from .ops import axis_divergence, divergence, face_gradient, face_interpolate
 
 __all__ = [
     "cell_average",
@@ -47,6 +47,7 @@ __all__ = [
     "face_current",
     "face_electromotive_force",
     "lorentz_force",
+    "thin_wall_flux",
     "wall_insulated",
 ]
 
@@ -139,6 +140,52 @@ def wall_insulated(flux: Field, axis: int | str, condition: BoundaryCondition) -
     selection = (slice(None),) * index
     data = flux.data.at[selection + (0,)].set(0.0).at[selection + (-1,)].set(0.0)
     return flux.replace_data(data)
+
+
+def thin_wall_flux(
+    potential: Field,
+    axis: int | str,
+    condition: BoundaryCondition,
+    conductance: float,
+    tangential: tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition],
+) -> Field:
+    """Return the current a thin conducting wall carries, on its two wall faces.
+
+    A wall of conductance :math:`\\sigma_w t_w` conducts along itself, with a
+    surface current :math:`\\mathbf K = -c\\nabla_\\tau\\varphi` for
+    :math:`c = \\sigma_w t_w/(\\sigma a)`. Charge conservation in the sheet,
+    :math:`\\nabla_\\tau\\cdot\\mathbf K = \\mathbf J\\cdot\\mathbf n`, makes
+    the wall-normal current :math:`-c\\nabla_\\tau^2\\varphi` -- Walker's thin-wall
+    condition, and the reason a Hunt duct carries a fraction of its current
+    through the wall instead of through the Hartmann layer.
+
+    The tangential Laplacian is evaluated on the layer of cells against the wall,
+    which is where the potential is prescribed to first order. ``conductance``
+    zero returns zeros, which is the insulating wall of :func:`wall_insulated`.
+    """
+    grid = potential.grid
+    index = grid.axis_index(axis)
+    offset = tuple(FACE if position == index else CENTER for position in range(3))
+    flux = jnp.zeros(grid.face_shape(index), dtype=potential.dtype)
+    if condition.is_periodic or not conductance:
+        return Field(flux, offset, grid)
+    surface = None
+    for other in range(3):
+        if other == index:
+            continue
+        along = axis_divergence(face_gradient(potential, other, tangential[other]), other).data
+        surface = along if surface is None else surface + along
+    layer = float(conductance) * surface
+    # The stored face value points along the axis, so it is the outward current on
+    # the upper wall and its negative on the lower one.
+    selection = (slice(None),) * index
+    flux = flux.at[selection + (0,)].set(_slice_along(layer, index, 0))
+    flux = flux.at[selection + (-1,)].set(-_slice_along(layer, index, -1))
+    return Field(flux, offset, grid)
+
+
+def _slice_along(data: jnp.ndarray, axis: int, position: int) -> jnp.ndarray:
+    return data[(slice(None),) * axis + (position,)]
 
 
 def face_current(
