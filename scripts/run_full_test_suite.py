@@ -45,6 +45,7 @@ _TEST_SHARDS = {
     ),
     "fringing": ("tests/test_fringing.py",),
     "physics": (
+        "tests/test_core3d.py",
         "tests/test_physics.py",
         "tests/test_q2d_identities.py",
         "tests/test_solver.py",
@@ -58,6 +59,7 @@ _CHANGE_TEST_NAMES = {
     "__main__": "cli",
     "cases": "config solver physics fringing benchmarks",
     "cli": "cli example_runner",
+    "core3d": "core3d",
     "design": "design",
     "bc": "ops",
     "grid": "grid",
