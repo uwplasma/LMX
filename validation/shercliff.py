@@ -14,12 +14,21 @@ constant properties the inductionless system reduces to
    \\mu\\nabla^2 u - \\sigma B^2 u + \\sigma B\\,\\partial_z\\varphi + f = 0,
    \\qquad \\nabla^2\\varphi = B\\,\\partial_z u,
 
-with no slip on all four walls and, because an insulating wall carries no
-current, :math:`\\partial_n\\varphi = 0` on all four. The discretization is
-spectral, so the answer is converged to eight digits by about forty points per
-direction and can be treated as exact when a finite-volume result is compared
-against it. At :math:`B=0` it reproduces the analytic Poiseuille duct maximum
-0.29468541 for unit forcing on ``[-1, 1]^2``.
+with no slip on all four walls. An insulating wall carries no current, so
+:math:`\\partial_n\\varphi = 0` there. A thin conducting wall carries the current
+it receives along itself, which is Walker's condition: the surface current is
+:math:`\\mathbf K = -c\\nabla_\\tau\\varphi` with
+:math:`c = \\sigma_w t_w/(\\sigma a)`; charge conservation in the sheet,
+:math:`\\nabla_\\tau\\cdot\\mathbf K = \\mathbf J\\cdot\\mathbf n`, then gives
+:math:`\\partial_n\\varphi = c\\,\\partial_\\tau^2\\varphi` with
+:math:`\\mathbf n` the outward normal. Setting both conductances to zero
+recovers Shercliff's insulating duct; a nonzero conductance on the walls normal
+to the field is Hunt's case.
+
+The discretization is spectral, so the answer is converged to eight digits by
+about forty points per direction and can be treated as exact when a finite-volume
+result is compared against it. At :math:`B=0` it reproduces the analytic
+Poiseuille duct maximum 0.29468541 for unit forcing on ``[-1, 1]^2``.
 """
 
 from __future__ import annotations
@@ -44,12 +53,16 @@ def duct_flow(
     points: int = 40,
     *,
     forcing: float = 1.0,
+    hartmann_wall: float = 0.0,
+    side_wall: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Return the nodes, velocity and potential of an insulating square duct.
+    """Return the nodes, velocity and potential of a square duct.
 
     Non-dimensionalised so that the half width, density, kinematic viscosity and
     conductivity are one; the field is then ``B = hartmann`` along ``y`` and the
     duct occupies ``[-1, 1]`` in both transverse directions.
+    ``hartmann_wall`` and ``side_wall`` are the wall conductance ratios of the
+    walls normal to and parallel to the field; both zero is Shercliff's duct.
     """
     if points < 4:
         raise ValueError("the spectral reference needs at least four points per direction")
@@ -72,12 +85,20 @@ def duct_flow(
     source[:size] = -float(forcing)
     operator[size:, :size] = -field * along_z
     operator[size:, size:] = laplacian
+    second_y = np.kron(derivative @ derivative, identity)
+    second_z = np.kron(identity, derivative @ derivative)
     for row in np.flatnonzero(edge):
         operator[row, :] = 0.0
         operator[row, row] = 1.0
         source[row] = 0.0
         operator[size + row, :] = 0.0
-        operator[size + row, size:] = along_y[row] if abs(y[row]) > 1.0 - 1e-12 else along_z[row]
+        if abs(y[row]) > 1.0 - 1e-12:
+            outward = np.sign(y[row])
+            closure = along_y[row] * outward - hartmann_wall * second_z[row]
+        else:
+            outward = np.sign(z[row])
+            closure = along_z[row] * outward - side_wall * second_y[row]
+        operator[size + row, size:] = closure
         source[size + row] = 0.0
     anchor = size // 2
     operator[size + anchor, :] = 0.0
@@ -104,8 +125,8 @@ def chebyshev_weights(points: int) -> np.ndarray:
     return weights
 
 
-def flow_rate(hartmann: float, points: int = 40, *, forcing: float = 1.0) -> float:
+def flow_rate(hartmann: float, points: int = 40, *, forcing: float = 1.0, **walls: float) -> float:
     """Return the mean velocity of the cross-section, ``Q / A``."""
-    _, velocity, _ = duct_flow(hartmann, points, forcing=forcing)
+    _, velocity, _ = duct_flow(hartmann, points, forcing=forcing, **walls)
     weights = chebyshev_weights(points)
     return float(weights @ velocity @ weights) / 4.0

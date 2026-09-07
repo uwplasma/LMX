@@ -65,14 +65,14 @@ import solvax
 from .advect import momentum_advection
 from .core3d import (
     ChannelProblem,
+    electric_state,
     enforce_face_constraints,
     project,
     velocity_condition,
     zero_velocity,
 )
-from .em import face_conductivity, face_current, face_electromotive_force, lorentz_force, wall_insulated
 from .grid import Field
-from .ops import divergence, face_interpolate, staggered_laplacian
+from .ops import face_interpolate, staggered_laplacian
 from .poisson import FastDiagonalHelmholtz, FastDiagonalPoisson
 
 __all__ = ["SteadySolution", "solve_steady_state", "steady_residual"]
@@ -87,43 +87,6 @@ class SteadySolution:
     potential: Field
     residual_norm: jnp.ndarray
     steps: int
-
-
-def _potential_and_force(
-    velocity: tuple[Field, Field, Field],
-    problem: ChannelProblem,
-    factorization: FastDiagonalPoisson,
-    field_scale,
-) -> tuple[Field, tuple[Field, Field, Field]]:
-    """Return the induced potential and the Lorentz force it carries."""
-    from .core3d import _constant
-
-    scalar = problem.scalar_conditions
-    field = tuple(
-        _constant(problem.grid, value).replace_data(field_scale * _constant(problem.grid, value).data)
-        for value in problem.magnetic_field
-    )
-    sigma = _constant(problem.grid, problem.conductivity)
-    conductivities = [face_conductivity(sigma, axis, scalar[axis]) for axis in range(3)]
-    emfs = [face_electromotive_force(velocity, field, axis, scalar) for axis in range(3)]
-    motional = tuple(
-        wall_insulated(
-            conductivities[axis].replace_data(conductivities[axis].data * emfs[axis].data),
-            axis,
-            scalar[axis],
-        )
-        for axis in range(3)
-    )
-    potential = factorization.solve(divergence(motional))
-    currents = tuple(
-        wall_insulated(
-            face_current(potential, conductivities[axis], emfs[axis], axis, scalar[axis]),
-            axis,
-            scalar[axis],
-        )
-        for axis in range(3)
-    )
-    return potential, lorentz_force(currents, field, scalar)
 
 
 def steady_residual(
@@ -145,7 +108,7 @@ def steady_residual(
     velocity = enforce_face_constraints(velocity, problem)
     scalar = problem.scalar_conditions
     drive = problem.forcing if forcing is None else forcing
-    _, force = _potential_and_force(velocity, problem, factorization, field_scale)
+    _, force = electric_state(velocity, problem, factorization, field_scale)
     conditions = tuple(velocity_condition(problem.conditions, axis) for axis in range(3))
     transport = (
         None
@@ -256,7 +219,7 @@ def solve_steady_state(
             "marched state"
         )
     corrected, pressure = project(root, problem, factorization)
-    potential, _ = _potential_and_force(corrected, problem, factorization, field_scale)
+    potential, _ = electric_state(corrected, problem, factorization, field_scale)
     return SteadySolution(corrected, pressure, potential, final, max_steps)
 
 

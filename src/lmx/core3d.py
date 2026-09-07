@@ -68,6 +68,7 @@ from dataclasses import dataclass
 import jax
 import jax.numpy as jnp
 import numpy as np
+import solvax
 
 from .advect import momentum_advection
 from .bc import DIRICHLET, BoundaryCondition
@@ -76,6 +77,7 @@ from .em import (
     face_current,
     face_electromotive_force,
     lorentz_force,
+    thin_wall_flux,
     wall_insulated,
 )
 from .grid import CENTER, FACE, Field, Grid
@@ -89,6 +91,7 @@ from .poisson import (
 
 __all__ = [
     "ChannelProblem",
+    "electric_state",
     "enforce_face_constraints",
     "project",
     "step",
@@ -132,6 +135,7 @@ class ChannelProblem:
     forcing: tuple[float, float, float] = (0.0, 0.0, 0.0)
     dt: float = 1.0e-3
     advection: str = "off"
+    wall_conductance: tuple[float, float, float] = (0.0, 0.0, 0.0)
 
     def __post_init__(self) -> None:
         if len(self.conditions) != 3:
@@ -143,6 +147,15 @@ class ChannelProblem:
             raise ValueError("conductivity must not be negative")
         if self.advection not in _ADVECTION:
             raise ValueError(f"advection must be one of {sorted(_ADVECTION)}, got {self.advection!r}")
+        if len(self.wall_conductance) != 3:
+            raise ValueError("a channel needs one wall conductance per axis")
+        if any(float(value) < 0.0 for value in self.wall_conductance):
+            raise ValueError("wall conductance must not be negative")
+
+    @property
+    def conducting_walls(self) -> bool:
+        """Whether any wall carries current along itself."""
+        return any(float(value) > 0.0 for value in self.wall_conductance)
 
     @property
     def scalar_conditions(self) -> tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition]:
@@ -203,6 +216,107 @@ class ChannelProblem:
         :func:`step`; the assembly reads concrete arrays and cannot be traced.
         """
         return fast_diagonal_poisson(self.grid, self.scalar_conditions)
+
+
+def electric_state(
+    velocity: tuple[Field, Field, Field],
+    problem: ChannelProblem,
+    factorization: FastDiagonalPoisson | None = None,
+    field_scale=1.0,
+) -> tuple[Field, tuple[Field, Field, Field]]:
+    """Return the induced potential and the Lorentz force it carries.
+
+    One place forms the face currents, so the projection step and the steady
+    solve cannot drift apart in how they close the wall or scale the potential.
+    ``field_scale`` multiplies the imposed field and may be traced.
+    """
+    factorization = problem.factorization() if factorization is None else factorization
+    scalar = problem.scalar_conditions
+    field = tuple(
+        _constant(problem.grid, value).replace_data(field_scale * _constant(problem.grid, value).data)
+        for value in problem.magnetic_field
+    )
+    conductivities = [
+        face_conductivity(_constant(problem.grid, problem.conductivity), axis, scalar[axis])
+        for axis in range(3)
+    ]
+    emfs = [face_electromotive_force(velocity, field, axis, scalar) for axis in range(3)]
+    motional = tuple(
+        wall_insulated(
+            conductivities[axis].replace_data(conductivities[axis].data * emfs[axis].data),
+            axis,
+            scalar[axis],
+        )
+        for axis in range(3)
+    )
+    potential = _solve_potential(divergence(motional), problem, factorization)
+    currents = tuple(
+        _closed_current(potential, conductivities[axis], emfs[axis], axis, problem) for axis in range(3)
+    )
+    return potential, lorentz_force(currents, field, scalar)
+
+
+def _closed_current(
+    potential: Field, conductivity: Field, emf: Field, axis: int, problem: ChannelProblem
+) -> Field:
+    """Ohm's law inside, and whatever the wall itself conducts on the wall faces."""
+    scalar = problem.scalar_conditions
+    ohmic = wall_insulated(face_current(potential, conductivity, emf, axis, scalar[axis]), axis, scalar[axis])
+    if not problem.conducting_walls:
+        return ohmic
+    wall = thin_wall_flux(potential, axis, scalar[axis], problem.wall_conductance[axis], scalar)
+    return ohmic.replace_data(ohmic.data + wall.data)
+
+
+def _charge_operator(potential: Field, problem: ChannelProblem) -> Field:
+    """Return the charge balance of a potential alone, with no motional term."""
+    scalar = problem.scalar_conditions
+    zero = tuple(
+        Field(
+            jnp.zeros(problem.grid.face_shape(axis), dtype=potential.dtype), _face_offset(axis), problem.grid
+        )
+        for axis in range(3)
+    )
+    conductivities = [
+        face_conductivity(_constant(problem.grid, problem.conductivity), axis, scalar[axis])
+        for axis in range(3)
+    ]
+    currents = tuple(
+        _closed_current(potential, conductivities[axis], zero[axis], axis, problem) for axis in range(3)
+    )
+    balance = divergence(currents)
+    return balance.replace_data(-balance.data)
+
+
+def _face_offset(axis: int) -> tuple[float, float, float]:
+    return tuple(FACE if position == axis else CENTER for position in range(3))
+
+
+def _solve_potential(source: Field, problem: ChannelProblem, factorization: FastDiagonalPoisson) -> Field:
+    """Solve the charge equation for the potential.
+
+    With insulating walls the operator is the scalar Laplacian and the exact
+    factorization answers in three contractions. A conducting wall adds a
+    tangential surface operator on the wall layer, which is not separable; the
+    factorization then becomes the preconditioner of a Krylov solve, and the
+    solve is wrapped in :func:`jax.lax.custom_linear_solve` so the adjoint runs
+    on the transposed operator instead of through the iteration.
+    """
+    scale = 1.0 / float(problem.conductivity) if float(problem.conductivity) else 0.0
+
+    def preconditioner(residual: Field) -> Field:
+        return factorization.solve(residual.replace_data(scale * residual.data))
+
+    if not problem.conducting_walls:
+        return preconditioner(source)
+
+    def operator(potential: Field) -> Field:
+        return _charge_operator(potential, problem)
+
+    def solve(matvec, target):
+        return solvax.gmres(matvec, target, precond=preconditioner, rtol=1.0e-12, max_restarts=20).x
+
+    return jax.lax.custom_linear_solve(operator, source, solve, solve)
 
 
 def zero_velocity(problem: ChannelProblem) -> tuple[Field, Field, Field]:
@@ -273,29 +387,7 @@ def step(
     """
     factorization = problem.factorization() if factorization is None else factorization
     scalar = problem.scalar_conditions
-    field = tuple(_constant(problem.grid, value) for value in problem.magnetic_field)
-    sigma = _constant(problem.grid, problem.conductivity)
-
-    conductivities = [face_conductivity(sigma, axis, scalar[axis]) for axis in range(3)]
-    emfs = [face_electromotive_force(velocity, field, axis, scalar) for axis in range(3)]
-    motional = tuple(
-        wall_insulated(
-            conductivities[axis].replace_data(conductivities[axis].data * emfs[axis].data),
-            axis,
-            scalar[axis],
-        )
-        for axis in range(3)
-    )
-    potential = factorization.solve(divergence(motional))
-    currents = tuple(
-        wall_insulated(
-            face_current(potential, conductivities[axis], emfs[axis], axis, scalar[axis]),
-            axis,
-            scalar[axis],
-        )
-        for axis in range(3)
-    )
-    force = lorentz_force(currents, field, scalar)
+    potential, force = electric_state(velocity, problem, factorization)
 
     velocity_conditions = tuple(velocity_condition(problem.conditions, axis) for axis in range(3))
     transport = (
