@@ -56,8 +56,8 @@ taping the linear solver.
 
 | | |
 |:---:|:---:|
-| ![Hunt duct side-layer jets from Ha 20 to 1000](docs/_static/hunt_side_layers.webp) | ![Hartmann, Shercliff and Hunt profiles against analytical solutions](docs/_static/analytic_velocity_profiles.webp) |
-| Hunt duct, Ha 20 → 1000: side-layer jets and their Ha^-1/2 thickness · `lmx run hunt --ha 1000` | Analytical validation at Ha 20 · `python examples/hartmann_example.py` |
+| ![Hunt duct side-layer jets from Ha 20 to 1000](docs/_static/hunt_side_layers.webp) | ![Hartmann layers, flow rate error and mesh convergence against a spectral reference](docs/_static/validation_ladder.webp) |
+| Hunt duct, Ha 20 → 1000: side-layer jets and their Ha^-1/2 thickness · `lmx run hunt --ha 1000` | Shercliff and Hunt against an independent spectral solve, Ha 20 → 300 · `python scripts/make_showcase_figures.py --only ladder` |
 | ![Q2D turbulence snapshots and energy spectrum](docs/_static/q2d_turbulence_poster.webp) | ![Field, wall and geometry design with gradient descent](docs/_static/blanket_design_optimization.webp) |
 | Q2D vortex merging and a k⁻³ enstrophy range · `python examples/q2d_turbulence_demo.py` | Differentiable field, wall and geometry design · `python examples/variable_field_extruded_demo.py` |
 

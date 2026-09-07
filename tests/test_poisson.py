@@ -238,3 +238,18 @@ def test_the_helmholtz_factorization_refuses_an_asymmetric_operator(monkeypatch)
     monkeypatch.setattr(poisson, "assemble_staggered_axis_operator", asymmetric)
     with pytest.raises(ValueError, match="not symmetric under its cell weights"):
         poisson.fast_diagonal_helmholtz(grid, (CENTER,) * 3, (WALL, WALL, WALL))
+
+
+def test_a_wall_resolving_mesh_still_factorizes():
+    """Eight orders of magnitude in the operator is a graded mesh, not a broken stencil."""
+    from lmx.grid import wall_resolving_faces
+    from lmx.poisson import fast_diagonal_poisson
+
+    faces = wall_resolving_faces(48, -1.0, 1.0, layer_thickness=1.0 / 300.0, cells_in_layer=6, max_ratio=1.45)
+    grid = Grid(uniform_faces(1, 0.0, 1.0), faces, faces)
+    widths = np.diff(faces)
+    assert widths.max() / widths.min() > 1.0e3
+    factorization = fast_diagonal_poisson(grid, (WRAPPED, WALL, WALL))
+    source = _random_cells(grid)
+    solved = factorization.solve(source.replace_data(source.data - jnp.mean(source.data)))
+    assert bool(jnp.all(jnp.isfinite(solved.data)))

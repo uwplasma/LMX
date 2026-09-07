@@ -6,8 +6,8 @@ and pipe models for spatially varying magnetic fields, and periodic Q2D flow
 with Hartmann-layer damping. LMX builds the physics;
 [SOLVAX](https://github.com/uwplasma/SOLVAX) supplies reusable numerical solvers.
 
-```{image} _static/analytic_velocity_profiles.webp
-:alt: Full-profile analytical validation for Hartmann, Shercliff, and Hunt ducts
+```{image} _static/validation_ladder.webp
+:alt: Hartmann-layer collapse, flow-rate error against a spectral reference, and mesh convergence
 :align: center
 ```
 
