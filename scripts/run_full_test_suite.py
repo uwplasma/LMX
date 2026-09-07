@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Run all or selected LMX tests in parallel within a declared budget."""
+"""Run all or selected LMX tests in parallel within a declared budget.
+
+A tier selects evidence markers and a shard selects files; combining them runs
+one evidence tier over one file group, which keeps each pull-request job inside
+the plan's wall-clock target without dropping any test from the matrix.
+"""
 
 from __future__ import annotations
 
@@ -178,8 +183,6 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--coverage-fail-under must be between 0 and 100")
     if args.shard and args.tests:
         parser.error("--shard cannot be combined with explicit test paths")
-    if args.tier and args.shard:
-        parser.error("--tier cannot be combined with --shard")
     if args.changed_from and (args.shard or args.tests):
         parser.error("--changed-from cannot be combined with --shard or explicit test paths")
 

@@ -162,7 +162,7 @@ jobs:
           python -m coverage xml -o coverage.xml
 
   pr-tests:
-    name: PR ${{ matrix.tier }}
+    name: PR ${{ matrix.tier }}${{ matrix.shard && format(' ({0})', matrix.shard) || '' }}
     needs: scope
     if: github.event_name == 'pull_request' && needs.scope.outputs.full == 'true'
     runs-on: ubuntu-latest
@@ -170,19 +170,33 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        tier: [unit, regression]
+        include:
+          - tier: unit
+            shard: ""
+            budget: 300
+          - tier: regression
+            shard: fringing
+            budget: 420
+          - tier: regression
+            shard: physics
+            budget: 420
+          - tier: regression
+            shard: support
+            budget: 300
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-lmx
         with:
           python-version: "3.10"
           solvax-version: "0.19.0"
-          cache-suffix: pr-${{ matrix.tier }}
+          cache-suffix: pr-${{ matrix.tier }}${{ matrix.shard }}
       - name: Run uncovered evidence tier
         env:
           TIER: ${{ matrix.tier }}
+          SHARD: ${{ matrix.shard }}
+          BUDGET: ${{ matrix.budget }}
         run: |
-          budget=420
-          if [[ "$TIER" == unit ]]; then budget=240; fi
-          python scripts/run_full_test_suite.py --tier "$TIER" --no-coverage \
-            --budget-seconds "$budget" --test-timeout-seconds 120
+          shard=()
+          if [[ -n "$SHARD" ]]; then shard=(--shard "$SHARD"); fi
+          python scripts/run_full_test_suite.py --tier "$TIER" "${shard[@]}" --no-coverage \
+            --budget-seconds "$BUDGET" --test-timeout-seconds 300
