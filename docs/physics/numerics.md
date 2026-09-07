@@ -251,6 +251,41 @@ coupling. The momentum discretization and the time loop follow in their own plan
 steps, and the existing fully developed and extruded solvers continue to use
 `lmx.mesh` until those land.
 
+## The projection step and its two stiffnesses
+
+`lmx.core3d` assembles one fractional step: the potential is solved, the face
+currents of `lmx.em` give the Lorentz force, momentum advances, and a pressure
+Poisson solve returns the velocity to the discretely divergence-free space.
+
+The two stiffnesses are handled differently, on purpose. The velocity part of the
+Lorentz force is a damping of rate $\sigma B^2/\rho$, which would force
+$\Delta t\propto Ha^{-2}$ if left explicit. It is applied implicitly as a
+correction to the conservative face force,
+
+$$
+\mathbf u^{*}=\mathbf u+\frac{\Delta t\,\mathbf r}{1+\Delta t\,\lambda},
+$$
+
+so the correction vanishes with the right-hand side and changes the path to a
+steady state but not the steady state itself. Viscosity is left explicit and its
+limit is reported by `ChannelProblem.diffusive_step_limit` rather than enforced,
+so a caller sweeping a parameter sees the constraint instead of a silently
+clipped step. The magnetic stiffness grows as $Ha^2$ and must go; the viscous one
+depends only on the mesh and can stay until an implicit viscous solve lands.
+
+Two constraints are imposed before any divergence is taken: a wall-normal
+velocity is zero on its wall faces, and on a periodic axis the duplicated first
+and last face are made equal. Without either the discrete divergence carries a
+net boundary flux, and with every axis periodic or Neumann the pressure cannot
+remove that constant, so the projection would return a field that is still not
+divergence free.
+
+Steady Stokes flow between plates has the exact profile $f(1-y^2)/(2\nu)$. The
+step reproduces it and **converges at second order**, measured as 2.01 and 2.04
+over 8, 16 and 32 cells across the channel. Convective transport is omitted;
+that is the Stokes limit, appropriate at blanket interaction parameters and
+stated rather than implied.
+
 ## LMX and SOLVAX
 
 LMX owns:
