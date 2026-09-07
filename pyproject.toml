@@ -75,6 +75,8 @@ filterwarnings = ["error"]
 markers = [
   "curated: executes the complete curated user workflows",
   "unit: isolated functionality; not a runtime classification",
+  "slow: complete workflows scheduled outside pull requests",
+  "gpu: requires an actual accelerator",
   "numerical: discretization, solver, conservation, and convergence checks",
   "regression: deterministic golden-profile and serialized-output checks",
   "physics: physics-level invariants for the current solver implementation",
@@ -83,7 +85,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["lmx"]
+source = ["src/lmx"]
 branch = true
 
 [tool.coverage.report]
