@@ -57,6 +57,7 @@ _CHANGE_TEST_NAMES = {
     "bc": "ops",
     "grid": "grid",
     "ops": "ops",
+    "poisson": "poisson",
     "io": "io cli fringing freemhd example_runner",
     "mesh": "mesh solver physics fringing benchmarks",
     "physics": "solver physics fringing",

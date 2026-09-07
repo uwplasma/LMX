@@ -199,10 +199,29 @@ two-point gradient is centred between cell centres rather than on the face, so
 its truncation error is first order in the spacing change; solution order there
 is a manufactured-solution question and is verified in the step that owns it.
 
-These modules supply geometry and operators only. The momentum discretization,
-the electric coupling and the time loop follow in their own plan steps, and the
-existing fully developed and extruded solvers continue to use `lmx.mesh` until
-those land.
+`lmx.poisson` inverts that Laplacian directly. On a tensor-product grid the
+operator is the Kronecker sum of three one-dimensional operators, each symmetric
+once the cell widths are folded in, so diagonalizing them on the host reduces a
+solve to three tensor contractions and one elementwise divide. The one-dimensional
+operators are read out of `lmx.ops` by applying the assembled Laplacian to unit
+vectors, so the factorization cannot drift away from the stencil the rest of the
+code uses.
+
+The consequences matter for this code in particular: the cost does not grow with
+the Hartmann number the way an iteration count does, the answer is exact to
+round-off instead of to a tolerance, and the solve is a linear map, so it
+differentiates without taping any iteration. A pure Neumann or fully periodic
+problem is singular; the constant is removed from the right-hand side and the
+returned field has zero volume-weighted mean. Inhomogeneous boundary data is
+affine rather than linear and belongs in the right-hand side, so a condition
+carrying a value is refused instead of silently linearized. A guard rejects any
+axis operator that is not symmetric under the cell widths, which is the tripwire
+that a future three-point wall stencil would trip.
+
+These modules supply geometry, operators and the scalar solve only. The momentum
+discretization, the electric coupling and the time loop follow in their own plan
+steps, and the existing fully developed and extruded solvers continue to use
+`lmx.mesh` until those land.
 
 ## LMX and SOLVAX
 
