@@ -1064,6 +1064,15 @@ def test_limited_linear_vector_convection_matches_manufactured_conservation_and_
     )[1]
     assert compiled == pytest.approx(action, abs=2.0e-5)
     assert tangent == pytest.approx(2.0 * action, abs=3.0e-5)
+    cotangent = jnp.cos(jnp.arange(action.size).reshape(action.shape))
+
+    def objective(scale):
+        return jnp.vdot(cotangent, convection(scale)[0])
+
+    reverse = jax.jit(jax.grad(objective))(1.0)
+    assert jnp.isfinite(reverse)
+    np.testing.assert_allclose(reverse, jnp.vdot(cotangent, tangent), rtol=1e-10, atol=1e-12)
+    np.testing.assert_allclose(reverse, (objective(1.00001) - objective(0.99999)) / 2e-5, rtol=1e-8)
 
 
 def test_explicit_deviatoric_stress_matches_independent_finite_volume_oracle():
@@ -1372,6 +1381,13 @@ def test_b2_stokes_residual_has_consistent_resting_jacobian():
     np.testing.assert_allclose(matrix[: 3 * size, 3 * size :], -matrix[3 * size :, : 3 * size].T, atol=1e-12)
     direction = jnp.sin(jnp.arange(4 * size) + 0.2)
     tangent = matrix @ direction
+    cotangent = jnp.cos(jnp.arange(4 * size) + 0.3)
+    reverse = jax.vjp(residual, state)[1](cotangent)[0]
+    compiled = jax.jit(jax.grad(lambda value: jnp.vdot(cotangent, residual(value))))(state)
+    for actual in (reverse, compiled):
+        assert jnp.isfinite(actual).all()
+        np.testing.assert_allclose(actual, matrix.T @ cotangent, rtol=1e-10, atol=1e-12)
+        np.testing.assert_allclose(jnp.vdot(actual, direction), jnp.vdot(cotangent, tangent), atol=1e-12)
     for step in (1e-3, 1e-5, 1e-7):
         difference = (residual(state + step * direction) - residual(state - step * direction)) / (2 * step)
         np.testing.assert_allclose(difference, tangent, rtol=1e-10, atol=1e-12)
