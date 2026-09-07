@@ -88,6 +88,13 @@ class SolverConfig:
     coupling_history_depth: int = 6
     coupling_regularization: float = 1.0e-8
     coupling_damping: float = 1.0
+    extruded_formulation: Literal["stokes_projection", "b1_finite_volume", "b2_finite_volume"] = (
+        "stokes_projection"
+    )
+
+    def __post_init__(self):
+        if self.extruded_formulation not in {"stokes_projection", "b1_finite_volume", "b2_finite_volume"}:
+            raise ValueError(f"Unsupported extruded formulation {self.extruded_formulation!r}")
 
 
 @dataclass(frozen=True)
@@ -617,6 +624,7 @@ def load_run_config(path: str | Path) -> RunConfig:
         raise ValueError(f"Unsupported solver kind {solver_kind!r}")
     solver = SolverConfig(
         kind=solver_kind,
+        extruded_formulation=str(solver_table.get("extruded_formulation", "stokes_projection")),
         mode=solver_mode,
         preconditioner=str(solver_table.get("preconditioner", "jacobi")),
         time_scheme=str(solver_table.get("time_scheme", "implicit_euler")),

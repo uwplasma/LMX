@@ -81,21 +81,18 @@ def _solve_extruded_projection(
     case = problem.case
     with jax.ensure_compile_time_eval():
         mesh = _cross_section_mesh(case)
-    use_alex_b2_finite_volume = (
-        case.name.startswith("alex_b2-fringing-square_") and case.geometry.kind == "layered_duct"
+    formulation = case.solver.extruded_formulation
+    use_alex_b2_finite_volume = formulation == "b2_finite_volume"
+    use_alex_b1_finite_volume = formulation == "b1_finite_volume"
+    required_geometry = {"b1_finite_volume": "pipe_ogrid", "b2_finite_volume": "layered_duct"}.get(
+        formulation
     )
-    use_alex_b1_finite_volume = (
-        case.name.startswith("alex_b1-fringing-pipe_") and case.geometry.kind == "pipe_ogrid"
-    )
+    if required_geometry is not None and case.geometry.kind != required_geometry:
+        raise ValueError(f"{formulation} requires {required_geometry} geometry")
     if design_parameters is not None and (
         case.geometry.kind not in {"rect_duct", "layered_duct", "pipe_ogrid"} or use_alex_b2_finite_volume
     ):
         raise NotImplementedError("differentiable extruded fields do not yet support ALEX B2")
-    if case.name.startswith("alex_") and not (use_alex_b1_finite_volume or use_alex_b2_finite_volume):
-        raise NotImplementedError(
-            "Unsupported ALEX production case; only the frozen B1 pipe and B2 square "
-            "finite-volume paths are implemented"
-        )
     if num_devices is not None and num_devices > 1 and use_alex_b1_finite_volume:
         raise NotImplementedError("Production spatial sharding does not yet support ALEX B1")
     if (
@@ -174,7 +171,7 @@ def _solve_pipe_projection(
             bx, by, bz = _sample_station_magnetic_field(
                 case,
                 field_scale=field_scale,
-                x=problem.profile.x,
+                x=base_x,
                 y=base_rr[0] * jnp.cos(static_theta_grid[0]),
                 z=base_rr[0] * jnp.sin(static_theta_grid[0]),
                 volume_field=problem.profile.volume_field,
@@ -1604,7 +1601,7 @@ def evolve_extruded_fields(
     """Return differentiable 3-D duct or straight-pipe production fields.
 
     Returns velocity, pressure, potential, current, and Lorentz-force fields.
-    Pressure forcing, imposed-field scale, and material conductivity are
+    Axial force density, imposed-field scale, and material conductivity are
     continuous. Field scale may contain one coefficient per axial station;
     conductivity scale may be scalar or ``(fluid, solid)``. Geometry scale may
     be scalar, ``(axial, transverse_y, transverse_z)`` for a duct, or
@@ -1644,18 +1641,23 @@ def extruded_engineering_objectives(
     problem: ExtrudedInductionlessProblem,
     fields: tuple[jnp.ndarray, ...],
     *,
+    forcing: float | jnp.ndarray | None = None,
     geometry_scale: float | jnp.ndarray = 1.0,
     smoothing: float = 1.0e-8,
 ) -> dict[str, jnp.ndarray]:
     """Reduce differentiable 3-D fields to scalar design objectives.
 
     Values retain the units of ``problem``. Pass the same fixed-topology
-    ``geometry_scale`` used to evolve the fields. Lower is better except for
-    flow rate; wall current is a cell-centered design proxy, not a validation
+    ``geometry_scale`` used to evolve the fields. Wall current is a
+    cell-centered design proxy, not a validation
     flux. ``pressure_tap_flux_power`` integrates inlet-minus-outlet ``p*u``
     on the first/last cell-center planes. ``pumping_power`` is only mean
     pressure drop times outlet flow. Neither includes body-drive work or
     certifies total pump power. Unequal tap flows make the flux gauge dependent.
+    ``tap_body_drive_power`` and ``tap_kinetic_energy`` use trapezoidal axial
+    quadrature over the same tap-to-tap slab, excluding the outer half cells.
+    Pass the scalar force density used by evolution; ``None`` uses the case
+    forcing. Constraint work and dissipation are not included.
     """
     geometry_kind = problem.case.geometry.kind
     if geometry_kind not in {"rect_duct", "layered_duct", "pipe_ogrid"}:
@@ -1664,28 +1666,36 @@ def extruded_engineering_objectives(
         raise ValueError("fields must contain velocity, pressure, potential, and current")
     if smoothing <= 0.0:
         raise ValueError("smoothing must be positive")
-    u, _, _, pressure, _, jx, jy, jz = fields[:8]
+    u, v, w, pressure, _, jx, jy, jz = fields[:8]
+    drive = jnp.asarray(problem.case.forcing if forcing is None else forcing)
+    if drive.ndim:
+        raise ValueError("engineering work requires a scalar axial force density")
     with jax.ensure_compile_time_eval():
         mesh = _cross_section_mesh(problem.case)
-        fluid = np.asarray(build_material_fields(problem.case, mesh).fluid_mask)
+        materials = build_material_fields(problem.case, mesh)
+        fluid = np.asarray(materials.fluid_mask)
         area = (
             np.asarray(mesh.y_centers)[:, None] * np.asarray(mesh.dy)[:, None] * float(np.mean(mesh.dz))
             if geometry_kind == "pipe_ogrid"
             else np.asarray(mesh.dy)[:, None] * np.asarray(mesh.dz)[None, :]
         )
     expected_shape = (len(mesh.x_centers), *mesh.yz_shape)
-    if any(value.shape != expected_shape for value in (u, pressure, jx, jy, jz)):
+    if any(value.shape != expected_shape for value in (u, v, w, pressure, jx, jy, jz)):
         raise ValueError(f"field arrays must share the problem shape {expected_shape}")
     if geometry_kind == "pipe_ogrid":
         scale = jnp.asarray(geometry_scale)
         if scale.ndim and scale.shape != (2,):
             raise ValueError("pipe geometry_scale must be scalar or (axial, radial)")
         radial_scale = scale if scale.ndim == 0 else scale[1]
+        axial_scale = scale if scale.ndim == 0 else scale[0]
         area_scale = radial_scale**2
     else:
-        _, transverse_y_scale, transverse_z_scale = _coordinate_scale(geometry_scale)
+        axial_scale, transverse_y_scale, transverse_z_scale = _coordinate_scale(geometry_scale)
         area_scale = transverse_y_scale * transverse_z_scale
     weights = area_scale * jnp.asarray(fluid * area)
+    # Integrate adjacent tap samples; a single station encloses zero volume.
+    slab_weights = axial_scale * jnp.diff(jnp.asarray(mesh.x_centers))[:, None, None] * weights
+    kinetic_density = 0.5 * jnp.asarray(materials.density) * (u**2 + v**2 + w**2)
     area_sum = jnp.sum(weights)
     flow = jnp.sum(weights * u, axis=(1, 2))
     mean_u = flow / area_sum
@@ -1714,6 +1724,8 @@ def extruded_engineering_objectives(
         "flow_rate": flow[-1],
         "pumping_power": pressure_drop * flow[-1],
         "pressure_tap_flux_power": jnp.sum(weights * (pressure[0] * u[0] - pressure[-1] * u[-1])),
+        "tap_body_drive_power": drive * jnp.sum(slab_weights * (u[:-1] + u[1:]) / 2),
+        "tap_kinetic_energy": jnp.sum(slab_weights * (kinetic_density[:-1] + kinetic_density[1:]) / 2),
         "flow_nonuniformity": flow_nonuniformity,
         "wall_current_density_rms": wall_current_rms,
         "recirculation_fraction": recirculation_fraction,

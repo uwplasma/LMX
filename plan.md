@@ -86,7 +86,7 @@ metric. No history rewrite is currently necessary.
 | F4 | Generic layered momentum uses uniform spacing while electric closure uses actual widths; pipe diffusion applies scalar cylindrical Laplacians componentwise | Audit nonuniform and vector-metric/cross terms using continuous manufactured solutions |
 | F5 | Traced generic evolution freezes imposed-field samples; geometry scaling does not resample live global fields | Differentiate field location, basis, geometry and coil/equilibrium parameters together |
 | F6 | Tabulation converts through NumPy, silently extrapolates and reconstructs uniform axial stations | Traceable in-domain SI field protocol; use actual mesh coordinates |
-| F7 | Generic recurrence clips velocity and adjusts stationwise flow | Audit physical consistency, energy and differentiability; never hide residual failure |
+| F7 | Generic recurrence clips velocity, adjusts stationwise flow, and uses a compact Poisson stencil inconsistent with its centered divergence/gradient composition | Audit physical consistency and energy; require one compatible coupled residual |
 | F8 | No accepted terminal B2 steady primal/adjoint | Certify the physical residual, not a small iteration update |
 | F9 | Q2D energy defect is reported, not the advertised terminal gate; mixed weak/strong dtypes can break checkpointed evolution | Explicit completion/acceptance and dtype policies, with workflow tests |
 | F10 | Specialized B1 sharding is unsupported; Q2D has no dedicated spatial-shard path; generic two-GPU runs slow down | Close documented restrictions and measure useful scaling |
@@ -642,54 +642,69 @@ method/data before freezing its benchmark.
 
 ### Resume checkpoint
 
-- Roadmap merged as [PR #54](https://github.com/uwplasma/LMX/pull/54),
-  commit `83cfe56`; its hosted checks passed. Billing is not blocking new runs.
-- #56 merged as `1b6cfc8`; hosted run `33969565351` passes all three shards
-  and ≥95% combined coverage, docs/architecture; FreeMHD passes in 5m28s.
-- Active branch `codex/q2d-energy-acceptance`, based on `1b6cfc8`: finite,
-  positive configurable energy tolerance (default 1e-3), Courant precedence,
-  finite diagnostics, and a scale-aware zero-energy floor. No IFRK4/AD change.
-  Eight Q2D cases pass in 36.65 s with 100% module line/branch coverage;
-  analytic budget/refinement, small-amplitude float32, exact threshold and
-  unchanged rejected fields tested. Clean docs/Ruff/architecture pass.
-  User example completes with 41 frames/movie and energy defect 4.94767e-6.
-  Test allowance 12,035→12,085 covers 49 scientific test lines; no new files.
-- F2 body-work/storage tranche is saved on `codex/tap-control-volume-work`.
-  Rebase its two commits after #56 `10ab3a8` onto main, then open its PR.
-  30 affected tests pass in 31.8 s, including three geometries and exact
-  work/storage/geometry derivatives; docs and usage snippet pass. It integrates
-  the tap-center slab, not the whole domain, and does not certify energy closure.
-- User approved this roadmap on 2026-09-04 and requested it be pushed.
-- [PR #55](https://github.com/uwplasma/LMX/pull/55) merged as `c226c3b` after
-  all gates passed at `4d34431`: real-dtype promotion, analytic field/AD tests,
-  B2 single-device guard, CI grouping/flag ordering and timeout robustness.
-  Hosted run `33947048844` passes the combined ≥95% coverage gate; support
-  6m18s, fringing 5m05s, physics 4m34s; docs/architecture and pinned FreeMHD
-  (4m53s, run `33947048854`) pass. These are job durations, not solver speedups.
-- Qualification found SOLVAX 0.17 cannot collect the existing Schur tests.
-  Package minimum and CI pins now agree on 0.19. Full local qualification on
-  that version passed. Initial 0.17 results are failed evidence, not coverage.
-- Next physical work: complete F2 with a consistent control volume for actual
-  drive work, storage, viscous/Joule/electrical flux terms and geometry AD.
-  Pass the forcing actually used by evolution; do not double count prescribed
-  pressure forcing. The tap-flux metric alone does not close F2 or certify the
-  generic recurrence's energy balance. Q2D acceptance is implemented pending
-  hosted qualification, not a replacement for M1–M9.
-- Current local evidence: 507 tests / 95.22%, 259.9 s end-to-end; Q2D 100%.
-  Python 3.11.14 / JAX 0.10.2 / SOLVAX 0.19.0. Ruff, architecture/import,
-  standalone Q2D snippet, Sphinx, isolated build and Twine passed. Reproduce:
-  `.venv/bin/python scripts/run_full_test_suite.py --coverage-xml artifacts/q2d-precision-coverage.xml --junit-xml artifacts/q2d-precision-junit.xml`.
-  [Qualification record](https://github.com/uwplasma/LMX/pull/55#issuecomment-5549401799).
-- CI collection covers 508 cases exactly once (335 support, 49 fringing,
-  124 physics). The 540 s shard budget and physical assertions remain intact.
-  The example's 60 s subprocess limit failed twice; its 120 s limit qualified
-  successfully. Cold local example: 35.1 s. Earlier failed runs are preserved
-  in #55, not waived. M4 still owes controlled performance/CI optimization.
-- Raw profiles are local ignored artifacts, not available from a fresh clone.
-  All headline results and limitations are recorded in sections 2–3.
-- Before resuming: fetch origin, inspect branch/PR status and working-tree
-  changes, then read this checkpoint. Preserve unrelated edits. Record each
-  completed tranche and push its checkpoint; never rely on chat history alone.
+- Main is #57 merge `d18fefc`; #54–#57 passed all applicable exact-head gates.
+  Q2D acceptance is explicit, pressure-tap flux work is available; F2 remains open.
+- Integration PR #63 contains #58 `ede81ec`, #59 `a3ddfad`, #60 `75b0ef4`,
+  #61 `f25ec90`, and #62 `d53da86`, all preserved as ancestor commits.
+  Target main directly; require exact-head full hosted coverage/docs/FreeMHD.
+  After #63 merges, close superseded #58–#62 with its merge link. This avoids
+  serial rebase/qualification of the same combined tree; keep them open until then.
+  Jobs have been queued for runners; some scope/impact jobs now progress.
+  Never restart solely for queue delay or waive gates using prior-head results.
+- #58: body-drive work and stored kinetic energy use the tap-center slab;
+  three geometries and force/velocity/geometry derivatives tested. Original
+  head passed numerical shards and FreeMHD; rebased head must qualify.
+- #59: independent 18-cell pressure oracle verifies weighted symmetry,
+  positive energy, rank 17 Neumann / 18 mixed and AD. Signed B2 momentum
+  residual supplies diagnostic norms. Unlimited Newtonian velocity gradients
+  fix a 7.8858% resting Jacobian mismatch; advective gradients stay limited.
+  Resting 108-unknown uniform Stokes rank/adjoint/FD checks pass, not full B2.
+- #60: shared distance-weighted face interpolation fixes affine consistency;
+  23 fewer package lines, no files added; geometry JVP and B2 restart pass.
+  Nonuniform energy compatibility is separate and remains open.
+- #61: explicit SolverConfig/TOML formulation replaces name-based dispatch;
+  renamed production B1/B2 cases pass and restart identity is checked.
+  Full combined-stack local gate: 520 passed / 95.24% / 144.4 s; docs pass.
+  Reproduce: `scripts/run_full_test_suite.py --coverage-xml artifacts/explicit-formulation-coverage.xml --junit-xml artifacts/explicit-formulation-junit.xml`.
+- #62 `codex/bounded-field-tables` is based on #61; formatting also checked.
+  F6: honor supplied axial coordinates, reject extrapolation/nonfinite queries,
+  validate table axes/components, load once, interpolate vector components
+  together. Five distinct affected tests pass; fringing/table group 16.55 s.
+  Both wall/field tutorial snippets execute; clean Sphinx/Ruff/audit pass.
+  Pipe caller now supplies mesh cell centres rather than profile stations;
+  shifted-origin sampling and production/AD parity tests pass (47.72 s).
+  No new files; test allowance 12,330 covers these additional checks.
+  Warm local float64 interpolation (17³ table, 25³ queries, 10 samples):
+  separate component calls 24.57 ms median vs vector call 7.63 ms, matching
+  outputs at 1e-13. Excludes I/O/compilation; not a solver speedup claim.
+  Host-side table sampling is not live coil/geometry AD; M5 remains open.
+- Active `codex/ci-superseded-work` is based on #62 `d53da86`.
+  Add per-PR cancellation to docs/FreeMHD, keeping workflows independent and
+  non-PR runs distinct. Workflow/action changes trigger numerical qualification;
+  docs/FreeMHD selectors cover their own setup and physical-input dependencies.
+  Eleven real-Git-diff cases exercise all three workflow selectors (33 shell
+  executions) in 1.24 s, including Q2D/external exclusions and B2 markers.
+  No new files; test allowance 12,400 matches the combined inventory.
+  YAML parses for all changed workflows. One inventory comparison failed while
+  docs/log were being edited; stable-tree rerun passed all 35 config tests (5.73 s).
+  Six obsolete docs/FreeMHD runs on #59/#61/#62 were confirmed cancelled;
+  current-head and main runs were preserved. No numerical gates relaxed.
+  Full combined local qualification: 532 passed, 95.28% coverage, 129.7 s.
+  Reproduce: `scripts/run_full_test_suite.py --coverage-xml artifacts/ci-stack-coverage.xml --junit-xml artifacts/ci-stack-junit.xml`.
+  #59 numerical shards and FreeMHD passed; integration #63 still needs its gates.
+- Next M1: nonuniform pressure/continuity compatibility, advection limiter
+  transitions and electromagnetic closure before a production B2 campaign.
+  Uniform checkerboard diagnostic: interior |DG|=0 vs compact |L|=4.
+  Pre-#60 nonuniform resting test (dy=dz=[0.4,0.8,1.3], dx=1):
+  weighted pressure/continuity defect 0.3714285714 despite full rank/FD parity.
+  Affine consistency alone does not close that energy identity.
+- F2 still needs consistent viscous/Joule/electrical flux and storage-rate
+  balance. M1–M9 remain open; no accepted B2 steady primal/adjoint is claimed.
+  SOLVAX minimum/CI pins 0.19; no algorithm changes in these LMX tranches.
+  Python 3.11.14 / JAX 0.10.2 locally. CI shard budget stays 540 s.
+- Raw profiles remain local ignored artifacts; public packaging remains open.
+  Resume by fetching origin, inspecting PR/working-tree state, preserving
+  unrelated edits, and recording/pushing evidence and next steps here.
 
 Keep at most ten substantive entries. Older evidence becomes immutable
 commit/PR/artifact links, not another tracked log. Each entry records work,
