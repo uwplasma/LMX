@@ -218,8 +218,36 @@ carrying a value is refused instead of silently linearized. A guard rejects any
 axis operator that is not symmetric under the cell widths, which is the tripwire
 that a future three-point wall stencil would trip.
 
-These modules supply geometry, operators and the scalar solve only. The momentum
-discretization, the electric coupling and the time loop follow in their own plan
+`lmx.em` builds the electric coupling on those operators, following Ni et al.
+Its rule is that one face-normal current
+
+$$
+J_{n,f}=\sigma_f\left[-\frac{\phi_N-\phi_P}{d_{PN}}
++(\mathbf u_f\times\mathbf B_f)\cdot\mathbf n_f\right]
+$$
+
+is the single source of truth: the potential equation is the divergence of
+exactly that flux and the Lorentz force is rebuilt from the same numbers. The
+reason is quantitative. In the core the momentum balance is
+$-\nabla p+\mathbf J\times\mathbf B=0$ to $O(Ha^{-2})$, so an $O(\Delta)$
+inconsistency between the two parts of $\mathbf J$ is amplified by $Ha^2$ and
+appears as a spurious core current.
+
+The force uses Ni's face form,
+
+$$
+(\mathbf J\times\mathbf B)_c=\frac{1}{\Omega_c}\sum_f J_{n,f}\,s_f\,
+(\mathbf r_f-\mathbf r_c)\times\mathbf B_f,
+$$
+
+which never forms a cell-centred current vector and samples the magnetic field on
+the faces, so it remains correct where the field varies along the duct. Face
+conductivity is the distance-weighted harmonic mean, the series resistance of the
+two half-cells and therefore the right average across a fluid-wall jump; the
+arithmetic mean would let a poorly conducting wall draw too much current.
+
+These modules supply geometry, operators, the scalar solve and the electric
+coupling. The momentum discretization and the time loop follow in their own plan
 steps, and the existing fully developed and extruded solvers continue to use
 `lmx.mesh` until those land.
 

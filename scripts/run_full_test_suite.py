@@ -39,6 +39,7 @@ _TEST_SHARDS = {
         "tests/test_grid.py",
         "tests/test_ops.py",
         "tests/test_poisson.py",
+        "tests/test_em.py",
     ),
     "fringing": ("tests/test_fringing.py",),
     "physics": (
@@ -58,6 +59,7 @@ _CHANGE_TEST_NAMES = {
     "bc": "ops",
     "grid": "grid",
     "ops": "ops",
+    "em": "em",
     "poisson": "poisson",
     "io": "io cli fringing freemhd example_runner",
     "mesh": "mesh solver physics fringing benchmarks",
