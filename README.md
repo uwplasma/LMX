@@ -10,9 +10,9 @@
 LMX solves the flow of liquid metals in strong magnetic fields, the physics of
 fusion blanket channels: Hartmann, Shercliff and Hunt ducts with conducting
 walls, three-dimensional ducts and pipes in spatially varying fields, and
-quasi-two-dimensional vortex dynamics. Every solve runs on CPU or GPU and is
-differentiable, so pressure drop, wall currents and flow profiles can be
-optimised with exact gradients. Reusable solvers and implicit derivatives come
+quasi-two-dimensional vortex dynamics. Fully developed, Q2D and generic 3-D
+field APIs support autodiff on CPU or GPU for pressure, wall-current and flow
+objectives. Model and validation limits are listed below. Reusable solvers and implicit derivatives come
 from [SOLVAX](https://github.com/uwplasma/SOLVAX).
 
 <p align="center">
@@ -23,7 +23,9 @@ from [SOLVAX](https://github.com/uwplasma/SOLVAX).
 ## Install
 
 ```console
-pip install "git+https://github.com/uwplasma/LMX.git#egg=lmx[visualization]"
+git clone https://github.com/uwplasma/LMX.git
+cd LMX
+pip install ".[visualization]"
 lmx examples/hartmann_case.toml
 ```
 
@@ -80,8 +82,8 @@ parameters and evidence status are in [`examples/catalog.toml`](examples/catalog
 - **Validated:** Hartmann, Shercliff and Hunt ducts against analytical profiles
   with conservation and mesh-refinement checks; implicit adjoints against
   finite differences; Q2D decay identities and energy budgets.
-- **Research stage:** the 3-D duct and pipe models (no convective transport
-  yet, short bounded transients), the ALEX B1/B2 fringing-field benchmarks
+- **Research stage:** generic 3-D ducts and pipes (no convective transport,
+  bounded evolution), the separate ALEX B1/B2 fringing-field benchmarks
   (FreeMHD smoke comparison passes; production acceptance open), and
   multi-device execution (correct, not yet faster). The
   [validation matrix](https://lmx.readthedocs.io/en/latest/validation/index.html)
