@@ -44,6 +44,7 @@ __all__ = [
     "face_inner_product",
     "face_interpolate",
     "laplacian",
+    "staggered_laplacian",
 ]
 
 
@@ -171,3 +172,78 @@ def _broadcast(values: np.ndarray, axis: int, dtype) -> jnp.ndarray:
 
 def _as_array(values: np.ndarray, dtype) -> jnp.ndarray:
     return jnp.asarray(values, dtype=dtype)
+
+
+def staggered_laplacian(
+    field: Field, conditions: tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition]
+) -> Field:
+    """Return the Laplacian of a field at any staggered position.
+
+    A velocity component in the marker-and-cell layout is cell-centred along two
+    axes and face-centred along the third, so its Laplacian needs both stencils.
+    Along a cell-centred axis the wall condition supplies a ghost value and the
+    scalar path applies unchanged. Along a face-centred axis the field already
+    sits on the wall, so no ghost exists and none is invented: the value is
+    differenced to the cell centres with the cell widths and back to the faces
+    with the centre-to-centre distances.
+
+    On a face-centred axis with a wall the two boundary faces are returned as
+    zero. Their value is prescribed by the boundary condition, not evolved, and
+    returning zero keeps a caller that updates them from silently using a
+    one-sided stencil that does not exist. A periodic axis wraps and has no such
+    face.
+    """
+    if len(conditions) != 3:
+        raise ValueError("a staggered Laplacian needs one boundary condition per axis")
+    grid = field.grid
+    if field.shape != grid.offset_shape(field.offset):
+        raise ValueError(f"field shape {field.shape} does not match its offset {field.offset}")
+    total = None
+    for axis, condition in enumerate(conditions):
+        if field.offset[axis] == CENTER:
+            contribution = _centred_axis_laplacian(field, axis, condition)
+        else:
+            contribution = _face_axis_laplacian(field, axis, condition)
+        total = contribution if total is None else total + contribution
+    return field.replace_data(total)
+
+
+def _centred_axis_laplacian(field: Field, axis: int, condition: BoundaryCondition) -> jnp.ndarray:
+    """Second difference along an axis on which the field is cell centred."""
+    grid = field.grid
+    padded = pad(field.data, axis, condition, grid=grid)
+    distances = face_distances(grid, axis, condition)
+    gradient = (_take(padded, axis, slice(1, None)) - _take(padded, axis, slice(None, -1))) / _broadcast(
+        distances, axis, field.dtype
+    )
+    widths = np.asarray(grid.widths[axis])
+    difference = _take(gradient, axis, slice(1, None)) - _take(gradient, axis, slice(None, -1))
+    return difference / _broadcast(widths, axis, field.dtype)
+
+
+def _face_axis_laplacian(field: Field, axis: int, condition: BoundaryCondition) -> jnp.ndarray:
+    """Second difference along an axis on which the field sits on the faces."""
+    grid = field.grid
+    widths = np.asarray(grid.widths[axis])
+    data = field.data
+    if condition.is_periodic:
+        # The first and last faces coincide; drop the duplicate before wrapping.
+        interior = _take(data, axis, slice(None, -1))
+        gradient = (_roll(interior, axis, -1) - interior) / _broadcast(widths, axis, field.dtype)
+        distances = 0.5 * (widths + np.roll(widths, 1))
+        difference = gradient - _roll(gradient, axis, 1)
+        result = difference / _broadcast(distances, axis, field.dtype)
+        return jnp.concatenate((result, _take(result, axis, slice(None, 1))), axis=axis)
+    gradient = (_take(data, axis, slice(1, None)) - _take(data, axis, slice(None, -1))) / _broadcast(
+        widths, axis, field.dtype
+    )
+    distances = 0.5 * (widths[:-1] + widths[1:])
+    inner = (_take(gradient, axis, slice(1, None)) - _take(gradient, axis, slice(None, -1))) / _broadcast(
+        distances, axis, field.dtype
+    )
+    zeros = jnp.zeros_like(_take(data, axis, slice(None, 1)))
+    return jnp.concatenate((zeros, inner, zeros), axis=axis)
+
+
+def _roll(data: jnp.ndarray, axis: int, shift: int) -> jnp.ndarray:
+    return jnp.roll(data, shift, axis=axis)
