@@ -23,6 +23,13 @@ problem = build_square_duct_extruded_problem(
 result = lmx.solve(problem)
 ```
 
+`problem.case.time_stepper.max_steps` is the maximum number of additional
+outer updates, also after a restart. A primal solve can stop on convergence;
+`evolve_extruded_fields` instead executes exactly this count unless `steps=`
+overrides it. `solver.coupling_iterations` does not cap either count. Set an
+explicit small `max_steps` for a smoke run and inspect `result.status`;
+reaching the step limit is not evidence of a steady solution.
+
 The returned fields contain velocity, pressure, potential, current, Lorentz
 force, face fluxes, station coordinates, and the imposed field. Always inspect
 termination and conservation together:

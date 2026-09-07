@@ -12,6 +12,9 @@ lmx benchmark [OPTIONS]
 `run` accepts `hartmann`, `shercliff`, `hunt`, `fringing_rect`,
 `fringing_layered`, and `fringing_pipe`. Use `lmx run --help` for geometry,
 field-transition, resolution, output, and logging controls.
+For rectangular cases, `--ny` and `--nz` set the fluid-cell counts (48 each
+by default), including fully developed Hartmann, Shercliff, and Hunt flows;
+`--width` and `--height` set the fluid dimensions. Hunt wall cells are additional.
 
 ```console
 lmx run fringing_rect --ha 20 --nx-stations 21 --ny 24 --nz 24 \
