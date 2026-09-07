@@ -2,7 +2,8 @@
 
 Run ``python scripts/make_showcase_figures.py`` (CPU, about three minutes).
 Outputs go to ``docs/_static``: a 256^2 quasi-2D turbulence animation and
-poster, and a Hunt-duct Hartmann-number sweep. Sizes are kept under the
+poster, a Hunt-duct Hartmann-number sweep, and the validation ladder of the
+staggered core against the spectral reference. Sizes are kept under the
 documented Git media budget; production-resolution movies are release assets.
 """
 
@@ -21,6 +22,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 import lmx  # noqa: E402
+from lmx.bc import NEUMANN, PERIODIC, BoundaryCondition  # noqa: E402
 from lmx.cases import solve_steady  # noqa: E402
 from lmx.validation import extract_midplane_profile  # noqa: E402
 
@@ -161,6 +163,153 @@ def hunt_sweep(hartmann_numbers: tuple[float, ...] = (20.0, 100.0, 500.0, 1000.0
     _save_webp(fig, STATIC / "hunt_side_layers.webp")
 
 
+def validation_ladder(
+    hartmann_numbers: tuple[float, ...] = (20.0, 100.0, 300.0),
+    conductances: tuple[float, ...] = (0.0, 0.027, 0.1),
+    cells: int = 48,
+) -> None:
+    """Rows 2-4 of the validation ladder, solved by the staggered core.
+
+    Every curve here is the steady Newton-Krylov solve of `lmx.steady` on a
+    wall-resolving mesh, and every reference is `validation.shercliff`, which
+    shares no operator, mesh or solver with the package. The point of the middle
+    panel is that the error does not grow with the field: the Hartmann layer is
+    resolved rather than tolerated.
+    """
+    from validation.shercliff import duct_flow
+
+    # The gates here are parts in a thousand; float32 cannot express them.
+    lmx.enable_x64()
+    profiles, errors, refinement = {}, {}, {}
+    for hartmann in hartmann_numbers:
+        for conductance in conductances:
+            problem = _duct_problem(cells, hartmann, conductance)
+            rate, velocity = _steady_duct(problem)
+            exact = _reference_rate(hartmann, conductance)
+            errors[(hartmann, conductance)] = abs(rate - exact) / exact
+            if conductance == 0.0:
+                profiles[hartmann] = (
+                    np.asarray(problem.grid.centers[1]),
+                    np.asarray(velocity)[0][:, cells // 2],
+                )
+            print(f"ladder Ha={hartmann:g} c={conductance:g}: {rate:.6g} against {exact:.6g}")
+    for count in (24, 32, 40, 48):
+        problem = _duct_problem(count, 20.0, 0.0)
+        rate, _ = _steady_duct(problem)
+        refinement[count] = abs(rate - _reference_rate(20.0, 0.0)) / _reference_rate(20.0, 0.0)
+
+    fig, axes = plt.subplots(1, 3, figsize=(13.5, 4.0), constrained_layout=True)
+    colors = plt.cm.viridis(np.linspace(0.05, 0.85, len(hartmann_numbers)))
+    for (hartmann, (y, u)), color in zip(profiles.items(), colors, strict=True):
+        half = y < 0.0
+        axes[0].semilogx(
+            (1.0 + y[half]) * hartmann, u[half] / np.max(u), color=color, lw=1.8, label=f"Ha = {hartmann:g}"
+        )
+        nodes, reference, _ = duct_flow(hartmann, 48)
+        middle = reference[:, reference.shape[1] // 2]
+        inside = nodes < 0.0
+        axes[0].semilogx(
+            (1.0 + nodes[inside]) * hartmann,
+            middle[inside] / np.max(middle),
+            "o",
+            ms=2.5,
+            color=color,
+            alpha=0.5,
+        )
+    wall = np.logspace(-1.5, 1.2, 60)
+    axes[0].semilogx(wall, 1.0 - np.exp(-wall), "--", color="tab:red", lw=1.2, label=r"$1-e^{-\xi}$")
+    axes[0].set_xlabel(r"$\xi = (1 + y/a)\,Ha$   (wall distance in layer widths)")
+    axes[0].set_ylabel("u / max u   (lines LMX, points spectral)")
+    axes[0].set_title("Hartmann layers collapse", fontsize=11)
+    axes[0].set_xlim(3.0e-2, 20.0)
+    axes[0].legend(frameon=False, loc="lower right")
+
+    markers = {0.0: "o", 0.027: "s", 0.1: "^"}
+    for conductance in conductances:
+        values = [errors[(hartmann, conductance)] for hartmann in hartmann_numbers]
+        axes[1].loglog(
+            hartmann_numbers,
+            values,
+            markers[conductance] + "-",
+            lw=1.4,
+            label=f"c = {conductance:g}" if conductance else "insulating",
+        )
+    axes[1].axhline(0.02, color="tab:red", ls="--", lw=1, label="2 % gate")
+    axes[1].set_xlabel("Ha")
+    axes[1].set_ylabel("relative error in Q / A")
+    axes[1].set_title(f"Flow rate vs the spectral reference, {cells}² cells", fontsize=11)
+    axes[1].legend(frameon=False, fontsize=8)
+
+    counts = np.array(sorted(refinement))
+    values = np.array([refinement[count] for count in counts])
+    axes[2].loglog(counts, values, "o-", color="k", label="LMX, Ha = 20")
+    axes[2].loglog(
+        counts, values[0] * (counts / counts[0]) ** -2.0, "--", color="tab:red", label="second order"
+    )
+    axes[2].set_xlabel("cells per transverse direction")
+    axes[2].set_ylabel("relative error in Q / A")
+    axes[2].set_title("Mesh convergence, insulating Ha = 20", fontsize=11)
+    axes[2].legend(frameon=False)
+    _save_webp(fig, STATIC / "validation_ladder.webp")
+
+
+def _fitted_faces(cells: int, thickness: float):
+    """Faces resolving a layer with the gentlest stretching that still spans the duct.
+
+    `wall_resolving_faces` rescales its widths to fill the half-width, so a
+    growth ratio larger than the cell count needs does not buy resolution: it
+    buys a mesh whose widths span four orders of magnitude and whose operator is
+    badly conditioned for no reason. Fitting the ratio keeps the smallest cell
+    where the layer wants it and no smaller.
+    """
+    from lmx.grid import wall_resolving_faces
+
+    low, high = 1.0001, 2.0
+    for _ in range(40):
+        middle = 0.5 * (low + high)
+        try:
+            wall_resolving_faces(
+                cells, -1.0, 1.0, layer_thickness=thickness, cells_in_layer=6, max_ratio=middle
+            )
+        except ValueError:
+            low = middle
+        else:
+            high = middle
+    return wall_resolving_faces(cells, -1.0, 1.0, layer_thickness=thickness, cells_in_layer=6, max_ratio=high)
+
+
+def _duct_problem(cells: int, hartmann: float, conductance: float):
+    from lmx.core3d import ChannelProblem
+    from lmx.grid import Grid, uniform_faces
+
+    transverse = _fitted_faces(cells, 1.0 / hartmann)
+    spanwise = _fitted_faces(cells, 1.0 / np.sqrt(hartmann))
+    return ChannelProblem(
+        grid=Grid(uniform_faces(1, 0.0, 1.0), transverse, spanwise),
+        conditions=(BoundaryCondition(PERIODIC), BoundaryCondition(NEUMANN), BoundaryCondition(NEUMANN)),
+        conductivity=1.0,
+        magnetic_field=(0.0, hartmann, 0.0),
+        forcing=(1.0, 0.0, 0.0),
+        dt=1.0,
+        wall_conductance=(0.0, conductance, 0.0),
+    )
+
+
+def _steady_duct(problem) -> tuple[float, np.ndarray]:
+    from lmx.steady import solve_steady_state
+
+    velocity = solve_steady_state(problem, pseudo_step=1.0e3, linear_restart=600).velocity[0].data
+    volumes = np.asarray(problem.grid.cell_volumes())[0]
+    rate = float((np.asarray(velocity)[0] * volumes).sum() / volumes.sum())
+    return rate, np.asarray(velocity)
+
+
+def _reference_rate(hartmann: float, conductance: float) -> float:
+    from validation.shercliff import flow_rate
+
+    return flow_rate(hartmann, 48, hartmann_wall=conductance)
+
+
 def _save_webp(fig: plt.Figure, path: Path, dpi: int = 120) -> None:
     png = path.with_suffix(".png")
     fig.savefig(png, dpi=dpi)
@@ -172,13 +321,15 @@ def _save_webp(fig: plt.Figure, path: Path, dpi: int = 120) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--only", choices=("q2d", "hunt"), help="Regenerate one asset group.")
+    parser.add_argument("--only", choices=("q2d", "hunt", "ladder"), help="Regenerate one asset group.")
     args = parser.parse_args()
     STATIC.mkdir(parents=True, exist_ok=True)
     if args.only in (None, "q2d"):
         q2d_turbulence()
     if args.only in (None, "hunt"):
         hunt_sweep()
+    if args.only in (None, "ladder"):
+        validation_ladder()
 
 
 if __name__ == "__main__":
