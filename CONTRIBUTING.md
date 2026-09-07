@@ -74,6 +74,20 @@ Never relax a tolerance retrospectively to obtain a pass. A threshold may change
 only when reference uncertainty, discretization analysis, or a corrected physical
 definition justifies it, with before-and-after evidence retained.
 
+The specialised `b1_finite_volume` and `b2_finite_volume` formulations are frozen
+under [plan decision D2](plan.md). Do not extend or retune these implementations;
+their tests remain active. `lmx-b2-lane-v1` identifies the preserved reference.
+Shared numerical kernels can be reused by the new core. Retire the specialised
+implementations only after that core passes all three replacement gates:
+
+- Shercliff/Hunt at Ha 1000: Table I flow rates within 0.5%;
+- ANL x0 = 3: pressure drop within 3% of the analytical result;
+- the reduced, matched FreeMHD B2 comparison.
+
+Retirement preserves specifications, reference data and provenance, wall and
+restart contracts, and a FreeMHD comparator of at most 600 lines. The reference
+tag is not a production-validation claim or a new release.
+
 ## Pull requests
 
 Keep each pull request reviewable and identify:
