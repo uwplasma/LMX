@@ -132,6 +132,26 @@ the production mesh without spending iterations on roundoff-level pressure
 corrections. Traced 3-D paths retain roundoff-level primal solves where their
 implicit derivatives require them.
 
+## Fully developed design: eliminating the drive
+
+At fixed field, materials and geometry the fully developed inductionless problem
+is linear in the drive, so the volumetric flow rate is $Q=Gf$ for a single
+response $G$ that one solve measures. `lmx.design` uses that directly: the drive
+delivering a requested throughput is $f=Q_{\rm target}/G$ exactly, and its
+derivative is $df/dQ=1/G$.
+
+The point is not economy of solves alone. An optimizer asked to find the drive
+would return a scalar good only to its own tolerance, and would spend its budget
+rediscovering a linear relation instead of exploring the inputs that genuinely
+change the flow: wall conductance, aspect ratio and field strength. The tests
+check the analytic derivative against automatic differentiation of the solve, so
+the elimination is verified rather than assumed.
+
+For a duct driven by a uniform pressure gradient the drop over a length $L$ is
+$fL$ and the hydraulic power is $fLQ$. That is the isothermal power of a fully
+developed segment. It excludes entry and exit losses, manifolds and all thermal
+effects, so it is not a blanket pumping budget.
+
 ## LMX and SOLVAX
 
 LMX owns:
