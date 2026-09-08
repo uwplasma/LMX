@@ -26,6 +26,7 @@ live in the module that owns their concepts.
 
 | Area | Names |
 |---|---|
+| Staggered core | `ChannelProblem`, `duct_problem`, `solve_steady_state`, `advance` |
 | Cases and solves | `make_hartmann_case`, `make_shercliff_case`, `make_hunt_case`, `make_q2d_case`, `solve_fully_developed_fields`, `evolve_q2d`, `Q2DProblem`, `solve` |
 | Meshes | `generate_rect_duct_mesh`, `generate_rect_duct_mesh_from_faces`, `generate_layered_duct_mesh`, `generate_layered_duct_mesh_from_fluid_faces`, `generate_multilayer_duct_mesh` |
 | Wall models | `WallLayer`, `wall_conductance_ratio`, `effective_pinhole_conductance_ratio`, `tangential_stack_conductance_ratio`, `normal_stack_leakage_ratio`, `equivalent_single_layer`, `nested_wall_layer_resolution_summary` |
@@ -33,10 +34,17 @@ live in the module that owns their concepts.
 | Evidence | Power balance in `lmx.solvers` and the analytical, conservation, and packaged benchmark tools in `lmx.validation` |
 | Runtime | `enable_compilation_cache` |
 
-`solve(model)` accepts a `CaseSpec`, `ExtrudedInductionlessProblem`, or
-`Q2DProblem`. All result types expose `converged`, `status`,
-`steps`, `residual`, `fields`, and `diagnostics`; specialized solve functions
-provide restart, progress, logging, and timing hooks in their owning modules.
+`solve(model)` accepts a `ChannelProblem`, `CaseSpec`,
+`ExtrudedInductionlessProblem`, or `Q2DProblem`.
+
+`duct_problem(hartmann=..., cells=..., wall_conductance=...)` builds a square
+insulating or Hunt duct with meshes that resolve the layers that exist -- `a/Ha`
+against the walls normal to the field, `a/sqrt(Ha)` against the others -- and
+`solve_steady_state` finds its steady state as a differentiable root. `advance`
+runs the same physics as one compiled trajectory when the transient is what is
+wanted. The remaining result types expose `converged`, `status`, `steps`,
+`residual`, `fields`, and `diagnostics`; specialized solve functions provide
+restart, progress, logging, and timing hooks in their owning modules.
 
 ## Case schema
 

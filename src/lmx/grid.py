@@ -214,7 +214,7 @@ def wall_resolving_faces(
     *,
     layer_thickness: float,
     cells_in_layer: int = 8,
-    max_ratio: float = 1.15,
+    max_ratio: float | None = 1.15,
 ) -> np.ndarray:
     """Return faces resolving a wall layer of ``layer_thickness`` at both ends.
 
@@ -222,11 +222,25 @@ def wall_resolving_faces(
     widths grow by at most ``max_ratio``, the stretching limit reported for
     high-Hartmann duct meshes. Raise when the request cannot be met with
     ``count`` cells so a caller never silently runs an unresolved layer.
+
+    ``max_ratio=None`` fits the gentlest ratio that still spans the domain. The
+    widths are rescaled to fill the half-width either way, so a ratio larger
+    than the cell count needs buys no resolution -- it buys an operator whose
+    entries span orders of magnitude for nothing.
     """
     if layer_thickness <= 0.0:
         raise ValueError("layer_thickness must be positive")
     if cells_in_layer < 1:
         raise ValueError("cells_in_layer must be positive")
+    if max_ratio is None:
+        return wall_resolving_faces(
+            count,
+            lower,
+            upper,
+            layer_thickness=layer_thickness,
+            cells_in_layer=cells_in_layer,
+            max_ratio=_fitted_ratio(count, 0.5 * (upper - lower), layer_thickness, cells_in_layer),
+        )
     if max_ratio < 1.0:
         raise ValueError("max_ratio must be at least one")
     if count % 2:
@@ -247,6 +261,27 @@ def wall_resolving_faces(
     widths *= half_width / reach
     half = np.concatenate([[0.0], np.cumsum(widths)])
     return np.concatenate([lower + half[:-1], upper - half[::-1]])
+
+
+def _fitted_ratio(count: int, half_width: float, layer_thickness: float, cells_in_layer: int) -> float:
+    """Return the smallest growth ratio whose widths still reach ``half_width``."""
+    if count % 2:
+        raise ValueError("count must be even when clustering at both ends")
+
+    def reaches(ratio: float) -> bool:
+        first = layer_thickness / _geometric_sum(cells_in_layer, ratio)
+        return float(np.sum(first * ratio ** np.arange(count // 2))) >= half_width
+
+    low, high = 1.0, 4.0
+    if not reaches(high):
+        raise ValueError(
+            f"{count} cells cannot span {half_width:.4g} while resolving a layer of "
+            f"{layer_thickness:.4g}; increase count or cells_in_layer"
+        )
+    for _ in range(60):
+        middle = 0.5 * (low + high)
+        low, high = (low, middle) if reaches(middle) else (middle, high)
+    return high
 
 
 def _geometric_sum(terms: int, ratio: float) -> float:
