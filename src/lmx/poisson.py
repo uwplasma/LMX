@@ -29,11 +29,15 @@ from dataclasses import dataclass
 import jax.numpy as jnp
 import numpy as np
 
-from .bc import BoundaryCondition
-from .grid import CENTER, Field, Grid, uniform_faces
+from .bc import NEUMANN, PERIODIC, BoundaryCondition
+from .grid import CENTER, POLAR, Field, Grid, uniform_faces
 from .ops import laplacian
 
 __all__ = [
+    "FastDiagonalPolarPoisson",
+    "assemble_radial_laplacian",
+    "azimuthal_eigenvalues",
+    "fast_diagonal_polar_poisson",
     "FastDiagonalHelmholtz",
     "FastDiagonalPoisson",
     "assemble_axis_laplacian",
@@ -103,6 +107,153 @@ def assemble_axis_laplacian(grid: Grid, axis: int, condition: BoundaryCondition)
         field = Field(jnp.asarray(unit), (CENTER,) * 3, line)
         columns.append(np.asarray(laplacian(field, conditions).data).reshape(count))
     return np.stack(columns, axis=1)
+
+
+def assemble_radial_laplacian(grid: Grid, condition: BoundaryCondition) -> np.ndarray:
+    """Return the dense radial Laplacian the polar flux form applies.
+
+    The azimuth is collapsed to a single periodic cell, which contributes
+    nothing because its two faces carry the same value, and the axial direction
+    to a single cell with a homogeneous Neumann condition. The metric factors of
+    the azimuth and the axis cancel between the face areas and the cell volume,
+    so what is left is exactly ``(1/r) d/dr (r d/dr)`` as the production stencil
+    discretizes it, including the zero-area face on the axis.
+    """
+    count = grid.shape[0]
+    line = Grid(
+        np.asarray(grid.x_faces),
+        uniform_faces(1, 0.0, 2.0 * np.pi),
+        uniform_faces(1, 0.0, 1.0),
+        geometry=POLAR,
+    )
+    conditions = (condition, BoundaryCondition(PERIODIC), BoundaryCondition(NEUMANN))
+    columns = []
+    for index in range(count):
+        unit = np.zeros(line.shape)
+        unit[index, 0, 0] = 1.0
+        field = Field(jnp.asarray(unit), (CENTER,) * 3, line)
+        columns.append(np.asarray(laplacian(field, conditions).data).reshape(count))
+    return np.stack(columns, axis=1)
+
+
+def azimuthal_eigenvalues(grid: Grid) -> np.ndarray:
+    """Return the eigenvalue of the azimuthal second difference for every mode.
+
+    The discrete Fourier basis diagonalizes a uniform periodic second
+    difference, so mode ``m`` contributes ``-4 sin^2(pi m / N) / dtheta^2``
+    divided by ``r^2``. That last division is what stops the polar Laplacian
+    separating into a sum of one-dimensional operators -- and what makes it
+    separate again once the azimuth is transformed, one radial operator per mode.
+    """
+    widths = np.asarray(grid.widths[1])
+    if not np.allclose(widths, widths[0]):
+        raise ValueError("the azimuthal transform needs a uniform azimuth")
+    count = grid.shape[1]
+    modes = np.arange(count)
+    return -4.0 * np.sin(np.pi * modes / count) ** 2 / float(widths[0]) ** 2
+
+
+@dataclass(frozen=True)
+class FastDiagonalPolarPoisson:
+    """A factorized polar Laplacian: one radial eigendecomposition per azimuthal mode."""
+
+    grid: Grid
+    conditions: tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition]
+    radial_vectors: np.ndarray
+    radial_values: np.ndarray
+    radial_scale: np.ndarray
+    axial_vectors: np.ndarray
+    axial_values: np.ndarray
+    axial_scale: np.ndarray
+    singular: bool
+
+    def solve(self, rhs: Field) -> Field:
+        """Return the field whose polar Laplacian is ``rhs``."""
+        if rhs.grid != self.grid:
+            raise ValueError("right-hand side must share the factorized grid")
+        if rhs.offset != (CENTER, CENTER, CENTER):
+            raise ValueError("the polar factorization solves for a cell-centred field")
+        dtype = rhs.dtype
+        volumes = jnp.asarray(self.grid.cell_volumes(), dtype=dtype)
+        data = rhs.data
+        if self.singular:
+            data = data - jnp.sum(volumes * data) / jnp.sum(volumes)
+        data = data * jnp.asarray(self.radial_scale[:, None, None], dtype=dtype)
+        data = data * jnp.asarray(self.axial_scale[None, None, :], dtype=dtype)
+        transformed = jnp.fft.fft(data, axis=1)
+        transformed = jnp.einsum("mji,jmz->imz", jnp.asarray(self.radial_vectors), transformed)
+        transformed = jnp.tensordot(jnp.asarray(self.axial_vectors).T, transformed, axes=([1], [2]))
+        transformed = jnp.moveaxis(transformed, 0, 2)
+        denominator = (
+            jnp.asarray(self.radial_values)[:, :, None] + jnp.asarray(self.axial_values)[None, None, :]
+        )
+        denominator = jnp.moveaxis(denominator, 0, 1)
+        if self.singular:
+            denominator = denominator.at[0, 0, 0].set(1.0)
+            transformed = transformed.at[0, 0, 0].set(0.0)
+        transformed = transformed / denominator
+        restored = jnp.tensordot(jnp.asarray(self.axial_vectors), transformed, axes=([1], [2]))
+        restored = jnp.moveaxis(restored, 0, 2)
+        restored = jnp.einsum("mji,imz->jmz", jnp.asarray(self.radial_vectors), restored)
+        solution = jnp.real(jnp.fft.ifft(restored, axis=1))
+        solution = solution / jnp.asarray(self.radial_scale[:, None, None], dtype=dtype)
+        solution = solution / jnp.asarray(self.axial_scale[None, None, :], dtype=dtype)
+        if self.singular:
+            solution = solution - jnp.sum(volumes * solution) / jnp.sum(volumes)
+        return rhs.replace_data(solution)
+
+
+def fast_diagonal_polar_poisson(
+    grid: Grid, conditions: tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition]
+) -> FastDiagonalPolarPoisson:
+    """Factorize the polar Laplacian, one radial eigendecomposition per azimuthal mode."""
+    if not grid.is_polar:
+        raise ValueError("this factorization is for a polar grid; use fast_diagonal_poisson")
+    if len(conditions) != 3:
+        raise ValueError("a factorization needs one boundary condition per axis")
+    if not conditions[1].is_periodic:
+        raise ValueError("the azimuth of a polar grid is periodic by construction")
+    radial = assemble_radial_laplacian(grid, conditions[0])
+    radial_weights = np.asarray(grid.centers[0]) * np.asarray(grid.widths[0])
+    radial_root = np.sqrt(radial_weights)
+    symmetric = radial_root[:, None] * radial / radial_root[None, :]
+    asymmetry = _relative_asymmetry(symmetric)
+    if asymmetry > _symmetry_tolerance(symmetric):
+        raise ValueError(
+            f"the radial operator is not symmetric under the annular volumes "
+            f"(relative asymmetry {asymmetry:.3e}); fast diagonalization does not apply"
+        )
+    symmetric = 0.5 * (symmetric + symmetric.T)
+    azimuthal = azimuthal_eigenvalues(grid)
+    inverse_square = 1.0 / np.asarray(grid.centers[0]) ** 2
+    vectors, values = [], []
+    for eigenvalue in azimuthal:
+        operator = symmetric + np.diag(eigenvalue * inverse_square)
+        mode_values, mode_vectors = np.linalg.eigh(operator)
+        # Descending, so the zero eigenvalue of a singular mode is first, as the
+        # Cartesian factorization also arranges it.
+        vectors.append(mode_vectors[:, ::-1])
+        values.append(mode_values[::-1])
+    axial = assemble_axis_laplacian(
+        Grid(*(uniform_faces(1, 0.0, 1.0),) * 2, np.asarray(grid.z_faces)), 2, conditions[2]
+    )
+    axial_weights = np.asarray(grid.widths[2])
+    axial_root = np.sqrt(axial_weights)
+    axial_symmetric = axial_root[:, None] * axial / axial_root[None, :]
+    axial_values, axial_vectors = np.linalg.eigh(0.5 * (axial_symmetric + axial_symmetric.T))
+    axial_values, axial_vectors = axial_values[::-1], axial_vectors[:, ::-1]
+    singular = conditions[0].kind == NEUMANN and conditions[2].is_periodic
+    return FastDiagonalPolarPoisson(
+        grid,
+        tuple(conditions),
+        np.stack(vectors),
+        np.stack(values),
+        radial_root,
+        axial_vectors,
+        axial_values,
+        axial_root,
+        singular,
+    )
 
 
 @dataclass(frozen=True)
