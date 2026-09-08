@@ -10,6 +10,7 @@ documented Git media budget; production-resolution movies are release assets.
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import jax
@@ -346,6 +347,85 @@ def pipe_sweep(hartmann_numbers: tuple[float, ...] = (0.0, 20.0, 100.0, 400.0)) 
     _save_webp(fig, STATIC / "pipe_flow.webp")
 
 
+RESULTS = Path(__file__).resolve().parents[1] / "benchmarks" / "results"
+
+
+def benchmark_scaling() -> None:
+    """Time per step against problem size, from the JSON the benchmark harness writes.
+
+    Nothing here is measured by this script: it reads
+    ``benchmarks/results/*.json`` so that a figure and the number it draws come
+    from the same run, on the machine named in the file. A missing device or
+    precision is simply absent from the plot rather than interpolated.
+    """
+    reports = sorted(RESULTS.glob("*.json"))
+    if not reports:
+        raise SystemExit(f"no benchmark JSON in {RESULTS}; run scripts/run_benchmarks.py first")
+    series = {}
+    for path in reports:
+        report = json.loads(path.read_text(encoding="utf-8"))
+        environment = report["environment"]
+        label = (
+            f"{environment['device_count']}x {environment['platform'].upper()}"
+            f"{'' if environment['device_count'] == 1 else ''}"
+            f", {'fp64' if environment['x64'] else 'fp32'}"
+        )
+        for entry in report["cases"]:
+            if not entry.get("accepted"):
+                continue
+            series.setdefault((entry["case"], label), []).append((entry["cells"], entry["seconds_per_step"]))
+
+    fig, axes = plt.subplots(1, 3, figsize=(14.0, 4.2), constrained_layout=True)
+    styles = {"fp64": "-", "fp32": "--"}
+    colors = {"CPU": "tab:blue", "GPU": "tab:red"}
+    for index, case in enumerate(("core3d_advance", "q2d_evolve")):
+        for (name, label), points in sorted(series.items()):
+            if name != case:
+                continue
+            cells, seconds = (np.array(values) for values in zip(*sorted(points), strict=True))
+            kind = "GPU" if "GPU" in label else "CPU"
+            axes[index].loglog(
+                cells,
+                seconds,
+                styles["fp64" if "fp64" in label else "fp32"],
+                marker="o",
+                ms=4,
+                color=colors[kind],
+                label=label,
+            )
+        axes[index].set_xlabel("cells")
+        axes[index].set_ylabel("seconds per step")
+        axes[index].legend(frameon=False, fontsize=8)
+    axes[0].set_title("Staggered 3-D core", fontsize=11)
+    axes[1].set_title("Quasi-2D evolution", fontsize=11)
+
+    for precision, style in styles.items():
+        for case, marker in (("core3d_advance", "o"), ("q2d_evolve", "s")):
+            host = {label: dict(points) for (name, label), points in series.items() if name == case}
+            cpu = next((v for k, v in host.items() if "CPU" in k and precision in k), None)
+            gpu = next((v for k, v in host.items() if "GPU" in k and precision in k), None)
+            if not cpu or not gpu:
+                continue
+            shared = sorted(set(cpu) & set(gpu))
+            if not shared:
+                continue
+            axes[2].loglog(
+                shared,
+                [cpu[cells] / gpu[cells] for cells in shared],
+                style,
+                marker=marker,
+                ms=4,
+                label=f"{'3-D core' if case == 'core3d_advance' else 'Q2D'}, {precision}",
+            )
+    axes[2].axhline(10.0, color="k", ls=":", lw=1)
+    axes[2].axhline(20.0, color="k", ls=":", lw=1)
+    axes[2].set_xlabel("cells")
+    axes[2].set_ylabel("GPU speed-up over CPU")
+    axes[2].set_title("Targets: 10x (3-D core), 20x (Q2D)", fontsize=11)
+    axes[2].legend(frameon=False, fontsize=8)
+    _save_webp(fig, STATIC / "device_scaling.webp")
+
+
 def _save_webp(fig: plt.Figure, path: Path, dpi: int = 120) -> None:
     png = path.with_suffix(".png")
     fig.savefig(png, dpi=dpi)
@@ -358,7 +438,9 @@ def _save_webp(fig: plt.Figure, path: Path, dpi: int = 120) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
-        "--only", choices=("q2d", "hunt", "ladder", "pipe"), help="Regenerate one asset group."
+        "--only",
+        choices=("q2d", "hunt", "ladder", "pipe", "scaling"),
+        help="Regenerate one asset group.",
     )
     args = parser.parse_args()
     STATIC.mkdir(parents=True, exist_ok=True)
@@ -370,6 +452,8 @@ def main() -> None:
         validation_ladder()
     if args.only in (None, "pipe"):
         pipe_sweep()
+    if args.only == "scaling":
+        benchmark_scaling()
 
 
 if __name__ == "__main__":

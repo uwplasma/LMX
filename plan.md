@@ -435,8 +435,8 @@ Effort ≈ 3.5 weeks.
 
 | Step | Action | Exit |
 |---|---|---|
-| 2.1 | Day-1 profile of the old code on one A4000 (`jax.profiler`, `block_until_ready`): host-sync vs kernel time, peak device memory | baseline JSON in `benchmarks/` |
-| 2.2 | Benchmark harness: pytest-benchmark cases (fully developed 128², 3-D 64³/128³/256³, Q2D 512²/1024²/2048²) × {fp32, fp64} × {CPU, 1 GPU, 2 GPU}; `lmx benchmark` writes JSON with hardware, versions, dtype, cache state, tolerances, accepted status | reproducible JSON + one figure script |
+| 2.1 | Day-1 profile on one A4000: compile time, warm time and time per step separated; a direct host-sync measurement that times the same trajectory at two lengths | baseline JSON in `benchmarks/results/` |
+| 2.2 | Benchmark harness `scripts/run_benchmarks.py`: the staggered 3-D core at 32³–192³ and Q2D at 256²–2048², × {fp32, fp64} × {CPU, 1 GPU, 2 GPU}, writing JSON with host, device, versions, dtype, tolerances and an accepted flag; `scripts/make_showcase_figures.py --only scaling` draws it from that JSON and measures nothing itself | reproducible JSON + one figure script |
 | 2.3 | Nightly cron on the office box (Section 9) pushing results to a `benchmarks` branch | first nightly run |
 | 2.4 | Sharding: slab decomposition with `shard_map` + `ppermute` halos for the core; evaluate jaxDecomp and sharded `jnp.fft` for Q2D and the Poisson transposes; audit primal and transpose all-gathers | 1-GPU vs 2-GPU fields agree to 1e-12 (fp64) |
 | 2.5 | Optimise to targets: fusion audit, buffer donation, fp32 transforms, batching of line solves; report crossover size | G4/G5 numbers, or the measured reason they are not met |
