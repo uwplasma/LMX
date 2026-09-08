@@ -273,6 +273,79 @@ def _reference_rate(hartmann: float, conductance: float) -> float:
     return flow_rate(hartmann, 48, hartmann_wall=conductance)
 
 
+def pipe_sweep(hartmann_numbers: tuple[float, ...] = (0.0, 20.0, 100.0, 400.0)) -> None:
+    """A circular pipe across the Hartmann range: core, layers and flow rate."""
+    from lmx.pipe import flow_rate, pipe_problem, solve_pipe
+
+    lmx.enable_x64()
+    profiles, rates, maps = {}, {}, None
+    for hartmann in hartmann_numbers:
+        problem = pipe_problem(hartmann=hartmann, radial=64, azimuthal=128)
+        velocity, _ = solve_pipe(problem)
+        radius = np.asarray(problem.grid.centers[0])
+        angle = np.asarray(problem.grid.centers[1])
+        values = np.asarray(velocity.data)[:, :, 0]
+        rates[hartmann] = flow_rate(velocity)
+        along = np.argmin(np.abs(angle - 0.0))
+        across = np.argmin(np.abs(angle - 0.5 * np.pi))
+        scale = np.max(values)
+        profiles[hartmann] = (radius, values[:, along] / scale, values[:, across] / scale)
+        if hartmann == hartmann_numbers[-1]:
+            maps = (
+                np.asarray(problem.grid.faces[0]),
+                np.asarray(problem.grid.faces[1]),
+                values / scale,
+            )
+        print(f"pipe Ha={hartmann:g}: Q/A = {rates[hartmann]:.6g}")
+
+    fig = plt.figure(figsize=(13.5, 4.2), constrained_layout=True)
+    grid = fig.add_gridspec(1, 3, width_ratios=[1.25, 0.95, 1.0])
+    ax_profile, ax_map, ax_rate = (fig.add_subplot(grid[index]) for index in range(3))
+    colors = plt.cm.viridis(np.linspace(0.05, 0.85, len(hartmann_numbers)))
+    for (hartmann, (radius, along, across)), color in zip(profiles.items(), colors, strict=True):
+        ax_profile.plot(radius, along, color=color, lw=1.8, label=f"Ha = {hartmann:g}")
+        ax_profile.plot(radius, across, color=color, lw=1.2, ls="--")
+    ax_profile.set_xlabel("r / a")
+    ax_profile.set_ylabel("u / max u")
+    ax_profile.set_title("Radial profiles: solid along B, dashed across it", fontsize=11)
+    ax_profile.set_xlim(0.0, 1.0)
+    ax_profile.legend(frameon=False, fontsize=9)
+
+    radial_faces, azimuthal_faces, values = maps
+    mesh_angle, mesh_radius = np.meshgrid(azimuthal_faces, radial_faces)
+    image = ax_map.pcolormesh(
+        mesh_radius * np.cos(mesh_angle),
+        mesh_radius * np.sin(mesh_angle),
+        values,
+        cmap="magma",
+        shading="flat",
+    )
+    ax_map.set_aspect("equal")
+    ax_map.set_xlabel("distance along B / a")
+    ax_map.set_ylabel("distance across B / a")
+    ax_map.set_title(f"u / max u at Ha = {hartmann_numbers[-1]:g}", fontsize=11)
+    fig.colorbar(image, ax=ax_map, shrink=0.85)
+
+    values = np.array([rates[hartmann] for hartmann in hartmann_numbers])
+    finite = np.array(hartmann_numbers) > 0.0
+    ax_rate.loglog(np.array(hartmann_numbers)[finite], values[finite], "o-", color="k", label="LMX")
+    guide = np.array([10.0, 600.0])
+    reference = np.array(hartmann_numbers)[finite][1]
+    ax_rate.loglog(
+        guide,
+        values[finite][1] * (guide / reference) ** -1.0,
+        "--",
+        color="tab:red",
+        label=r"$\propto Ha^{-1}$",
+    )
+    ax_rate.axhline(0.125, color="tab:blue", ls=":", lw=1.2, label="Poiseuille, Ha = 0")
+    ax_rate.set_xlabel("Ha")
+    ax_rate.set_ylabel("Q / A")
+    ax_rate.set_title("Flow rate at fixed pressure gradient", fontsize=11)
+    ax_rate.legend(frameon=False, fontsize=9)
+    _save_webp(fig, STATIC / "pipe_flow.webp")
+
+
 def _save_webp(fig: plt.Figure, path: Path, dpi: int = 120) -> None:
     png = path.with_suffix(".png")
     fig.savefig(png, dpi=dpi)
@@ -284,7 +357,9 @@ def _save_webp(fig: plt.Figure, path: Path, dpi: int = 120) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--only", choices=("q2d", "hunt", "ladder"), help="Regenerate one asset group.")
+    parser.add_argument(
+        "--only", choices=("q2d", "hunt", "ladder", "pipe"), help="Regenerate one asset group."
+    )
     args = parser.parse_args()
     STATIC.mkdir(parents=True, exist_ok=True)
     if args.only in (None, "q2d"):
@@ -293,6 +368,8 @@ def main() -> None:
         hunt_sweep()
     if args.only in (None, "ladder"):
         validation_ladder()
+    if args.only in (None, "pipe"):
+        pipe_sweep()
 
 
 if __name__ == "__main__":
