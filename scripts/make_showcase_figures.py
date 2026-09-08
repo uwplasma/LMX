@@ -22,7 +22,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 import lmx  # noqa: E402
-from lmx.bc import NEUMANN, PERIODIC, BoundaryCondition  # noqa: E402
 from lmx.cases import solve_steady  # noqa: E402
 from lmx.validation import extract_midplane_profile  # noqa: E402
 
@@ -253,46 +252,10 @@ def validation_ladder(
     _save_webp(fig, STATIC / "validation_ladder.webp")
 
 
-def _fitted_faces(cells: int, thickness: float):
-    """Faces resolving a layer with the gentlest stretching that still spans the duct.
-
-    `wall_resolving_faces` rescales its widths to fill the half-width, so a
-    growth ratio larger than the cell count needs does not buy resolution: it
-    buys a mesh whose widths span four orders of magnitude and whose operator is
-    badly conditioned for no reason. Fitting the ratio keeps the smallest cell
-    where the layer wants it and no smaller.
-    """
-    from lmx.grid import wall_resolving_faces
-
-    low, high = 1.0001, 2.0
-    for _ in range(40):
-        middle = 0.5 * (low + high)
-        try:
-            wall_resolving_faces(
-                cells, -1.0, 1.0, layer_thickness=thickness, cells_in_layer=6, max_ratio=middle
-            )
-        except ValueError:
-            low = middle
-        else:
-            high = middle
-    return wall_resolving_faces(cells, -1.0, 1.0, layer_thickness=thickness, cells_in_layer=6, max_ratio=high)
-
-
 def _duct_problem(cells: int, hartmann: float, conductance: float):
-    from lmx.core3d import ChannelProblem
-    from lmx.grid import Grid, uniform_faces
+    from lmx.core3d import duct_problem
 
-    transverse = _fitted_faces(cells, 1.0 / hartmann)
-    spanwise = _fitted_faces(cells, 1.0 / np.sqrt(hartmann))
-    return ChannelProblem(
-        grid=Grid(uniform_faces(1, 0.0, 1.0), transverse, spanwise),
-        conditions=(BoundaryCondition(PERIODIC), BoundaryCondition(NEUMANN), BoundaryCondition(NEUMANN)),
-        conductivity=1.0,
-        magnetic_field=(0.0, hartmann, 0.0),
-        forcing=(1.0, 0.0, 0.0),
-        dt=1.0,
-        wall_conductance=(0.0, conductance, 0.0),
-    )
+    return duct_problem(hartmann=hartmann, cells=cells, wall_conductance=conductance)
 
 
 def _steady_duct(problem) -> tuple[float, np.ndarray]:

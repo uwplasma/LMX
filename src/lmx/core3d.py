@@ -71,7 +71,7 @@ import numpy as np
 import solvax
 
 from .advect import momentum_advection
-from .bc import DIRICHLET, BoundaryCondition
+from .bc import DIRICHLET, PERIODIC, BoundaryCondition
 from .em import (
     face_conductivity,
     face_current,
@@ -80,7 +80,7 @@ from .em import (
     thin_wall_flux,
     wall_insulated,
 )
-from .grid import CENTER, FACE, Field, Grid
+from .grid import CENTER, FACE, Field, Grid, uniform_faces, wall_resolving_faces
 from .ops import divergence, face_gradient, face_interpolate, staggered_laplacian
 from .poisson import (
     FastDiagonalHelmholtz,
@@ -91,6 +91,7 @@ from .poisson import (
 
 __all__ = [
     "ChannelProblem",
+    "duct_problem",
     "electric_state",
     "enforce_face_constraints",
     "project",
@@ -222,7 +223,7 @@ def electric_state(
     velocity: tuple[Field, Field, Field],
     problem: ChannelProblem,
     factorization: FastDiagonalPoisson | None = None,
-    field_scale=1.0,
+    field_scale: float | jnp.ndarray = 1.0,
 ) -> tuple[Field, tuple[Field, Field, Field]]:
     """Return the induced potential and the Lorentz force it carries.
 
@@ -317,6 +318,53 @@ def _solve_potential(source: Field, problem: ChannelProblem, factorization: Fast
         return solvax.gmres(matvec, target, precond=preconditioner, rtol=1.0e-12, max_restarts=20).x
 
     return jax.lax.custom_linear_solve(operator, source, solve, solve)
+
+
+def duct_problem(
+    *,
+    hartmann: float,
+    cells: int = 48,
+    wall_conductance: float = 0.0,
+    forcing: float = 1.0,
+    advection: str = "off",
+    cells_in_layer: int = 6,
+) -> ChannelProblem:
+    """Build a square insulating or Hunt duct at a given Hartmann number.
+
+    Non-dimensionalised the way the analytic solutions are: half width, density,
+    kinematic viscosity and conductivity all one, the field along ``y`` with
+    magnitude ``hartmann``, and ``forcing`` the axial pressure gradient. The two
+    transverse meshes resolve the layers that actually exist -- ``a/Ha`` against
+    the walls normal to the field and ``a/sqrt(Ha)`` against the others -- with
+    the gentlest stretching that spans the duct, which is the difference between
+    a converged flow rate and a fine mesh in the wrong place.
+    """
+    if hartmann < 0.0:
+        raise ValueError("hartmann must not be negative")
+    if hartmann:
+        transverse = wall_resolving_faces(
+            cells, -1.0, 1.0, layer_thickness=1.0 / hartmann, cells_in_layer=cells_in_layer, max_ratio=None
+        )
+        spanwise = wall_resolving_faces(
+            cells,
+            -1.0,
+            1.0,
+            layer_thickness=1.0 / np.sqrt(hartmann),
+            cells_in_layer=cells_in_layer,
+            max_ratio=None,
+        )
+    else:
+        transverse = spanwise = uniform_faces(cells, -1.0, 1.0)
+    return ChannelProblem(
+        grid=Grid(uniform_faces(1, 0.0, 1.0), transverse, spanwise),
+        conditions=(BoundaryCondition(PERIODIC), _INSULATING, _INSULATING),
+        conductivity=1.0 if hartmann else 0.0,
+        magnetic_field=(0.0, float(hartmann), 0.0),
+        forcing=(float(forcing), 0.0, 0.0),
+        dt=1.0,
+        advection=advection,
+        wall_conductance=(0.0, float(wall_conductance), 0.0),
+    )
 
 
 def zero_velocity(problem: ChannelProblem) -> tuple[Field, Field, Field]:

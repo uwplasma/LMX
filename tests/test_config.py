@@ -568,6 +568,10 @@ def test_wall_conductivity_rejects_nonpositive_geometry(
 
 EXPECTED_ROOT_API = {
     "enable_x64",
+    "ChannelProblem",
+    "duct_problem",
+    "solve_steady_state",
+    "advance",
     "enable_compilation_cache",
     "make_hartmann_case",
     "make_shercliff_case",

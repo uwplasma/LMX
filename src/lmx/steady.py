@@ -94,8 +94,8 @@ def steady_residual(
     problem: ChannelProblem,
     factorization: FastDiagonalPoisson | None = None,
     *,
-    forcing=None,
-    field_scale=1.0,
+    forcing: tuple[float, float, float] | None = None,
+    field_scale: float | jnp.ndarray = 1.0,
 ) -> tuple[Field, Field, Field]:
     """Return the projected steady momentum residual of a velocity field.
 
@@ -164,8 +164,8 @@ def solve_steady_state(
     tolerance: float = 1.0e-9,
     max_steps: int = 40,
     pseudo_step: float | None = None,
-    forcing=None,
-    field_scale=1.0,
+    forcing: tuple[float, float, float] | None = None,
+    field_scale: float | jnp.ndarray = 1.0,
     linear_tolerance: float = 1.0e-6,
     linear_restart: int = 400,
     linear_max_restarts: int = 6,
