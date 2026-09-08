@@ -334,13 +334,17 @@ def test_the_polar_laplacian_is_second_order_away_from_the_axis():
     assert np.max(np.abs(values[0])) > 2.0 * errors[1]
 
 
-def test_the_separable_stencils_refuse_a_polar_grid():
-    """A wrong answer on a metric a stencil does not carry is worse than no answer."""
-    grid = _polar(4, 8)
-    field = _polar_cells(grid, lambda r, theta: r)
-    with pytest.raises(ValueError, match="use lmx.ops.laplacian"):
-        staggered_laplacian(field, (BoundaryCondition(DIRICHLET), WRAP, WRAP))
+def test_the_staggered_laplacian_carries_the_polar_metric():
+    """It is a flux balance, so `(1/r) d/dr (r d/dr)` comes out of the same stencil."""
+    grid = _polar(16, 32)
+    field = _polar_cells(grid, lambda r, theta: 1.0 - r**2)
+    values = np.asarray(staggered_laplacian(field, (BoundaryCondition(DIRICHLET), WRAP, WRAP)).data)
+    assert np.max(np.abs(values[:-1] + 4.0)) < 1e-12
+
+
+def test_the_fast_diagonalization_assembly_refuses_a_polar_grid():
+    """The `1/r^2` azimuthal term does not separate; `fast_diagonal_polar_poisson` does it instead."""
     from lmx.poisson import assemble_axis_laplacian
 
     with pytest.raises(ValueError, match="fast diagonalization assumes"):
-        assemble_axis_laplacian(grid, 0, BoundaryCondition(DIRICHLET))
+        assemble_axis_laplacian(_polar(4, 8), 0, BoundaryCondition(DIRICHLET))

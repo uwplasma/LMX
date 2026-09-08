@@ -166,9 +166,15 @@ class FastDiagonalPolarPoisson:
     axial_values: np.ndarray
     axial_scale: np.ndarray
     singular: bool
+    shift: float = 0.0
+    coefficient: float = -1.0
 
     def solve(self, rhs: Field) -> Field:
-        """Return the field whose polar Laplacian is ``rhs``."""
+        """Return the field this operator maps to ``rhs``.
+
+        The operator is ``shift*I - coefficient*laplacian``; the Poisson factory
+        passes ``(0, -1)``, which leaves the Laplacian itself.
+        """
         if rhs.grid != self.grid:
             raise ValueError("right-hand side must share the factorized grid")
         if rhs.offset != (CENTER, CENTER, CENTER):
@@ -184,10 +190,8 @@ class FastDiagonalPolarPoisson:
         transformed = jnp.einsum("mji,jmz->imz", jnp.asarray(self.radial_vectors), transformed)
         transformed = jnp.tensordot(jnp.asarray(self.axial_vectors).T, transformed, axes=([1], [2]))
         transformed = jnp.moveaxis(transformed, 0, 2)
-        denominator = (
-            jnp.asarray(self.radial_values)[:, :, None] + jnp.asarray(self.axial_values)[None, None, :]
-        )
-        denominator = jnp.moveaxis(denominator, 0, 1)
+        total = jnp.asarray(self.radial_values)[:, :, None] + jnp.asarray(self.axial_values)[None, None, :]
+        denominator = jnp.moveaxis(self.shift - self.coefficient * total, 0, 1)
         if self.singular:
             denominator = denominator.at[0, 0, 0].set(1.0)
             transformed = transformed.at[0, 0, 0].set(0.0)
@@ -204,9 +208,18 @@ class FastDiagonalPolarPoisson:
 
 
 def fast_diagonal_polar_poisson(
-    grid: Grid, conditions: tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition]
+    grid: Grid,
+    conditions: tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition],
+    *,
+    shift: float = 0.0,
+    coefficient: float = -1.0,
 ) -> FastDiagonalPolarPoisson:
-    """Factorize the polar Laplacian, one radial eigendecomposition per azimuthal mode."""
+    """Factorize ``shift*I - coefficient*laplacian``, one eigendecomposition per azimuthal mode.
+
+    The default leaves the Laplacian itself. A positive shift with a positive
+    coefficient is the damped operator that preconditions a pipe at large
+    Hartmann number.
+    """
     if not grid.is_polar:
         raise ValueError("this factorization is for a polar grid; use fast_diagonal_poisson")
     if len(conditions) != 3:
@@ -242,7 +255,7 @@ def fast_diagonal_polar_poisson(
     axial_symmetric = axial_root[:, None] * axial / axial_root[None, :]
     axial_values, axial_vectors = np.linalg.eigh(0.5 * (axial_symmetric + axial_symmetric.T))
     axial_values, axial_vectors = axial_values[::-1], axial_vectors[:, ::-1]
-    singular = conditions[0].kind == NEUMANN and conditions[2].is_periodic
+    singular = shift == 0.0 and conditions[0].kind == NEUMANN and conditions[2].is_periodic
     return FastDiagonalPolarPoisson(
         grid,
         tuple(conditions),
@@ -253,6 +266,8 @@ def fast_diagonal_polar_poisson(
         axial_values,
         axial_root,
         singular,
+        float(shift),
+        float(coefficient),
     )
 
 

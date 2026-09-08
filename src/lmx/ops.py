@@ -207,15 +207,6 @@ def _as_array(values: np.ndarray, dtype) -> jnp.ndarray:
     return jnp.asarray(values, dtype=dtype)
 
 
-def _require_separable(grid: Grid, name: str) -> None:
-    """Refuse a metric this stencil does not carry."""
-    if grid.is_polar:
-        raise ValueError(
-            f"{name} differences along each axis with that axis's own widths, which is not the "
-            "Laplacian on a polar grid; use lmx.ops.laplacian, whose flux form reads the metric"
-        )
-
-
 def staggered_laplacian(
     field: Field, conditions: tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition]
 ) -> Field:
@@ -237,7 +228,7 @@ def staggered_laplacian(
     """
     if len(conditions) != 3:
         raise ValueError("a staggered Laplacian needs one boundary condition per axis")
-    _require_separable(field.grid, "the staggered Laplacian")
+
     grid = field.grid
     if field.shape != grid.offset_shape(field.offset):
         raise ValueError(f"field shape {field.shape} does not match its offset {field.offset}")
@@ -252,16 +243,23 @@ def staggered_laplacian(
 
 
 def _centred_axis_laplacian(field: Field, axis: int, condition: BoundaryCondition) -> jnp.ndarray:
-    """Second difference along an axis on which the field is cell centred."""
+    """Flux balance along an axis on which the field is cell centred.
+
+    Written as a flux difference rather than a second difference, so the metric
+    of the axis enters through :meth:`lmx.grid.Grid.axis_measures` and the same
+    stencil is ``(1/r) d/dr (r d/dr)`` on a polar grid. The two forms are
+    identical where the measures are one and the widths, which is Cartesian.
+    """
     grid = field.grid
     padded = pad(field.data, axis, condition, grid=grid)
     distances = face_distances(grid, axis, condition)
-    gradient = (_take(padded, axis, slice(1, None)) - _take(padded, axis, slice(None, -1))) / _broadcast(
+    gradient = (_take(padded, axis, slice(1, None)) - _take(padded, axis, slice(None, -1))) / _metric(
         distances, axis, field.dtype
     )
-    widths = np.asarray(grid.widths[axis])
-    difference = _take(gradient, axis, slice(1, None)) - _take(gradient, axis, slice(None, -1))
-    return difference / _broadcast(widths, axis, field.dtype)
+    face_measure, cell_measure = grid.axis_measures(axis)
+    flux = gradient * _metric(face_measure, axis, field.dtype)
+    difference = _take(flux, axis, slice(1, None)) - _take(flux, axis, slice(None, -1))
+    return difference / _metric(cell_measure, axis, field.dtype)
 
 
 def _face_axis_laplacian(field: Field, axis: int, condition: BoundaryCondition) -> jnp.ndarray:
