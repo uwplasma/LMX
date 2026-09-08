@@ -8,6 +8,7 @@ import pytest
 from lmx.grid import (
     CENTER,
     FACE,
+    POLAR,
     Field,
     Grid,
     geometric_faces,
@@ -217,3 +218,51 @@ def test_wall_resolving_faces_accept_a_uniform_growth_ratio():
     widths = np.diff(faces)
     assert np.allclose(widths, widths[0], atol=1e-14)
     assert float(np.sum(widths[:8])) <= 0.5 + 1.0e-9
+
+
+def test_the_polar_metric_integrates_a_cylinder():
+    """Volumes and areas are the metric; every stencil reads the geometry through them."""
+    grid = Grid(
+        uniform_faces(8, 0.0, 1.0),
+        uniform_faces(16, 0.0, 2.0 * np.pi),
+        uniform_faces(2, 0.0, 1.0),
+        geometry=POLAR,
+    )
+    assert grid.is_polar
+    assert grid.cell_volumes().sum() == pytest.approx(np.pi)
+    # The face on the axis has no area, which is what makes it need no condition.
+    assert np.max(np.abs(grid.face_areas(0)[0])) == 0.0
+    assert grid.face_areas(0)[-1].sum() == pytest.approx(2.0 * np.pi)
+    assert grid.face_areas(2)[:, :, 0].sum() == pytest.approx(np.pi)
+    # An azimuthal face is dr*dz, with no radius in it.
+    assert grid.face_areas(1)[0, 0, 0] == pytest.approx(0.125 * 0.5)
+
+
+def test_a_polar_grid_checks_what_its_coordinates_mean():
+    with pytest.raises(ValueError, match="geometry must be one of"):
+        Grid(
+            uniform_faces(2, 0.0, 1.0),
+            uniform_faces(2, 0.0, 1.0),
+            uniform_faces(2, 0.0, 1.0),
+            geometry="toroidal",
+        )
+    with pytest.raises(ValueError, match="span 2\\*pi in the azimuth"):
+        Grid(
+            uniform_faces(2, 0.0, 1.0), uniform_faces(2, 0.0, 3.0), uniform_faces(2, 0.0, 1.0), geometry=POLAR
+        )
+    with pytest.raises(ValueError, match="non-negative radius"):
+        Grid(
+            uniform_faces(2, -1.0, 1.0),
+            uniform_faces(2, 0.0, 2.0 * np.pi),
+            uniform_faces(2, 0.0, 1.0),
+            geometry=POLAR,
+        )
+    cartesian = Grid(uniform_faces(2, 0.0, 1.0), uniform_faces(2, 0.0, 1.0), uniform_faces(2, 0.0, 1.0))
+    polar = Grid(
+        uniform_faces(2, 0.0, 1.0),
+        uniform_faces(2, 0.0, 2.0 * np.pi),
+        uniform_faces(2, 0.0, 1.0),
+        geometry=POLAR,
+    )
+    assert cartesian != polar
+    assert hash(cartesian) != hash(polar)

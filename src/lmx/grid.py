@@ -19,6 +19,8 @@ import jax
 import numpy as np
 
 __all__ = [
+    "CARTESIAN",
+    "POLAR",
     "CENTER",
     "FACE",
     "Field",
@@ -45,25 +47,60 @@ def _validated(faces: Sequence[float] | np.ndarray, *, name: str) -> np.ndarray:
     return values
 
 
+CARTESIAN = "cartesian"
+POLAR = "polar"
+_GEOMETRIES = (CARTESIAN, POLAR)
+
+
 @dataclass(frozen=True)
 class Grid:
-    """Immutable tensor-product grid defined by strictly increasing face coordinates."""
+    """Immutable tensor-product grid defined by strictly increasing face coordinates.
+
+    ``geometry`` names what the three coordinates mean. :data:`CARTESIAN` is
+    ``(x, y, z)``. :data:`POLAR` is ``(r, theta, z)``, which is a tensor product
+    in the coordinates but not in the metric: an azimuthal face keeps its area
+    while a radial one grows with ``r``, and the azimuthal distance between two
+    cell centres is ``r*dtheta``. Every stencil in :mod:`lmx.ops` reads the
+    metric through :meth:`face_areas`, :meth:`cell_volumes` and
+    :func:`lmx.ops.face_distances`, so putting it here is enough to make the
+    same operators solve a pipe.
+
+    The axis is not a special case in flux form. The face at ``r = 0`` has zero
+    area, so nothing flows through it and no regularity condition has to be
+    imposed by hand -- which is the reason to write the divergence as a flux
+    balance rather than as a differentiated product.
+    """
 
     x_faces: np.ndarray
     y_faces: np.ndarray
     z_faces: np.ndarray
+    geometry: str = CARTESIAN
 
     def __post_init__(self) -> None:
         for axis in _AXES:
             object.__setattr__(self, f"{axis}_faces", _validated(getattr(self, f"{axis}_faces"), name=axis))
+        if self.geometry not in _GEOMETRIES:
+            raise ValueError(f"geometry must be one of {list(_GEOMETRIES)}, got {self.geometry!r}")
+        if self.geometry == POLAR:
+            if self.x_faces[0] < 0.0:
+                raise ValueError("a polar grid needs a non-negative radius")
+            span = float(self.y_faces[-1] - self.y_faces[0])
+            if not np.isclose(span, 2.0 * np.pi):
+                raise ValueError(f"a polar grid must span 2*pi in the azimuth, got {span:.6g}")
 
     def __hash__(self) -> int:
-        return hash(tuple(faces.tobytes() for faces in self.faces))
+        return hash((self.geometry, tuple(faces.tobytes() for faces in self.faces)))
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Grid):
             return NotImplemented
-        return all(np.array_equal(a, b) for a, b in zip(self.faces, other.faces, strict=True))
+        return self.geometry == other.geometry and all(
+            np.array_equal(a, b) for a, b in zip(self.faces, other.faces, strict=True)
+        )
+
+    @property
+    def is_polar(self) -> bool:
+        return self.geometry == POLAR
 
     @property
     def faces(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -103,6 +140,9 @@ class Grid:
     def cell_volumes(self) -> np.ndarray:
         """Volume of every cell, shaped like the cell-centred field."""
         dx, dy, dz = self.widths
+        if self.is_polar:
+            radial = 0.5 * (self.x_faces[1:] ** 2 - self.x_faces[:-1] ** 2)
+            return radial[:, None, None] * dy[None, :, None] * dz[None, None, :]
         return dx[:, None, None] * dy[None, :, None] * dz[None, None, :]
 
     def face_areas(self, axis: str | int) -> np.ndarray:
@@ -113,6 +153,15 @@ class Grid:
             if other == index:
                 continue
             area = area * width.reshape([-1 if axes == other else 1 for axes in range(3)])
+        if not self.is_polar:
+            return area
+        # A radial face is r*dtheta*dz, an azimuthal one dr*dz, an axial one the
+        # annular sector; only the first two follow from the widths alone.
+        if index == 0:
+            return area * self.x_faces[:, None, None]
+        if index == 2:
+            radial = 0.5 * (self.x_faces[1:] ** 2 - self.x_faces[:-1] ** 2)
+            return (radial / self.widths[0])[:, None, None] * area
         return area
 
     def face_shape(self, axis: str | int) -> tuple[int, int, int]:
