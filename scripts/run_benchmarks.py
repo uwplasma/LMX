@@ -251,9 +251,13 @@ def _shard_case(jax, cells: int, steps: int, repeats: int) -> dict:
     mesh = Mesh(np.array(devices), ("d",))
     placed = jax.device_put(jnp.asarray(vorticity, dtype=dtype), NamedSharding(mesh, Spec("d", None)))
     _, sharded_seconds, result = _timed(jax, lambda: evolve(placed), repeats)
-    difference = float(jnp.max(jnp.abs(jnp.asarray(result) - jnp.asarray(reference))))
-    scale = float(jnp.max(jnp.abs(jnp.asarray(reference))))
-    tolerance = 1.0e3 * float(np.finfo(np.asarray(reference).dtype).eps) * scale
+    # Compare on the host: the two results live on different device sets, and
+    # subtracting them on device is itself the error this case exists to avoid.
+    single_values = np.asarray(jax.device_get(reference))
+    sharded_values = np.asarray(jax.device_get(result))
+    difference = float(np.max(np.abs(sharded_values - single_values)))
+    scale = float(np.max(np.abs(single_values)))
+    tolerance = 1.0e3 * float(np.finfo(single_values.dtype).eps) * scale
     return {
         "case": "q2d_shard",
         "cells": cells**2,
