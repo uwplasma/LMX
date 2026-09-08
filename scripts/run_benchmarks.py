@@ -193,6 +193,75 @@ def _host_sync_case(jax, cells: int, steps: int, repeats: int) -> dict:
     }
 
 
+def _shard_case(jax, cells: int, steps: int, repeats: int) -> dict:
+    """Run the quasi-2D evolution on every device at once and see what it costs.
+
+    The array is placed with a :class:`jax.sharding.NamedSharding` and nothing
+    else is changed, so this measures what XLA's partitioner does unaided --
+    the baseline any hand-written decomposition has to beat. Two numbers come
+    out: whether the sharded answer is the same one (it must be, to round-off)
+    and the strong-scaling efficiency, single-device time over device count
+    times sharded time.
+
+    The staggered three-dimensional core is not here. Its three components have
+    lengths ``n+1`` on their own axis and ``n`` on the others, so no single axis
+    divides evenly across all of them, and every solve contracts along all three
+    axes. That needs a decomposition designed for it, not a placement.
+    """
+    import jax.numpy as jnp
+    import numpy as np
+    from jax.sharding import Mesh, NamedSharding
+    from jax.sharding import PartitionSpec as Spec
+
+    import lmx
+
+    devices = jax.devices()
+    if len(devices) < 2:
+        return {"case": "q2d_shard", "shape": [cells, cells], "accepted": False, "error": "one device"}
+    wavenumber = np.fft.fftfreq(cells, d=1.0 / cells)
+    total = np.sqrt(wavenumber[:, None] ** 2 + wavenumber[None, :] ** 2)
+    amplitude = np.where(total > 0, (total / 12.0) ** 4 * np.exp(-2.0 * (total / 12.0) ** 2), 0.0)
+    phase = np.exp(2j * np.pi * np.asarray(jax.random.uniform(jax.random.PRNGKey(0), (cells, cells))))
+    vorticity = np.fft.ifftn(amplitude * phase).real
+    vorticity *= 4.0 / np.sqrt(np.mean(vorticity**2))
+    dtype = jnp.float64 if jax.config.jax_enable_x64 else jnp.float32
+
+    def evolve(field):
+        problem = lmx.Q2DProblem(
+            field,
+            length=(2.0 * np.pi, 2.0 * np.pi),
+            viscosity=2.0e-4,
+            hartmann_friction=2.0e-2,
+            dt=2.0e-3,
+            steps=steps,
+            history_stride=steps,
+        )
+        return lmx.solve(problem).vorticity
+
+    compiled = jax.jit(evolve)
+    single = jax.device_put(jnp.asarray(vorticity, dtype=dtype), devices[0])
+    _, single_seconds, reference = _timed(jax, lambda: compiled(single), repeats)
+    mesh = Mesh(np.array(devices), ("d",))
+    placed = jax.device_put(jnp.asarray(vorticity, dtype=dtype), NamedSharding(mesh, Spec("d", None)))
+    _, sharded_seconds, result = _timed(jax, lambda: compiled(placed), repeats)
+    difference = float(jnp.max(jnp.abs(jnp.asarray(result) - jnp.asarray(reference))))
+    scale = float(jnp.max(jnp.abs(jnp.asarray(reference))))
+    tolerance = 1.0e3 * float(np.finfo(np.asarray(reference).dtype).eps) * scale
+    return {
+        "case": "q2d_shard",
+        "cells": cells**2,
+        "shape": [cells, cells],
+        "steps": steps,
+        "devices": len(devices),
+        "single_seconds": single_seconds,
+        "sharded_seconds": sharded_seconds,
+        "efficiency": single_seconds / (len(devices) * sharded_seconds),
+        "agreement": difference,
+        "agreement_tolerance": tolerance,
+        "accepted": difference < tolerance,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--cases", default="core3d,q2d,hostsync", help="Comma-separated case names.")
@@ -216,6 +285,8 @@ def main(argv: list[str] | None = None) -> int:
         plan += [(_q2d_case, int(value)) for value in arguments.q2d_sizes.split(",") if value]
     if "hostsync" in requested:
         plan += [(_host_sync_case, int(arguments.core3d_sizes.split(",")[0]))]
+    if "shard" in requested:
+        plan += [(_shard_case, int(value)) for value in arguments.q2d_sizes.split(",") if value]
     for builder, size in plan:
         try:
             entry = builder(jax, size, arguments.steps, arguments.repeats)
