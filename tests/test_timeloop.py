@@ -13,7 +13,7 @@ from lmx.bc import NEUMANN, PERIODIC, BoundaryCondition
 from lmx.core3d import ChannelProblem, step, zero_velocity
 from lmx.grid import Grid, uniform_faces
 from lmx.ops import divergence
-from lmx.timeloop import advance, trajectory_diagnostics
+from lmx.timeloop import advance, energy_budget, kinetic_energy, trajectory_diagnostics
 
 pytestmark = pytest.mark.unit
 
@@ -127,3 +127,70 @@ def test_diagnostics_match_a_direct_evaluation():
 def test_advance_validates_its_length():
     with pytest.raises(ValueError, match="steps must be positive"):
         advance(_problem(cells=4), 0)
+
+
+def _uniform_duct(cells: int = 12, hartmann: float = 10.0, conductance: float = 0.0, **overrides):
+    """A duct on a uniform mesh, where the interpolations carry no stretching error."""
+    grid = Grid(uniform_faces(1, 0.0, 1.0), uniform_faces(cells, -1.0, 1.0), uniform_faces(cells, -1.0, 1.0))
+    settings = dict(
+        grid=grid,
+        conditions=(PERIODIC_AXIS, WALL, WALL),
+        conductivity=1.0,
+        magnetic_field=(0.0, hartmann, 0.0),
+        forcing=(1.0, 0.0, 0.0),
+        dt=2.0e-3,
+        wall_conductance=(0.0, conductance, 0.0),
+    )
+    settings.update(overrides)
+    return ChannelProblem(**settings)
+
+
+def test_the_lorentz_force_does_exactly_minus_the_joule_dissipation():
+    """A discrete identity, not an approximation: it holds at any state, to round-off."""
+    problem = _uniform_duct()
+    run = advance(problem, 20)
+    budget = energy_budget(run.velocity, problem)
+    assert float(jnp.abs(budget.ohmic_defect / budget.scale)) < 1e-12
+    assert float(budget.joule) > 0.0
+    assert float(budget.lorentz) < 0.0
+
+
+def test_a_conducting_wall_takes_power_out_through_the_boundary():
+    """Leaving the boundary work out is a large error, not a small one."""
+    budgets = {}
+    for cells in (12, 24):
+        problem = _uniform_duct(cells, conductance=0.05)
+        budgets[cells] = energy_budget(advance(problem, 20).velocity, problem)
+    budget = budgets[12]
+    assert float(budget.wall) > 0.0
+    # Dropping the boundary work is a percent-level error, an order above the closure itself.
+    without = float(jnp.abs((budget.joule + budget.lorentz) / budget.scale))
+    assert without > 20.0 * abs(float(budget.ohmic_defect / budget.scale))
+    # The wall potential is the adjacent cell value, so the closure is first order.
+    assert abs(float(budgets[24].ohmic_defect / budgets[24].scale)) < 0.75 * abs(
+        float(budget.ohmic_defect / budget.scale)
+    )
+
+
+def test_the_budget_is_the_rate_of_change_of_kinetic_energy():
+    """`defect` is dE/dt, so a step of half the size halves the error against it."""
+    errors = []
+    for step_size in (4.0e-3, 2.0e-3):
+        problem = _uniform_duct(dt=step_size)
+        start = advance(problem, 10).velocity
+        budget = energy_budget(start, problem)
+        after, _, _ = step(start, problem)
+        rate = (kinetic_energy(after, problem) - kinetic_energy(start, problem)) / step_size
+        errors.append(abs(float((rate - budget.defect) / budget.scale)))
+    assert errors[1] < 0.6 * errors[0], errors
+
+
+def test_a_run_can_be_taken_in_chunks():
+    """Restart is the same physics: the state is the whole of it."""
+    problem = _problem()
+    factorization = problem.factorization()
+    whole = advance(problem, 12, factorization=factorization)
+    first = advance(problem, 6, factorization=factorization)
+    second = advance(problem, 6, first.velocity, factorization=factorization)
+    for chunked, complete in zip(second.velocity, whole.velocity, strict=True):
+        assert np.max(np.abs(np.asarray(chunked.data) - np.asarray(complete.data))) < 1e-14

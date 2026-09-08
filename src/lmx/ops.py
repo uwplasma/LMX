@@ -141,6 +141,11 @@ def face_inner_product(
     The weight is the face area times the centre-to-centre distance, the volume
     of the control cell straddling that face, which is the weight under which
     :func:`divergence` and :func:`face_gradient` are exact adjoints.
+
+    A periodic axis stores its wrap face twice, once at each end, so each copy
+    takes half the weight. Counting both in full would double the measure of
+    that control volume, which an adjoint identity would not notice -- both
+    sides carry the same error -- but an energy budget would, and did.
     """
     grid = left.grid
     index = grid.axis_index(axis)
@@ -148,7 +153,12 @@ def face_inner_product(
     _require_face(right, index)
     if left.grid != right.grid:
         raise ValueError("fields must share one grid")
-    weights = grid.face_areas(index) * _shaped(face_distances(grid, index, condition), index)
+    distances = face_distances(grid, index, condition)
+    if condition.is_periodic:
+        distances = distances.copy()
+        distances[0] *= 0.5
+        distances[-1] *= 0.5
+    weights = grid.face_areas(index) * _shaped(distances, index)
     return jnp.sum(_as_array(weights, left.dtype) * left.data * right.data)
 
 

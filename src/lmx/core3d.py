@@ -93,6 +93,7 @@ __all__ = [
     "ChannelProblem",
     "duct_problem",
     "electric_state",
+    "face_currents",
     "enforce_face_constraints",
     "project",
     "step",
@@ -219,17 +220,17 @@ class ChannelProblem:
         return fast_diagonal_poisson(self.grid, self.scalar_conditions)
 
 
-def electric_state(
+def face_currents(
     velocity: tuple[Field, Field, Field],
     problem: ChannelProblem,
     factorization: FastDiagonalPoisson | None = None,
     field_scale: float | jnp.ndarray = 1.0,
-) -> tuple[Field, tuple[Field, Field, Field]]:
-    """Return the induced potential and the Lorentz force it carries.
+) -> tuple[Field, tuple[Field, Field, Field], tuple[Field, Field, Field]]:
+    """Return the potential, the face-normal currents and the imposed field.
 
-    One place forms the face currents, so the projection step and the steady
-    solve cannot drift apart in how they close the wall or scale the potential.
-    ``field_scale`` multiplies the imposed field and may be traced.
+    One place forms the face currents, so the projection step, the steady solve
+    and the energy budget cannot drift apart in how they close the wall or scale
+    the potential. ``field_scale`` multiplies the imposed field and may be traced.
     """
     factorization = problem.factorization() if factorization is None else factorization
     scalar = problem.scalar_conditions
@@ -254,7 +255,18 @@ def electric_state(
     currents = tuple(
         _closed_current(potential, conductivities[axis], emfs[axis], axis, problem) for axis in range(3)
     )
-    return potential, lorentz_force(currents, field, scalar)
+    return potential, currents, field
+
+
+def electric_state(
+    velocity: tuple[Field, Field, Field],
+    problem: ChannelProblem,
+    factorization: FastDiagonalPoisson | None = None,
+    field_scale: float | jnp.ndarray = 1.0,
+) -> tuple[Field, tuple[Field, Field, Field]]:
+    """Return the induced potential and the Lorentz force it carries."""
+    potential, currents, field = face_currents(velocity, problem, factorization, field_scale)
+    return potential, lorentz_force(currents, field, problem.scalar_conditions)
 
 
 def _closed_current(
