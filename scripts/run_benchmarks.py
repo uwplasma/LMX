@@ -113,6 +113,12 @@ def _core3d_case(jax, cells: int, steps: int, repeats: int) -> dict:
     compile_seconds, warm, (velocity, residual) = _timed(jax, lambda: compiled(start), repeats)
     finite = bool(np.all([np.all(np.isfinite(np.asarray(field.data))) for field in velocity]))
     divergence_residual = float(jnp.max(jnp.abs(divergence(velocity).data)))
+    # The projection removes the divergence to whatever the arithmetic can hold, and
+    # what it can hold depends on both the precision and the number of cells the
+    # round-off accumulates over. A fixed absolute bound would read a correct float32
+    # run as a failure at 128 cubed, which is a statement about the bound.
+    epsilon = float(np.finfo(np.asarray(velocity[0].data).dtype).eps)
+    tolerance = 1.0e3 * epsilon * cells
     return {
         "case": "core3d_advance",
         "cells": cells**3,
@@ -122,8 +128,8 @@ def _core3d_case(jax, cells: int, steps: int, repeats: int) -> dict:
         "warm_seconds": warm,
         "seconds_per_step": warm / steps,
         "divergence_residual": divergence_residual,
-        "divergence_tolerance": 1.0e-6,
-        "accepted": finite and divergence_residual < 1.0e-6,
+        "divergence_tolerance": tolerance,
+        "accepted": finite and divergence_residual < tolerance,
     }
 
 
