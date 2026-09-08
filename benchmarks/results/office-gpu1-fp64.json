@@ -1,0 +1,151 @@
+{
+  "environment": {
+    "host": "pop-os",
+    "platform": "gpu",
+    "device_kind": "NVIDIA RTX A4000",
+    "device_count": 1,
+    "cpu_count": 36,
+    "python": "3.11.15",
+    "jax": "0.10.2",
+    "x64": true,
+    "lmx_commit": "a0b2c2b-dirty"
+  },
+  "cases": [
+    {
+      "case": "core3d_advance",
+      "cells": 32768,
+      "shape": [
+        32,
+        32,
+        32
+      ],
+      "steps": 20,
+      "compile_seconds": 1.6206080471165478,
+      "warm_seconds": 0.00939548690803349,
+      "seconds_per_step": 0.0004697743454016745,
+      "divergence_residual": 1.1086981371760483e-16,
+      "divergence_tolerance": 7.105427357601002e-12,
+      "accepted": true
+    },
+    {
+      "case": "core3d_advance",
+      "cells": 262144,
+      "shape": [
+        64,
+        64,
+        64
+      ],
+      "steps": 20,
+      "compile_seconds": 4.353686120826751,
+      "warm_seconds": 0.07530580391176045,
+      "seconds_per_step": 0.0037652901955880225,
+      "divergence_residual": 2.2165874578016131e-16,
+      "divergence_tolerance": 1.4210854715202004e-11,
+      "accepted": true
+    },
+    {
+      "case": "core3d_advance",
+      "cells": 2097152,
+      "shape": [
+        128,
+        128,
+        128
+      ],
+      "steps": 20,
+      "compile_seconds": 10.127216767054051,
+      "warm_seconds": 1.0615917751565576,
+      "seconds_per_step": 0.05307958875782788,
+      "divergence_residual": 4.4381470058505785e-16,
+      "divergence_tolerance": 2.8421709430404007e-11,
+      "accepted": true
+    },
+    {
+      "case": "core3d_advance",
+      "cells": 7077888,
+      "shape": [
+        192,
+        192,
+        192
+      ],
+      "steps": 20,
+      "compile_seconds": 25.18466184590943,
+      "warm_seconds": 5.345705623971298,
+      "seconds_per_step": 0.26728528119856493,
+      "divergence_residual": 1.957838871395856e-15,
+      "divergence_tolerance": 4.263256414560601e-11,
+      "accepted": true
+    },
+    {
+      "case": "q2d_evolve",
+      "cells": 65536,
+      "shape": [
+        256,
+        256
+      ],
+      "steps": 20,
+      "compile_seconds": 4.465362127870321,
+      "warm_seconds": 0.07153451512567699,
+      "seconds_per_step": 0.0035767257562838496,
+      "accepted": true
+    },
+    {
+      "case": "q2d_evolve",
+      "cells": 262144,
+      "shape": [
+        512,
+        512
+      ],
+      "steps": 20,
+      "compile_seconds": 3.798348532989621,
+      "warm_seconds": 0.1709709509741515,
+      "seconds_per_step": 0.008548547548707574,
+      "accepted": true
+    },
+    {
+      "case": "q2d_evolve",
+      "cells": 1048576,
+      "shape": [
+        1024,
+        1024
+      ],
+      "steps": 20,
+      "compile_seconds": 4.416673426982015,
+      "warm_seconds": 0.6255767571274191,
+      "seconds_per_step": 0.03127883785637096,
+      "accepted": true
+    },
+    {
+      "case": "q2d_evolve",
+      "cells": 4194304,
+      "shape": [
+        2048,
+        2048
+      ],
+      "steps": 20,
+      "compile_seconds": 6.104370713001117,
+      "warm_seconds": 2.375244846800342,
+      "seconds_per_step": 0.11876224234001712,
+      "accepted": true
+    },
+    {
+      "case": "core3d_host_sync",
+      "cells": 32768,
+      "shape": [
+        32,
+        32,
+        32
+      ],
+      "steps": [
+        20,
+        80
+      ],
+      "seconds_per_step": [
+        0.0004733333014883101,
+        0.0004306809249101207
+      ],
+      "per_step_ratio": 0.9098893391948616,
+      "ratio_tolerance": 1.15,
+      "accepted": true
+    }
+  ]
+}

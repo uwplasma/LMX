@@ -142,6 +142,33 @@ python examples/q2d_turbulence_demo.py
 - Energy and enstrophy budget identities checked on every run.
 - 256² for 3,000 steps in about 20 s on a laptop CPU.
 
+## Performance
+
+![Time per step against problem size, CPU and GPU, both precisions](docs/_static/device_scaling.webp)
+
+```console
+python scripts/run_benchmarks.py --output benchmarks/results/mine.json
+python scripts/make_showcase_figures.py --only scaling
+```
+
+Measured on a 36-core CPU and one RTX A4000, both from the same commit, with the
+compile time, the warm time and the time per step kept apart.
+
+- **Float32 meets both targets:** 29.6× on the 3-D core at 128³, 54.5× on Q2D at 1024².
+- **Float64 does not, and the reason is the card:** an A4000 runs float64 at 1/64
+  of its float32 rate, and the fast-diagonalization contractions are `O(N⁴)`, so
+  the 3-D core goes flop-bound — 3.4× at 128³, falling as the problem grows.
+- **The loop really runs ahead:** the same trajectory at 10 and at 40 steps costs
+  the same per step, so nothing synchronises with the host inside it.
+- Every number carries an `accepted` flag judged against the precision it was
+  computed in; a run that lost its divergence-free constraint is reported, not quoted.
+
+Two GPUs give the **same answer bit for bit** on the Q2D solve, and no speed-up:
+the strong-scaling efficiency of an unaided placement is 0.25 in float64 and
+0.14 in float32 at 2048², because the transforms all-gather every step across
+PCIe. Correct, not yet faster — the numbers are in
+[`benchmarks/results`](benchmarks/results) and the next step is in the [plan](plan.md).
+
 ## Comparison with other codes
 
 | Comparison | What it establishes | Status |
