@@ -8,32 +8,56 @@
     "python": "3.11.15",
     "jax": "0.10.2",
     "x64": true,
-    "lmx_commit": "3bfc767-dirty"
+    "lmx_commit": "a0b2c2b-dirty"
   },
   "cases": [
     {
-      "case": "_shard_case",
+      "case": "q2d_shard",
+      "cells": 262144,
       "shape": [
+        512,
         512
       ],
-      "accepted": false,
-      "error": "Received incompatible devices for jitted computation. Got argument x of subtract with shape float64[512,512] and with device ids [0, 1] on platform GPU and argument y of subtract with shape float64[51"
+      "steps": 20,
+      "devices": 2,
+      "single_seconds": 0.18084591394290328,
+      "sharded_seconds": 0.34023257601074874,
+      "efficiency": 0.26576807556662346,
+      "agreement": 0.0,
+      "agreement_tolerance": 3.4306964487564518e-12,
+      "accepted": true
     },
     {
-      "case": "_shard_case",
+      "case": "q2d_shard",
+      "cells": 1048576,
       "shape": [
+        1024,
         1024
       ],
-      "accepted": false,
-      "error": "Received incompatible devices for jitted computation. Got argument x of subtract with shape float64[1024,1024] and with device ids [0, 1] on platform GPU and argument y of subtract with shape float64["
+      "steps": 20,
+      "devices": 2,
+      "single_seconds": 0.6270962238777429,
+      "sharded_seconds": 1.2385758450254798,
+      "efficiency": 0.25315212887299704,
+      "agreement": 0.0,
+      "agreement_tolerance": 4.121896726905474e-12,
+      "accepted": true
     },
     {
-      "case": "_shard_case",
+      "case": "q2d_shard",
+      "cells": 4194304,
       "shape": [
+        2048,
         2048
       ],
-      "accepted": false,
-      "error": "Received incompatible devices for jitted computation. Got argument x of subtract with shape float64[2048,2048] and with device ids [0, 1] on platform GPU and argument y of subtract with shape float64["
+      "steps": 20,
+      "devices": 2,
+      "single_seconds": 2.384809244191274,
+      "sharded_seconds": 4.703328911913559,
+      "efficiency": 0.2535235456476942,
+      "agreement": 0.0,
+      "agreement_tolerance": 3.718199575864368e-12,
+      "accepted": true
     }
   ]
 }

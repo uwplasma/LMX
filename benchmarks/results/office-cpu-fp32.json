@@ -8,7 +8,7 @@
     "python": "3.11.15",
     "jax": "0.10.2",
     "x64": false,
-    "lmx_commit": "4b0096f-dirty"
+    "lmx_commit": "a0b2c2b-dirty"
   },
   "cases": [
     {
@@ -20,9 +20,9 @@
         32
       ],
       "steps": 20,
-      "compile_seconds": 0.8625537548214197,
-      "warm_seconds": 0.08293674583546817,
-      "seconds_per_step": 0.004146837291773409,
+      "compile_seconds": 0.8347426010295749,
+      "warm_seconds": 0.12692276388406754,
+      "seconds_per_step": 0.006346138194203377,
       "divergence_residual": 5.9323451040427244e-08,
       "divergence_tolerance": 0.003814697265625,
       "accepted": true
@@ -36,9 +36,9 @@
         64
       ],
       "steps": 20,
-      "compile_seconds": 1.4436605088412762,
-      "warm_seconds": 0.42298925877548754,
-      "seconds_per_step": 0.02114946293877438,
+      "compile_seconds": 1.3549248098861426,
+      "warm_seconds": 0.4214962888509035,
+      "seconds_per_step": 0.021074814442545175,
       "divergence_residual": 1.1840555913522621e-07,
       "divergence_tolerance": 0.00762939453125,
       "accepted": true
@@ -52,9 +52,9 @@
         128
       ],
       "steps": 20,
-      "compile_seconds": 4.844854117138311,
-      "warm_seconds": 2.1928150299936533,
-      "seconds_per_step": 0.10964075149968266,
+      "compile_seconds": 4.733909151982516,
+      "warm_seconds": 2.3717444739304483,
+      "seconds_per_step": 0.11858722369652241,
       "divergence_residual": 2.3813360883195855e-07,
       "divergence_tolerance": 0.0152587890625,
       "accepted": true
@@ -67,9 +67,9 @@
         256
       ],
       "steps": 20,
-      "compile_seconds": 3.8368334660772234,
-      "warm_seconds": 0.5310628630686551,
-      "seconds_per_step": 0.026553143153432757,
+      "compile_seconds": 4.3275193511508405,
+      "warm_seconds": 0.550454803975299,
+      "seconds_per_step": 0.02752274019876495,
       "accepted": true
     },
     {
@@ -80,9 +80,9 @@
         512
       ],
       "steps": 20,
-      "compile_seconds": 5.7085582700092345,
-      "warm_seconds": 2.452820135978982,
-      "seconds_per_step": 0.1226410067989491,
+      "compile_seconds": 5.971959206974134,
+      "warm_seconds": 2.470524376956746,
+      "seconds_per_step": 0.1235262188478373,
       "accepted": true
     },
     {
@@ -93,9 +93,9 @@
         1024
       ],
       "steps": 20,
-      "compile_seconds": 11.24167187185958,
-      "warm_seconds": 7.682329681934789,
-      "seconds_per_step": 0.38411648409673943,
+      "compile_seconds": 10.545931713888422,
+      "warm_seconds": 8.071572137996554,
+      "seconds_per_step": 0.4035786068998277,
       "accepted": true
     }
   ]

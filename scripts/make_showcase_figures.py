@@ -371,7 +371,9 @@ def benchmark_scaling() -> None:
             f", {'fp64' if environment['x64'] else 'fp32'}"
         )
         for entry in report["cases"]:
-            if not entry.get("accepted"):
+            # The host-sync and sharding cases report their own numbers; this
+            # figure is about time against size on one device.
+            if not entry.get("accepted") or not isinstance(entry.get("seconds_per_step"), float):
                 continue
             series.setdefault((entry["case"], label), []).append((entry["cells"], entry["seconds_per_step"]))
 
