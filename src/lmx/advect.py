@@ -55,6 +55,8 @@ def momentum_advection(
     """
     if len(conditions) != 3:
         raise ValueError("momentum advection needs one boundary condition per axis")
+    if velocity[0].grid.is_polar:
+        raise ValueError("momentum transport on a polar grid needs the curvature terms; not implemented")
     return tuple(_component(velocity, component, conditions, limited) for component in range(3))
 
 
