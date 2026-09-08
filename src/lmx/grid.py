@@ -164,6 +164,25 @@ class Grid:
             return (radial / self.widths[0])[:, None, None] * area
         return area
 
+    def axis_measures(self, axis: str | int) -> tuple[np.ndarray, np.ndarray]:
+        """Return the face and cell measures of one axis, with the other two divided out.
+
+        A one-dimensional stencil along ``axis`` needs the flux area and the
+        control volume only up to whatever the other two directions contribute,
+        because that part cancels between them. Cartesian returns ones and the
+        cell widths; polar returns the radius on the radial faces and the
+        annular measure on the cells, which is what turns a plain second
+        difference into ``(1/r) d/dr (r d/dr)``.
+        """
+        index = self.axis_index(axis)
+        widths = np.asarray(self.widths[index])
+        if not self.is_polar or index == 2:
+            return np.ones(self.shape[index] + 1), widths
+        if index == 0:
+            return np.asarray(self.x_faces), np.asarray(self.centers[0]) * widths
+        radius = np.asarray(self.centers[0])[:, None, None]
+        return np.ones(self.shape[1] + 1), radius * widths[None, :, None]
+
     def face_shape(self, axis: str | int) -> tuple[int, int, int]:
         """Shape of a field living on the faces normal to ``axis`` (walls included)."""
         index = self.axis_index(axis)
