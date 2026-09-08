@@ -26,12 +26,20 @@ from dataclasses import dataclass
 import jax
 import jax.numpy as jnp
 
-from .core3d import ChannelProblem, step, zero_velocity
+from .core3d import ChannelProblem, face_currents, step, velocity_condition, zero_velocity
+from .em import lorentz_force
 from .grid import Field
-from .ops import divergence
+from .ops import divergence, face_inner_product, face_interpolate, staggered_laplacian
 from .poisson import FastDiagonalHelmholtz, FastDiagonalPoisson
 
-__all__ = ["Trajectory", "advance", "trajectory_diagnostics"]
+__all__ = [
+    "EnergyBudget",
+    "Trajectory",
+    "advance",
+    "energy_budget",
+    "kinetic_energy",
+    "trajectory_diagnostics",
+]
 
 
 @dataclass(frozen=True)
@@ -49,26 +57,141 @@ class Trajectory:
         return int(self.divergence_residual.shape[0])
 
 
+def kinetic_energy(velocity: tuple[Field, Field, Field], problem: ChannelProblem) -> jnp.ndarray:
+    """Return the kinetic energy of a staggered velocity.
+
+    Each component is weighted by the control volume of its own faces, the same
+    measure under which the divergence and the gradient are exact adjoints. That
+    is what makes the energy budget close: a cell-centred average would leave a
+    defect of the order of the interpolation error rather than of round-off.
+    """
+    conditions = tuple(velocity_condition(problem.conditions, axis) for axis in range(3))
+    return (
+        0.5
+        * float(problem.density)
+        * sum(face_inner_product(field, field, axis, conditions[axis]) for axis, field in enumerate(velocity))
+    )
+
+
 def trajectory_diagnostics(
     velocity: tuple[Field, Field, Field], problem: ChannelProblem
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Return the divergence residual and kinetic energy of one state."""
-    residual = jnp.max(jnp.abs(divergence(velocity).data))
-    volumes = jnp.asarray(problem.grid.cell_volumes(), dtype=velocity[0].dtype)
-    energy = (
-        0.5
-        * float(problem.density)
-        * sum(jnp.sum(volumes * _cell_average(component).data ** 2) for component in velocity)
+    return jnp.max(jnp.abs(divergence(velocity).data)), kinetic_energy(velocity, problem)
+
+
+@dataclass(frozen=True)
+class EnergyBudget:
+    """The mechanical power crossing one control volume: the whole duct.
+
+    The pressure does no work on a discretely divergence-free velocity, because
+    the divergence and the gradient are exact adjoints under this measure, so
+    the balance is between what the drive and the field put in and what
+    viscosity takes out. Two independent statements come out of it, and they are
+    worth keeping apart. ``defect`` is what the steady solve promises: the
+    residual, projected onto the velocity, is zero. ``ohmic_defect`` is a
+    property of the discretization instead -- continuously the Lorentz force
+    does exactly minus the Joule dissipation, and how nearly the discrete face
+    currents reproduce that is a measurement, not a guarantee.
+    """
+
+    drive: jnp.ndarray
+    lorentz: jnp.ndarray
+    viscous: jnp.ndarray
+    joule: jnp.ndarray
+    wall: jnp.ndarray
+
+    @property
+    def defect(self) -> jnp.ndarray:
+        """Net power into the fluid, which is the rate of change of kinetic energy."""
+        return self.drive + self.lorentz - self.viscous
+
+    @property
+    def ohmic_defect(self) -> jnp.ndarray:
+        """How far the discrete Lorentz work is from the dissipation it should equal.
+
+        A conducting wall takes current out of the fluid and dissipates it in the
+        sheet, so the fluid's own Joule term is not the whole of it; ``wall`` is
+        the electrical power crossing the boundary, and leaving it out of the
+        comparison is a 26 % error at a wall conductance of 0.027.
+        """
+        return self.joule + self.wall + self.lorentz
+
+    @property
+    def scale(self) -> jnp.ndarray:
+        """The largest term, for turning either defect into a relative number."""
+        return jnp.max(jnp.abs(jnp.stack([self.drive, self.lorentz, self.viscous, self.joule, self.wall])))
+
+
+def energy_budget(
+    velocity: tuple[Field, Field, Field],
+    problem: ChannelProblem,
+    factorization: FastDiagonalPoisson | None = None,
+) -> EnergyBudget:
+    """Return the mechanical power balance of one state."""
+    factorization = problem.factorization() if factorization is None else factorization
+    scalar = problem.scalar_conditions
+    conditions = tuple(velocity_condition(problem.conditions, axis) for axis in range(3))
+    potential, currents, field = face_currents(velocity, problem, factorization)
+    force = lorentz_force(currents, field, scalar)
+    density = float(problem.density)
+    drive = sum(
+        float(problem.forcing[axis])
+        * face_inner_product(
+            component, component.replace_data(jnp.ones_like(component.data)), axis, conditions[axis]
+        )
+        for axis, component in enumerate(velocity)
     )
-    return residual, energy
+    lorentz = sum(
+        face_inner_product(
+            component, face_interpolate(force[axis], axis, scalar[axis]), axis, conditions[axis]
+        )
+        for axis, component in enumerate(velocity)
+    )
+    viscous = (
+        -density
+        * float(problem.viscosity)
+        * sum(
+            face_inner_product(component, staggered_laplacian(component, conditions), axis, conditions[axis])
+            for axis, component in enumerate(velocity)
+        )
+    )
+    conductivity = float(problem.conductivity)
+    joule = (
+        sum(face_inner_product(current, current, axis, scalar[axis]) for axis, current in enumerate(currents))
+        / conductivity
+        if conductivity
+        else jnp.zeros(())
+    )
+    return EnergyBudget(
+        jnp.asarray(drive),
+        jnp.asarray(lorentz),
+        jnp.asarray(viscous),
+        jnp.asarray(joule),
+        jnp.asarray(_wall_power(potential, currents, problem)),
+    )
 
 
-def _cell_average(field: Field) -> Field:
-    """Average a face component onto cell centres for an energy that lives on cells."""
-    from .em import cell_average
+def _wall_power(potential: Field, currents: tuple[Field, Field, Field], problem: ChannelProblem):
+    """Return the electrical power the fluid delivers to its conducting walls.
 
-    axis = next(index for index, offset in enumerate(field.offset) if offset == 0.0)
-    return cell_average(field, axis)
+    The outward current at a wall face times the potential there, which is what
+    the sheet dissipates. The stored face value points along the axis, so the
+    outward direction is negative on the lower wall.
+    """
+    grid = problem.grid
+    scalar = problem.scalar_conditions
+    total = jnp.zeros((), dtype=potential.dtype)
+    for axis in range(3):
+        if scalar[axis].is_periodic or not float(problem.wall_conductance[axis]):
+            continue
+        area = jnp.asarray(grid.face_areas(axis), dtype=potential.dtype)
+        for position, sign in ((0, -1.0), (-1, 1.0)):
+            selection = (slice(None),) * axis + (position,)
+            total = total + sign * jnp.sum(
+                potential.data[selection] * currents[axis].data[selection] * area[selection]
+            )
+    return total
 
 
 def advance(

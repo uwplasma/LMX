@@ -206,3 +206,20 @@ def test_the_answer_follows_the_hartmann_number_and_not_the_conductivity():
 def test_the_hunt_reference_values_are_what_the_spectral_solve_returns():
     for conductance, cached in HUNT_FLOW_RATE.items():
         assert flow_rate(20.0, 64, hartmann_wall=conductance) == pytest.approx(cached, rel=2e-4)
+
+
+def test_the_steady_state_closes_its_mechanical_power_balance():
+    """What the drive and the field put in is what viscosity takes out, to round-off.
+
+    The pressure does no work on a discretely divergence-free velocity, so this
+    is the residual of the steady solve projected onto the velocity itself: an
+    independent reading of the same claim, in energy rather than in momentum.
+    """
+    from lmx.timeloop import energy_budget
+
+    for conductance in (0.0, 0.027):
+        problem = _duct(32, 20.0, ratio=1.35, conductance=conductance)
+        budget = energy_budget(solve_steady_state(problem, pseudo_step=1.0e3).velocity, problem)
+        assert abs(float(budget.defect / budget.scale)) < 1e-10
+        assert float(budget.drive) > 0.0
+        assert float(budget.viscous) > 0.0
