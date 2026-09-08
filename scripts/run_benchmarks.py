@@ -227,6 +227,9 @@ def _shard_case(jax, cells: int, steps: int, repeats: int) -> dict:
     dtype = jnp.float64 if jax.config.jax_enable_x64 else jnp.float32
 
     def evolve(field):
+        # `lmx.solve` compiles internally and reports a status, so it cannot be
+        # wrapped in another `jit`; the placement of its input is what the
+        # partitioner sees.
         problem = lmx.Q2DProblem(
             field,
             length=(2.0 * np.pi, 2.0 * np.pi),
@@ -238,12 +241,11 @@ def _shard_case(jax, cells: int, steps: int, repeats: int) -> dict:
         )
         return lmx.solve(problem).vorticity
 
-    compiled = jax.jit(evolve)
     single = jax.device_put(jnp.asarray(vorticity, dtype=dtype), devices[0])
-    _, single_seconds, reference = _timed(jax, lambda: compiled(single), repeats)
+    _, single_seconds, reference = _timed(jax, lambda: evolve(single), repeats)
     mesh = Mesh(np.array(devices), ("d",))
     placed = jax.device_put(jnp.asarray(vorticity, dtype=dtype), NamedSharding(mesh, Spec("d", None)))
-    _, sharded_seconds, result = _timed(jax, lambda: compiled(placed), repeats)
+    _, sharded_seconds, result = _timed(jax, lambda: evolve(placed), repeats)
     difference = float(jnp.max(jnp.abs(jnp.asarray(result) - jnp.asarray(reference))))
     scale = float(jnp.max(jnp.abs(jnp.asarray(reference))))
     tolerance = 1.0e3 * float(np.finfo(np.asarray(reference).dtype).eps) * scale
