@@ -1,0 +1,63 @@
+{
+  "environment": {
+    "host": "pop-os",
+    "platform": "gpu",
+    "device_kind": "NVIDIA RTX A4000",
+    "device_count": 2,
+    "cpu_count": 36,
+    "python": "3.11.15",
+    "jax": "0.10.2",
+    "x64": true,
+    "lmx_commit": "a0b2c2b-dirty"
+  },
+  "cases": [
+    {
+      "case": "q2d_shard",
+      "cells": 262144,
+      "shape": [
+        512,
+        512
+      ],
+      "steps": 20,
+      "devices": 2,
+      "single_seconds": 0.18084591394290328,
+      "sharded_seconds": 0.34023257601074874,
+      "efficiency": 0.26576807556662346,
+      "agreement": 0.0,
+      "agreement_tolerance": 3.4306964487564518e-12,
+      "accepted": true
+    },
+    {
+      "case": "q2d_shard",
+      "cells": 1048576,
+      "shape": [
+        1024,
+        1024
+      ],
+      "steps": 20,
+      "devices": 2,
+      "single_seconds": 0.6270962238777429,
+      "sharded_seconds": 1.2385758450254798,
+      "efficiency": 0.25315212887299704,
+      "agreement": 0.0,
+      "agreement_tolerance": 4.121896726905474e-12,
+      "accepted": true
+    },
+    {
+      "case": "q2d_shard",
+      "cells": 4194304,
+      "shape": [
+        2048,
+        2048
+      ],
+      "steps": 20,
+      "devices": 2,
+      "single_seconds": 2.384809244191274,
+      "sharded_seconds": 4.703328911913559,
+      "efficiency": 0.2535235456476942,
+      "agreement": 0.0,
+      "agreement_tolerance": 3.718199575864368e-12,
+      "accepted": true
+    }
+  ]
+}
