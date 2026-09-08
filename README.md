@@ -99,6 +99,9 @@ python scripts/make_showcase_figures.py --only pipe
   azimuth leaves each mode separable in `(r, z)`.
 - `Q/A = 1/8` at zero field, the exact Hagen–Poiseuille value, at second order;
   `Q/A ∝ Ha^{−1}` once the field takes over.
+- Within **0.04 – 0.43 %** of [`validation/pipe.py`](validation/pipe.py) at Ha 0
+  to 100 — a Fourier–Chebyshev solve on the diameter, which removes the axis
+  singularity by construction rather than treating it.
 
 ## Design with gradients
 
@@ -144,6 +147,7 @@ python examples/q2d_turbulence_demo.py
 | Comparison | What it establishes | Status |
 |---|---|---|
 | [`validation/shercliff.py`](validation/shercliff.py) spectral solve | Duct flow rates, insulating and Hunt walls, Ha 0 → 1000 | independent of the package; 0.4 – 2.3 % on the meshes above |
+| [`validation/pipe.py`](validation/pipe.py) spectral solve | Pipe flow rates, insulating and conducting walls, Ha 0 → 100 | independent of the package; 0.04 – 0.43 % |
 | Analytic Hartmann, Shercliff, Hunt and Poiseuille | Profiles and flow rates in every limit that has a closed form | `python examples/hartmann_example.py` |
 | FreeMHD (OpenFOAM `epotFoam`), pinned [`freemhd_install`](https://github.com/rogeriojorge/freemhd_install) image, B2 case | Same observed contract, executed by both codes | passes: transverse pressure difference RMS 0.0045, max 0.0109, against frozen bounds 0.16 and 0.32 — an integration check on a harness mesh, **not** a production result |
 | ALEX B1 pipe and B2 square duct experiments | Fringing-field pressure drop | production acceptance **open**; specs and digitised references are frozen in [`src/lmx/data/benchmarks`](src/lmx/data/benchmarks) |
@@ -170,13 +174,12 @@ parameters and evidence status are in [`examples/catalog.toml`](examples/catalog
 ## What is validated, what is research
 
 - **Validated:** Hartmann, Shercliff and Hunt ducts against an independent
-  spectral solve and against analytical profiles; the pipe against
-  Hagen–Poiseuille at zero field; implicit adjoints against finite differences;
+  spectral solve and against analytical profiles; the pipe against a second,
+  independent spectral solve over Ha 0 to 100; implicit adjoints against finite differences;
   the mechanical power balance to 1e-13; Q2D decay identities.
-- **Research stage:** the pipe at finite Hartmann number has no outside
-  reference yet, three-dimensional ducts carry no convective transport, the ALEX
-  B1/B2 fringing benchmarks have production acceptance open, and multi-device
-  execution is correct but not yet faster. The
+- **Research stage:** three-dimensional ducts carry no convective transport, the
+  ALEX B1/B2 fringing benchmarks have production acceptance open, and
+  multi-device execution is not yet established. The
   [validation matrix](https://lmx.readthedocs.io/en/latest/validation/index.html)
   and the [plan](plan.md) state each gate.
 
