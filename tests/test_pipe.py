@@ -88,3 +88,53 @@ def test_the_mesh_resolves_the_layer_the_field_implies():
     assert np.allclose(coarse, coarse[0])
     assert layered.min() < 1.0 / 200.0
     assert layered[-1] < layered[0]
+
+
+# Mean velocity of a unit-forced pipe from validation.pipe, a Fourier-Chebyshev
+# solve on the diameter that shares no operator with the package, at the
+# resolution where 47 and 63 radial points agree to better than 1e-5 relative.
+SPECTRAL_FLOW_RATE = {
+    (0.0, 0.0): 0.125000000,
+    (5.0, 0.0): 0.089620450,
+    (20.0, 0.0): 0.035346710,
+    (100.0, 0.0): 0.008151880,
+    (20.0, 0.1): 0.015286900,
+}
+
+
+@pytest.mark.parametrize(("hartmann", "radial", "azimuthal"), [(0.0, 48, 32), (5.0, 48, 64), (20.0, 48, 64)])
+def test_the_pipe_matches_an_independent_spectral_solve(hartmann, radial, azimuthal):
+    """The insulating pipe, against a solve that removes the axis by construction."""
+    problem = pipe_problem(hartmann=hartmann, radial=radial, azimuthal=azimuthal)
+    rate = flow_rate(solve_pipe(problem)[0])
+    exact = SPECTRAL_FLOW_RATE[(hartmann, 0.0)]
+    assert abs(rate - exact) / exact < 5e-3
+
+
+def test_the_conducting_pipe_converges_to_the_reference():
+    """The thin-wall closure is the accuracy bottleneck, so it needs the refinement."""
+    exact = SPECTRAL_FLOW_RATE[(20.0, 0.1)]
+    errors = []
+    for radial in (32, 64):
+        problem = pipe_problem(hartmann=20.0, radial=radial, azimuthal=64, wall_conductance=0.1)
+        errors.append(abs(flow_rate(solve_pipe(problem)[0]) - exact) / exact)
+    assert errors[1] < 0.02
+    assert np.log2(errors[0] / errors[1]) > 2.0, errors
+
+
+@pytest.mark.slow
+def test_the_pipe_holds_at_hartmann_100():
+    problem = pipe_problem(hartmann=100.0, radial=64, azimuthal=128)
+    exact = SPECTRAL_FLOW_RATE[(100.0, 0.0)]
+    assert abs(flow_rate(solve_pipe(problem)[0]) - exact) / exact < 5e-3
+
+
+@pytest.mark.slow
+def test_the_spectral_reference_returns_what_is_cached():
+    """Poiseuille exactly at zero field, and the cached values it was compared against."""
+    from validation.pipe import flow_rate as spectral
+
+    assert spectral(0.0, 31, 32) == pytest.approx(0.125, rel=1e-12)
+    for (hartmann, conductance), cached in SPECTRAL_FLOW_RATE.items():
+        value = spectral(hartmann, 47, 48, wall_conductance=conductance)
+        assert value == pytest.approx(cached, rel=1e-5), (hartmann, conductance)
