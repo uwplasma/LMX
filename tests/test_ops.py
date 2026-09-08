@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from lmx.bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition, pad
-from lmx.grid import CENTER, FACE, Field, Grid, geometric_faces, tanh_faces, uniform_faces
+from lmx.grid import CENTER, FACE, POLAR, Field, Grid, geometric_faces, tanh_faces, uniform_faces
 from lmx.ops import (
     cell_inner_product,
     divergence,
@@ -15,11 +15,13 @@ from lmx.ops import (
     face_inner_product,
     face_interpolate,
     laplacian,
+    staggered_laplacian,
 )
 
 pytestmark = pytest.mark.unit
 
 WALL = BoundaryCondition(NEUMANN)
+WRAP = BoundaryCondition(PERIODIC)
 STRETCHED = Grid(
     geometric_faces(6, 0.0, 3.0, 1.25),
     tanh_faces(8, -1.0, 1.0, 1.6),
@@ -279,3 +281,66 @@ def test_face_inner_product_rejects_mismatched_grids_and_shapes():
         )
     with pytest.raises(ValueError, match="does not match grid"):
         face_inner_product(face, Field(jnp.zeros((2, 2, 2)), (FACE, CENTER, CENTER), grid), 0, WALL)
+
+
+def _polar(radial: int, azimuthal: int) -> Grid:
+    return Grid(
+        uniform_faces(radial, 0.0, 1.0),
+        uniform_faces(azimuthal, 0.0, 2.0 * np.pi),
+        uniform_faces(1, 0.0, 1.0),
+        geometry=POLAR,
+    )
+
+
+def _polar_cells(grid: Grid, function) -> Field:
+    radius, angle, axial = (np.asarray(values) for values in grid.centers)
+    r, theta, z = np.meshgrid(radius, angle, axial, indexing="ij")
+    return Field(jnp.asarray(function(r, theta)), (CENTER, CENTER, CENTER), grid)
+
+
+def test_the_flux_form_laplacian_is_exact_on_a_paraboloid():
+    """`1 - r^2` has Laplacian `-4` everywhere, and the flux form reproduces it exactly.
+
+    Everywhere except the wall cell: the two-point wall flux is first order, and
+    a cell whose volume is also first order therefore carries an order-one error
+    in the Laplacian. That is the same closure the Cartesian operator uses, and
+    it is why the Poisson *solution* stays second order while this pointwise
+    reading of the operator does not.
+    """
+    grid = _polar(16, 32)
+    field = _polar_cells(grid, lambda r, theta: 1.0 - r**2)
+    values = np.asarray(laplacian(field, (BoundaryCondition(DIRICHLET), WRAP, WRAP)).data)
+    assert np.max(np.abs(values[:-1] + 4.0)) < 1e-12
+    assert abs(values[-1, 0, 0] + 4.0) > 0.1
+
+
+def test_the_polar_laplacian_is_second_order_away_from_the_axis():
+    """`r cos(theta)` is harmonic; the radial and azimuthal terms cancel at order `1/r`."""
+    errors = []
+    for count in (16, 32, 64):
+        grid = _polar(count, 2 * count)
+        field = _polar_cells(grid, lambda r, theta: r * np.cos(theta))
+        values = np.asarray(laplacian(field, (BoundaryCondition(DIRICHLET), WRAP, WRAP)).data)
+        radius = np.asarray(grid.centers[0])
+        inside = (radius > 0.2) & (radius < 0.95)
+        errors.append(float(np.max(np.abs(values[inside]))))
+    orders = [np.log2(errors[index] / errors[index + 1]) for index in range(2)]
+    assert min(orders) > 1.8, orders
+    # Against the axis the two terms are each of order 1/r, so their cancellation
+    # loses an order. A pipe resolves its wall layers, not its centre.
+    grid = _polar(32, 64)
+    field = _polar_cells(grid, lambda r, theta: r * np.cos(theta))
+    values = np.asarray(laplacian(field, (BoundaryCondition(DIRICHLET), WRAP, WRAP)).data)
+    assert np.max(np.abs(values[0])) > 2.0 * errors[1]
+
+
+def test_the_separable_stencils_refuse_a_polar_grid():
+    """A wrong answer on a metric a stencil does not carry is worse than no answer."""
+    grid = _polar(4, 8)
+    field = _polar_cells(grid, lambda r, theta: r)
+    with pytest.raises(ValueError, match="use lmx.ops.laplacian"):
+        staggered_laplacian(field, (BoundaryCondition(DIRICHLET), WRAP, WRAP))
+    from lmx.poisson import assemble_axis_laplacian
+
+    with pytest.raises(ValueError, match="fast diagonalization assumes"):
+        assemble_axis_laplacian(grid, 0, BoundaryCondition(DIRICHLET))

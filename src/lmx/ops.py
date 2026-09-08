@@ -50,13 +50,27 @@ __all__ = [
 
 
 def face_distances(grid: Grid, axis: int, condition: BoundaryCondition) -> np.ndarray:
-    """Return the centre-to-centre distance across every face normal to ``axis``."""
+    """Return the centre-to-centre distance across every face normal to ``axis``.
+
+    One dimensional where the metric is, and three dimensional where it is not:
+    the azimuthal spacing of a polar grid is ``r*dtheta``, so it varies across
+    the radius and cannot be described by a single array along its own axis.
+    """
     widths = np.asarray(grid.widths[axis])
     interior = 0.5 * (widths[:-1] + widths[1:])
     if condition.is_periodic:
         wrap = 0.5 * (widths[0] + widths[-1])
-        return np.concatenate(([wrap], interior, [wrap]))
-    return np.concatenate(([widths[0]], interior, [widths[-1]]))
+        spacing = np.concatenate(([wrap], interior, [wrap]))
+    else:
+        spacing = np.concatenate(([widths[0]], interior, [widths[-1]]))
+    if grid.is_polar and axis == 1:
+        return np.asarray(grid.centers[0])[:, None, None] * spacing[None, :, None]
+    return spacing
+
+
+def _metric(values: np.ndarray, axis: int, dtype) -> jnp.ndarray:
+    """Broadcast a spacing that may already carry its own shape."""
+    return jnp.asarray(values if values.ndim == 3 else _shaped(values, axis), dtype=dtype)
 
 
 def face_gradient(field: Field, axis: int | str, condition: BoundaryCondition) -> Field:
@@ -68,7 +82,7 @@ def face_gradient(field: Field, axis: int | str, condition: BoundaryCondition) -
     difference = _take(padded, index, slice(1, None)) - _take(padded, index, slice(None, -1))
     distances = face_distances(grid, index, condition)
     offset = tuple(FACE if position == index else CENTER for position in range(3))
-    return Field(difference / _broadcast(distances, index, field.dtype), offset, grid)
+    return Field(difference / _metric(distances, index, field.dtype), offset, grid)
 
 
 def axis_divergence(face: Field, axis: int | str) -> Field:
@@ -156,9 +170,9 @@ def face_inner_product(
     distances = face_distances(grid, index, condition)
     if condition.is_periodic:
         distances = distances.copy()
-        distances[0] *= 0.5
-        distances[-1] *= 0.5
-    weights = grid.face_areas(index) * _shaped(distances, index)
+        wrap = (slice(None),) * index + ([0, -1],) if distances.ndim == 3 else ([0, -1],)
+        distances[wrap] *= 0.5
+    weights = grid.face_areas(index) * (distances if distances.ndim == 3 else _shaped(distances, index))
     return jnp.sum(_as_array(weights, left.dtype) * left.data * right.data)
 
 
@@ -193,6 +207,15 @@ def _as_array(values: np.ndarray, dtype) -> jnp.ndarray:
     return jnp.asarray(values, dtype=dtype)
 
 
+def _require_separable(grid: Grid, name: str) -> None:
+    """Refuse a metric this stencil does not carry."""
+    if grid.is_polar:
+        raise ValueError(
+            f"{name} differences along each axis with that axis's own widths, which is not the "
+            "Laplacian on a polar grid; use lmx.ops.laplacian, whose flux form reads the metric"
+        )
+
+
 def staggered_laplacian(
     field: Field, conditions: tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition]
 ) -> Field:
@@ -214,6 +237,7 @@ def staggered_laplacian(
     """
     if len(conditions) != 3:
         raise ValueError("a staggered Laplacian needs one boundary condition per axis")
+    _require_separable(field.grid, "the staggered Laplacian")
     grid = field.grid
     if field.shape != grid.offset_shape(field.offset):
         raise ValueError(f"field shape {field.shape} does not match its offset {field.offset}")

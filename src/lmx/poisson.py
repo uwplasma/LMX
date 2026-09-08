@@ -73,6 +73,14 @@ def _symmetry_tolerance(operator: np.ndarray) -> float:
     return max(1.0e-8, 1.0e11 * float(np.finfo(operator.dtype).eps))
 
 
+def _require_separable(grid: Grid) -> None:
+    if grid.is_polar:
+        raise ValueError(
+            "fast diagonalization assumes the Laplacian separates into a sum of one-dimensional "
+            "operators, which the 1/r^2 azimuthal term of a polar grid does not"
+        )
+
+
 def assemble_axis_laplacian(grid: Grid, axis: int, condition: BoundaryCondition) -> np.ndarray:
     """Return the dense one-dimensional Laplacian :mod:`lmx.ops` applies along ``axis``.
 
@@ -80,6 +88,7 @@ def assemble_axis_laplacian(grid: Grid, axis: int, condition: BoundaryCondition)
     Neumann condition, which contributes nothing, so the result is exactly the
     stencil the three-dimensional operator uses along ``axis``.
     """
+    _require_separable(grid)
     count = grid.shape[axis]
     faces = [uniform_faces(1, 0.0, 1.0)] * 3
     faces[axis] = np.asarray(grid.faces[axis])
