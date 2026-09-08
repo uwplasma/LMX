@@ -40,8 +40,13 @@ def _commit() -> str:
         )
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
+    # Untracked files -- the results directory this run is about to write into --
+    # do not make the measured code different from the commit it names.
     dirty = subprocess.run(
-        ["git", "-C", str(ROOT), "status", "--porcelain"], capture_output=True, text=True, check=False
+        ["git", "-C", str(ROOT), "status", "--porcelain", "--untracked-files=no"],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     return result.stdout.strip() + ("-dirty" if dirty.stdout.strip() else "")
 

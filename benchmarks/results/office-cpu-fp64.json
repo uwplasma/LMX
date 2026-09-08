@@ -1,0 +1,102 @@
+{
+  "environment": {
+    "host": "pop-os",
+    "platform": "cpu",
+    "device_kind": "cpu",
+    "device_count": 1,
+    "cpu_count": 36,
+    "python": "3.11.15",
+    "jax": "0.10.2",
+    "x64": true,
+    "lmx_commit": "4b0096f"
+  },
+  "cases": [
+    {
+      "case": "core3d_advance",
+      "cells": 32768,
+      "shape": [
+        32,
+        32,
+        32
+      ],
+      "steps": 20,
+      "compile_seconds": 0.8838976700790226,
+      "warm_seconds": 0.1291413060389459,
+      "seconds_per_step": 0.006457065301947296,
+      "divergence_residual": 1.1081116235241922e-16,
+      "divergence_tolerance": 7.105427357601002e-12,
+      "accepted": true
+    },
+    {
+      "case": "core3d_advance",
+      "cells": 262144,
+      "shape": [
+        64,
+        64,
+        64
+      ],
+      "steps": 20,
+      "compile_seconds": 1.6015163301490247,
+      "warm_seconds": 0.48132578283548355,
+      "seconds_per_step": 0.024066289141774177,
+      "divergence_residual": 2.2162855768355637e-16,
+      "divergence_tolerance": 1.4210854715202004e-11,
+      "accepted": true
+    },
+    {
+      "case": "core3d_advance",
+      "cells": 2097152,
+      "shape": [
+        128,
+        128,
+        128
+      ],
+      "steps": 20,
+      "compile_seconds": 6.380397379864007,
+      "warm_seconds": 3.619477665051818,
+      "seconds_per_step": 0.1809738832525909,
+      "divergence_residual": 4.4361861652432594e-16,
+      "divergence_tolerance": 2.8421709430404007e-11,
+      "accepted": true
+    },
+    {
+      "case": "q2d_evolve",
+      "cells": 65536,
+      "shape": [
+        256,
+        256
+      ],
+      "steps": 20,
+      "compile_seconds": 4.806456306949258,
+      "warm_seconds": 0.8344973470084369,
+      "seconds_per_step": 0.04172486735042184,
+      "accepted": true
+    },
+    {
+      "case": "q2d_evolve",
+      "cells": 262144,
+      "shape": [
+        512,
+        512
+      ],
+      "steps": 20,
+      "compile_seconds": 6.460778682958335,
+      "warm_seconds": 3.395242552040145,
+      "seconds_per_step": 0.16976212760200723,
+      "accepted": true
+    },
+    {
+      "case": "q2d_evolve",
+      "cells": 1048576,
+      "shape": [
+        1024,
+        1024
+      ],
+      "steps": 20,
+      "compile_seconds": 13.818515534047037,
+      "warm_seconds": 10.557411987800151,
+      "seconds_per_step": 0.5278705993900076,
+      "accepted": true
+    }
+  ]
+}

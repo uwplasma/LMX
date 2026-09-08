@@ -1,0 +1,39 @@
+{
+  "environment": {
+    "host": "pop-os",
+    "platform": "gpu",
+    "device_kind": "NVIDIA RTX A4000",
+    "device_count": 2,
+    "cpu_count": 36,
+    "python": "3.11.15",
+    "jax": "0.10.2",
+    "x64": true,
+    "lmx_commit": "3bfc767-dirty"
+  },
+  "cases": [
+    {
+      "case": "_shard_case",
+      "shape": [
+        512
+      ],
+      "accepted": false,
+      "error": "Received incompatible devices for jitted computation. Got argument x of subtract with shape float64[512,512] and with device ids [0, 1] on platform GPU and argument y of subtract with shape float64[51"
+    },
+    {
+      "case": "_shard_case",
+      "shape": [
+        1024
+      ],
+      "accepted": false,
+      "error": "Received incompatible devices for jitted computation. Got argument x of subtract with shape float64[1024,1024] and with device ids [0, 1] on platform GPU and argument y of subtract with shape float64["
+    },
+    {
+      "case": "_shard_case",
+      "shape": [
+        2048
+      ],
+      "accepted": false,
+      "error": "Received incompatible devices for jitted computation. Got argument x of subtract with shape float64[2048,2048] and with device ids [0, 1] on platform GPU and argument y of subtract with shape float64["
+    }
+  ]
+}

@@ -415,10 +415,12 @@ def benchmark_scaling() -> None:
                 style,
                 marker=marker,
                 ms=4,
+                color="tab:purple" if case == "core3d_advance" else "tab:green",
                 label=f"{'3-D core' if case == 'core3d_advance' else 'Q2D'}, {precision}",
             )
-    axes[2].axhline(10.0, color="k", ls=":", lw=1)
-    axes[2].axhline(20.0, color="k", ls=":", lw=1)
+    for target, name in ((10.0, "3-D core target"), (20.0, "Q2D target")):
+        axes[2].axhline(target, color="k", ls=":", lw=1)
+        axes[2].annotate(name, (axes[2].get_xlim()[0], target), fontsize=7, va="bottom")
     axes[2].set_xlabel("cells")
     axes[2].set_ylabel("GPU speed-up over CPU")
     axes[2].set_title("Targets: 10x (3-D core), 20x (Q2D)", fontsize=11)
