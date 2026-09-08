@@ -253,3 +253,71 @@ def test_a_wall_resolving_mesh_still_factorizes():
     source = _random_cells(grid)
     solved = factorization.solve(source.replace_data(source.data - jnp.mean(source.data)))
     assert bool(jnp.all(jnp.isfinite(solved.data)))
+
+
+def _polar_grid(radial: int, azimuthal: int, axial: int = 1) -> Grid:
+    from lmx.grid import POLAR
+
+    return Grid(
+        uniform_faces(radial, 0.0, 1.0),
+        uniform_faces(azimuthal, 0.0, 2.0 * np.pi),
+        uniform_faces(axial, 0.0, 1.0),
+        geometry=POLAR,
+    )
+
+
+@pytest.mark.parametrize("radial_condition", [FIXED, WALL], ids=["dirichlet", "neumann"])
+def test_the_polar_factorization_inverts_its_own_operator(radial_condition):
+    """One radial eigendecomposition per azimuthal mode, and the mode zero null space removed."""
+    from lmx.ops import laplacian
+    from lmx.poisson import fast_diagonal_polar_poisson
+
+    grid = _polar_grid(12, 16, 3)
+    conditions = (radial_condition, WRAPPED, WRAPPED)
+    factorization = fast_diagonal_polar_poisson(grid, conditions)
+    volumes = np.asarray(grid.cell_volumes())
+    source = np.asarray(_random_cells(grid).data)
+    if factorization.singular:
+        source = source - (source * volumes).sum() / volumes.sum()
+    field = Field(jnp.asarray(source), (CENTER, CENTER, CENTER), grid)
+    difference = np.asarray(laplacian(factorization.solve(field), conditions).data) - source
+    if factorization.singular:
+        difference = difference - (difference * volumes).sum() / volumes.sum()
+    assert np.max(np.abs(difference)) / np.max(np.abs(source)) < 1e-11
+
+
+def test_the_polar_solve_is_second_order_on_a_paraboloid():
+    """`lap phi = -4` with `phi(1) = 0` is `1 - r^2`, wall closure and axis included."""
+    from lmx.poisson import fast_diagonal_polar_poisson
+
+    errors = []
+    for count in (16, 32, 64):
+        grid = _polar_grid(count, 2 * count)
+        factorization = fast_diagonal_polar_poisson(grid, (FIXED, WRAPPED, WRAPPED))
+        source = Field(jnp.full(grid.shape, -4.0), (CENTER, CENTER, CENTER), grid)
+        radius = np.asarray(grid.centers[0])[:, None, None]
+        errors.append(float(np.max(np.abs(np.asarray(factorization.solve(source).data) - (1.0 - radius**2)))))
+    orders = [np.log2(errors[index] / errors[index + 1]) for index in range(2)]
+    assert min(orders) > 1.9, orders
+
+
+def test_the_polar_factorization_states_what_it_needs():
+    from lmx.poisson import fast_diagonal_polar_poisson
+
+    cartesian = Grid(uniform_faces(4, 0.0, 1.0), uniform_faces(4, 0.0, 1.0), uniform_faces(4, 0.0, 1.0))
+    with pytest.raises(ValueError, match="use fast_diagonal_poisson"):
+        fast_diagonal_polar_poisson(cartesian, (WALL, WRAPPED, WRAPPED))
+    grid = _polar_grid(4, 8)
+    with pytest.raises(ValueError, match="azimuth of a polar grid is periodic"):
+        fast_diagonal_polar_poisson(grid, (WALL, WALL, WRAPPED))
+    from lmx.grid import POLAR
+    from lmx.poisson import azimuthal_eigenvalues
+
+    stretched = Grid(
+        uniform_faces(4, 0.0, 1.0),
+        np.array([0.0, 1.0, 3.0, 2.0 * np.pi]),
+        uniform_faces(2, 0.0, 1.0),
+        geometry=POLAR,
+    )
+    with pytest.raises(ValueError, match="needs a uniform azimuth"):
+        azimuthal_eigenvalues(stretched)
