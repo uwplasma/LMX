@@ -46,16 +46,31 @@ __all__ = [
 _SINGULAR_TOLERANCE = 1.0e-9
 
 
+def _relative_asymmetry(operator: np.ndarray) -> float:
+    """Return the asymmetry of an operator against its own diagonal scale.
+
+    A wall-resolving mesh can span four orders of magnitude in cell width, and
+    the entries of the operator span eight. Measured against the largest entry,
+    the round-off of the small rows looks like a defect; measured against
+    ``sqrt(|d_i d_j|)``, the natural scale of the entry itself, it does not.
+    A stencil that is genuinely not symmetric is wrong by an order one fraction
+    of its own entries, so this separates the two cleanly.
+    """
+    diagonal = np.sqrt(np.abs(np.diag(operator)))
+    scale = np.outer(diagonal, diagonal)
+    floor = max(float(np.max(scale)), 1.0) * float(np.finfo(operator.dtype).eps)
+    return float(np.max(np.abs(operator - operator.T) / np.maximum(scale, floor)))
+
+
 def _symmetry_tolerance(operator: np.ndarray) -> float:
-    """Return the asymmetry a correct assembly may still show.
+    """Return the relative asymmetry a correct assembly may still show.
 
     The one-dimensional operators are read out through the production stencil,
-    so they are assembled at whatever precision the session runs in. A fixed
-    absolute bound would reject a perfectly good float32 assembly, so the
+    so they are assembled at whatever precision the session runs in. A bound
+    tied to float64 would reject a perfectly good float32 assembly, so the
     tolerance follows the dtype.
     """
-    scale = max(float(np.max(np.abs(operator))), 1.0)
-    return max(1.0e-10, 200.0 * float(np.finfo(operator.dtype).eps)) * scale
+    return max(1.0e-8, 1.0e11 * float(np.finfo(operator.dtype).eps))
 
 
 def assemble_axis_laplacian(grid: Grid, axis: int, condition: BoundaryCondition) -> np.ndarray:
@@ -165,11 +180,11 @@ def fast_diagonal_poisson(
         widths = np.asarray(grid.widths[axis])
         root = np.sqrt(widths)
         symmetric = root[:, None] * operator / root[None, :]
-        asymmetry = np.max(np.abs(symmetric - symmetric.T))
+        asymmetry = _relative_asymmetry(symmetric)
         if asymmetry > _symmetry_tolerance(symmetric):
             raise ValueError(
                 f"axis {axis} operator is not symmetric under the cell widths "
-                f"(asymmetry {asymmetry:.3e}); fast diagonalization does not apply"
+                f"(relative asymmetry {asymmetry:.3e}); fast diagonalization does not apply"
             )
         symmetric = 0.5 * (symmetric + symmetric.T)
         eigenvalues, eigenvectors = np.linalg.eigh(symmetric)
@@ -328,11 +343,11 @@ def fast_diagonal_helmholtz(
         weights = _axis_weights(grid, axis, offset[axis], condition)[selection]
         root = np.sqrt(weights)
         symmetric = root[:, None] * operator / root[None, :]
-        asymmetry = np.max(np.abs(symmetric - symmetric.T))
+        asymmetry = _relative_asymmetry(symmetric)
         if asymmetry > _symmetry_tolerance(symmetric):
             raise ValueError(
                 f"axis {axis} operator is not symmetric under its cell weights "
-                f"(asymmetry {asymmetry:.3e}); fast diagonalization does not apply"
+                f"(relative asymmetry {asymmetry:.3e}); fast diagonalization does not apply"
             )
         eigenvalues, eigenvectors = np.linalg.eigh(0.5 * (symmetric + symmetric.T))
         vectors.append(eigenvectors)

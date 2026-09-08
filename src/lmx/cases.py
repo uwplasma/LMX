@@ -68,7 +68,9 @@ from .specs import (
 )
 
 if TYPE_CHECKING:
+    from .core3d import ChannelProblem
     from .q2d import Q2DProblem, Q2DResult
+    from .steady import SteadySolution
 
 _STEP_DIAGNOSTIC_NAMES = (
     "u_max_history",
@@ -1040,15 +1042,23 @@ def solve_steady(
 
 
 def solve(
-    model: CaseSpec | ExtrudedInductionlessProblem | Q2DProblem,
-) -> Solution | ExtrudedInductionlessSolution | Q2DResult:
-    """Solve a fully developed, three-dimensional fringing, or Q2D problem.
+    model: "ChannelProblem | CaseSpec | ExtrudedInductionlessProblem | Q2DProblem",
+) -> "SteadySolution | Solution | ExtrudedInductionlessSolution | Q2DResult":
+    """Solve a duct, a fully developed case, a fringing problem, or a Q2D one.
 
-    The configured mode selects steady or transient execution for ``CaseSpec``.
-    Advanced restart, mesh, logging, progress, and timing hooks remain on the
-    specialized functions in :mod:`lmx.cases` and :mod:`lmx.fringing`.
+    A :class:`lmx.core3d.ChannelProblem` goes to the staggered core's steady
+    Newton-Krylov solve; the configured mode selects steady or transient
+    execution for ``CaseSpec``. Advanced restart, mesh, logging, progress, and
+    timing hooks remain on the specialized functions in :mod:`lmx.cases`,
+    :mod:`lmx.steady` and :mod:`lmx.fringing`.
     """
 
+    from .core3d import ChannelProblem
+
+    if isinstance(model, ChannelProblem):
+        from .steady import solve_steady_state
+
+        return solve_steady_state(model)
     if isinstance(model, CaseSpec):
         return solve_transient(model) if model.solver.mode == "transient" else solve_steady(model)
     if isinstance(model, ExtrudedInductionlessProblem):
@@ -1060,7 +1070,8 @@ def solve(
     if isinstance(model, Q2DProblem):
         return solve_q2d(model)
     raise TypeError(
-        f"solve expects CaseSpec, ExtrudedInductionlessProblem, or Q2DProblem, got {type(model).__name__}"
+        "solve expects ChannelProblem, CaseSpec, ExtrudedInductionlessProblem, or Q2DProblem, "
+        f"got {type(model).__name__}"
     )
 
 

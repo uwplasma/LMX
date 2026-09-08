@@ -94,8 +94,8 @@ def steady_residual(
     problem: ChannelProblem,
     factorization: FastDiagonalPoisson | None = None,
     *,
-    forcing=None,
-    field_scale=1.0,
+    forcing: tuple[float, float, float] | None = None,
+    field_scale: float | jnp.ndarray = 1.0,
 ) -> tuple[Field, Field, Field]:
     """Return the projected steady momentum residual of a velocity field.
 
@@ -164,8 +164,8 @@ def solve_steady_state(
     tolerance: float = 1.0e-9,
     max_steps: int = 40,
     pseudo_step: float | None = None,
-    forcing=None,
-    field_scale=1.0,
+    forcing: tuple[float, float, float] | None = None,
+    field_scale: float | jnp.ndarray = 1.0,
     linear_tolerance: float = 1.0e-6,
     linear_restart: int = 400,
     linear_max_restarts: int = 6,
@@ -213,10 +213,9 @@ def solve_steady_state(
         raise RuntimeError(
             f"the steady solve did not converge: residual {checked:.3e} against an initial "
             f"{reference:.3e}. "
-            "The preconditioner inverts the viscous and damping terms exactly and leaves the potential "
-            "coupling to the Krylov iteration, so a very large Hartmann number on a strongly stretched "
-            "mesh is what exhausts it; raise linear_max_restarts, adjust pseudo_step, or start from a "
-            "marched state"
+            "Restarted GMRES stagnates on this operator once the field is strong, so the usual cure is "
+            "a larger linear_restart rather than more restarts of a short one; a conducting wall, which "
+            "makes the potential solve iterative too, needs more of both"
         )
     corrected, pressure = project(root, problem, factorization)
     potential, _ = electric_state(corrected, problem, factorization, field_scale)

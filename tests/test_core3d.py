@@ -20,6 +20,7 @@ from lmx.bc import NEUMANN, PERIODIC, BoundaryCondition
 from lmx.cases import make_hartmann_case, solve_fully_developed_fields
 from lmx.core3d import (
     ChannelProblem,
+    duct_problem,
     enforce_face_constraints,
     project,
     step,
@@ -411,3 +412,26 @@ def test_a_wall_resolving_mesh_reaches_the_reference_flow_rate_at_hartmann_20():
     assert abs(resolved - exact) / exact < 0.02
     # The same cell count spread uniformly cannot resolve the a/Ha layer.
     assert abs(_duct_mean_velocity(32, 20.0) - exact) / exact > 0.1
+
+
+def test_the_duct_helper_resolves_the_layers_it_names():
+    """The mesh follows the physics: a/Ha against the field, a/sqrt(Ha) across it."""
+    problem = duct_problem(hartmann=100.0, cells=40)
+    transverse, spanwise = (np.diff(problem.grid.faces[axis]) for axis in (1, 2))
+    assert transverse.min() < 1.0 / 100.0
+    assert spanwise.min() < 1.0 / np.sqrt(100.0)
+    # The gentlest stretching that spans the duct, not the finest one available.
+    assert transverse.max() / transverse.min() < spanwise.max() / spanwise.min() * 1.0e3
+    assert problem.wall_conductance == (0.0, 0.0, 0.0)
+    with pytest.raises(ValueError, match="hartmann must not be negative"):
+        duct_problem(hartmann=-1.0)
+
+
+def test_the_public_solve_reaches_the_new_core():
+    """`lmx.solve` dispatches a ChannelProblem to the steady Newton-Krylov path."""
+    import lmx
+
+    problem = lmx.duct_problem(hartmann=5.0, cells=16)
+    solution = lmx.solve(problem)
+    assert float(np.mean(np.asarray(solution.velocity[0].data))) > 0.0
+    assert float(solution.residual_norm) < 1e-8
