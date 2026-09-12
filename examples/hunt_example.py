@@ -90,7 +90,7 @@ conductance = float(volumetric_flow_rate(case, unit_fields[0]))
 if TARGET_FLOW_RATE is not None:
     case = replace(case, forcing=TARGET_FLOW_RATE / conductance)
 
-# Warm-start the reporting corrector from the linear predictor. This checks
+# Run the reporting corrector from the linear predictor. This checks
 # stopping gates and throughput, not cold-start convergence or an independent model.
 initial_state = MHDState(*(case.forcing * field for field in unit_fields), time=0.0, residual=float("inf"))
 solution = solve_steady(case, initial_state=initial_state)
