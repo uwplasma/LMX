@@ -1,3 +1,4 @@
+import json
 from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
@@ -23,6 +24,84 @@ from lmx.validation import (
 )
 
 pytestmark = pytest.mark.unit
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["--cases", "unknown"],
+        ["--cases", ""],
+        ["--steps", "0"],
+        ["--repeats", "-1"],
+        ["--q2d-sizes", ""],
+        ["--core3d-sizes", "1"],
+    ],
+)
+def test_device_benchmark_rejects_invalid_requests(arguments):
+    from scripts.run_benchmarks import main
+
+    with pytest.raises(SystemExit) as error:
+        main(arguments)
+    assert error.value.code == 2
+
+
+@pytest.mark.parametrize("verdict", [True, False, "exception"])
+def test_device_benchmark_exit_matches_retained_evidence(tmp_path, monkeypatch, verdict):
+    from scripts import run_benchmarks as runner
+
+    def build(*args):
+        if verdict == "exception":
+            raise RuntimeError("bounded allocation failure")
+        return {"accepted": verdict}
+
+    monkeypatch.setattr(runner, "_q2d_case", build)
+    monkeypatch.setattr(runner, "_environment", lambda jax: {})
+    output = tmp_path / "report.json"
+    assert runner.main(["--cases", "q2d", "--q2d-sizes", "8", "--output", str(output)]) == (
+        0 if verdict is True else 1
+    )
+    entry = json.loads(output.read_text())["cases"][0]
+    assert entry["accepted"] is (verdict is True)
+    if verdict == "exception":
+        assert "bounded allocation failure" in entry["error"]
+
+
+@pytest.mark.parametrize("status", ["completed", "courant_limit_exceeded", "energy_budget_exceeded"])
+def test_device_benchmark_honors_q2d_solver_verdict(monkeypatch, status):
+    import jax
+    import jax.numpy as jnp
+
+    import lmx
+    from scripts.run_benchmarks import _q2d_case
+
+    monkeypatch.setattr(
+        lmx,
+        "solve",
+        lambda problem: SimpleNamespace(
+            vorticity=jnp.zeros((8, 8)),
+            status=status,
+        ),
+    )
+    result = _q2d_case(jax, 8, 2, 1)
+    assert result["solver_status"] == status
+    assert result["accepted"] is (status == "completed")
+
+
+def test_trajectory_timing_does_not_certify_host_synchronization(monkeypatch):
+    from scripts import run_benchmarks as runner
+
+    monkeypatch.setattr(
+        runner,
+        "_core3d_case",
+        lambda jax, cells, steps, repeats: {
+            "accepted": True,
+            "seconds_per_step": float(steps),
+        },
+    )
+    result = runner._host_sync_case(None, 8, 2, 1)
+    assert result["per_step_ratio"] == 4.0
+    assert result["accepted"] and not result["host_sync_verified"]
+
 
 _MATCHED = ("matched_contract",)
 _SHARED = _MATCHED + ("shared",)
