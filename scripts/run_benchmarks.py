@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import platform
 import socket
 import subprocess
@@ -57,9 +58,7 @@ def _environment(jax) -> dict:
         "platform": devices[0].platform,
         "device_kind": devices[0].device_kind,
         "device_count": len(devices),
-        "cpu_count": len(__import__("os").sched_getaffinity(0))
-        if hasattr(__import__("os"), "sched_getaffinity")
-        else None,
+        "cpu_count": len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count(),
         "python": platform.python_version(),
         "jax": jax.__version__,
         "x64": bool(jax.config.jax_enable_x64),
@@ -264,6 +263,9 @@ def _shard_case(jax, cells: int, steps: int, repeats: int) -> dict:
         "shape": [cells, cells],
         "steps": steps,
         "devices": len(devices),
+        "scaling_scope": "shared_host_logical_devices"
+        if devices[0].platform == "cpu"
+        else "accelerator_devices",
         "single_seconds": single_seconds,
         "sharded_seconds": sharded_seconds,
         "efficiency": single_seconds / (len(devices) * sharded_seconds),
