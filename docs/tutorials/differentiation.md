@@ -13,6 +13,14 @@ steady-flow interface is documented as end-to-end differentiable only when its
 production field equations use that contract and pass independent gradient,
 residual, runtime, and memory gates.
 
+For `lmx.steady.solve_steady_state`, a rejected primal residual or linearized
+solve raises eagerly. During autodiff tracing, failure instead produces
+nonfinite fields or derivatives without host callbacks: reject any nonfinite
+objective **or** gradient before accepting an optimizer step. Drive and field
+scale are continuous inputs; problem geometry/materials stay static. Its
+host-built factorizations currently prevent wrapping the whole reporting
+solve in an outer `jax.jit`; use the field interface below for compiled design.
+
 ## Steady duct response
 
 ```python

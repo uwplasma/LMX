@@ -1,17 +1,10 @@
-"""Solve the steady state directly instead of marching to it.
+"""Matrix-free Newton-Krylov steady flow with implicit derivatives.
 
-Marching a duct to its fully developed state costs a number of steps set by the
-slowest physical time in the problem, and at blanket conditions that is the
-viscous one, :math:`a^2/\\nu`. The state itself is the root of a residual, so it
-can be found in a handful of Newton steps instead -- and, more importantly for
-what this package is for, a root is differentiable through the implicit function
-theorem, so a design derivative costs one adjoint solve rather than a tape of
-every step.
+The implicit function theorem differentiates converged roots with tangent and
+transpose solves, without retaining nonlinear iterations.
 
-The residual is written in the velocity alone. Both the potential and the
-pressure are determined by the velocity through linear solves that
-:mod:`lmx.poisson` performs exactly, so carrying them as unknowns would only add
-a saddle-point structure that the projection already removes:
+Potential and pressure are eliminated through their discrete linear solves,
+leaving a residual in velocity alone:
 
 .. math:: \\mathbf R(\\mathbf u)
    = \\mathbb P\\left[\\nu\\nabla^2\\mathbf u
@@ -24,32 +17,15 @@ that :math:`\\mathbf u` induces. A root of :math:`\\mathbf R` is a steady state
 of :func:`lmx.core3d.step`, and the projection keeps the iteration inside the
 subspace the time stepper never leaves.
 
-The preconditioner is one projection step. Writing the implicit viscous operator
-as :math:`M = (\\text{shift}\\,I - \\Delta t\\,\\nu\\nabla^2)/\\Delta t`, its
-inverse tends to :math:`(\\lambda - \\nu\\nabla^2)^{-1}` as the pseudo-step
-grows, which is the exact Jacobian inverse of the Stokes and damping part of the
-residual. That is the part which is stiff -- the viscous term as the mesh is
-refined and the damping as :math:`Ha^2` -- so the Krylov iteration is left with
-the well-conditioned remainder.
+The preconditioner projects a viscous/damping inverse, approaching
+:math:`(\\lambda - \\nu\\nabla^2)^{-1}` as the pseudo-step grows.
 
-The Krylov subspace is deliberately large. Restarted GMRES stagnates on this
-operator once the field is strong: at :math:`Ha=300`, GMRES(60) with sixty
-restarts -- 3600 iterations -- reduces the residual by a factor of forty and
-stops improving, while GMRES(400) converges in 1077. The subspace is what the
-method needs here, not more restarts of a short one.
+Strong fields can require a large Krylov subspace rather than more restarts
+of a short one; conducting walls also make the potential solve iterative.
 
-An anisotropic preconditioner was tried and rejected. Eliminating the potential
-from a fully developed duct leaves :math:`-\\lambda\\,\\partial_b\\nabla^{-2}
-\\partial_b`, whose symbol in the velocity eigenbasis is
-:math:`\\ell_b/\\sum_k\\ell_k`, and folding that into the factorization is nearly
-free. It makes the iteration *worse* -- residual 1.6 against 0.12 at
-:math:`Ha=300` -- because the potential obeys Neumann conditions while the
-velocity obeys Dirichlet ones, so the two do not share an eigenbasis exactly
-where it matters, in the Hartmann layer. The uniform rate is kept.
-
-Failure is raised, never returned. A Newton iteration that stops on its step
-limit, or an adjoint solve that does not converge, would otherwise hand back a
-plausible-looking field and a gradient computed at a point that is not a root.
+Primal residuals and tangent/transpose convergence are certified. Rejection
+raises eagerly; during tracing, it produces nonfinite fields and derivatives
+without host callbacks. Optimizers must reject nonfinite values and gradients.
 """
 
 from __future__ import annotations
@@ -80,7 +56,7 @@ __all__ = ["SteadySolution", "solve_steady_state", "steady_residual"]
 
 @dataclass(frozen=True)
 class SteadySolution:
-    """A converged steady state and the evidence that it converged."""
+    """Steady fields and residual evidence; traced rejection gives nonfinite fields."""
 
     velocity: tuple[Field, Field, Field]
     pressure: Field
@@ -172,15 +148,19 @@ def solve_steady_state(
 ) -> SteadySolution:
     """Find the steady state by matrix-free Newton-Krylov, differentiably.
 
-    The solve is registered through :func:`solvax.root_solve`, so a derivative
-    with respect to anything ``problem`` closes over -- the drive, the field, a
-    material property -- comes from one linearised solve at the root rather than
-    from differentiating the Newton iteration.
+    The drive and ``field_scale`` are differentiable through :func:`solvax.root_solve`;
+    ``problem`` and factorization geometry are static. Rejected roots raise eagerly
+    or yield nonfinite fields and derivatives during tracing.
     """
-    factorization = problem.factorization()
     step = float(problem.dt if pseudo_step is None else pseudo_step)
-    if step <= 0.0:
-        raise ValueError("pseudo_step must be positive")
+    for name, value in (
+        ("pseudo_step", step),
+        ("tolerance", tolerance),
+        ("linear_tolerance", linear_tolerance),
+    ):
+        if not np.isfinite(value) or value <= 0.0:
+            raise ValueError(f"{name} must be positive and finite")
+    factorization = problem.factorization()
     viscous = dataclasses.replace(problem, dt=step).viscous_factorizations()
     start = zero_velocity(problem) if velocity is None else enforce_face_constraints(velocity, problem)
 
@@ -204,26 +184,26 @@ def solve_steady_state(
 
     root = solvax.root_solve(residual, start, solver, tangent_solve=_tangent_solve)
     final = _norm(residual(root))
-    checked, reference = _concrete(final), _concrete(scale)
-    if (
-        checked is not None
-        and reference is not None
-        and (not np.isfinite(checked) or checked > 10.0 * tolerance * max(reference, 1.0))
-    ):
-        raise RuntimeError(
-            f"the steady solve did not converge: residual {checked:.3e} against an initial "
-            f"{reference:.3e}. "
-            "Restarted GMRES stagnates on this operator once the field is strong, so the usual cure is "
-            "a larger linear_restart rather than more restarts of a short one; a conducting wall, which "
-            "makes the potential solve iterative too, needs more of both"
-        )
+    accepted = (
+        jnp.isfinite(final) & jnp.isfinite(scale) & (final <= 10.0 * tolerance * jnp.maximum(scale, 1.0))
+    )
+    root = _certified(root, accepted, "steady solve")
     corrected, pressure = project(root, problem, factorization)
     potential, _ = electric_state(corrected, problem, factorization, field_scale)
     return SteadySolution(corrected, pressure, potential, final, max_steps)
 
 
 def _krylov(matvec, target):
-    return solvax.gmres(matvec, target, rtol=1.0e-10, restart=60, max_restarts=60).x
+    result = solvax.gmres(matvec, target, rtol=1.0e-10, restart=60, max_restarts=60)
+    return _certified(result.x, result.converged & jnp.isfinite(result.residual_norm), "steady linear solve")
+
+
+def _certified(value, accepted, stage):
+    """Reject eagerly; multiply by NaN under tracing so failed gradients fail too."""
+    traced = any(isinstance(leaf, jax.core.Tracer) for leaf in jax.tree.leaves((value, accepted)))
+    if not traced and not bool(accepted):
+        raise RuntimeError(f"the {stage} did not converge")
+    return jax.tree.map(lambda leaf: leaf * jnp.where(accepted, 1.0, jnp.nan), value)
 
 
 def _tangent_solve(operator, target):
@@ -240,11 +220,3 @@ def _tangent_solve(operator, target):
 
 def _norm(velocity: tuple[Field, Field, Field]):
     return jnp.sqrt(sum(jnp.sum(field.data**2) for field in velocity))
-
-
-def _concrete(value) -> float | None:
-    """Return ``value`` as a host float, or ``None`` while it is being traced."""
-    try:
-        return float(value)
-    except (TypeError, jax.errors.TracerArrayConversionError, jax.errors.ConcretizationTypeError):
-        return None
