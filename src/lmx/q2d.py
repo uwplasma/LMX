@@ -192,10 +192,9 @@ def _measures(omega_hat, forcing, eigenvalues, kx, ky, dt, spacing, viscosity, f
     psi = jnp.fft.ifftn(psi_hat).real
     energy = 0.5 * jnp.mean(ux**2 + uy**2)
     enstrophy = 0.5 * jnp.mean(omega**2)
-    divergence = jnp.fft.ifftn(1j * kx * jnp.fft.fftn(ux) + 1j * ky * jnp.fft.fftn(uy)).real
     courant = dt * jnp.max(jnp.abs(ux) / spacing[0] + jnp.abs(uy) / spacing[1])
     energy_rate = -2.0 * viscosity * enstrophy - 2.0 * friction * energy + jnp.mean(psi * forcing)
-    return energy, enstrophy, jnp.max(jnp.abs(divergence)), courant, energy_rate
+    return energy, enstrophy, courant, energy_rate
 
 
 @partial(jax.jit, static_argnames=("steps", "checkpoint_size"))
@@ -352,6 +351,8 @@ def solve_q2d(problem: Q2DProblem) -> Q2DResult:
             frame_steps.append(completed)
     psi_hat, ux, uy = _flow(omega_hat, eigenvalues, kx, ky)
     vorticity = jnp.fft.ifftn(omega_hat).real
+    # Divergence is a final-field diagnostic; energy and Courant remain checked at every step.
+    divergence = jnp.max(jnp.abs(jnp.fft.ifftn(1j * kx * jnp.fft.fftn(ux) + 1j * ky * jnp.fft.fftn(uy)).real))
     budget_residual = jnp.abs(final[0] - initial[0] - budget) / jnp.maximum(
         jnp.maximum(initial[0], jnp.abs(budget)), jnp.finfo(vorticity.dtype).tiny
     )
@@ -361,10 +362,13 @@ def solve_q2d(problem: Q2DProblem) -> Q2DResult:
         ux=ux,
         uy=uy,
         psi=psi_hat,
-        diagnostics=jnp.asarray((*initial, *final, budget_residual, max_courant)),
+        diagnostics=jnp.asarray((*initial, *final, budget_residual, max_courant, divergence)),
     )
     diagnostics = Q2DDiagnostics(
-        *(float(value) for value in (initial[0], final[0], final[1], budget_residual, final[2], max_courant))
+        *(
+            float(value)
+            for value in (initial[0], final[0], final[1], budget_residual, divergence, max_courant)
+        )
     )
     status = (
         "courant_limit_exceeded"
