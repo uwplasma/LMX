@@ -140,6 +140,8 @@ def _tests_for_changes(paths: tuple[str, ...]) -> tuple[str, ...]:
             selected.append("tests/test_example_runner.py")
         elif path == "scripts/run_benchmark_b_independence.py":
             selected.append("tests/test_run_benchmark_b_independence.py")
+        elif path == "scripts/run_benchmarks.py":
+            selected.append("tests/test_benchmarks.py")
         elif path in {"scripts/run_freemhd_parity_suite.py", "validation/freemhd.py"}:
             selected.append("tests/test_freemhd.py")
         elif path in {
