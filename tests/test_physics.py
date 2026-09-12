@@ -1,3 +1,6 @@
+import os
+import subprocess
+import sys
 from dataclasses import replace
 from pathlib import Path
 
@@ -644,6 +647,43 @@ def test_q2d_mixed_precision_matches_analytic_fields_and_derivatives(control):
     assert np.asarray(actual) == pytest.approx(np.asarray(expected), rel=2.0e-6, abs=1.0e-10)
     tangent = jax.jvp(objective, (value,), (jnp.ones_like(value),))[1]
     assert tangent == pytest.approx(actual[1], rel=1.0e-9, abs=1.0e-12)
+
+
+@pytest.mark.physics
+def test_q2d_sharded_setup_preserves_fields_and_diagnostics():
+    code = """
+from dataclasses import replace, asdict
+import jax
+import numpy as np
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from lmx.q2d import make_q2d_case, solve_q2d
+assert len(jax.devices()) == 2
+placement = NamedSharding(Mesh(np.array(jax.devices()), ('d',)), P('d', None))
+for dtype in (np.float32, np.float64):
+    case = make_q2d_case(shape=(16, 16), steps=4, history_stride=2)
+    initial = np.asarray(case.initial_vorticity, dtype=dtype)
+    reference = solve_q2d(replace(case, initial_vorticity=jax.device_put(initial, jax.devices()[0])))
+    sharded = solve_q2d(replace(case, initial_vorticity=jax.device_put(initial, placement)))
+    assert reference.status == sharded.status == 'completed'
+    for name in ('vorticity', 'velocity_x', 'velocity_y', 'vorticity_history'):
+        expected, actual = np.asarray(getattr(reference, name)), np.asarray(getattr(sharded, name))
+        assert actual.dtype == dtype
+        np.testing.assert_allclose(actual, expected, rtol=100*np.finfo(dtype).eps, atol=100*np.finfo(dtype).eps)
+    np.testing.assert_allclose(list(asdict(sharded.diagnostics).values()),
+                               list(asdict(reference.diagnostics).values()),
+                               rtol=100*np.finfo(dtype).eps, atol=100*np.finfo(dtype).eps)
+"""
+    subprocess.run(
+        [sys.executable, "-c", code],
+        check=True,
+        timeout=90,
+        env={
+            **os.environ,
+            "JAX_PLATFORMS": "cpu",
+            "JAX_ENABLE_X64": "true",
+            "XLA_FLAGS": "--xla_force_host_platform_device_count=2",
+        },
+    )
 
 
 @pytest.mark.physics
