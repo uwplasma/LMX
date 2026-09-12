@@ -207,6 +207,50 @@ kind = "no_slip"
     return path
 
 
+def test_draft_ci_defers_numerics_without_skipping_ready_or_coverage_jobs(tmp_path):
+    workflow = Path(".github/workflows/ci.yml").read_text()
+    assert "types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]" in workflow
+    assert "  push:\n    branches: [main]" in workflow
+    assert "  workflow_dispatch:" in workflow and "  workflow_call:" in workflow
+    script = textwrap.dedent(workflow.split("run: |\n", 1)[1].split("\n\n  ", 1)[0])
+    for event in ("push", "workflow_dispatch", "workflow_call"):
+        output = tmp_path / event
+        rendered = script.replace("${{ github.event_name }}", event).replace("${{ github.base_ref }}", "main")
+        subprocess.run(
+            ["bash", "-e", "-c", rendered],
+            check=True,
+            env={**os.environ, "GITHUB_OUTPUT": str(output)},
+        )
+        assert output.read_text().splitlines() == ["full=true", "targeted=false"]
+    for event, draft in (
+        ("pull_request", True),
+        ("pull_request", False),
+        ("push", False),
+        ("workflow_dispatch", False),
+        ("workflow_call", False),
+    ):
+        for full, targeted in ((True, False), (False, True), (False, False)):
+            expected = {
+                "quality": full or targeted,
+                "pr-impact": event == "pull_request" and not draft and targeted,
+                "pr-tests": event == "pull_request" and not draft and full,
+                "compatibility": event != "pull_request" and full,
+                "coverage": event != "pull_request" and full,
+            }
+            for job, enabled in expected.items():
+                expression = workflow.split(f"\n  {job}:\n", 1)[1].split("    if: ", 1)[1].splitlines()[0]
+                for key, value in {
+                    "github.event_name": event,
+                    "github.event.pull_request.draft": str(draft).lower(),
+                    "needs.scope.outputs.full": str(full).lower(),
+                    "needs.scope.outputs.targeted": str(targeted).lower(),
+                }.items():
+                    expression = expression.replace(key, repr(value))
+                # These job guards deliberately use only shell-compatible comparisons/boolean operators.
+                result = subprocess.run(["bash", "-c", f"[[ {expression} ]]"], check=False)
+                assert result.returncode == (0 if enabled else 1), (job, event, draft, full, targeted)
+
+
 def test_every_test_file_belongs_to_a_covered_shard():
     """A file outside every shard never runs in the coverage lane and scores zero."""
     from scripts.run_full_test_suite import _TEST_SHARDS
