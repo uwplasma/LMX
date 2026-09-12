@@ -188,7 +188,7 @@ states each gate and what it does not cover.
 |---|---|
 | `lmx examples/hartmann_case.toml` | Hartmann duct from a TOML file, terminal diagnostics |
 | `python examples/hartmann_example.py` | analytical error, conservation, mesh convergence |
-| `python examples/hunt_example.py` | conducting Hartmann walls, side-layer jets |
+| `python examples/hunt_example.py` | conducting walls, prescribed throughput and hydraulic power |
 | `python examples/li_aln_wall_stack_example.py` | explicit wall material layers and interface currents |
 | `python examples/fringing_benchmark_demo.py` | 3-D duct entering a magnetic field |
 | `python examples/variable_field_extruded_demo.py` | gradient-based field, wall and geometry design |

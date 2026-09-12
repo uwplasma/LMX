@@ -10,6 +10,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from lmx import make_hunt_case, solve
+from lmx.design import hydraulic_power, linear_flow_response, volumetric_flow_rate
 from lmx.io import write_case_overview_plots, write_solution_outputs
 from lmx.validation import validation_summary
 
@@ -28,12 +29,14 @@ FLUID_CONDUCTIVITY = 1.0
 DENSITY = 1.0
 VISCOSITY = 1.0
 FORCING = 1.0
+TARGET_FLOW_RATE = 0.05  # Set to None to prescribe FORCING instead.
+DUCT_LENGTH = 2.5  # Fully developed segment length, not a complete blanket.
 TIME_STEP = 0.002
 FINAL_TIME = 1.0
-MAX_STEPS = 48
-POTENTIAL_ITERATIONS = 160
+MAX_STEPS = 96
+POTENTIAL_ITERATIONS = 400
 COUPLING_ITERATIONS = 12
-STEADY_TOLERANCE = 1.0e-8
+STEADY_TOLERANCE = 1.0e-12  # Update tolerance must resolve the 1e-8 throughput check.
 WRITE_PARAVIEW = True
 WRITE_CSV = True
 WRITE_NPZ = True
@@ -79,8 +82,23 @@ case = replace(
     ),
 )
 
-# Run the solve and write the standard solution products.
+# Linearity eliminates drive from a fixed-throughput design: Q = G * drive.
+response = linear_flow_response(case)
+if TARGET_FLOW_RATE is not None:
+    case = replace(case, forcing=float(response.drive_for(TARGET_FLOW_RATE)))
+
+# Re-solve at the selected drive; do not merely rescale saved output fields.
 solution = solve(case)
+flow_rate = float(volumetric_flow_rate(case, solution.state.u))
+expected_flow = float(response.flow_per_unit_drive) * case.forcing
+flow_error = abs(flow_rate - expected_flow) / max(abs(expected_flow), 1e-30)
+if not solution.converged or not flow_error <= 1e-8:
+    raise RuntimeError(
+        f"Hunt throughput verification failed: status={solution.status}, "
+        f"residual={solution.residual:g}, relative flow error={flow_error:g}, "
+        f"potential residual={float(solution.diagnostics.potential_residual_history[-1]):g}, "
+        f"linear residual={float(solution.diagnostics.linear_residual_history[-1]):g}"
+    )
 generated = write_solution_outputs(solution, case, OUTPUT_DIR)
 plots = (
     write_case_overview_plots(
@@ -94,6 +112,16 @@ plots = (
 summary = {
     "case": case.name,
     "wall_model": "conducting Hartmann walls; insulating side walls",
+    "design": {
+        "target_flow_rate": TARGET_FLOW_RATE,
+        "flow_rate": flow_rate,
+        "drive": case.forcing,
+        "flow_per_unit_drive": float(response.flow_per_unit_drive),
+        "drive_derivative_wrt_flow": float(1.0 / response.flow_per_unit_drive),
+        "relative_flow_error": flow_error,
+        "length": DUCT_LENGTH,
+        "hydraulic_power": float(hydraulic_power(case.forcing, flow_rate, DUCT_LENGTH)),
+    },
     "validation": validation_summary(solution, case.name, HARTMANN_NUMBER),
     "generated_files": {
         **{kind: [path.name for path in paths] for kind, paths in generated.items()},

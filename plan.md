@@ -471,7 +471,7 @@ Effort ≈ 1.5 weeks.
 | 3b.1 | Drive for requested throughput: the fully developed problem is linear in the force density; compute `G = Q(f = 1)`, eliminate `f = Q_target/G`, check `df/dQ = 1/G` and two direct solves | exact to solver tolerance |
 | 3b.2 | Profile fit: minimise area-weighted squared error over positive drive and bounded field multiplier with `solve_fully_developed_fields`; recover synthetic parameters; report irreducible error for incompatible targets | Executable fully-developed tutorial and regression: 12² Shercliff synthetic recovery within 1e-6, implicit gradients checked against finite differences; antisymmetric target tests the irreducible residual. Identifiability limits documented. Broader Hunt/gallery extension remains 3b.4 |
 | 3b.3 | Minimum work at fixed flow over wall conductance and aspect ratio with implicit gradients; feasibility and projected-gradient/KKT checks; re-solve the optimum on a held-out finer mesh | Taylor and finite-difference sweeps; finer-mesh confirmation |
-| 3b.4 | Extend `hunt_example.py` (no new optimiser API); figure: profiles before/after, objective and constraint iterates, gradient error, work vs flow | gallery figure |
+| 3b.4 | Extend `hunt_example.py` (no new optimiser API); figure: profiles before/after, objective and constraint iterates, gradient error, work vs flow | In progress (#113): throughput example requires both a converged reporting solve and 1e-8 relative flow agreement. Current tight solve reaches 1.24e-11 flow agreement but reports `step_limit` with 1.41e-9 update residual; 160→400 potential iterations does not resolve it. Do not publish this example as qualified. Wall/aspect-ratio optimization, held-out finer mesh and the gallery remain unfinished |
 
 Effort ≈ 1 week.
 
