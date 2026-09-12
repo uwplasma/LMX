@@ -435,15 +435,22 @@ Effort ≈ 3.5 weeks.
 
 | Step | Action | Exit |
 |---|---|---|
-| 2.1 | Day-1 profile on one A4000: compile time, warm time and time per step separated; a direct host-sync measurement that times the same trajectory at two lengths | baseline JSON in `benchmarks/results/` |
+| 2.1 | Profile on one A4000: first-call time (including compilation), warm time and time per step separated; trajectory-length sensitivity is descriptive and does not certify absence of host synchronization | baseline JSON in `benchmarks/results/`; runtime traces needed for synchronization attribution |
 | 2.2 | Benchmark harness `scripts/run_benchmarks.py`: the staggered 3-D core at 32³–192³ and Q2D at 256²–2048², × {fp32, fp64} × {CPU, 1 GPU, 2 GPU}, writing JSON with host, device, versions, dtype, tolerances and an accepted flag; `scripts/make_showcase_figures.py --only scaling` draws it from that JSON and measures nothing itself | reproducible JSON + one figure script |
 | 2.3 | Nightly cron on the office box (Section 9) pushing results to a `benchmarks` branch | first nightly run |
-| 2.4 | Sharding, measured first: place the array across both devices and see what the partitioner does unaided, which is the baseline any hand-written decomposition has to beat | **blocked, measured**: `lmx.q2d` builds its wavenumber grids outside any `jit`, so they are committed to one device and a sharded input cannot flow through -- `Received incompatible devices for jitted computation`. The staggered core has a second obstacle: its three components have length `n+1` on their own axis and `n` on the others, so no single axis divides evenly across all three |
-| 2.4a **done** | Hand the Q2D constants on as NumPy from `solve_q2d`, which is never traced, so they reach the compiled step uncommitted and replicate | **met and measured**: the 1-GPU and 2-GPU fields are bit-identical (agreement 0.0 at 512², 1024² and 2048², both precisions), and the strong-scaling efficiency of the unaided placement is 0.25–0.27 in float64 and 0.14–0.20 in float32. Two devices take about twice as long as one: the transforms need an all-to-all every step over PCIe |
+| 2.4 | Sharding, measured first: place the array across devices and see what the partitioner does unaided, which is the baseline any hand-written decomposition has to beat | Q2D placement is functional; speedup remains unmet. The staggered core has a separate obstacle: its three components have length `n+1` on their own axis and `n` on the others, so no single axis divides evenly across all three |
+| 2.4a **done** | Compile the shared Q2D setup so constants follow input placement without an explicit NumPy host round-trip | PR #108: eight 64²/512² × fp32/fp64 × one/two GPU cases preserve baseline fields and diagnostics exactly. Warm timings are mixed, not a universal speedup. Two/four logical CPU-device checks include fields, diagnostics and analytical friction derivatives. CPU placement is a shared-host test, not fixed-core strong scaling. FFT all-gathers are present; runtime attribution is still needed (#107) |
 | 2.4b | A decomposition designed for the staggered core: slab in one axis with `shard_map` and `ppermute` halos, and a transpose for the contraction along the sharded axis. The two A4000s are PCIe-joined with no NVLink (`nvidia-smi topo -m` reports `NODE`), which is the bandwidth such a design has to answer to | 1-GPU vs 2-GPU fields agree to 1e-12 (fp64); efficiency reported |
 | 2.5 | Optimise to targets: fusion audit, buffer donation, fp32 transforms, batching of line solves; report crossover size | G4/G5 numbers, or the measured reason they are not met |
 
 Effort ≈ 2 weeks spread across the phase.
+
+Next bounded check (#107): use local CPU placement to qualify primal/AD
+correctness before spending office time. Profile setup, integration, diagnostics
+and FFT collectives separately before choosing a decomposition; do not infer
+communication time from fields-only versus validated-solve timing. Logical CPU
+devices share cores and memory, so keep G5 open until controlled fixed-resource
+scaling evidence exists. The office interconnect is not the only test target.
 
 ### Phase 3 — Q2D turbulence (weeks 2–4, ∥)
 

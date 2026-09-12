@@ -83,8 +83,26 @@ and 1.39%, respectively.
 
 These figures characterize this workload and hardware, not every grid or
 device. Timings exclude compilation, use identical precision and inputs, and
-synchronize the final field before stopping the clock. Multi-GPU performance
-is reported separately because the present periodic Q2D state is not sharded.
+synchronize the final field before stopping the clock. Q2D accepts sharded
+initial fields; correctness does not imply a parallel speedup.
+
+To check placement locally, run from the repository root in a fresh process:
+
+```sh
+JAX_PLATFORMS=cpu XLA_FLAGS=--xla_force_host_platform_device_count=4 \
+  python scripts/run_benchmarks.py --cases shard --q2d-sizes 64,256 \
+  --steps 20 --repeats 3 --x64 1 --output artifacts/q2d-cpu4.json
+```
+
+Repeat with two devices and `--x64 0` for float32. Each run compares a
+single-device trajectory against the same input distributed over all devices,
+checks solver completion and field agreement, and records synchronized times.
+The grid's first dimension must divide evenly by the device count.
+[JAX CPU devices](https://docs.jax.dev/en/latest/config_options.html#num-cpu-devices)
+share host cores and memory: the reported efficiency is a **logical-device
+placement comparison**, not fixed-core strong scaling or a prediction for a GPU
+interconnect. Record thread settings and host load; one CPU device can already
+use multiple threads. Distributed FFT communication still needs profiling.
 
 ## Interpretation
 
