@@ -104,6 +104,13 @@ placement comparison**, not fixed-core strong scaling or a prediction for a GPU
 interconnect. Record thread settings and host load; one CPU device can already
 use multiple threads. Distributed FFT communication still needs profiling.
 
+Setup and diagnostic reductions are compiled; the validated reporting wrapper
+still performs host-side checks and optional frame collection. For optimization,
+use `evolve_q2d` inside a compiled objective to avoid reporting work on every
+evaluation, then qualify the resulting trajectory with `solve_q2d`. The pure
+kernel uses SOLVAX's checkpointed recurrence for bounded reverse-state storage;
+it does not replace the solver's Courant and energy acceptance gates.
+
 ## Interpretation
 
 The solver reports kinetic energy, enstrophy, the integrated energy-budget
