@@ -185,6 +185,7 @@ def _step(omega_hat, forcing_hat, eigenvalues, kx, ky, dealias, dt, decay, half_
     return (updated * dealias).at[0, 0].set(0.0)
 
 
+@jax.jit
 def _measures(omega_hat, forcing, eigenvalues, kx, ky, dt, spacing, viscosity, friction):
     psi_hat, ux, uy = _flow(omega_hat, eigenvalues, kx, ky)
     omega = jnp.fft.ifftn(omega_hat).real
