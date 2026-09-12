@@ -716,6 +716,24 @@ def test_q2d_real_dtype_floor_and_weak_scalar_defaults():
 
 
 @pytest.mark.physics
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("stride", [0, 2])
+def test_q2d_divergence_diagnostic_uses_reported_final_velocity(dtype, stride):
+    initial = np.random.default_rng(71).normal(size=(16, 16)).astype(dtype)
+    case = Q2DProblem(initial, length=(3.0, 5.0), steps=5, history_stride=stride, dt=0.001)
+    result = solve_q2d(case)
+    ux, uy = np.asarray(result.velocity_x), np.asarray(result.velocity_y)
+    kx = 2 * np.pi * np.fft.fftfreq(16, d=3.0 / 16)[:, None]
+    ky = 2 * np.pi * np.fft.fftfreq(16, d=5.0 / 16)[None, :]
+    divergence = np.fft.ifftn(1j * kx * np.fft.fftn(ux) + 1j * ky * np.fft.fftn(uy)).real
+    scale = max(np.max(np.abs(ux)), np.max(np.abs(uy))) * max(np.max(abs(kx)), np.max(abs(ky)))
+    assert result.status == "completed"
+    np.testing.assert_allclose(
+        result.diagnostics.max_divergence, np.max(np.abs(divergence)), atol=20 * np.finfo(dtype).eps * scale
+    )
+
+
+@pytest.mark.physics
 def test_q2d_energy_acceptance_matches_modal_budget_and_time_refinement():
     residuals = []
     for dt, steps in ((0.25, 8), (0.125, 16), (0.02, 100)):
