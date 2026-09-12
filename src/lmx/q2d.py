@@ -8,7 +8,6 @@ from math import isfinite
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 from solvax import (
     checkpointed_fori_loop,
     periodic_poisson_eigenvalues,
@@ -231,6 +230,7 @@ def _integrate(
     return checkpointed_fori_loop(0, steps, advance, initial, checkpoint_size=checkpoint_size)
 
 
+@jax.jit
 def _setup(initial_vorticity, forcing, length, viscosity, friction, dt):
     shape, dtype = initial_vorticity.shape, initial_vorticity.dtype
     spacing = (length[0] / shape[0], length[1] / shape[1])
@@ -304,15 +304,6 @@ def solve_q2d(problem: Q2DProblem) -> Q2DResult:
         problem.viscosity,
         problem.hartmann_friction,
         problem.dt,
-    )
-    # These depend only on the shape, the box and the material constants, and this
-    # entry point is never traced -- it reports a status, so it cannot be. Handing
-    # them on as NumPy leaves them uncommitted, which is what lets a state sharded
-    # across several devices be combined with them; built with jax.numpy outside a
-    # trace they belong to one device and the solve fails outright with
-    # "Received incompatible devices for jitted computation".
-    eigenvalues, kx, ky, dealias, decay = (
-        np.asarray(array) for array in (eigenvalues, kx, ky, dealias, decay)
     )
     initial = _measures(
         omega_hat,
