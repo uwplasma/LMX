@@ -1,23 +1,11 @@
 """Fully developed duct design: throughput, pumping power and their derivatives.
 
-At fixed field, materials and geometry the fully developed inductionless problem
-is *linear* in the drive: doubling the force density doubles the velocity
-everywhere. The volumetric flow rate is therefore ``Q = G f`` for a single
-response ``G`` that one solve measures, and the drive that delivers a requested
-throughput is ``f = Q_target / G`` exactly.
-
-That matters for design. Searching for a drive with an optimizer would spend many
-solves rediscovering a scalar that one solve determines, and would return an
-answer good only to its own tolerance. Eliminating it leaves the optimizer to
-work on the inputs that genuinely change the flow: wall conductance, aspect ratio
-and field strength. The derivative is exact too, ``df/dQ = 1/G``, which the tests
-check against automatic differentiation of the solve itself.
-
-The pressure drop follows the drive. For a duct driven by a uniform pressure
-gradient the wall-to-wall drop over a length ``L`` is ``f L``, so the hydraulic
-pumping power is ``f L Q``. This is the isothermal hydraulic power of the
-fully developed segment; it is not a blanket pumping-power budget, which would
-also carry entry and exit losses, manifolds and thermal effects.
+At fixed field, materials and geometry, flow is linear in force density:
+``Q = G f``. One unit-drive solve gives ``G``, eliminating the drive from
+fixed-flow optimization as ``f = Q_target / G`` with ``df/dQ = 1/G``.
+For a uniform pressure-gradient drive over length ``L``, pressure drop is
+``f L`` and hydraulic power is ``f L Q``. These are isothermal segment
+quantities, excluding entry/exit losses, manifolds and thermal effects.
 """
 
 from __future__ import annotations
@@ -28,7 +16,6 @@ import jax
 import jax.numpy as jnp
 
 from .cases import solve_fully_developed_fields
-from .physics import build_material_fields
 from .solvers import _build_mesh
 from .specs import CaseSpec
 
@@ -44,12 +31,11 @@ __all__ = [
 
 
 def fluid_cell_areas(case: CaseSpec) -> jnp.ndarray:
-    """Return the cross-section area of every cell, zero outside the fluid."""
+    """Return mesh-only integration weights, zero outside the fluid."""
     with jax.ensure_compile_time_eval():
         mesh = _build_mesh(case)
-        materials = build_material_fields(case, mesh)
         areas = jnp.asarray(mesh.dy)[:, None] * jnp.asarray(mesh.dz)[None, :]
-        return jnp.where(materials.fluid_mask, areas, 0.0)
+        return areas if mesh.fluid_mask is None else jnp.where(mesh.fluid_mask, areas, 0.0)
 
 
 def volumetric_flow_rate(case: CaseSpec, velocity: jnp.ndarray) -> jnp.ndarray:
