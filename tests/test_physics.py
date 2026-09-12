@@ -650,14 +650,16 @@ def test_q2d_mixed_precision_matches_analytic_fields_and_derivatives(control):
 
 
 @pytest.mark.physics
-def test_q2d_sharded_setup_preserves_fields_and_diagnostics():
+@pytest.mark.parametrize("devices", [2, 4])
+def test_q2d_sharded_setup_preserves_fields_and_diagnostics(devices):
     code = """
 from dataclasses import replace, asdict
 import jax
+import jax.numpy as jnp
 import numpy as np
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
-from lmx.q2d import make_q2d_case, solve_q2d
-assert len(jax.devices()) == 2
+from lmx.q2d import evolve_q2d, make_q2d_case, solve_q2d
+assert len(jax.devices()) in (2, 4)
 placement = NamedSharding(Mesh(np.array(jax.devices()), ('d',)), P('d', None))
 for dtype in (np.float32, np.float64):
     case = make_q2d_case(shape=(16, 16), steps=4, history_stride=2)
@@ -672,6 +674,17 @@ for dtype in (np.float32, np.float64):
     np.testing.assert_allclose(list(asdict(sharded.diagnostics).values()),
                                list(asdict(reference.diagnostics).values()),
                                rtol=100*np.finfo(dtype).eps, atol=100*np.finfo(dtype).eps)
+    def objective(field, friction):
+        final = evolve_q2d(field, hartmann_friction=friction, steps=4, dt=.01)[0]
+        return jnp.mean(final**2)
+    derivative = jax.jit(jax.value_and_grad(objective, argnums=1))
+    control = jnp.asarray(.1, dtype=dtype)
+    expected = derivative(jax.device_put(initial, jax.devices()[0]), control)
+    actual = derivative(jax.device_put(initial, placement), control)
+    np.testing.assert_allclose(np.asarray(actual), np.asarray(expected),
+                               rtol=100*np.finfo(dtype).eps, atol=100*np.finfo(dtype).eps)
+    # A Taylor-Green mode has zero nonlinear advection: d(mean(w²))/d(friction)=-2*t*mean(w²).
+    np.testing.assert_allclose(actual[1], -.08*actual[0], rtol=100*np.finfo(dtype).eps)
 """
     subprocess.run(
         [sys.executable, "-c", code],
@@ -681,7 +694,8 @@ for dtype in (np.float32, np.float64):
             **os.environ,
             "JAX_PLATFORMS": "cpu",
             "JAX_ENABLE_X64": "true",
-            "XLA_FLAGS": "--xla_force_host_platform_device_count=2",
+            "XLA_FLAGS": f"--xla_force_host_platform_device_count={devices}",
+            "JAX_NUM_CPU_DEVICES": str(devices),
         },
     )
 
