@@ -350,7 +350,7 @@ def solve_q2d(problem: Q2DProblem) -> Q2DResult:
             frames.append(jnp.fft.ifftn(omega_hat).real)
             frame_steps.append(completed)
     psi_hat, ux, uy = _flow(omega_hat, eigenvalues, kx, ky)
-    vorticity = jnp.fft.ifftn(omega_hat).real
+    vorticity = frames[-1] if frames else jnp.fft.ifftn(omega_hat).real
     # Divergence is a final-field diagnostic; energy and Courant remain checked at every step.
     divergence = jnp.max(jnp.abs(jnp.fft.ifftn(1j * kx * jnp.fft.fftn(ux) + 1j * ky * jnp.fft.fftn(uy)).real))
     budget_residual = jnp.abs(final[0] - initial[0] - budget) / jnp.maximum(
