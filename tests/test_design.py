@@ -67,12 +67,23 @@ def _flow(case, drive, scale=1.0):
     return volumetric_flow_rate(case, velocity)
 
 
-def test_fluid_areas_sum_to_the_open_cross_section():
-    case = _case()
+@pytest.mark.parametrize("factory", [lmx.make_hartmann_case, lmx.make_hunt_case])
+def test_fluid_areas_sum_to_the_open_cross_section(factory):
+    from lmx.physics import build_material_fields
+    from lmx.solvers import _build_mesh
+
+    case = factory(ha=5, ny=12, nz=12)
     areas = np.asarray(fluid_cell_areas(case))
-    assert areas.shape == (case.geometry.ny, case.geometry.nz)
+    mesh = _build_mesh(case)
+    expected = np.where(build_material_fields(case, mesh).fluid_mask, mesh.dy[:, None] * mesh.dz[None, :], 0)
+    np.testing.assert_array_equal(areas, expected)
     assert np.all(areas >= 0.0)
     assert float(np.sum(areas)) == pytest.approx(case.geometry.width * case.geometry.height, rel=1e-12)
+    velocity = jnp.ones(areas.shape)
+    integrate = jax.jit(jax.value_and_grad(lambda u: volumetric_flow_rate(case, u)))
+    value, gradient = integrate(velocity)
+    assert float(value) == pytest.approx(float(areas.sum()), rel=1e-12)
+    np.testing.assert_array_equal(gradient, areas)
 
 
 def test_flow_rate_is_linear_in_the_drive():
