@@ -1,5 +1,7 @@
 """Fully developed duct design: linearity, exact drive elimination and gradients."""
 
+from pathlib import Path
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -20,6 +22,40 @@ from lmx.design import (
 pytestmark = pytest.mark.unit
 
 LENGTH = 2.5
+
+
+def test_documented_profile_fit_recovers_drive_and_field():
+    tutorial = Path(__file__).resolve().parents[1] / "docs/tutorials/fully_developed.md"
+    code = tutorial.read_text().split("## Fit a measured velocity profile", 1)[1]
+    code = code.split("```python\n", 1)[1].split("```", 1)[0]
+    namespace = {}
+    exec(compile(code, str(tutorial), "exec"), namespace)
+    fit, evaluate = namespace["fit"], namespace["evaluate"]
+    np.testing.assert_allclose(fit.x, namespace["truth"], rtol=0, atol=1e-6)
+    assert fit.fun < 1e-14
+    initial = np.array([1.0, 1.0])
+    value, gradient = evaluate(initial)
+    step = 1e-4
+    finite = np.array(
+        [
+            (evaluate(initial + step * axis)[0] - evaluate(initial - step * axis)[0]) / (2 * step)
+            for axis in np.eye(2)
+        ]
+    )
+    assert fit.fun < value
+    np.testing.assert_allclose(gradient, finite, rtol=1e-5, atol=1e-8)
+    # Symmetric drive/field controls cannot fit an antisymmetric target component.
+    target, areas = namespace["target"], namespace["areas"]
+    odd = 0.1 * jnp.sqrt(jnp.mean(target**2)) * jnp.linspace(-1, 1, target.shape[0])[:, None]
+    namespace["target"] = target + odd
+    namespace["normalization"] = jnp.sum(areas * (target + odd) ** 2)
+    namespace["value_and_gradient"] = jax.jit(jax.value_and_grad(namespace["loss"]))
+    incompatible = namespace["minimize"](
+        evaluate, fit.x, jac=True, method="L-BFGS-B", bounds=[(0.1, 3.0), (0.5, 2.0)]
+    )
+    floor = float(jnp.sum(areas * odd**2) / namespace["normalization"])
+    assert incompatible.success and incompatible.fun > 1e-4
+    assert incompatible.fun == pytest.approx(floor, rel=1e-7)
 
 
 def _case(ha: float = 5.0, ny: int = 12, nz: int = 12):
