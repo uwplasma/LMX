@@ -723,6 +723,11 @@ def test_q2d_divergence_diagnostic_uses_reported_final_velocity(dtype, stride):
     case = Q2DProblem(initial, length=(3.0, 5.0), steps=5, history_stride=stride, dt=0.001)
     result = solve_q2d(case)
     ux, uy = np.asarray(result.velocity_x), np.asarray(result.velocity_y)
+    if stride:
+        np.testing.assert_array_equal(result.vorticity_history[-1], result.vorticity)
+        assert result.frame_times[-1] == pytest.approx(case.steps * case.dt)
+    else:
+        assert result.vorticity_history.shape == (0, *initial.shape)
     kx = 2 * np.pi * np.fft.fftfreq(16, d=3.0 / 16)[:, None]
     ky = 2 * np.pi * np.fft.fftfreq(16, d=5.0 / 16)[None, :]
     divergence = np.fft.ifftn(1j * kx * np.fft.fftn(ux) + 1j * ky * np.fft.fftn(uy)).real
