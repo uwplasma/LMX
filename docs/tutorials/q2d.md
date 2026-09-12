@@ -114,7 +114,9 @@ it does not replace the solver's Courant and energy acceptance gates.
 ## Interpretation
 
 The solver reports kinetic energy, enstrophy, the integrated energy-budget
-residual, spectral velocity divergence, and maximum Courant number. A result is
+residual, final-field spectral velocity divergence, and maximum Courant number.
+Energy-budget and Courant reductions run every step; divergence is evaluated
+once on the reported final velocity, avoiding repeated transforms. A result is
 accepted (`status == "completed"`, `converged == True`) only when fields and
 diagnostics are finite, maximum Courant number is at most one, and the
 normalized energy-budget residual is at most `energy_budget_tolerance`
