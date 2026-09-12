@@ -7,10 +7,9 @@ compilation. ``warm_seconds`` is the best of several later calls, which is what
 a long run pays. ``seconds_per_step`` divides the warm time by the number of
 steps in the trajectory, which is the only number that compares across sizes.
 
-Every case is a single compiled call. Anything that synchronises with the host
-inside the loop would show up here as a warm time that scales with the step
-count rather than with the work, which is the failure this harness exists to
-catch on an accelerator.
+The core trajectory is a compiled call; Q2D includes its reporting wrapper.
+Trajectory-length ratios describe timing only: a fixed synchronization cost
+per step also gives constant time per step. Use traces to locate synchronization.
 
 ``accepted`` is a correctness flag, not a timing one: a case that produced a
 non-finite field or drifted off its divergence-free constraint is reported and
@@ -161,7 +160,12 @@ def _q2d_case(jax, cells: int, steps: int, repeats: int) -> dict:
         steps=steps,
         history_stride=steps,
     )
-    compile_seconds, warm, result = _timed(jax, lambda: lmx.solve(problem).vorticity, repeats)
+
+    def run():
+        result = lmx.solve(problem)
+        return result.vorticity, result.status
+
+    compile_seconds, warm, (result, status) = _timed(jax, run, repeats)
     finite = bool(np.all(np.isfinite(np.asarray(result))))
     return {
         "case": "q2d_evolve",
@@ -171,18 +175,13 @@ def _q2d_case(jax, cells: int, steps: int, repeats: int) -> dict:
         "compile_seconds": compile_seconds,
         "warm_seconds": warm,
         "seconds_per_step": warm / steps,
-        "accepted": finite,
+        "solver_status": status,
+        "accepted": finite and status == "completed",
     }
 
 
 def _host_sync_case(jax, cells: int, steps: int, repeats: int) -> dict:
-    """Time the same trajectory at two lengths; a host sync per step would show here.
-
-    A compiled `scan` costs the same per step however many steps it runs. Any
-    synchronisation with the host inside the loop adds a fixed latency per step
-    that does not compile away, so the ratio of the two per-step times is a
-    direct measurement of whether the loop is really running ahead.
-    """
+    """Report length sensitivity, which cannot prove absence of host synchronization."""
     short = _core3d_case(jax, cells, steps, repeats)
     long = _core3d_case(jax, cells, 4 * steps, repeats)
     ratio = long["seconds_per_step"] / short["seconds_per_step"]
@@ -193,8 +192,8 @@ def _host_sync_case(jax, cells: int, steps: int, repeats: int) -> dict:
         "steps": [steps, 4 * steps],
         "seconds_per_step": [short["seconds_per_step"], long["seconds_per_step"]],
         "per_step_ratio": ratio,
-        "ratio_tolerance": 1.15,
-        "accepted": bool(short["accepted"] and long["accepted"] and ratio < 1.15),
+        "host_sync_verified": False,
+        "accepted": bool(short["accepted"] and long["accepted"]),
     }
 
 
@@ -244,13 +243,14 @@ def _shard_case(jax, cells: int, steps: int, repeats: int) -> dict:
             steps=steps,
             history_stride=steps,
         )
-        return lmx.solve(problem).vorticity
+        result = lmx.solve(problem)
+        return result.vorticity, result.status
 
     single = jax.device_put(jnp.asarray(vorticity, dtype=dtype), devices[0])
-    _, single_seconds, reference = _timed(jax, lambda: evolve(single), repeats)
+    _, single_seconds, (reference, single_status) = _timed(jax, lambda: evolve(single), repeats)
     mesh = Mesh(np.array(devices), ("d",))
     placed = jax.device_put(jnp.asarray(vorticity, dtype=dtype), NamedSharding(mesh, Spec("d", None)))
-    _, sharded_seconds, result = _timed(jax, lambda: evolve(placed), repeats)
+    _, sharded_seconds, (result, sharded_status) = _timed(jax, lambda: evolve(placed), repeats)
     # Compare on the host: the two results live on different device sets, and
     # subtracting them on device is itself the error this case exists to avoid.
     single_values = np.asarray(jax.device_get(reference))
@@ -269,7 +269,8 @@ def _shard_case(jax, cells: int, steps: int, repeats: int) -> dict:
         "efficiency": single_seconds / (len(devices) * sharded_seconds),
         "agreement": difference,
         "agreement_tolerance": tolerance,
-        "accepted": difference < tolerance,
+        "solver_status": [single_status, sharded_status],
+        "accepted": difference < tolerance and single_status == sharded_status == "completed",
     }
 
 
@@ -284,20 +285,32 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", default="", help="Where to write the JSON report.")
     arguments = parser.parse_args(argv)
 
+    requested = [name.strip() for name in arguments.cases.split(",") if name.strip()]
+    if not requested or set(requested) - {"core3d", "q2d", "hostsync", "shard"}:
+        parser.error("--cases must select core3d, q2d, hostsync or shard")
+    if arguments.steps < 1 or arguments.repeats < 1:
+        parser.error("--steps and --repeats must be positive")
+    try:
+        core_sizes = [int(value) for value in arguments.core3d_sizes.split(",")]
+        q2d_sizes = [int(value) for value in arguments.q2d_sizes.split(",")]
+        if min(core_sizes + q2d_sizes) < 2:
+            raise ValueError
+    except ValueError:
+        parser.error("sizes must be comma-separated integers of at least two cells")
+
     import jax
 
     jax.config.update("jax_enable_x64", arguments.x64 == "1")
     report = {"environment": _environment(jax), "cases": []}
-    requested = [name.strip() for name in arguments.cases.split(",") if name.strip()]
     plan = []
     if "core3d" in requested:
-        plan += [(_core3d_case, int(value)) for value in arguments.core3d_sizes.split(",") if value]
+        plan += [(_core3d_case, size) for size in core_sizes]
     if "q2d" in requested:
-        plan += [(_q2d_case, int(value)) for value in arguments.q2d_sizes.split(",") if value]
+        plan += [(_q2d_case, size) for size in q2d_sizes]
     if "hostsync" in requested:
-        plan += [(_host_sync_case, int(arguments.core3d_sizes.split(",")[0]))]
+        plan += [(_host_sync_case, core_sizes[0])]
     if "shard" in requested:
-        plan += [(_shard_case, int(value)) for value in arguments.q2d_sizes.split(",") if value]
+        plan += [(_shard_case, size) for size in q2d_sizes]
     for builder, size in plan:
         try:
             entry = builder(jax, size, arguments.steps, arguments.repeats)
@@ -310,7 +323,7 @@ def main(argv: list[str] | None = None) -> int:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         print(f"wrote {path}")
-    return 0
+    return 0 if all(entry["accepted"] for entry in report["cases"]) else 1
 
 
 if __name__ == "__main__":

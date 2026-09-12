@@ -158,8 +158,8 @@ compile time, the warm time and the time per step kept apart.
 - **Float64 does not, and the reason is the card:** an A4000 runs float64 at 1/64
   of its float32 rate, and the fast-diagonalization contractions are `O(N⁴)`, so
   the 3-D core goes flop-bound — 3.4× at 128³, falling as the problem grows.
-- **The loop really runs ahead:** the same trajectory at 10 and at 40 steps costs
-  the same per step, so nothing synchronises with the host inside it.
+- **Trajectory-length scaling:** 10 and 40 steps cost about the same per step;
+  this timing ratio alone does not establish absence of host synchronization.
 - Every number carries an `accepted` flag judged against the precision it was
   computed in; a run that lost its divergence-free constraint is reported, not quoted.
 
