@@ -9,8 +9,11 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
-from lmx import make_hunt_case, solve
+from lmx import make_hunt_case, solve_fully_developed_fields
+from lmx.cases import solve_steady
+from lmx.design import hydraulic_power, volumetric_flow_rate
 from lmx.io import write_case_overview_plots, write_solution_outputs
+from lmx.specs import MHDState
 from lmx.validation import validation_summary
 
 # Inputs: geometry, wall model, material properties, numerics, and outputs.
@@ -28,6 +31,8 @@ FLUID_CONDUCTIVITY = 1.0
 DENSITY = 1.0
 VISCOSITY = 1.0
 FORCING = 1.0
+TARGET_FLOW_RATE = 0.05  # Set to None to prescribe FORCING instead.
+DUCT_LENGTH = 2.5  # Fully developed segment length, not a complete blanket.
 TIME_STEP = 0.002
 FINAL_TIME = 1.0
 MAX_STEPS = 48
@@ -79,8 +84,26 @@ case = replace(
     ),
 )
 
-# Run the solve and write the standard solution products.
-solution = solve(case)
+# Linearity eliminates drive from a fixed-throughput design: Q = G * drive.
+unit_fields = solve_fully_developed_fields(case, forcing=1.0)
+conductance = float(volumetric_flow_rate(case, unit_fields[0]))
+if TARGET_FLOW_RATE is not None:
+    case = replace(case, forcing=TARGET_FLOW_RATE / conductance)
+
+# Run the reporting corrector from the linear predictor. This checks
+# stopping gates and throughput, not cold-start convergence or an independent model.
+initial_state = MHDState(*(case.forcing * field for field in unit_fields), time=0.0, residual=float("inf"))
+solution = solve_steady(case, initial_state=initial_state)
+flow_rate = float(volumetric_flow_rate(case, solution.state.u))
+expected_flow = conductance * case.forcing
+flow_error = abs(flow_rate - expected_flow) / max(abs(expected_flow), 1e-30)
+if not solution.converged or not flow_error <= 1e-8:
+    raise RuntimeError(
+        f"Hunt throughput verification failed: status={solution.status}, "
+        f"residual={solution.residual:g}, relative flow error={flow_error:g}, "
+        f"potential residual={float(solution.diagnostics.potential_residual_history[-1]):g}, "
+        f"linear residual={float(solution.diagnostics.linear_residual_history[-1]):g}"
+    )
 generated = write_solution_outputs(solution, case, OUTPUT_DIR)
 plots = (
     write_case_overview_plots(
@@ -94,6 +117,17 @@ plots = (
 summary = {
     "case": case.name,
     "wall_model": "conducting Hartmann walls; insulating side walls",
+    "design": {
+        "verification": "warm-started reporting corrector",
+        "target_flow_rate": TARGET_FLOW_RATE,
+        "flow_rate": flow_rate,
+        "drive": case.forcing,
+        "flow_per_unit_drive": conductance,
+        "drive_derivative_wrt_flow": 1.0 / conductance,
+        "relative_flow_error": flow_error,
+        "length": DUCT_LENGTH,
+        "hydraulic_power": float(hydraulic_power(case.forcing, flow_rate, DUCT_LENGTH)),
+    },
     "validation": validation_summary(solution, case.name, HARTMANN_NUMBER),
     "generated_files": {
         **{kind: [path.name for path in paths] for kind, paths in generated.items()},
