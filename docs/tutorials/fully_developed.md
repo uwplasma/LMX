@@ -51,7 +51,9 @@ Run `python examples/hunt_example.py` for a conducting-wall duct with a
 requested flow rate. Edit `TARGET_FLOW_RATE` and `DUCT_LENGTH` near the top;
 set the target to `None` to prescribe `FORCING` instead. The example computes
 the unit-drive response, eliminates the required drive analytically, and then
-performs a direct reporting solve to check the requested throughput. Its JSON
+warm-starts a reporting corrector from the scaled fields. The corrector must
+pass the configured solver gates and a separate `1e-8` relative flow check;
+this is not a cold-start convergence test or an independent physical reference. Its JSON
 summary records flow, drive, `d(drive)/dQ = 1/G`, and hydraulic power `drive*L*Q`.
 This is fully developed segment work, excluding entry/exit, manifolds and
 thermal effects. It is not a complete blanket pumping budget.

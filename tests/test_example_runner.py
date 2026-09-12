@@ -19,6 +19,7 @@ def test_portable_duct_tutorials_and_toml_first_run(tmp_path: Path):
     assert hartmann["analytical_profile"]["l2_error"] < 0.05
     assert hunt["validation"]["interface_current_residual"] < 1.0e-8
     design = hunt["design"]
+    assert design["verification"] == "warm-started reporting corrector"
     assert design["flow_rate"] == pytest.approx(design["target_flow_rate"], rel=1e-8)
     assert design["relative_flow_error"] < 1e-8
     assert design["drive_derivative_wrt_flow"] == pytest.approx(1 / design["flow_per_unit_drive"])
