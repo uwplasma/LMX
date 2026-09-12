@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
   workflow_dispatch:
   workflow_call:
 
@@ -74,7 +75,7 @@ jobs:
   pr-impact:
     name: Changed numerical surface
     needs: scope
-    if: github.event_name == 'pull_request' && needs.scope.outputs.targeted == 'true'
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false && needs.scope.outputs.targeted == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -164,7 +165,7 @@ jobs:
   pr-tests:
     name: PR ${{ matrix.tier }}${{ matrix.shard && format(' ({0})', matrix.shard) || '' }}
     needs: scope
-    if: github.event_name == 'pull_request' && needs.scope.outputs.full == 'true'
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false && needs.scope.outputs.full == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     strategy:
