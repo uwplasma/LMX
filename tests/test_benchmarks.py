@@ -26,6 +26,16 @@ from lmx.validation import (
 pytestmark = pytest.mark.unit
 
 
+def test_device_environment_records_cpu_count_without_affinity(monkeypatch):
+    import jax
+
+    from scripts import run_benchmarks as runner
+
+    monkeypatch.delattr(runner.os, "sched_getaffinity", raising=False)
+    monkeypatch.setattr(runner.os, "cpu_count", lambda: 14)
+    assert runner._environment(jax)["cpu_count"] == 14
+
+
 @pytest.mark.parametrize(
     "arguments",
     [
