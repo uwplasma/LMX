@@ -31,7 +31,9 @@ covered gate for release qualification:
 ```
 
 The first command skips global coverage because a selected subset cannot
-measure it honestly. PRs run disjoint `--tier unit --no-coverage` and
+measure it honestly. Draft PRs retain applicable metadata/architecture checks;
+numerical jobs begin when marked ready for review and rerun on subsequent updates.
+Ready PRs run disjoint `--tier unit --no-coverage` and
 `--tier regression --no-coverage` selections, with execution budgets of four and
 seven minutes, leaving setup time within the five/eight-minute targets. Queue
 latency is reported separately. Main/release qualification retains at least 95%
