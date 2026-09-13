@@ -61,7 +61,7 @@ FLUID_CELLS_Z = 4
 TIME_STEP_S = 1.0e-3
 FINAL_TIME_S = 4.0e-3
 MAX_STEPS = 4
-POTENTIAL_ITERATIONS = 32
+POTENTIAL_ITERATIONS = 200  # Per cold potential solve inside the steady affine solve.
 
 
 # Set up dimensional and reduced electrical properties.
@@ -216,6 +216,7 @@ for model in WALL_MODELS:
             length_scale=LENGTH_SCALE_M,
         ),
         "mesh_shape": list(mesh.yz_shape),
+        "status": solution.status,
         "validation": diagnostics,
     }
     meshes[model] = mesh
