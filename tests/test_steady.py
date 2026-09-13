@@ -1,5 +1,8 @@
 """The steady solve: it is the fixed point of the step, and its gradient is exact."""
 
+import dataclasses
+import functools
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -87,7 +90,7 @@ def test_the_residual_vanishes_exactly_at_a_fixed_point_of_the_step():
 
 
 def test_the_steady_solve_reproduces_the_marched_state_far_faster(monkeypatch):
-    """Newton-Krylov reaches the marched state with far fewer projections than marching.
+    """The steady solve reaches the marched state with far fewer projections than marching.
 
     A claim about the method, not about the machine, so the work is counted rather
     than timed: both paths are built from the same projection, and a clock also
@@ -125,10 +128,12 @@ def test_the_steady_solve_reproduces_the_marched_state_far_faster(monkeypatch):
     solution = solve_steady_state(problem, pseudo_step=100.0)
     jax.effects_barrier()
     assert abs(_mean(problem, solution.velocity) - _mean(problem, velocity)) < 1e-8
-    # The linearised residual projects in the tangent, where no callback fires. Each
-    # such application is paired with a counted one: a Krylov iteration with its
+    # This insulating Stokes duct is one CG solve, whose operator and preconditioner both
+    # project through the counted name, so the count is the work. Newton-Krylov projects
+    # the linearised residual in the tangent, where no callback fires, but each such
+    # application is paired with a counted one: a Krylov iteration with its
     # preconditioner, a restart cycle's true residual with its Newton step's residual.
-    # Doubling the count therefore bounds the work of the whole solve.
+    # Doubling the count therefore bounds the work of either route.
     newton = projections[0]
     # A count of zero means the solve no longer projects through the patched names, and
     # would pass the comparison below without measuring anything.
@@ -232,11 +237,37 @@ def test_the_adjoint_matches_finite_differences_where_the_layers_are_thin(hartma
     assert float(gradient[1]) < 0.0
 
 
+def _random_velocity(problem: ChannelProblem, seed: int):
+    """A random velocity with no constraint imposed: wall faces and periodic copies are free."""
+    from lmx.core3d import velocity_offset
+    from lmx.grid import Field
+
+    keys = jax.random.split(jax.random.PRNGKey(seed), 3)
+    return tuple(
+        Field(
+            jax.random.normal(
+                keys[axis], problem.grid.offset_shape(velocity_offset(axis)), dtype=jnp.float64
+            ),
+            velocity_offset(axis),
+            problem.grid,
+        )
+        for axis in range(3)
+    )
+
+
+def _face_volume_inner(problem: ChannelProblem, left, right) -> float:
+    from lmx.core3d import velocity_condition
+    from lmx.ops import face_inner_product
+
+    return sum(
+        float(face_inner_product(a, b, axis, velocity_condition(problem.conditions, axis)))
+        for axis, (a, b) in enumerate(zip(left, right, strict=True))
+    )
+
+
 def _stokes_operator_samples(problem: ChannelProblem):
     """Return <v, A u>, <u, A v> and <u, A u> for two random divergence-free velocities."""
-    from lmx.core3d import project, velocity_condition, velocity_offset
-    from lmx.grid import Field
-    from lmx.ops import face_inner_product
+    from lmx.core3d import project
 
     factorization = problem.factorization()
     rest = steady_residual(zero_velocity(problem), problem, factorization)
@@ -247,28 +278,85 @@ def _stokes_operator_samples(problem: ChannelProblem):
             field.replace_data(field.data - base.data) for field, base in zip(value, rest, strict=True)
         )
 
-    def sample(seed):
-        keys = jax.random.split(jax.random.PRNGKey(seed), 3)
-        raw = tuple(
-            Field(
-                jax.random.normal(
-                    keys[axis], problem.grid.offset_shape(velocity_offset(axis)), dtype=jnp.float64
-                ),
-                velocity_offset(axis),
-                problem.grid,
-            )
-            for axis in range(3)
-        )
-        return project(raw, problem, factorization)[0]
-
-    def inner(left, right):
-        return sum(
-            float(face_inner_product(a, b, axis, velocity_condition(problem.conditions, axis)))
-            for axis, (a, b) in enumerate(zip(left, right, strict=True))
-        )
-
-    u, v = sample(1), sample(2)
+    u, v = (project(_random_velocity(problem, seed), problem, factorization)[0] for seed in (1, 2))
+    inner = functools.partial(_face_volume_inner, problem)
     return inner(v, operator(u)), inner(u, operator(v)), inner(u, operator(u))
+
+
+def _extruded(problem: ChannelProblem, axial_cells: int, hartmann: float, cells: int) -> ChannelProblem:
+    """The same duct cross-section repeated over several periodic axial cells."""
+    transverse = wall_resolving_faces(
+        cells, -1.0, 1.0, layer_thickness=1.0 / hartmann, cells_in_layer=6, max_ratio=None
+    )
+    spanwise = wall_resolving_faces(
+        cells, -1.0, 1.0, layer_thickness=1.0 / np.sqrt(hartmann), cells_in_layer=6, max_ratio=None
+    )
+    return dataclasses.replace(problem, grid=Grid(uniform_faces(axial_cells, 0.0, 1.0), transverse, spanwise))
+
+
+def test_the_conjugate_gradient_preconditioner_is_symmetric_positive_definite():
+    """CG needs the preconditioner symmetric positive definite in the same inner product as the operator.
+
+    Several axial cells, because the periodic wrap face is where a one-cell
+    duct hides an error: the viscous solve returns the duplicate face as zero,
+    and completing it by averaging instead of copying made the axial viscous
+    inverse asymmetric by 2.7e-2 on a 24-cube Ha 20 duct, and CG took 320
+    iterations instead of 119.
+    """
+    from lmx.core3d import project
+    from lmx.steady import _isotropic_viscous, _orthogonal_projection, _preconditioner
+
+    problem = _extruded(duct_problem(hartmann=100.0, cells=24), 4, 100.0, 24)
+    factorization = problem.factorization()
+    precond = _preconditioner(problem, factorization, _isotropic_viscous(problem, 1.0e3), 1.0e3)
+    inner = functools.partial(_face_volume_inner, problem)
+
+    u, v = _random_velocity(problem, 1), _random_velocity(problem, 2)
+    orthogonal = functools.partial(_orthogonal_projection, problem=problem, factorization=factorization)
+    assert abs(inner(v, orthogonal(u)) - inner(orthogonal(v), u)) <= 1e-12 * abs(inner(v, orthogonal(u)))
+    # The oblique projection the time step uses is not self-adjoint, which is why the adjoint needs the other.
+    oblique = project(u, problem, factorization)[0], project(v, problem, factorization)[0]
+    assert abs(inner(v, oblique[0]) - inner(oblique[1], u)) > 1e-3 * abs(inner(v, oblique[0]))
+
+    up, vp = orthogonal(_random_velocity(problem, 3)), orthogonal(_random_velocity(problem, 4))
+    forward, backward = inner(vp, precond(up)), inner(up, precond(vp))
+    # The eigenbases of a stretched axis carry about 1e-9; the wrap-face defect was 2.7e-2.
+    assert abs(forward - backward) <= 1e-8 * max(abs(forward), abs(backward))
+    assert inner(up, precond(up)) > 0.0 and inner(vp, precond(vp)) > 0.0
+
+
+def test_the_conjugate_gradient_route_agrees_with_newton_krylov():
+    """A unidirectional duct flow does not advect itself, so both routes answer the same question.
+
+    Without advection the steady state is one CG solve; with the central
+    advection switched on it goes through Newton-GMRES, whose restart cycle is
+    what memory allows in three dimensions. The advective flux needs more than
+    one axial cell, so both ducts are extruded.
+    """
+    symmetric = _extruded(duct_problem(hartmann=100.0, cells=24), 4, 100.0, 24)
+    advective = _extruded(duct_problem(hartmann=100.0, cells=24, advection="central"), 4, 100.0, 24)
+    cg = solve_steady_state(symmetric, pseudo_step=1.0e3).velocity
+    newton = solve_steady_state(advective, pseudo_step=1.0e3).velocity
+    size = max(float(jnp.max(jnp.abs(field.data))) for field in newton)
+    difference = max(float(jnp.max(jnp.abs(a.data - b.data))) for a, b in zip(cg, newton, strict=True))
+    assert difference <= 1e-8 * size
+
+
+def test_a_periodic_extrusion_reproduces_the_duct_by_conjugate_gradients():
+    """Six axial cells carry the one-cell solution; round-off excites the axial modes CG must still resolve."""
+    duct = duct_problem(hartmann=20.0, cells=24)
+    flat = solve_steady_state(duct, pseudo_step=1.0e3).velocity[0].data
+    deep = solve_steady_state(_extruded(duct, 6, 20.0, 24), pseudo_step=1.0e3).velocity[0].data
+    assert float(jnp.max(jnp.abs(deep - flat[:1]))) <= 1e-8 * float(jnp.max(jnp.abs(flat)))
+
+
+def test_mixed_precision_reaches_the_same_steady_duct():
+    """Float32 fast solves with a float64 correction keep CG's operator linear enough."""
+    duct = duct_problem(hartmann=20.0, cells=24)
+    state = _mean(duct, solve_steady_state(duct, pseudo_step=1.0e3).velocity)
+    mixed_duct = dataclasses.replace(duct, precision="mixed")
+    mixed = _mean(mixed_duct, solve_steady_state(mixed_duct, pseudo_step=1.0e3).velocity)
+    assert mixed == pytest.approx(state, rel=1e-9)
 
 
 @pytest.mark.parametrize("conductance", [0.0, 0.05])

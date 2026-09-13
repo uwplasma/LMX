@@ -1381,7 +1381,7 @@ def solve(
     """Solve a duct, a fully developed case, a fringing problem, or a Q2D one.
 
     A :class:`lmx.core3d.ChannelProblem` goes to the staggered core's steady
-    Newton-Krylov solve; the configured mode selects steady or transient
+    solve, :func:`lmx.steady.solve_steady_state`; the configured mode selects steady or transient
     execution for ``CaseSpec``. Advanced restart, mesh, logging, progress, and
     timing hooks remain on the specialized functions in :mod:`lmx.cases`,
     :mod:`lmx.steady` and :mod:`lmx.fringing`.

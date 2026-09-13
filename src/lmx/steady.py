@@ -1,7 +1,4 @@
-"""Matrix-free Newton-Krylov steady flow with implicit derivatives.
-
-The implicit function theorem differentiates converged roots with tangent and
-transpose solves, without retaining nonlinear iterations.
+"""Steady flow with implicit derivatives, in memory independent of the iteration count.
 
 Potential and pressure are eliminated through their discrete linear solves,
 leaving a residual in velocity alone:
@@ -17,11 +14,20 @@ that :math:`\\mathbf u` induces. A root of :math:`\\mathbf R` is a steady state
 of :func:`lmx.core3d.step`, and the projection keeps the iteration inside the
 subspace the time stepper never leaves.
 
-The preconditioner projects a viscous/damping inverse, approaching
-:math:`(\\lambda - \\nu\\nabla^2)^{-1}` as the pseudo-step grows.
+Without advection and with insulating walls the residual is affine,
+:math:`\\mathbf R(\\mathbf u) = A\\mathbf u + \\mathbf b`, and :math:`-A` is
+symmetric positive definite on the constrained divergence-free fields in the
+face-volume inner product, because the electromotive and force interpolations
+are discrete adjoints. That case is one preconditioned conjugate-gradient
+solve, differentiated by one more. Advection, or a conducting wall, whose
+closure is not symmetric, takes matrix-free Newton-Krylov with restarted
+GMRES, and the implicit function theorem differentiates its root with tangent
+and transpose solves. Neither keeps more than a restart cycle of vectors.
 
-Strong fields can require a large Krylov subspace rather than more restarts
-of a short one; conducting walls also make the potential solve iterative.
+The preconditioner projects a viscous inverse damped at :math:`\\sigma|B|^2/\\rho`
+in every component, approaching :math:`(\\lambda - \\nu\\nabla^2)^{-1}` as the
+pseudo-step grows. Its conditioning still degrades with the Hartmann number on
+layer-resolving meshes, so the iteration count grows with it.
 
 Primal residuals and tangent/transpose convergence are certified. Rejection
 raises eagerly; during tracing, it produces nonfinite fields and derivatives
@@ -30,7 +36,6 @@ without host callbacks. Optimizers must reject nonfinite values and gradients.
 
 from __future__ import annotations
 
-import dataclasses
 import functools
 from dataclasses import dataclass
 
@@ -47,11 +52,12 @@ from .core3d import (
     face_lorentz_force,
     project,
     velocity_condition,
+    velocity_offset,
     zero_velocity,
 )
 from .grid import Field
-from .ops import staggered_laplacian
-from .poisson import FastDiagonalHelmholtz, FastDiagonalPoisson
+from .ops import face_inner_product, staggered_laplacian
+from .poisson import FastDiagonalHelmholtz, FastDiagonalPoisson, fast_diagonal_helmholtz
 
 __all__ = ["SteadySolution", "solve_steady_state", "steady_residual"]
 
@@ -115,7 +121,10 @@ def _preconditioner(
     viscous: tuple[FastDiagonalHelmholtz, ...],
     pseudo_step: float,
 ):
-    """One projection step, used as the right preconditioner of the Newton system.
+    """One projection step: the conjugate-gradient and the Newton-GMRES preconditioner.
+
+    It ends in :func:`lmx.core3d.project`, whose copy of the first periodic face
+    completes the viscous solve, which returns that duplicate face as zero.
 
     ``viscous`` has to be factorized at ``pseudo_step`` and not at the problem's
     own step: a preconditioner built at the wrong step is a different operator,
@@ -134,6 +143,114 @@ def _preconditioner(
     return apply
 
 
+def _isotropic_viscous(problem: ChannelProblem, pseudo_step: float) -> tuple[FastDiagonalHelmholtz, ...]:
+    """Viscous factorizations damping every component at ``sigma |B|^2 / rho``, for both routes.
+
+    Damping only the components normal to the field, as the time step does,
+    leaves a Schur-complement deficit once projected: on
+    ``duct_problem(hartmann=300, cells=40)`` the preconditioned spectrum spans
+    ``[2.2e-3, 2.0e3]`` and CG takes 3638 iterations; with one shift it spans
+    ``[2.2e-3, 8.5]`` and CG takes 399.
+    """
+    rate = float(problem.conductivity) * float(np.dot(problem.magnetic_field, problem.magnetic_field))
+    conditions = tuple(velocity_condition(problem.conditions, axis) for axis in range(3))
+    return tuple(
+        fast_diagonal_helmholtz(
+            problem.grid,
+            velocity_offset(component),
+            conditions,
+            shift=1.0 + pseudo_step * rate / float(problem.density),
+            coefficient=pseudo_step * float(problem.viscosity),
+            precision=problem.precision,
+        )
+        for component in range(3)
+    )
+
+
+def _face_weights(problem: ChannelProblem) -> tuple[Field, Field, Field]:
+    """Return the diagonal of the face-volume inner product as a velocity."""
+    conditions = tuple(velocity_condition(problem.conditions, axis) for axis in range(3))
+    ones = jax.tree.map(jnp.ones_like, zero_velocity(problem))
+    return jax.grad(
+        lambda u: 0.5 * sum(face_inner_product(f, f, axis, conditions[axis]) for axis, f in enumerate(u))
+    )(ones)
+
+
+def _orthogonal_projection(
+    velocity: tuple[Field, Field, Field], problem: ChannelProblem, factorization: FastDiagonalPoisson
+) -> tuple[Field, Field, Field]:
+    """Project onto the constrained divergence-free fields, orthogonally in the face volume.
+
+    :func:`lmx.core3d.project` copies the first periodic face onto its duplicate,
+    an oblique projection; both copies carry half the weight, so averaging them
+    is the orthogonal one.
+    """
+    constrained = []
+    for component, field in enumerate(velocity):
+        data = field.data
+        selection = (slice(None),) * component
+        if problem.conditions[component].is_periodic:
+            mean = 0.5 * (data[selection + (0,)] + data[selection + (-1,)])
+            data = data.at[selection + (0,)].set(mean).at[selection + (-1,)].set(mean)
+        else:
+            data = data.at[selection + (0,)].set(0.0).at[selection + (-1,)].set(0.0)
+        constrained.append(field.replace_data(data))
+    return project(tuple(constrained), problem, factorization)[0]
+
+
+def _stokes_limit_root(
+    problem: ChannelProblem,
+    start: tuple[Field, Field, Field],
+    factorization: FastDiagonalPoisson,
+    precond,
+    *,
+    forcing,
+    field_scale,
+    tolerance: float,
+    max_iterations: int,
+):
+    """Solve the affine Stokes-limit problem with one preconditioned CG solve.
+
+    ``R(u) = A u + b`` with ``-A`` symmetric positive definite on the constrained
+    divergence-free fields ``V`` in the face-volume inner product ``W``. CG runs
+    on ``y = W u`` with operator ``y -> -A W^-1 y`` and preconditioner
+    ``r -> W P r``, so the residual it measures is ``R`` itself. The derivative
+    is a symmetric :func:`jax.lax.custom_linear_solve`, whose operator must be
+    symmetric on every vector because a cotangent is arbitrary:
+    ``K y = -A Q W^-1 y + (I - Q) W^-1 y`` with ``Q`` the orthogonal projection
+    onto ``V``. Its inverse projects once per solve, not per iteration.
+    """
+    weights = _face_weights(problem)
+    inverse = jax.tree.map(jnp.reciprocal, weights)
+
+    def operator(velocity):
+        return steady_residual(
+            velocity, problem, factorization, forcing=(0.0, 0.0, 0.0), field_scale=field_scale
+        )
+
+    def matvec(state):
+        velocity = jax.tree.map(jnp.multiply, state, inverse)
+        inside = _orthogonal_projection(velocity, problem, factorization)
+        return jax.tree.map(lambda u, a, q: u - a - q, velocity, operator(inside), inside)
+
+    def solve(_, target):
+        inside = _orthogonal_projection(target, problem, factorization)
+        result = solvax.pcg(
+            lambda y: jax.tree.map(jnp.negative, operator(jax.tree.map(jnp.multiply, y, inverse))),
+            inside,
+            precond=lambda r: jax.tree.map(jnp.multiply, precond(r), weights),
+            rtol=tolerance,
+            max_steps=max_iterations,
+        )
+        kept = _certified(result.x, result.converged & jnp.isfinite(result.residual_norm), "steady CG solve")
+        solution = jax.tree.map(lambda y, t, q, w: y + w * (t - q), kept, target, inside, weights)
+        return solution, (result.iterations, result.residual_norm, result.converged)
+
+    rhs = steady_residual(start, problem, factorization, forcing=forcing, field_scale=field_scale)
+    step, diagnostics = jax.lax.custom_linear_solve(matvec, rhs, solve, symmetric=True, has_aux=True)
+    return jax.tree.map(lambda u, y, w: u + y / w, start, step, weights), diagnostics
+
+
 def solve_steady_state(
     problem: ChannelProblem,
     velocity: tuple[Field, Field, Field] | None = None,
@@ -144,15 +261,20 @@ def solve_steady_state(
     forcing: tuple[float, float, float] | None = None,
     field_scale: float | jnp.ndarray = 1.0,
     linear_tolerance: float = 1.0e-6,
-    linear_restart: int = 400,
-    linear_max_restarts: int = 6,
+    linear_restart: int = 60,
+    linear_max_restarts: int = 200,
 ) -> SteadySolution:
-    """Find the steady state by matrix-free Newton-Krylov, differentiably.
+    """Find the steady state, differentiably, in memory independent of the iteration count.
 
-    The drive and ``field_scale`` are differentiable through :func:`solvax.root_solve`;
-    close over static ``problem`` and solver controls when using :func:`jax.jit`.
-    Factorizations are assembled at trace time. Rejected roots raise eagerly
-    or yield nonfinite fields and derivatives during tracing.
+    Without advection and with insulating walls the problem is affine and
+    symmetric, and one preconditioned conjugate-gradient solve answers it; its
+    budget is ``linear_restart * linear_max_restarts`` iterations, and
+    ``linear_tolerance`` does not apply. Otherwise matrix-free Newton-Krylov
+    runs restarted GMRES. The drive and ``field_scale`` are differentiable
+    through implicit linear solves; close over static ``problem`` and solver
+    controls when using :func:`jax.jit`. Factorizations are assembled at trace
+    time. Rejected roots raise eagerly or yield nonfinite fields and
+    derivatives during tracing.
     """
     step = float(problem.dt if pseudo_step is None else pseudo_step)
     for name, value in (
@@ -164,7 +286,7 @@ def solve_steady_state(
             raise ValueError(f"{name} must be positive and finite")
     with jax.ensure_compile_time_eval():
         factorization = problem.factorization()
-        viscous = dataclasses.replace(problem, dt=step).viscous_factorizations()
+        viscous = _isotropic_viscous(problem, step)
     start = zero_velocity(problem) if velocity is None else enforce_face_constraints(velocity, problem)
 
     def residual(state):
@@ -173,6 +295,21 @@ def solve_steady_state(
     scale = _norm(residual(start))
 
     precond = _preconditioner(problem, factorization, viscous, step)
+
+    # The thin-wall closure is not symmetric yet (plan step 1.3b), so CG and its
+    # symmetric adjoint are reserved for insulating walls.
+    if problem.advection == "off" and not problem.conducting_walls:
+        root, _ = _stokes_limit_root(
+            problem,
+            jax.lax.stop_gradient(_orthogonal_projection(start, problem, factorization)),
+            factorization,
+            precond,
+            forcing=forcing,
+            field_scale=field_scale,
+            tolerance=tolerance,
+            max_iterations=linear_restart * linear_max_restarts if max_steps > 0 else 0,
+        )
+        return _finish(root, residual, scale, tolerance, problem, factorization, field_scale, max_steps)
 
     def solver(function, guess):
         solution = solvax.newton_krylov(
@@ -189,6 +326,13 @@ def solve_steady_state(
 
     tangent_solve = functools.partial(_tangent_solve, precond=precond)
     root = solvax.root_solve(residual, start, solver, tangent_solve=tangent_solve)
+    return _finish(root, residual, scale, tolerance, problem, factorization, field_scale, max_steps)
+
+
+def _finish(
+    root, residual, scale, tolerance, problem, factorization, field_scale, max_steps
+) -> SteadySolution:
+    """Certify the root on the residual both routes share, then report its fields."""
     final = _norm(residual(root))
     accepted = (
         jnp.isfinite(final) & jnp.isfinite(scale) & (final <= 10.0 * tolerance * jnp.maximum(scale, 1.0))
