@@ -1,7 +1,5 @@
 """The steady solve: it is the fixed point of the step, and its gradient is exact."""
 
-import time
-
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -88,22 +86,50 @@ def test_the_residual_vanishes_exactly_at_a_fixed_point_of_the_step():
     assert max(float(jnp.max(jnp.abs(field.data))) for field in residual) < 1e-9 * size
 
 
-def test_the_steady_solve_reproduces_the_marched_state_far_faster():
+def test_the_steady_solve_reproduces_the_marched_state_far_faster(monkeypatch):
+    """Newton-Krylov reaches the marched state with far fewer projections than marching.
+
+    A claim about the method, not about the machine, so the work is counted rather
+    than timed: both paths are built from the same projection, and a clock also
+    measures host load and whether the solve's loops were already compiled.
+    ``jax.debug.callback`` fires once per execution, inside compiled loops too, so
+    the counts are applications and not traces.
+    """
+    import lmx.core3d
+    import lmx.steady
+
+    projections = [0]
+    project = lmx.core3d.project
+
+    def bump():
+        projections[0] += 1
+
+    def counted_project(*args, **kwargs):
+        jax.debug.callback(bump)
+        return project(*args, **kwargs)
+
+    monkeypatch.setattr(lmx.core3d, "project", counted_project)
+    monkeypatch.setattr(lmx.steady, "project", counted_project)
+
     problem = _duct(12, 5.0, dt=0.02)
     factorization = problem.factorization()
     viscous = problem.viscous_factorizations()
     velocity = zero_velocity(problem)
-    started = time.perf_counter()
     for _ in range(300):
         velocity, _, _ = step(velocity, problem, factorization, viscous)
-    marched = time.perf_counter() - started
+    jax.effects_barrier()
+    marched = projections[0]
+    assert marched == 300
 
-    started = time.perf_counter()
+    projections[0] = 0
     solution = solve_steady_state(problem, pseudo_step=100.0)
-    newton = time.perf_counter() - started
+    jax.effects_barrier()
     assert abs(_mean(problem, solution.velocity) - _mean(problem, velocity)) < 1e-8
-    # A claim about the method, not about the machine: Newton has to beat 300 steps.
-    assert newton < marched
+    # The linearised residual projects in the tangent, where no callback fires. Each
+    # such application is paired with a counted one: a Krylov iteration with its
+    # preconditioner, a restart cycle's true residual with its Newton step's residual.
+    # Doubling the count therefore bounds the work of the whole solve.
+    assert 2 * projections[0] < marched
 
 
 @pytest.mark.parametrize(
@@ -156,14 +182,18 @@ def test_the_adjoint_matches_finite_differences(cells, hartmann, conductance):
     compiled_value, compiled_gradient = jax.jit(jax.value_and_grad(throughput, argnums=(0, 1)))(1.0, 1.0)
     np.testing.assert_allclose(compiled_value, value, rtol=1e-10, atol=1e-12)
     np.testing.assert_allclose(compiled_gradient, gradient, rtol=1e-8, atol=1e-12)
-    assert float(jax.jit(throughput)(1.0, 1.0)) == pytest.approx(float(value), rel=1e-10)
+    # The compiled objective is held to the eager one, then reused for the differences:
+    # an eager call traces and compiles the Newton loop, and a conducting wall's nested
+    # potential GMRES, every time, which was most of this test's cost.
+    compiled = jax.jit(throughput)
+    assert float(compiled(1.0, 1.0)) == pytest.approx(float(value), rel=1e-10)
     size = 1.0e-5
     for index, argument in enumerate(((1.0, 1.0), (1.0, 1.0))):
         raised = list(argument)
         lowered = list(argument)
         raised[index] += size
         lowered[index] -= size
-        difference = (throughput(*raised) - throughput(*lowered)) / (2.0 * size)
+        difference = (compiled(*raised) - compiled(*lowered)) / (2.0 * size)
         assert float(gradient[index]) == pytest.approx(float(difference), rel=1e-6)
     # The Stokes limit is linear in the drive, so the derivative is the value itself.
     assert float(gradient[0]) == pytest.approx(float(value), rel=1e-12)
