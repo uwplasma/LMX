@@ -557,6 +557,110 @@ def test_layered_hunt_fields_and_implicit_gradient_match_independent_checks():
     assert derivative == pytest.approx(finite, rel=2e-5, abs=1e-8)
 
 
+@pytest.mark.physics
+def test_cold_hunt_steady_solve_certifies_the_discrete_affine_problem():
+    """Issue #113: a cold steady Hunt report is certified without the solver's own norms."""
+
+    import scipy.sparse
+    import scipy.sparse.linalg
+
+    from lmx.design import volumetric_flow_rate
+    from lmx.mesh import apply_five_point_operator
+    from lmx.solvers import (
+        _compute_current_and_lorentz,
+        _face_current_components,
+        _velocity_system_coefficients,
+    )
+
+    case = make_hunt_case(
+        ha=20,
+        width=2,
+        height=2,
+        ny=24,
+        nz=24,
+        wall_cells=3,
+        wall_thickness=0.1,
+        insulator_cells=3,
+        insulator_thickness=0.1,
+        fluid_conductivity=1,
+        wall_conductance_ratio=0.05,
+        insulator_conductivity_ratio=1e-12,
+        density=1,
+        viscosity=1,
+    )
+    # The max-norm potential residual floors near 3e-12 at this 1e-12 wall contrast.
+    case = replace(
+        case,
+        time_stepper=replace(
+            case.time_stepper,
+            potential_iterations=160,
+            steady_tolerance=1e-12,
+            steady_potential_tolerance=1e-10,
+        ),
+        solver=replace(case.solver, coupling_tolerance=1e-12),
+    )
+    unit_velocity, unit_potential, *_ = solve_fully_developed_fields(case, forcing=1.0)
+    drive = 0.05 / float(volumetric_flow_rate(case, unit_velocity))
+    solution = solve_steady(replace(case, forcing=drive))
+    velocity, potential = solution.state.u, solution.state.phi
+
+    def relative(left, right):
+        left, right = np.asarray(left).ravel(), np.asarray(right).ravel()
+        return float(np.linalg.norm(left - right) / np.linalg.norm(right))
+
+    assert solution.status == "converged" and solution.residual <= 1e-12
+    assert float(volumetric_flow_rate(case, velocity)) == pytest.approx(0.05, rel=1e-10)
+    assert relative(velocity, drive * unit_velocity) <= 1e-10
+    assert relative(potential, drive * unit_potential) <= 1e-10
+
+    # Assemble the discrete momentum and charge equations from the operators
+    # alone: viscous stencil = Lorentz force + drive, net face current = 0.
+    mesh = solution.mesh
+    materials = build_material_fields(case, mesh)
+    _, by, bz = magnetic_field_components(case.magnetic_field, mesh)
+    fluid, sigma = materials.fluid_mask, materials.conductivity
+    metric = mesh.dy[:, None] * mesh.dz[None, :]
+    viscous = [
+        coefficient * metric
+        for coefficient in _velocity_system_coefficients(
+            mesh, materials.viscosity, jnp.zeros_like(velocity), fluid
+        )
+    ]
+    shape, cells, anchor = mesh.yz_shape, velocity.size, case.reference_phi_cell
+
+    def operator(state):
+        u, phi = state[:cells].reshape(shape), state[cells:].reshape(shape)
+        _, _, lorentz = _compute_current_and_lorentz(mesh, sigma, fluid, u, phi, by, bz)
+        momentum = jnp.where(
+            fluid, apply_five_point_operator(*viscous, u) - metric * lorentz / materials.density, u
+        )
+        face_jy, face_jz, _, _ = _face_current_components(mesh, sigma, fluid, u, phi, by, bz)
+        net_current = (
+            jnp.diff(jnp.pad(face_jy, ((1, 1), (0, 0))), axis=0) * mesh.dz[None, :]
+            + jnp.diff(jnp.pad(face_jz, ((0, 0), (1, 1))), axis=1) * mesh.dy[:, None]
+        )
+        return jnp.concatenate((momentum.ravel(), net_current.at[anchor].set(phi[anchor]).ravel()))
+
+    matrix = np.array(jax.jacfwd(operator)(jnp.zeros(2 * cells)))
+    drive_source = np.where(
+        np.asarray(fluid), drive * np.asarray(metric) / np.asarray(materials.density), 0.0
+    )
+    rhs = np.concatenate((drive_source.ravel(), np.zeros(cells)))
+    state = np.concatenate((np.asarray(velocity).ravel(), np.asarray(potential).ravel()))
+    residual = matrix @ state - rhs
+    motional_source = matrix[cells:, :cells] @ state[:cells]
+    assert np.linalg.norm(residual[:cells]) / np.linalg.norm(rhs[:cells]) <= 1e-10
+    assert np.linalg.norm(residual[cells:]) / np.linalg.norm(motional_source) <= 1e-10
+
+    # An independent sparse direct solve of the same equations.
+    row_scale = 1.0 / np.max(np.abs(matrix), axis=1)
+    direct = scipy.sparse.linalg.spsolve(
+        scipy.sparse.csr_matrix(matrix * row_scale[:, None]), rhs * row_scale
+    )
+    assert relative(velocity, direct[:cells]) <= 1e-10
+    assert relative(potential, direct[cells:]) <= 1e-10
+
+
 def test_fully_developed_implicit_gradients_match_independent_checks(differentiable_hartmann_case):
     def objective(forcing, field_scale):
         velocity, *_ = solve_fully_developed_fields(

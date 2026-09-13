@@ -391,19 +391,7 @@ def _fully_developed_case_step(
             mesh, materials.conductivity, case.reference_phi_cell, potential_solver
         )
     acceleration = case.solver.coupling_acceleration
-    if acceleration not in {"none", "aitken", "anderson"}:
-        raise ValueError(f"Unsupported coupling acceleration {acceleration!r}")
-    if (
-        case.solver.coupling_min_relaxation <= 0.0
-        or case.solver.coupling_max_relaxation < case.solver.coupling_min_relaxation
-    ):
-        raise ValueError("Coupling relaxation bounds must satisfy 0 < min <= max")
-    if case.solver.coupling_history_depth < 1:
-        raise ValueError("Anderson coupling history depth must be positive")
-    if case.solver.coupling_regularization < 0.0:
-        raise ValueError("Anderson coupling regularization must be non-negative")
-    if not 0.0 <= case.solver.coupling_damping <= 1.0:
-        raise ValueError("Anderson coupling damping must lie in [0, 1]")
+    _validate_coupling_controls(case)
     previous_fixed_point_residual: jnp.ndarray | None = None
     coupling_relaxation = jnp.asarray(1.0, dtype=u_previous.dtype)
     anderson_iterates: list[jnp.ndarray] = []
@@ -711,6 +699,412 @@ def _prepare_fully_developed_case(case: CaseSpec, mesh: StructuredMesh | None = 
     return mesh, materials, potential_solver, potential_system
 
 
+def _validate_coupling_controls(case: CaseSpec) -> None:
+    """Reject coupling-acceleration controls outside their documented ranges."""
+
+    solver = case.solver
+    if solver.coupling_acceleration not in {"none", "aitken", "anderson"}:
+        raise ValueError(f"Unsupported coupling acceleration {solver.coupling_acceleration!r}")
+    if (
+        solver.coupling_min_relaxation <= 0.0
+        or solver.coupling_max_relaxation < solver.coupling_min_relaxation
+    ):
+        raise ValueError("Coupling relaxation bounds must satisfy 0 < min <= max")
+    if solver.coupling_history_depth < 1:
+        raise ValueError("Anderson coupling history depth must be positive")
+    if solver.coupling_regularization < 0.0:
+        raise ValueError("Anderson coupling regularization must be non-negative")
+    if not 0.0 <= solver.coupling_damping <= 1.0:
+        raise ValueError("Anderson coupling damping must lie in [0, 1]")
+
+
+def _affine_fully_developed_solve(
+    case: CaseSpec,
+    mesh: StructuredMesh,
+    materials,
+    potential_solver: str,
+    potential_system: _PotentialSystem,
+    by: jnp.ndarray,
+    bz: jnp.ndarray,
+    *,
+    forcing: float | jax.Array,
+    tolerance: float,
+):
+    """Solve the linear duct problem as the fixed point ``u = G(u)``.
+
+    ``G`` is one potential solve followed by one momentum solve, and it is
+    affine in ``u``. SOLVAX GMRES therefore solves ``(I - dG) u = G(0)``
+    directly. Returns the Krylov solution together with ``G`` and its two
+    inner solves, so callers can report the residuals of the returned state.
+    """
+
+    fluid_mask = materials.fluid_mask
+    reaction = jnp.where(
+        fluid_mask,
+        materials.conductivity * (by**2 + bz**2) / materials.density,
+        0.0,
+    )
+    cell_metric = _cell_metric(mesh).astype(by.dtype)
+    coefficients = tuple(
+        coefficient * cell_metric
+        for coefficient in _velocity_system_coefficients(mesh, materials.viscosity, reaction, fluid_mask)
+    )
+    inner_tolerance = _nested_velocity_tolerance(tolerance, by.dtype)
+    source = jnp.asarray(forcing, dtype=by.dtype)
+    max_steps = max(case.time_stepper.max_steps, case.solver.coupling_iterations * 25)
+
+    def potential(velocity):
+        return _solve_potential(
+            mesh,
+            materials.conductivity,
+            fluid_mask,
+            velocity,
+            by,
+            bz,
+            case.reference_phi_cell,
+            case.time_stepper.potential_iterations,
+            tolerance=inner_tolerance,
+            solver=potential_solver,
+            system=potential_system,
+        )
+
+    def momentum(velocity, phi):
+        rhs, _ = _fully_developed_rhs(
+            mesh=mesh,
+            sigma=materials.conductivity,
+            rho=materials.density,
+            fluid_mask=fluid_mask,
+            u=velocity,
+            phi=phi,
+            by=by,
+            bz=bz,
+            forcing=source,
+        )
+        return _solve_velocity_system(
+            coefficients=coefficients,
+            cell_metric=cell_metric,
+            rhs=rhs + reaction * jnp.where(fluid_mask, velocity, 0.0),
+            active_mask=fluid_mask,
+            preconditioner=case.solver.preconditioner,
+            max_steps=max_steps,
+            tolerance=inner_tolerance,
+        )
+
+    def mapping(velocity):
+        velocity = momentum(velocity, potential(velocity)[0])[0]
+        return _enforce_velocity_bc(
+            velocity,
+            mesh,
+            fluid_mask,
+            interpolate_direct_fluid_walls=case.geometry.kind == "rect_duct",
+        )
+
+    zero = jnp.zeros(mesh.yz_shape, dtype=by.dtype)
+    restart = min(30, max(2, mesh.ny * mesh.nz))
+    max_restarts = 50
+    coupled = affine_fixed_point_gmres(
+        mapping,
+        zero,
+        restart=restart,
+        rtol=tolerance,
+        max_restarts=max_restarts,
+        transpose_rtol=tolerance,
+        transpose_max_restarts=max_restarts,
+    )
+    return coupled, mapping, potential, momentum
+
+
+def _fully_developed_affine_report(
+    case: CaseSpec,
+    mesh: StructuredMesh,
+    materials,
+    potential_solver: str,
+    potential_system: _PotentialSystem,
+    drive: float,
+):
+    """Solve the steady duct once and return its state with its certificates.
+
+    The residual is ``||G(u) - u|| / ||G(0)||`` evaluated after the solve, so
+    it does not depend on the Krylov recurrence. The potential and momentum
+    residuals and iteration counts come from ``G``'s solves at ``u``.
+    """
+
+    _, by, bz = magnetic_field_components(case.magnetic_field, mesh)
+    tolerance = max(float(case.time_stepper.steady_tolerance), 10.0 * float(jnp.finfo(by.dtype).eps))
+
+    def report(source):
+        coupled, mapping, potential, momentum = _affine_fully_developed_solve(
+            case,
+            mesh,
+            materials,
+            potential_solver,
+            potential_system,
+            by,
+            bz,
+            forcing=source,
+            tolerance=tolerance,
+        )
+        velocity = coupled.x
+        phi, potential_residual, potential_iterations, _ = potential(velocity)
+        _, linear_residual, linear_iterations, _ = momentum(velocity, phi)
+        source_norm = jnp.linalg.norm(mapping(jnp.zeros_like(velocity)))
+        residual = coupled.residual_norm / jnp.where(source_norm > 0.0, source_norm, 1.0)
+        return (
+            velocity,
+            phi,
+            residual,
+            coupled.iterations,
+            potential_residual,
+            potential_iterations,
+            linear_residual,
+            linear_iterations,
+        )
+
+    return by, bz, jax.jit(report)(jnp.asarray(drive, dtype=by.dtype))
+
+
+def _diagnostic_record(
+    *,
+    case: CaseSpec,
+    mesh: StructuredMesh,
+    materials,
+    u: jnp.ndarray,
+    phi: jnp.ndarray,
+    jy: jnp.ndarray,
+    jz: jnp.ndarray,
+    lorentz: jnp.ndarray,
+    by: jnp.ndarray,
+    bz: jnp.ndarray,
+    residual,
+    mean_velocity,
+    applied_forcing,
+    potential_residual,
+    potential_iterations,
+    linear_residual,
+    linear_iterations,
+    face_current_max,
+    emf_max,
+    face_lorentz_max,
+) -> jnp.ndarray:
+    """Stack one record of ``_STEP_DIAGNOSTIC_NAMES`` on the device."""
+
+    integrals = _integral_diagnostics(
+        mesh=mesh,
+        sigma=materials.conductivity,
+        fluid_mask=materials.fluid_mask,
+        u=u,
+        phi=phi,
+        jy=jy,
+        jz=jz,
+        lorentz=lorentz,
+        by=by,
+        bz=bz,
+        anchor=case.reference_phi_cell,
+    )
+    u_max = jnp.max(jnp.abs(u))
+    return jnp.stack(
+        (
+            u_max,
+            mean_velocity,
+            applied_forcing,
+            residual,
+            u_max * case.time_stepper.dt / jnp.min(mesh.dy),
+            jnp.mean(jy**2 + jz**2),
+            jnp.max(jnp.sqrt(jy**2 + jz**2)),
+            face_current_max,
+            emf_max,
+            jnp.max(jnp.abs(lorentz)),
+            face_lorentz_max,
+            potential_residual,
+            potential_iterations,
+            linear_residual,
+            linear_iterations,
+            *integrals,
+        )
+    )
+
+
+def _emit_diagnostic_record(
+    logger: StreamingSolverLogger | None,
+    *,
+    step_index: int,
+    step_time: float,
+    values: dict[str, float],
+    potential_initial_residual: float = 0.0,
+    linear_initial_residual: float = 0.0,
+) -> None:
+    if logger is None:
+        return
+    _emit_solver_step(
+        logger,
+        step_index=step_index,
+        step_time=step_time,
+        u_max_value=values["u_max_history"],
+        mean_velocity=values["mean_velocity_history"],
+        max_current=values["current_max_history"],
+        max_lorentz=values["lorentz_max_history"],
+        residual_value=values["residual_history"],
+        potential_residual=values["potential_residual_history"],
+        potential_iteration_count=values["potential_iterations_history"],
+        linear_residual=values["linear_residual_history"],
+        linear_iteration_count=values["linear_iterations_history"],
+        applied_forcing=values["applied_forcing_history"],
+        courant_like=values["courant_like"],
+        ohmic=values["ohmic_power"],
+        volumetric_flow_rate=values["volumetric_flow_rate_history"],
+        div_current_max=values["div_current_max_history"],
+        charge_balance_residual=values["charge_balance_residual_history"],
+        gauge_residual=values["gauge_residual_history"],
+        interface_current_residual=values["interface_current_residual_history"],
+        potential_initial_residual=potential_initial_residual,
+        linear_initial_residual=linear_initial_residual,
+    )
+
+
+def _history_diagnostics(
+    case: CaseSpec,
+    history_values: dict,
+    initial_diagnostics: Diagnostics | None,
+    append_diagnostics: bool,
+) -> Diagnostics:
+    stride = case.output.history_stride
+
+    def retained_history(name, values):
+        initial = (
+            getattr(initial_diagnostics, name) if initial_diagnostics is not None and stride != 0 else None
+        )
+        return _concat_history(initial, jnp.asarray(values, dtype=float), append=append_diagnostics)
+
+    return Diagnostics(**{name: retained_history(name, values) for name, values in history_values.items()})
+
+
+def _solve_fully_developed_steady(
+    case: CaseSpec,
+    logger: StreamingSolverLogger | None,
+    prepared,
+    *,
+    initial_state: MHDState | None,
+    initial_diagnostics: Diagnostics | None,
+    append_diagnostics: bool,
+    restart_info: RestartLogInfo | None,
+) -> Solution:
+    """Report the steady state from one certified affine solve (ADR 0005, D19).
+
+    The discrete fully developed problem is linear, so pseudo-time stepping
+    toward it only adds a stopping floor. A prescribed flow rate is met by
+    scaling the unit-drive solution, which is exact for a linear problem.
+    """
+
+    mesh, materials, potential_solver, potential_system = prepared
+    _validate_coupling_controls(case)
+    target_mean_velocity = _target_mean_velocity(case)
+    start_time = 0.0 if initial_state is None else float(initial_state.time)
+    _emit_solver_header(
+        logger,
+        case=case,
+        mesh=mesh,
+        mode="steady",
+        potential_solver=f"{potential_solver} / solvax_pcg / affine_gmres",
+        target_mean_velocity=target_mean_velocity,
+        reference_mean_velocity=_reference_mean_velocity(case),
+        restart=restart_info,
+    )
+    by, bz, solved = _fully_developed_affine_report(
+        case,
+        mesh,
+        materials,
+        potential_solver,
+        potential_system,
+        drive=case.forcing if target_mean_velocity is None else 1.0,
+    )
+    (
+        u,
+        phi,
+        residual,
+        iterations,
+        potential_residual,
+        potential_iterations,
+        linear_residual,
+        linear_iterations,
+    ) = solved
+    fluid_mask = materials.fluid_mask
+    fluid_weight = jnp.where(fluid_mask, _cell_metric(mesh).astype(u.dtype), 0.0)
+    fluid_total_weight = jnp.maximum(jnp.sum(fluid_weight), 1e-20)
+    applied_forcing = jnp.asarray(case.forcing, dtype=u.dtype)
+    if target_mean_velocity is not None:
+        unit_mean = jnp.sum(fluid_weight * u) / fluid_total_weight
+        resolved = jnp.abs(unit_mean) > 1e-20
+        applied_forcing = jnp.where(resolved, target_mean_velocity / jnp.where(resolved, unit_mean, 1.0), 0.0)
+        u, phi = applied_forcing * u, applied_forcing * phi
+    jy, jz, lorentz = _compute_current_and_lorentz(mesh, materials.conductivity, fluid_mask, u, phi, by, bz)
+    face_current_max, emf_max, face_lorentz_max = _face_current_emf_and_lorentz_max(
+        mesh, materials.conductivity, fluid_mask, u, phi, by, bz
+    )
+    record = _diagnostic_record(
+        case=case,
+        mesh=mesh,
+        materials=materials,
+        u=u,
+        phi=phi,
+        jy=jy,
+        jz=jz,
+        lorentz=lorentz,
+        by=by,
+        bz=bz,
+        residual=residual,
+        mean_velocity=jnp.sum(fluid_weight * u) / fluid_total_weight,
+        applied_forcing=applied_forcing,
+        potential_residual=potential_residual,
+        potential_iterations=potential_iterations,
+        linear_residual=linear_residual,
+        linear_iterations=linear_iterations,
+        face_current_max=face_current_max,
+        emf_max=emf_max,
+        face_lorentz_max=face_lorentz_max,
+    )
+    record, iterations = jax.device_get((record, iterations))
+    values = dict(zip(_STEP_DIAGNOSTIC_NAMES, map(float, record), strict=True))
+    steps = int(iterations)
+    _emit_diagnostic_record(logger, step_index=steps, step_time=start_time, values=values)
+    require_finite(
+        "fully developed solve",
+        velocity=u,
+        potential=phi,
+        current_y=jy,
+        current_z=jz,
+        lorentz_force=lorentz,
+        residual=values["residual_history"],
+    )
+    converged = _fully_developed_converged(
+        case,
+        velocity_residual=values["residual_history"],
+        linear_residual=values["linear_residual_history"],
+        potential_residual=values["potential_residual_history"],
+    )
+    state = MHDState(
+        u=u,
+        phi=phi,
+        jy=jy,
+        jz=jz,
+        lorentz_x=lorentz,
+        time=start_time,
+        residual=values["residual_history"],
+    )
+    history_values = {"time_history": [start_time], **{name: [value] for name, value in values.items()}}
+    solution = Solution(
+        mesh=mesh,
+        state=state,
+        diagnostics=_history_diagnostics(case, history_values, initial_diagnostics, append_diagnostics),
+        case_name=case.name,
+        converged=converged,
+        status="converged" if converged else "not_converged",
+        steps=steps,
+    )
+    if logger is not None:
+        logger.emit_footer(solution)
+    return solution
+
+
 def _solve_fully_developed(
     case: CaseSpec,
     logger: StreamingSolverLogger | None = None,
@@ -723,13 +1117,23 @@ def _solve_fully_developed(
 ) -> Solution:
     if case.output.history_stride < 0:
         raise ValueError("history_stride must be non-negative")
-    mesh, materials, potential_solver, potential_system = _prepare_fully_developed_case(case, mesh)
-    target_mean_velocity = _target_mean_velocity(case)
-    reference_mean_velocity = _reference_mean_velocity(case)
+    prepared = _prepare_fully_developed_case(case, mesh)
+    mesh, materials, potential_solver, potential_system = prepared
     if case.geometry.kind not in {"rect_duct", "layered_duct"}:
         raise NotImplementedError(
             f"Solver {case.solver.kind!r} does not yet support geometry {case.geometry.kind!r}"
         )
+    if case.solver.mode == "steady":
+        return _solve_fully_developed_steady(
+            case,
+            logger,
+            prepared,
+            initial_state=initial_state,
+            initial_diagnostics=initial_diagnostics,
+            append_diagnostics=append_diagnostics,
+            restart_info=restart_info,
+        )
+    target_mean_velocity = _target_mean_velocity(case)
     interpolate_direct_fluid_walls = case.geometry.kind == "rect_duct"
     initial_u, initial_phi, initial_jy, initial_jz, initial_lorentz, start_time = _initial_solver_state(
         case=case,
@@ -739,19 +1143,12 @@ def _solve_fully_developed(
         initial_state=initial_state,
     )
     dt = case.time_stepper.dt
-    steady_mode = case.solver.mode == "steady"
     steps = _bounded_time_step_count(
         start_time=start_time,
         dt=dt,
         t_final=case.time_stepper.t_final,
         max_steps=case.time_stepper.max_steps,
     )
-    if steady_mode:
-        step_coupling_iterations = case.solver.coupling_iterations
-        step_coupling_tolerance = float(case.time_stepper.steady_tolerance)
-    else:
-        step_coupling_iterations = case.solver.coupling_iterations
-        step_coupling_tolerance = case.solver.coupling_tolerance
     _emit_solver_header(
         logger,
         case=case,
@@ -759,7 +1156,7 @@ def _solve_fully_developed(
         mode=case.solver.mode,
         potential_solver=f"{potential_solver} / solvax_pcg",
         target_mean_velocity=target_mean_velocity,
-        reference_mean_velocity=reference_mean_velocity,
+        reference_mean_velocity=_reference_mean_velocity(case),
         restart=restart_info,
     )
 
@@ -768,10 +1165,8 @@ def _solve_fully_developed(
     jy = initial_jy
     jz = initial_jz
     lorentz = initial_lorentz
-    history_values: dict[str, list[float]] = {name: [] for name in ("time_history", *_STEP_DIAGNOSTIC_NAMES)}
-    last_step_diagnostics: dict[str, float] = {}
-    residual_value = float(initial_state.residual if initial_state is not None else 0.0)
-    step_count = 0
+    stride = case.output.history_stride
+    retained: list[tuple[float, jnp.ndarray]] = []
     fixed_velocity_system = (
         _prepare_fully_developed_velocity_system(case, mesh, materials, start_time)
         if case.magnetic_field.ramp_duration <= 0.0
@@ -791,7 +1186,7 @@ def _solve_fully_developed(
             potential_residual,
             potential_iteration_count,
             linear_residual,
-            _linear_iteration_count,
+            linear_iteration_count,
             face_current_max,
             emf_max,
             face_lorentz_max,
@@ -808,25 +1203,17 @@ def _solve_fully_developed(
             potential_solver=potential_solver,
             target_mean_velocity=target_mean_velocity,
             preconditioner=case.solver.preconditioner,
-            coupling_iterations=step_coupling_iterations,
-            coupling_tolerance=step_coupling_tolerance,
+            coupling_iterations=case.solver.coupling_iterations,
+            coupling_tolerance=case.solver.coupling_tolerance,
             phi_previous=phi,
             velocity_system=fixed_velocity_system,
             potential_system=potential_system,
         )
         _, by_step, bz_step = magnetic_field_components(case.magnetic_field, mesh, time=step_time)
-        (
-            volumetric_flow_rate,
-            mean_current_magnitude,
-            lorentz_power,
-            div_current_max,
-            charge_balance_residual,
-            gauge_residual,
-            interface_current_residual,
-        ) = _integral_diagnostics(
+        record = _diagnostic_record(
+            case=case,
             mesh=mesh,
-            sigma=materials.conductivity,
-            fluid_mask=materials.fluid_mask,
+            materials=materials,
             u=u,
             phi=phi,
             jy=jy,
@@ -834,83 +1221,41 @@ def _solve_fully_developed(
             lorentz=lorentz,
             by=by_step,
             bz=bz_step,
-            anchor=case.reference_phi_cell,
+            residual=jnp.maximum(residual, jnp.max(jnp.abs(u - u_before_step))),
+            mean_velocity=mean_velocity,
+            applied_forcing=applied_forcing,
+            potential_residual=potential_residual,
+            potential_iterations=potential_iteration_count,
+            linear_residual=linear_residual,
+            linear_iterations=linear_iteration_count,
+            face_current_max=face_current_max,
+            emf_max=emf_max,
+            face_lorentz_max=face_lorentz_max,
         )
-        u_max = jnp.max(jnp.abs(u))
-        device_diagnostics = jnp.stack(
-            (
-                u_max,
-                mean_velocity,
-                applied_forcing,
-                jnp.maximum(residual, jnp.max(jnp.abs(u - u_before_step))),
-                u_max * dt / jnp.min(mesh.dy),
-                jnp.mean(jy**2 + jz**2),
-                jnp.max(jnp.sqrt(jy**2 + jz**2)),
-                face_current_max,
-                emf_max,
-                jnp.max(jnp.abs(lorentz)),
-                face_lorentz_max,
-                potential_residual,
-                potential_iteration_count,
-                linear_residual,
-                _linear_iteration_count,
-                volumetric_flow_rate,
-                mean_current_magnitude,
-                lorentz_power,
-                div_current_max,
-                charge_balance_residual,
-                gauge_residual,
-                interface_current_residual,
+        if stride == 0:
+            retained[:] = ((step_time, record),)
+        elif step_index % stride == 0 or step_index == steps - 1:
+            retained.append((step_time, record))
+        if logger is not None:
+            # Records stay on the device unless a logger streams them.
+            _emit_diagnostic_record(
+                logger,
+                step_index=step_index + 1,
+                step_time=step_time,
+                values=dict(zip(_STEP_DIAGNOSTIC_NAMES, map(float, jax.device_get(record)), strict=True)),
+                potential_initial_residual=float(potential_initial_residual),
+                linear_initial_residual=float(linear_initial_residual),
             )
-        )
-        last_step_diagnostics = {
-            "time_history": step_time,
-            **dict(zip(_STEP_DIAGNOSTIC_NAMES, map(float, jax.device_get(device_diagnostics)), strict=True)),
-        }
-        residual_value = last_step_diagnostics["residual_history"]
-        retain_step = case.output.history_stride == 0 or step_index % max(case.output.history_stride, 1) == 0
-        if retain_step:
-            for name, value in last_step_diagnostics.items():
-                if case.output.history_stride == 0:
-                    history_values[name][:] = (value,)
-                else:
-                    history_values[name].append(value)
-        _emit_solver_step(
-            logger,
-            step_index=step_index + 1,
-            step_time=step_time,
-            u_max_value=last_step_diagnostics["u_max_history"],
-            mean_velocity=last_step_diagnostics["mean_velocity_history"],
-            max_current=last_step_diagnostics["current_max_history"],
-            max_lorentz=last_step_diagnostics["lorentz_max_history"],
-            residual_value=residual_value,
-            potential_residual=last_step_diagnostics["potential_residual_history"],
-            potential_iteration_count=last_step_diagnostics["potential_iterations_history"],
-            linear_residual=last_step_diagnostics["linear_residual_history"],
-            linear_iteration_count=last_step_diagnostics["linear_iterations_history"],
-            applied_forcing=last_step_diagnostics["applied_forcing_history"],
-            courant_like=last_step_diagnostics["courant_like"],
-            ohmic=last_step_diagnostics["ohmic_power"],
-            volumetric_flow_rate=last_step_diagnostics["volumetric_flow_rate_history"],
-            div_current_max=last_step_diagnostics["div_current_max_history"],
-            charge_balance_residual=last_step_diagnostics["charge_balance_residual_history"],
-            gauge_residual=last_step_diagnostics["gauge_residual_history"],
-            interface_current_residual=last_step_diagnostics["interface_current_residual_history"],
-            potential_initial_residual=float(potential_initial_residual),
-            linear_initial_residual=float(linear_initial_residual),
-        )
-        step_count = step_index + 1
-        if steady_mode and _fully_developed_converged(
-            case,
-            velocity_residual=residual_value,
-            linear_residual=last_step_diagnostics["linear_residual_history"],
-            potential_residual=last_step_diagnostics["potential_residual_history"],
-        ):
-            break
 
-    if case.output.history_stride > 1 and step_count and (step_count - 1) % case.output.history_stride != 0:
-        for name, value in last_step_diagnostics.items():
-            history_values[name].append(value)
+    records = jax.device_get(jnp.stack([record for _, record in retained])) if retained else None
+    history_values: dict[str, object] = {"time_history": [step_time for step_time, _ in retained]}
+    for index, name in enumerate(_STEP_DIAGNOSTIC_NAMES):
+        history_values[name] = [] if records is None else records[:, index]
+    residual_value = (
+        float(history_values["residual_history"][-1])
+        if records is not None
+        else float(initial_state.residual if initial_state is not None else 0.0)
+    )
 
     require_finite(
         "fully developed solve",
@@ -924,45 +1269,23 @@ def _solve_fully_developed(
         potential_residual_history=history_values["potential_residual_history"],
         linear_residual_history=history_values["linear_residual_history"],
     )
-    steady_converged = bool(
-        steady_mode
-        and step_count
-        and _fully_developed_converged(
-            case,
-            velocity_residual=last_step_diagnostics["residual_history"],
-            linear_residual=last_step_diagnostics["linear_residual_history"],
-            potential_residual=last_step_diagnostics["potential_residual_history"],
-        )
-    )
     state = MHDState(
         u=u,
         phi=phi,
         jy=jy,
         jz=jz,
         lorentz_x=lorentz,
-        time=float(start_time + step_count * dt),
+        time=float(start_time + steps * dt),
         residual=residual_value,
-    )
-
-    def retained_history(name, values):
-        array = jnp.asarray(values, dtype=float)
-        stride = case.output.history_stride
-        initial = (
-            getattr(initial_diagnostics, name) if initial_diagnostics is not None and stride != 0 else None
-        )
-        return _concat_history(initial, array, append=append_diagnostics)
-
-    diagnostics = Diagnostics(
-        **{name: retained_history(name, values) for name, values in history_values.items()}
     )
     solution = Solution(
         mesh=mesh,
         state=state,
-        diagnostics=diagnostics,
+        diagnostics=_history_diagnostics(case, history_values, initial_diagnostics, append_diagnostics),
         case_name=case.name,
-        converged=steady_converged if steady_mode else None,
-        status=("converged" if steady_converged else "step_limit" if steady_mode else "completed"),
-        steps=step_count,
+        converged=None,
+        status="completed",
+        steps=steps,
     )
     if logger is not None:
         logger.emit_footer(solution)
@@ -1015,7 +1338,18 @@ def solve_steady(
     append_diagnostics: bool = False,
     restart_info: RestartLogInfo | None = None,
 ) -> Solution:
-    """Solve a supported case to its configured steady-state stopping gate."""
+    """Solve a supported case to a certified steady state.
+
+    A fully developed case is linear, so its steady state comes from one
+    affine fixed-point GMRES solve, not from pseudo-time steps. ``status`` is
+    ``"converged"`` only when the relative fixed-point residual
+    ``||G(u) - u|| / ||G(0)||`` (``solution.residual``) meets
+    ``steady_tolerance`` and the final potential and momentum solves meet
+    their gates; otherwise it is ``"not_converged"``. ``steps`` counts GMRES
+    iterations and the diagnostics hold one record. ``initial_state`` sets
+    only the reported time, because the steady state does not depend on it.
+    Use :func:`solve_transient` for time histories.
+    """
 
     solver_kind = getattr(getattr(case, "solver", None), "kind", "fully_developed_inductionless")
     if solver_kind == "fully_developed_inductionless":
@@ -1103,80 +1437,20 @@ def solve_fully_developed_fields(
         _, by, bz = magnetic_field_components(case.magnetic_field, mesh)
     field_scale = jnp.asarray(magnetic_field_scale, dtype=by.dtype)
     by, bz = field_scale * by, field_scale * bz
-    fluid_mask = materials.fluid_mask
-    reaction = jnp.where(
-        fluid_mask,
-        materials.conductivity * (by**2 + bz**2) / materials.density,
-        0.0,
+    coupled, _, potential, _ = _affine_fully_developed_solve(
+        case,
+        mesh,
+        materials,
+        potential_solver,
+        potential_system,
+        by,
+        bz,
+        forcing=case.forcing if forcing is None else forcing,
+        tolerance=case.solver.coupling_tolerance,
     )
-    cell_metric = _cell_metric(mesh).astype(by.dtype)
-    coefficients = tuple(
-        coefficient * cell_metric
-        for coefficient in _velocity_system_coefficients(mesh, materials.viscosity, reaction, fluid_mask)
-    )
-    tolerance = _nested_velocity_tolerance(case.solver.coupling_tolerance, by.dtype)
-    source = jnp.asarray(case.forcing if forcing is None else forcing, dtype=by.dtype)
-    max_steps = max(case.time_stepper.max_steps, case.solver.coupling_iterations * 25)
-
-    def potential(velocity):
-        return _solve_potential(
-            mesh,
-            materials.conductivity,
-            fluid_mask,
-            velocity,
-            by,
-            bz,
-            case.reference_phi_cell,
-            case.time_stepper.potential_iterations,
-            tolerance=tolerance,
-            solver=potential_solver,
-            system=potential_system,
-        )[0]
-
-    def mapping(velocity):
-        phi = potential(velocity)
-        rhs, _ = _fully_developed_rhs(
-            mesh=mesh,
-            sigma=materials.conductivity,
-            rho=materials.density,
-            fluid_mask=fluid_mask,
-            u=velocity,
-            phi=phi,
-            by=by,
-            bz=bz,
-            forcing=source,
-        )
-        velocity, _, _, _ = _solve_velocity_system(
-            coefficients=coefficients,
-            cell_metric=cell_metric,
-            rhs=rhs + reaction * jnp.where(fluid_mask, velocity, 0.0),
-            active_mask=fluid_mask,
-            preconditioner=case.solver.preconditioner,
-            max_steps=max_steps,
-            tolerance=tolerance,
-        )
-        return _enforce_velocity_bc(
-            velocity,
-            mesh,
-            fluid_mask,
-            interpolate_direct_fluid_walls=case.geometry.kind == "rect_duct",
-        )
-
-    zero = jnp.zeros(mesh.yz_shape, dtype=by.dtype)
-    restart = min(30, max(2, mesh.ny * mesh.nz))
-    max_restarts = 50
-    coupled = affine_fixed_point_gmres(
-        mapping,
-        zero,
-        restart=restart,
-        rtol=case.solver.coupling_tolerance,
-        max_restarts=max_restarts,
-        transpose_rtol=case.solver.coupling_tolerance,
-        transpose_max_restarts=max_restarts,
-    )
-    phi = potential(coupled.x)
+    phi = potential(coupled.x)[0]
     jy, jz, lorentz = _compute_current_and_lorentz(
-        mesh, materials.conductivity, fluid_mask, coupled.x, phi, by, bz
+        mesh, materials.conductivity, materials.fluid_mask, coupled.x, phi, by, bz
     )
     return coupled.x, phi, jy, jz, lorentz
 
