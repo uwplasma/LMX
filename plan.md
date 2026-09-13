@@ -808,7 +808,13 @@ iterates marked, fixed colour scales and physical time in movies.
   API; this `plan.md` frozen except at phase boundaries.
 - **Size.** Architecture audit budgets follow this plan (modules ≤ 14 after
   Phase 4, source ≤ 9,000 lines, media ≤ 1 MB, clone ≤ 5 MB); no history rewrite
-  unless a measured size problem appears.
+  unless a measured size problem appears. Until step 4.6, the line budgets in
+  `scripts/audit_architecture.py` are interim ratchets set to the merged size
+  plus in-flight steps that have named their lines (2026-09-13: 18,800 total and
+  10,300 maintained core, after #125–#132 added 652 lines, 274 of them in the
+  `cases.py` path that 4.6 deletes, and 1.7d part ii's 144). A PR that raises a
+  ratchet names its plan step and the lines it adds; 4.6 resets both to the
+  Phase 4 targets.
 - **AI-assisted work.** Same rules; the reviewer reads the diff; CONTRIBUTING
   carries the disclosure JOSS requires.
 - **Authorship.** All commits authored by the project owner; no tool attribution.
