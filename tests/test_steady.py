@@ -304,11 +304,11 @@ def test_the_conjugate_gradient_preconditioner_is_symmetric_positive_definite():
     iterations instead of 119.
     """
     from lmx.core3d import project
-    from lmx.steady import _isotropic_viscous, _orthogonal_projection, _preconditioner
+    from lmx.steady import _orthogonal_projection, _preconditioner, _projection_solves
 
     problem = _extruded(duct_problem(hartmann=100.0, cells=24), 4, 100.0, 24)
     factorization = problem.factorization()
-    precond = _preconditioner(problem, factorization, _isotropic_viscous(problem, 1.0e3), 1.0e3)
+    precond = _preconditioner(problem, factorization, _projection_solves(problem, 1.0e3), 1.0e3)
     inner = functools.partial(_face_volume_inner, problem)
 
     u, v = _random_velocity(problem, 1), _random_velocity(problem, 2)
@@ -323,6 +323,45 @@ def test_the_conjugate_gradient_preconditioner_is_symmetric_positive_definite():
     # The eigenbases of a stretched axis carry about 1e-9; the wrap-face defect was 2.7e-2.
     assert abs(forward - backward) <= 1e-8 * max(abs(forward), abs(backward))
     assert inner(up, precond(up)) > 0.0 and inner(vp, precond(vp)) > 0.0
+
+
+def _conjugate_gradient_iterations(problem: ChannelProblem, solves) -> int:
+    """CG iterations of the insulating steady solve from rest, with the given projection-step solves."""
+    from lmx.steady import _orthogonal_projection, _preconditioner, _stokes_limit_root
+
+    factorization = problem.factorization()
+    precond = _preconditioner(problem, factorization, solves(problem, 1.0e3), 1.0e3)
+    start = _orthogonal_projection(zero_velocity(problem), problem, factorization)
+    controls = dict(forcing=None, field_scale=1.0, tolerance=1.0e-9, max_iterations=12000)
+    _, (iterations, _, converged) = _stokes_limit_root(problem, start, factorization, precond, **controls)
+    assert bool(converged)
+    return int(iterations)
+
+
+@pytest.mark.parametrize(
+    ("hartmann", "cells", "bound"),
+    [(300.0, 48, 70), pytest.param(1000.0, 64, 110, marks=pytest.mark.slow)],
+)
+def test_field_lines_cut_the_iterations_where_the_layers_are_thin(hartmann, cells, bound):
+    """Field lines take CG from 403 to 44 iterations at Ha 300 and from 714 to 68 at Ha 1000.
+
+    Round-off in the secondary components seeds part of the count, hence ~60 % headroom; the
+    1.10b parity gate is 300 at Ha 1000.
+    """
+    from lmx.steady import _isotropic_viscous, _projection_solves
+
+    problem = duct_problem(hartmann=hartmann, cells=cells)
+    lines = _conjugate_gradient_iterations(problem, _projection_solves)
+    assert lines <= bound, f"field lines took {lines} iterations"
+    damped = _conjugate_gradient_iterations(problem, _isotropic_viscous)
+    assert 6 * lines <= damped, f"field lines {lines}, damped {damped}"
+
+
+def test_field_lines_invert_the_fully_developed_operator_on_a_uniform_mesh():
+    """On a uniform mesh the induction form is the discrete operator: 3 iterations at Ha 300, 218 damped."""
+    from lmx.steady import _projection_solves
+
+    assert _conjugate_gradient_iterations(_duct(24, 300.0), _projection_solves) <= 5
 
 
 def test_the_conjugate_gradient_route_agrees_with_newton_krylov():
