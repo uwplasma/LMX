@@ -428,10 +428,20 @@ def test_the_duct_helper_resolves_the_layers_it_names():
 
 
 def test_the_public_solve_reaches_the_new_core():
-    """`lmx.solve` dispatches a ChannelProblem to the steady Newton-Krylov path."""
+    """`lmx.solve` dispatches a ChannelProblem to the certified steady solve of :mod:`lmx.steady`.
+
+    The certificate is relative: the final residual is within ten times the
+    tolerance of the residual at rest. An insulating Stokes duct is one CG solve,
+    which stops at the tolerance rather than overshooting it as Newton does, so
+    an absolute bound would test the route instead of the contract.
+    """
     import lmx
+    from lmx.core3d import zero_velocity
+    from lmx.steady import steady_residual
 
     problem = lmx.duct_problem(hartmann=5.0, cells=16)
     solution = lmx.solve(problem)
+    at_rest = steady_residual(zero_velocity(problem), problem)
+    scale = max(float(np.sqrt(sum(np.sum(np.asarray(field.data) ** 2) for field in at_rest))), 1.0)
     assert float(np.mean(np.asarray(solution.velocity[0].data))) > 0.0
-    assert float(solution.residual_norm) < 1e-8
+    assert float(solution.residual_norm) <= 10.0 * 1.0e-9 * scale
