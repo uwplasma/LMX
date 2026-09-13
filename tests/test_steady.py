@@ -169,9 +169,40 @@ def test_a_solve_that_does_not_converge_raises():
         solve_steady_state(problem, pseudo_step=1.0e3, max_steps=1, linear_restart=1, linear_max_restarts=1)
 
 
-def test_the_pseudo_step_is_validated():
-    with pytest.raises(ValueError, match="pseudo_step must be positive"):
-        solve_steady_state(_duct(6, 0.0), pseudo_step=0.0)
+@pytest.mark.parametrize("drive", [1.0, np.nan, np.inf])
+def test_a_rejected_root_cannot_produce_a_finite_objective_or_gradient(drive):
+    problem = _duct(4, 0.0)
+
+    def objective(drive):
+        solution = solve_steady_state(problem, forcing=(drive, 0.0, 0.0), max_steps=0)
+        return jnp.mean(solution.velocity[0].data)
+
+    with pytest.raises(RuntimeError, match="did not converge"):
+        objective(drive)
+    value, gradient = jax.value_and_grad(objective)(drive)
+    assert not np.isfinite(value) and not np.isfinite(gradient)
+
+
+def test_a_failed_tangent_solve_is_rejected_eagerly_and_under_jit():
+    from lmx.steady import _krylov, _tangent_solve
+
+    def solve(rhs):
+        return _krylov(jnp.zeros_like, rhs)
+
+    with pytest.raises(RuntimeError, match="linear solve did not converge"):
+        solve(jnp.ones(2))
+    assert not np.isfinite(jax.jit(solve)(jnp.ones(2))).all()
+    value, gradient = jax.value_and_grad(lambda rhs: jnp.sum(_tangent_solve(jnp.zeros_like, rhs)))(
+        jnp.ones(2)
+    )
+    assert not np.isfinite(value) and not np.isfinite(gradient).all()
+
+
+@pytest.mark.parametrize("name", ["pseudo_step", "tolerance", "linear_tolerance"])
+@pytest.mark.parametrize("value", [0.0, -1.0, np.nan, np.inf])
+def test_the_solver_controls_are_validated(name, value):
+    with pytest.raises(ValueError, match=f"{name} must be positive and finite"):
+        solve_steady_state(_duct(4, 0.0), **{name: value})
 
 
 @pytest.mark.parametrize("conductance", [0.027, 0.100])
