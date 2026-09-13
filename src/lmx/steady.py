@@ -31,6 +31,7 @@ without host callbacks. Optimizers must reject nonfinite values and gradients.
 from __future__ import annotations
 
 import dataclasses
+import functools
 from dataclasses import dataclass
 
 import jax
@@ -171,11 +172,13 @@ def solve_steady_state(
 
     scale = _norm(residual(start))
 
+    precond = _preconditioner(problem, factorization, viscous, step)
+
     def solver(function, guess):
         solution = solvax.newton_krylov(
             function,
             guess,
-            precond=_preconditioner(problem, factorization, viscous, step),
+            precond=precond,
             rtol=tolerance,
             max_steps=max_steps,
             linear_rtol=linear_tolerance,
@@ -184,7 +187,8 @@ def solve_steady_state(
         )
         return solution.x
 
-    root = solvax.root_solve(residual, start, solver, tangent_solve=_tangent_solve)
+    tangent_solve = functools.partial(_tangent_solve, precond=precond)
+    root = solvax.root_solve(residual, start, solver, tangent_solve=tangent_solve)
     final = _norm(residual(root))
     accepted = (
         jnp.isfinite(final) & jnp.isfinite(scale) & (final <= 10.0 * tolerance * jnp.maximum(scale, 1.0))
@@ -195,8 +199,8 @@ def solve_steady_state(
     return SteadySolution(corrected, pressure, potential, final, max_steps)
 
 
-def _krylov(matvec, target):
-    result = solvax.gmres(matvec, target, rtol=1.0e-10, restart=60, max_restarts=60)
+def _krylov(matvec, target, precond=None):
+    result = solvax.gmres(matvec, target, precond=precond, rtol=1.0e-10, restart=60, max_restarts=60)
     return _certified(result.x, result.converged & jnp.isfinite(result.residual_norm), "steady linear solve")
 
 
@@ -208,7 +212,7 @@ def _certified(value, accepted, stage):
     return jax.tree.map(lambda leaf: leaf * jnp.where(accepted, 1.0, jnp.nan), value)
 
 
-def _tangent_solve(operator, target):
+def _tangent_solve(operator, target, precond=None):
     """Solve the linearised system at the root, matrix free, in both directions.
 
     :func:`jax.lax.custom_linear_solve` makes the Krylov iteration opaque to
@@ -216,8 +220,23 @@ def _tangent_solve(operator, target):
     the adjoint runs GMRES on the transposed operator rather than differentiating
     through the forward iteration -- which cannot be transposed, because a Krylov
     basis is not a linear function of its right-hand side.
+
+    ``precond`` is the primal projection step. The transposed solve uses its
+    exact transpose: the step is symmetric only in the face-volume inner product,
+    and GMRES measures in the Euclidean one, where a stretched mesh makes the two
+    differ by the width ratio.
     """
-    return jax.lax.custom_linear_solve(operator, target, _krylov, _krylov)
+
+    def solve(matvec, rhs):
+        return _krylov(matvec, rhs, precond)
+
+    def transpose_solve(vecmat, rhs):
+        if precond is None:
+            return _krylov(vecmat, rhs)
+        transposed = jax.linear_transpose(precond, rhs)
+        return _krylov(vecmat, rhs, lambda direction: transposed(direction)[0])
+
+    return jax.lax.custom_linear_solve(operator, target, solve, transpose_solve)
 
 
 def _norm(velocity: tuple[Field, Field, Field]):

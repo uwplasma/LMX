@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from lmx.bc import NEUMANN, PERIODIC, BoundaryCondition
-from lmx.core3d import ChannelProblem, step, zero_velocity
+from lmx.core3d import ChannelProblem, duct_problem, step, zero_velocity
 from lmx.grid import Grid, uniform_faces, wall_resolving_faces
 from lmx.steady import solve_steady_state, steady_residual
 from validation.shercliff import flow_rate
@@ -167,6 +167,33 @@ def test_the_adjoint_matches_finite_differences(cells, hartmann, conductance):
         assert float(gradient[index]) == pytest.approx(float(difference), rel=1e-6)
     # The Stokes limit is linear in the drive, so the derivative is the value itself.
     assert float(gradient[0]) == pytest.approx(float(value), rel=1e-12)
+
+
+@pytest.mark.parametrize(
+    ("hartmann", "cells"), [(100.0, 24), pytest.param(300.0, 48, marks=pytest.mark.slow)]
+)
+def test_the_adjoint_matches_finite_differences_where_the_layers_are_thin(hartmann, cells):
+    """Stretched layer meshes need the preconditioned transpose; without it Ha 300 gave NaN."""
+    problem = duct_problem(hartmann=hartmann, cells=cells)
+
+    def throughput(drive, scale):
+        solution = solve_steady_state(
+            problem, pseudo_step=1.0e3, forcing=(drive, 0.0, 0.0), field_scale=scale
+        )
+        return jnp.mean(solution.velocity[0].data)
+
+    value, gradient = jax.value_and_grad(throughput, argnums=(0, 1))(1.0, 1.0)
+    assert np.isfinite(value) and np.isfinite(gradient).all()
+    size = 1.0e-4
+    for index in range(2):
+        raised = [1.0, 1.0]
+        lowered = [1.0, 1.0]
+        raised[index] += size
+        lowered[index] -= size
+        difference = (throughput(*raised) - throughput(*lowered)) / (2.0 * size)
+        assert float(gradient[index]) == pytest.approx(float(difference), rel=1e-6)
+    # A stronger field brakes the flow.
+    assert float(gradient[1]) < 0.0
 
 
 def test_a_solve_that_does_not_converge_raises():
