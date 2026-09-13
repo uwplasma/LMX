@@ -84,7 +84,7 @@ conductance = float(volumetric_flow_rate(case, unit.state.u))
 if TARGET_FLOW_RATE is not None:
     case = replace(case, forcing=TARGET_FLOW_RATE / conductance)
 
-# Solve again from rest at the design drive. Each steady solve is one affine
+# Run the design solve from rest at that drive. Each steady solve is one affine
 # GMRES solve whose residual is certified; the flow check tests Q = G * drive.
 solution = solve_steady(case)
 flow_rate = float(volumetric_flow_rate(case, solution.state.u))
