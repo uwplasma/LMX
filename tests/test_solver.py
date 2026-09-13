@@ -26,6 +26,7 @@ from lmx.specs import (
     ExtrudedInductionlessProblem,
     FringingProfile,
     GeometrySpec,
+    MHDState,
     NumericalFailure,
 )
 
@@ -55,7 +56,7 @@ def _fake_step_result(u, **overrides):
     return (u, *(values[name] for name in values))
 
 
-def _steady_stopping_case(**time_stepper):
+def _stepping_case(**time_stepper):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
     return replace(
         case,
@@ -153,7 +154,7 @@ def test_hartmann_solver_runs(monkeypatch: pytest.MonkeyPatch):
         )
 
     monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
-    solution = solve_steady(case)
+    solution = solve_transient(case)
     assert solution.state.u.shape == (12, 12)
     assert float(jnp.max(solution.state.u)) > 0.0
     assert jnp.isfinite(solution.state.phi).all()
@@ -167,7 +168,7 @@ def test_build_mesh_rejects_unsupported_geometry_kind():
         solvers._build_mesh(unsupported)
 
 
-def test_solve_steady_accepts_custom_mesh_override(monkeypatch: pytest.MonkeyPatch):
+def test_solve_transient_accepts_custom_mesh_override(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
     case = replace(case, time_stepper=replace(case.time_stepper, potential_solver="cg"))
     custom_mesh = generate_rect_duct_mesh_from_faces(
@@ -189,7 +190,7 @@ def test_solve_steady_accepts_custom_mesh_override(monkeypatch: pytest.MonkeyPat
         )
 
     monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
-    solution = solve_steady(case, mesh=custom_mesh)
+    solution = solve_transient(case, mesh=custom_mesh)
 
     assert solution.mesh is custom_mesh
 
@@ -386,8 +387,8 @@ def test_hunt_inlet_flow_rate_boundary_drives_short_transient(
 
     monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
 
-    driven_solution = solve_steady(driven)
-    undriven_solution = solve_steady(undriven)
+    driven_solution = solve_transient(driven)
+    undriven_solution = solve_transient(undriven)
 
     assert float(jnp.max(driven_solution.state.u)) > float(jnp.max(undriven_solution.state.u))
 
@@ -478,19 +479,19 @@ def test_common_solve_dispatches_configured_mode_and_fringing(monkeypatch: pytes
 def test_diagnostic_history_is_terminal_by_default_and_strided_when_requested(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    case = _steady_stopping_case(dt=0.002, t_final=0.01, max_steps=5, steady_tolerance=0.0)
+    case = _stepping_case(dt=0.002, t_final=0.01, max_steps=5, steady_tolerance=0.0)
     monkeypatch.setattr(
         cases_impl,
         "_fully_developed_case_step",
         lambda **kwargs: _fake_step_result(kwargs["u_previous"], velocity_residual=1.0e-2),
     )
 
-    terminal = solve_steady(replace(case, output=replace(case.output, history_stride=0)))
-    strided = solve_steady(replace(case, output=replace(case.output, history_stride=2)))
+    terminal = solve_transient(replace(case, output=replace(case.output, history_stride=0)))
+    strided = solve_transient(replace(case, output=replace(case.output, history_stride=2)))
     assert terminal.diagnostics.time_history.tolist() == pytest.approx([0.01])
     assert terminal.diagnostics.residual_history.shape == (1,)
     assert strided.diagnostics.time_history.tolist() == pytest.approx([0.002, 0.006, 0.01])
-    resumed = solve_steady(
+    resumed = solve_transient(
         replace(
             case,
             time_stepper=replace(case.time_stepper, t_final=0.02),
@@ -501,12 +502,13 @@ def test_diagnostic_history_is_terminal_by_default_and_strided_when_requested(
         append_diagnostics=True,
     )
     assert resumed.diagnostics.time_history.tolist() == pytest.approx([0.02])
-    with pytest.raises(ValueError, match="history_stride"):
-        solve_steady(replace(case, output=replace(case.output, history_stride=-1)))
+    for solver in (solve_steady, solve_transient):
+        with pytest.raises(ValueError, match="history_stride"):
+            solver(replace(case, output=replace(case.output, history_stride=-1)))
 
 
 def test_fully_developed_solve_reuses_invariant_linear_systems(monkeypatch: pytest.MonkeyPatch):
-    case = _steady_stopping_case(dt=0.002, t_final=0.006, max_steps=3, steady_tolerance=0.0)
+    case = _stepping_case(dt=0.002, t_final=0.006, max_steps=3, steady_tolerance=0.0)
     systems = []
 
     def fake_step(**kwargs):
@@ -514,7 +516,7 @@ def test_fully_developed_solve_reuses_invariant_linear_systems(monkeypatch: pyte
         return _fake_step_result(kwargs["u_previous"], velocity_residual=1.0e-2)
 
     monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_step)
-    solve_steady(case)
+    solve_transient(case)
     assert len(systems) == 3
     assert all(potential is systems[0][0] for potential, _ in systems)
     assert all(velocity is systems[0][1] for _, velocity in systems)
@@ -690,8 +692,8 @@ def test_magnetic_ramp_delays_short_transient_lorentz_response(
 
     monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
 
-    baseline = solve_steady(base)
-    delayed = solve_steady(ramped)
+    baseline = solve_transient(base)
+    delayed = solve_transient(ramped)
 
     assert float(delayed.diagnostics.current_max_history[0]) < float(
         baseline.diagnostics.current_max_history[0]
@@ -1158,10 +1160,10 @@ def test_conductive_current_components_keep_wall_currents_for_interface_audits()
     assert jnp.allclose(jz_masked[wall_mask], 0.0)
 
 
-def test_solve_steady_respects_t_final_when_tolerance_not_reached(
+def test_solve_transient_respects_t_final(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    case = _steady_stopping_case(dt=0.002, t_final=0.01, max_steps=200, steady_tolerance=0.0)
+    case = _stepping_case(dt=0.002, t_final=0.01, max_steps=200, steady_tolerance=0.0)
 
     def fake_fully_developed_case_step(**kwargs):
         u = kwargs["u_previous"]
@@ -1179,7 +1181,7 @@ def test_solve_steady_respects_t_final_when_tolerance_not_reached(
         )
 
     monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
-    solution = solve_steady(case)
+    solution = solve_transient(case)
 
     assert solution.diagnostics.time_history.shape[0] == 5
     assert float(solution.diagnostics.time_history[-1]) == pytest.approx(0.01)
@@ -1537,68 +1539,27 @@ def test_fully_developed_case_step_matches_target_mean_velocity_with_sensitivity
     assert float(linear_initial_residual) == pytest.approx(9.0e-6)
 
 
-def test_fully_developed_steady_stops_once_residual_reaches_tolerance(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    case = _steady_stopping_case(max_steps=10, steady_tolerance=1e-4, potential_tolerance=1.0e-2)
-    residuals = iter([1.0e-1, 1.0e-2, 1.0e-5, 1.0e-6])
+def test_fully_developed_steady_gate_requires_potential_residual_when_requested():
+    case = _stepping_case(steady_tolerance=1e-4, steady_potential_tolerance=5e-4)
 
-    def fake_fully_developed_case_step(**kwargs):
-        u = kwargs["u_previous"]
-        return _fake_step_result(
-            u,
-            velocity_residual=next(residuals),
-            potential_residual=1e-2,
-            potential_iterations=25,
-            linear_iterations=8.0,
-            mean_velocity=0.0,
-            applied_forcing=1.0,
-            potential_initial_residual=1e-2,
-            linear_initial_residual=1e-2,
+    def gate(velocity_residual=1e-5, potential_residual=1e-5):
+        return cases_impl._fully_developed_converged(
+            case,
+            velocity_residual=velocity_residual,
+            linear_residual=1e-9,
+            potential_residual=potential_residual,
         )
 
-    monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
-    solution = solve_steady(case)
-
-    assert solution.diagnostics.residual_history.shape[0] == 3
-    assert solution.diagnostics.potential_residual_history.shape[0] == 3
-    assert solution.diagnostics.linear_residual_history.shape[0] == 3
-    assert solution.state.time == pytest.approx(3 * case.time_stepper.dt)
-    assert solution.state.residual == pytest.approx(1.0e-5)
-    assert solution.residual == pytest.approx(1.0e-5)
-    assert solution.fields is solution.state
-    assert solution.converged is True
-    assert solution.status == "converged"
-    assert solution.steps == 3
+    assert gate()
+    assert gate(potential_residual=4e-4)
+    assert not gate(potential_residual=1e-3)
+    assert not gate(velocity_residual=2e-4)
 
 
-def test_fully_developed_steady_reports_step_limit(
+def test_fully_developed_transient_rejects_nonfinite_output(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    case = _steady_stopping_case(max_steps=2, steady_tolerance=1.0e-4, potential_tolerance=1.0e-3)
-
-    monkeypatch.setattr(
-        cases_impl,
-        "_fully_developed_case_step",
-        lambda **kwargs: _fake_step_result(
-            kwargs["u_previous"],
-            velocity_residual=1.0e-2,
-            potential_residual=1.0e-2,
-            linear_residual=1.0e-2,
-        ),
-    )
-
-    solution = solve_steady(case)
-
-    assert solution.converged is False
-    assert solution.status == "step_limit"
-    assert solution.steps == 2
-
-
-def test_fully_developed_steady_rejects_nonfinite_output(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    case = _steady_stopping_case(max_steps=1)
+    case = _stepping_case(max_steps=1)
 
     monkeypatch.setattr(
         cases_impl,
@@ -1610,65 +1571,58 @@ def test_fully_developed_steady_rejects_nonfinite_output(
     )
 
     with pytest.raises(NumericalFailure, match="potential"):
-        solve_steady(case)
+        solve_transient(case)
 
 
-def test_fully_developed_steady_requires_outer_state_convergence(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    case = _steady_stopping_case(max_steps=5, steady_tolerance=1.0e-4, potential_tolerance=1.0e-2)
-    updates = iter([1.0e-2, 1.0e-5])
+@pytest.mark.regression
+def test_steady_fully_developed_solve_reports_the_certified_affine_state():
+    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
+    mesh = solvers._build_mesh(case)
+    calls: list[str] = []
 
-    def fake_fully_developed_case_step(**kwargs):
-        u = kwargs["u_previous"] + next(updates)
-        return _fake_step_result(
-            u,
-            velocity_residual=1e-6,
-            potential_residual=1e-3,
-            potential_iterations=5,
-            linear_iterations=2.0,
-            mean_velocity=0.0,
-            applied_forcing=1.0,
-            potential_initial_residual=1e-3,
-            linear_initial_residual=1e-3,
-        )
+    class Logger:
+        def emit_header(self, **kwargs):
+            calls.append("header")
 
-    monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
-    solution = solve_steady(case)
+        def emit_step(self, record):
+            calls.append("step")
 
-    assert solution.diagnostics.residual_history == pytest.approx([1.0e-2, 1.0e-5])
-    assert solution.state.time == pytest.approx(2 * case.time_stepper.dt)
-    assert solution.state.residual == pytest.approx(1.0e-5)
+        def emit_footer(self, solution):
+            calls.append("footer")
 
+    zeros = jnp.zeros(mesh.yz_shape)
+    initial = MHDState(zeros, zeros, zeros, zeros, zeros, time=0.5, residual=1.0)
+    solution = solve_steady(case, logger=Logger(), mesh=mesh, initial_state=initial)
+    velocity = cases_impl.solve_fully_developed_fields(case)[0]
 
-def test_fully_developed_steady_can_require_potential_residual_when_requested(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    case = _steady_stopping_case(max_steps=6, steady_tolerance=1e-4, steady_potential_tolerance=5e-4)
-    residuals = iter([1.0e-3, 1.0e-5, 1.0e-5, 1.0e-6])
-    potential_residuals = iter([1.0e-2, 1.0e-3, 1.0e-4, 1.0e-5])
+    def relative(left, right):
+        return float(jnp.linalg.norm(left - right) / jnp.linalg.norm(right))
 
-    def fake_fully_developed_case_step(**kwargs):
-        u = kwargs["u_previous"]
-        return _fake_step_result(
-            u,
-            velocity_residual=next(residuals),
-            potential_residual=next(potential_residuals),
-            potential_iterations=20,
-            linear_iterations=8.0,
-            mean_velocity=0.0,
-            applied_forcing=1.0,
-            potential_initial_residual=1e-2,
-            linear_initial_residual=1e-2,
-        )
+    assert solution.mesh is mesh
+    assert calls == ["header", "step", "footer"]
+    assert solution.converged is True and solution.status == "converged"
+    assert 0 < solution.steps < 100
+    assert solution.residual <= case.time_stepper.steady_tolerance
+    assert solution.state.time == 0.5
+    assert solution.diagnostics.time_history.tolist() == [0.5]
+    assert solution.diagnostics.residual_history.tolist() == [solution.residual]
+    assert relative(solution.state.u, velocity) < 1e-6
 
-    monkeypatch.setattr(cases_impl, "_fully_developed_case_step", fake_fully_developed_case_step)
-    solution = solve_steady(case)
-
-    assert solution.diagnostics.residual_history.shape[0] == 3
-    assert solution.diagnostics.potential_residual_history.shape[0] == 3
-    assert solution.state.time == pytest.approx(3 * case.time_stepper.dt)
-    assert solution.state.residual == pytest.approx(1.0e-5)
+    flow_driven = replace(
+        case,
+        forcing=0.0,
+        boundary_conditions=case.boundary_conditions
+        + (
+            BoundaryCondition(
+                "inlet", "inlet_flow_rate", value=0.3 * case.geometry.width * case.geometry.height, axis="x"
+            ),
+        ),
+    )
+    driven = solve_steady(flow_driven, mesh=mesh)
+    drive = float(driven.diagnostics.applied_forcing_history[-1])
+    assert driven.status == "converged"
+    assert float(driven.diagnostics.mean_velocity_history[-1]) == pytest.approx(0.3, rel=1e-12)
+    assert relative(driven.state.u, drive * velocity) < 1e-6
 
 
 def test_potential_solver_rejects_unknown_backend():
@@ -2074,8 +2028,8 @@ def test_solve_fully_developed_enables_direct_wall_interpolation_only_for_rectan
     monkeypatch.setattr(cases_impl, "_initial_solver_state", fake_initial_solver_state)
     monkeypatch.setattr(cases_impl, "_bounded_time_step_count", lambda **kwargs: 0)
 
-    solve_steady(make_shercliff_case(ha=10.0, ny=8, nz=8))
-    solve_steady(make_hunt_case(ha=10.0, ny=8, nz=8, wall_cells=1))
+    solve_transient(make_shercliff_case(ha=10.0, ny=8, nz=8))
+    solve_transient(make_hunt_case(ha=10.0, ny=8, nz=8, wall_cells=1))
 
     assert flags == [True, False]
 
@@ -2389,7 +2343,7 @@ def test_solver_logging_helpers_and_footer_are_emitted():
     assert calls == ["header", "step", "footer"]
 
 
-def test_solve_steady_emits_footer_through_logger(monkeypatch: pytest.MonkeyPatch):
+def test_solve_transient_emits_footer_through_logger(monkeypatch: pytest.MonkeyPatch):
     calls: list[str] = []
 
     class Logger:
@@ -2411,7 +2365,7 @@ def test_solve_steady_emits_footer_through_logger(monkeypatch: pytest.MonkeyPatc
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
     case = replace(case, time_stepper=replace(case.time_stepper, max_steps=1))
 
-    solve_steady(case, logger=Logger())
+    solve_transient(case, logger=Logger())
 
     assert calls == ["header", "step", "footer"]
 
@@ -2561,7 +2515,7 @@ def test_public_solver_entrypoints_coerce_or_preserve_mode_before_dispatch(
     assert calls == [("transient", False), ("steady", True)]
 
 
-def test_steady_solver_supports_opt_in_solvax_aitken_coupling():
+def test_transient_solver_supports_opt_in_solvax_aitken_coupling():
     case = make_shercliff_case(ha=5.0, ny=6, nz=6)
     case = replace(
         case,
@@ -2578,12 +2532,12 @@ def test_steady_solver_supports_opt_in_solvax_aitken_coupling():
             coupling_max_relaxation=10.0,
         ),
     )
-    solution = solve_steady(case)
+    solution = solve_transient(case)
     assert jnp.isfinite(solution.state.u).all()
     assert jnp.isfinite(solution.state.phi).all()
 
 
-def test_steady_solver_supports_opt_in_solvax_anderson_coupling():
+def test_transient_solver_supports_opt_in_solvax_anderson_coupling():
     case = make_shercliff_case(ha=5.0, ny=6, nz=6)
     case = replace(
         case,
@@ -2600,7 +2554,7 @@ def test_steady_solver_supports_opt_in_solvax_anderson_coupling():
             coupling_history_depth=3,
         ),
     )
-    solution = solve_steady(case)
+    solution = solve_transient(case)
     assert jnp.isfinite(solution.state.u).all()
     assert jnp.isfinite(solution.state.phi).all()
 
@@ -2658,16 +2612,14 @@ for _unit_test_name in (
     "test_volume_scaled_potential_system_is_symmetric_after_cell_metric_weighting",
     "test_potential_coefficients_match_uniform_spacing_formula_on_rect_grid",
     "test_face_emf_uses_distance_weighted_nonuniform_interface_source",
-    "test_fully_developed_steady_stops_once_residual_reaches_tolerance",
-    "test_fully_developed_steady_requires_outer_state_convergence",
-    "test_fully_developed_steady_can_require_potential_residual_when_requested",
+    "test_fully_developed_steady_gate_requires_potential_residual_when_requested",
     "test_potential_solver_rejects_unknown_backend",
     "test_resolve_potential_solver_auto_handles_none_and_full_fluid_mask",
     "test_enforce_velocity_bc_supports_direct_wall_interpolation",
     "test_inlet_speed_supports_tuple_scalar_and_flow_rate_boundaries",
     "test_fully_developed_case_step_rejects_non_implicit_transient_scheme",
-    "test_steady_solver_supports_opt_in_solvax_aitken_coupling",
-    "test_steady_solver_supports_opt_in_solvax_anderson_coupling",
+    "test_transient_solver_supports_opt_in_solvax_aitken_coupling",
+    "test_transient_solver_supports_opt_in_solvax_anderson_coupling",
     "test_steady_solver_rejects_invalid_coupling_acceleration_controls",
 ):
     globals()[_unit_test_name] = pytest.mark.unit(globals()[_unit_test_name])

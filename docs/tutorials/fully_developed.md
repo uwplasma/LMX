@@ -17,8 +17,17 @@ for case in (hartmann, shercliff, hunt):
 
 Hartmann applies the field normal to insulating Hartmann walls. Shercliff
 orients it so side layers control the profile. Hunt resolves conducting Hartmann
-walls and insulating side walls. Use `dataclasses.replace` to change a
-visible part of a frozen case:
+walls and insulating side walls.
+
+The discrete fully developed problem is linear, so a steady solve is one
+affine fixed-point GMRES solve, not a march in pseudo-time. Each iteration
+applies one potential solve and one momentum solve. `result.residual` is the
+relative fixed-point residual `||G(u) - u|| / ||G(0)||`. `result.converged` is
+true only when that residual meets `steady_tolerance` and the final potential
+and momentum solves meet their gates. `result.steps` counts GMRES iterations.
+Set the solver mode to `"transient"` for a time history.
+
+Use `dataclasses.replace` to change a visible part of a frozen case:
 
 ```python
 from dataclasses import replace
@@ -49,12 +58,13 @@ the mesh-quality helpers report cells across Hartmann and side layers.
 
 Run `python examples/hunt_example.py` for a conducting-wall duct with a
 requested flow rate. Edit `TARGET_FLOW_RATE` and `DUCT_LENGTH` near the top;
-set the target to `None` to prescribe `FORCING` instead. The example computes
-the unit-drive response, eliminates the required drive analytically, and then
-warm-starts a reporting corrector from the scaled fields. The corrector must
-pass the configured solver gates and a separate `1e-8` relative flow check;
-this is not a cold-start convergence test or an independent physical reference. Its JSON
-summary records flow, drive, `d(drive)/dQ = 1/G`, and hydraulic power `drive*L*Q`.
+set the target to `None` to prescribe `FORCING` instead. The example solves at
+unit drive to measure the flow per unit drive `G`, eliminates the required
+drive analytically, and solves again from rest at that drive. Both solves must
+report `converged`, and the second must reproduce `G*drive` to a `1e-8`
+relative flow check. This checks the linear drive-to-flow relation, not an
+independent physical reference. Its JSON summary records flow, drive,
+`d(drive)/dQ = 1/G`, and hydraulic power `drive*L*Q`.
 This is fully developed segment work, excluding entry/exit, manifolds and
 thermal effects. It is not a complete blanket pumping budget.
 

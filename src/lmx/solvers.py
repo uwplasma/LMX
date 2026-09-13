@@ -876,11 +876,12 @@ def _solve_potential(
         (face_conv_y[1:, :] - face_conv_y[:-1, :]) / mesh.dy[:, None]
         + (face_conv_z[:, 1:] - face_conv_z[:, :-1]) / mesh.dz[None, :]
     )
-    cell_metric = _cell_metric(mesh).astype(rhs.dtype)
-    conductive_weight = jnp.where(sigma > 0.0, cell_metric, 0.0)
-    conductive_total_weight = jnp.maximum(jnp.sum(conductive_weight), 1.0e-20)
-    rhs_mean = jnp.sum(conductive_weight * rhs) / conductive_total_weight
-    rhs = jnp.where(sigma > 0.0, rhs - rhs_mean, 0.0)
+    # The face fluxes telescope to a zero net source and the anchor row makes
+    # the system nonsingular, so no mean is removed. Subtracting the round-off
+    # mean (~1e-17) from every conducting row would be a relative source of
+    # ~1e-5 in a 1e-12 insulating wall. It shifts the wall potential that the
+    # fluid Lorentz force reads by ~1e-7 and makes the coupled map non-affine.
+    rhs = jnp.where(sigma > 0.0, rhs, 0.0)
 
     diagonal, west, east, south, north = system.coefficients
     warm_start = jnp.zeros_like(rhs) if initial_phi is None else jnp.asarray(initial_phi)
