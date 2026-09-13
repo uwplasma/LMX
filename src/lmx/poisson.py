@@ -20,18 +20,31 @@ returned field has zero volume-weighted mean.
 The factorization represents the homogeneous operator. Inhomogeneous boundary
 data is affine, not linear, so it belongs in the right-hand side; passing a
 condition that carries a value is refused rather than silently linearized.
+
+``precision="mixed"`` runs the contractions of a float64 solve in float32 and
+recovers float64 accuracy by defect correction: the residual against the
+assembled operator is formed in float64 and solved again in float32,
+``refinements`` times (:func:`solvax.iterative_refinement`). The orthogonal
+transforms keep their relative accuracy mode by mode, so the shifted viscous
+operator reaches the float64 floor after one correction; the singular
+Laplacian on a layer-resolving mesh contracts more slowly and takes two, which
+are the factory defaults. The contraction assumes true float32
+matmuls; on Ampere GPUs pin ``jax_default_matmul_precision`` to ``"float32"``,
+because TensorFloat-32 stalls the correction near 1e-4. Float32 states are
+solved in float32 as before.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import jax.numpy as jnp
 import numpy as np
+import solvax
 
 from .bc import NEUMANN, PERIODIC, BoundaryCondition
 from .grid import CENTER, POLAR, Field, Grid, uniform_faces
-from .ops import laplacian
+from .ops import laplacian, staggered_laplacian
 
 __all__ = [
     "FastDiagonalPolarPoisson",
@@ -48,6 +61,90 @@ __all__ = [
 ]
 
 _SINGULAR_TOLERANCE = 1.0e-9
+_PRECISIONS = ("state", "mixed")
+
+
+def _check_precision(precision: str, refinements: int) -> None:
+    if precision not in _PRECISIONS:
+        raise ValueError(f"precision must be one of {list(_PRECISIONS)}, got {precision!r}")
+    if int(refinements) != refinements or refinements < 1:
+        raise ValueError("refinements must be a positive integer")
+
+
+def _single(array: np.ndarray) -> np.ndarray:
+    """Cast a host array to float32 once, at factorization, rather than per solve."""
+    return np.ascontiguousarray(array, dtype=np.float32)
+
+
+def _refined(factorization, direct, matvec, data: jnp.ndarray, volumes: np.ndarray | None) -> jnp.ndarray:
+    """Return ``direct(data)`` in the precision the factorization asks for.
+
+    A float64 right-hand side under ``precision="mixed"`` is solved in float32
+    and corrected against ``matvec`` in float64; anything else is solved
+    directly in its own precision. ``volumes`` marks a singular operator: the
+    incompatible mean is removed from the right-hand side, from every residual
+    and from the result in float64, where the float32 solve would lose it.
+    """
+    if factorization.precision != "mixed" or data.dtype != jnp.float64:
+        return direct(data)
+    operator = matvec
+    if volumes is not None:
+        data = _volume_mean_removed(data, volumes)
+
+        def matvec(values):
+            return _volume_mean_removed(operator(values), volumes)
+
+    def single(values):
+        return direct(values, single=True)
+
+    solution, _ = solvax.iterative_refinement(
+        matvec,
+        data,
+        solvax.as_low_precision(single, jnp.float32),
+        iterations=int(factorization.refinements),
+        residual_dtype=data.dtype,
+    )
+    return solution if volumes is None else _volume_mean_removed(solution, volumes)
+
+
+def _volume_mean_removed(values: jnp.ndarray, volumes: np.ndarray) -> jnp.ndarray:
+    weights = jnp.asarray(volumes, dtype=values.dtype)
+    return values - jnp.sum(weights * values) / jnp.sum(weights)
+
+
+def _single_bases(vectors, scales, denominator: np.ndarray) -> dict:
+    """Return the float32 copies a mixed-precision Cartesian solve contracts with."""
+    shapes = [tuple(-1 if position == axis else 1 for position in range(3)) for axis in range(3)]
+    return {
+        "vectors": tuple(_single(vector) for vector in vectors),
+        "transposed": tuple(_single(vector.T) for vector in vectors),
+        "scales": tuple(_single(scale.reshape(shape)) for scale, shape in zip(scales, shapes, strict=True)),
+        "inverse": tuple(
+            _single((1.0 / scale).reshape(shape)) for scale, shape in zip(scales, shapes, strict=True)
+        ),
+        "denominator": _single(denominator),
+    }
+
+
+def _scaled(data: jnp.ndarray, scales, low: dict | None, *, inverse: bool) -> jnp.ndarray:
+    for axis, scale in enumerate(scales):
+        if low is None:
+            factor = 1.0 / scale if inverse else scale
+            shape = [-1 if position == axis else 1 for position in range(3)]
+            data = data * jnp.asarray(factor.reshape(shape), dtype=data.dtype)
+        else:
+            data = data * jnp.asarray(low["inverse" if inverse else "scales"][axis])
+    return data
+
+
+def _contracted(data: jnp.ndarray, vectors, low: dict | None, *, transpose: bool) -> jnp.ndarray:
+    for axis, vector in enumerate(vectors):
+        if low is None:
+            matrix = jnp.asarray(vector.T if transpose else vector, dtype=data.dtype)
+        else:
+            matrix = jnp.asarray(low["transposed" if transpose else "vectors"][axis])
+        data = jnp.moveaxis(jnp.tensordot(matrix, data, axes=([1], [axis])), 0, axis)
+    return data
 
 
 def _relative_asymmetry(operator: np.ndarray) -> float:
@@ -168,6 +265,19 @@ class FastDiagonalPolarPoisson:
     singular: bool
     shift: float = 0.0
     coefficient: float = -1.0
+    precision: str = "state"
+    refinements: int = 2
+    _low: dict | None = field(default=None, init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        _check_precision(self.precision, self.refinements)
+        if self.precision == "mixed":
+            total = self.radial_values[:, :, None] + self.axial_values[None, None, :]
+            denominator = np.moveaxis(self.shift - self.coefficient * total, 0, 1)
+            if self.singular:
+                denominator[0, 0, 0] = 1.0
+            low = {"radial": _single(self.radial_vectors), "axial": _single(self.axial_vectors)}
+            object.__setattr__(self, "_low", low | {"denominator": _single(denominator)})
 
     def solve(self, rhs: Field) -> Field:
         """Return the field this operator maps to ``rhs``.
@@ -179,32 +289,51 @@ class FastDiagonalPolarPoisson:
             raise ValueError("right-hand side must share the factorized grid")
         if rhs.offset != (CENTER, CENTER, CENTER):
             raise ValueError("the polar factorization solves for a cell-centred field")
-        dtype = rhs.dtype
+
+        def operator(values):
+            return (
+                self.shift * values
+                - self.coefficient * laplacian(rhs.replace_data(values), self.conditions).data
+            )
+
+        volumes = self.grid.cell_volumes() if self.singular else None
+        return rhs.replace_data(_refined(self, self._direct, operator, rhs.data, volumes))
+
+    def _direct(self, data: jnp.ndarray, single: bool = False) -> jnp.ndarray:
+        dtype = data.dtype
+        low = self._low if single else None
+        radial_vectors = jnp.asarray(self.radial_vectors if low is None else low["radial"])
+        axial_vectors = jnp.asarray(self.axial_vectors if low is None else low["axial"])
         volumes = jnp.asarray(self.grid.cell_volumes(), dtype=dtype)
-        data = rhs.data
         if self.singular:
             data = data - jnp.sum(volumes * data) / jnp.sum(volumes)
         data = data * jnp.asarray(self.radial_scale[:, None, None], dtype=dtype)
         data = data * jnp.asarray(self.axial_scale[None, None, :], dtype=dtype)
         transformed = jnp.fft.fft(data, axis=1)
-        transformed = jnp.einsum("mji,jmz->imz", jnp.asarray(self.radial_vectors), transformed)
-        transformed = jnp.tensordot(jnp.asarray(self.axial_vectors).T, transformed, axes=([1], [2]))
+        transformed = jnp.einsum("mji,jmz->imz", radial_vectors, transformed)
+        transformed = jnp.tensordot(axial_vectors.T, transformed, axes=([1], [2]))
         transformed = jnp.moveaxis(transformed, 0, 2)
-        total = jnp.asarray(self.radial_values)[:, :, None] + jnp.asarray(self.axial_values)[None, None, :]
-        denominator = jnp.moveaxis(self.shift - self.coefficient * total, 0, 1)
+        if low is None:
+            total = (
+                jnp.asarray(self.radial_values)[:, :, None] + jnp.asarray(self.axial_values)[None, None, :]
+            )
+            denominator = jnp.moveaxis(self.shift - self.coefficient * total, 0, 1)
+            if self.singular:
+                denominator = denominator.at[0, 0, 0].set(1.0)
+        else:
+            denominator = jnp.asarray(low["denominator"])
         if self.singular:
-            denominator = denominator.at[0, 0, 0].set(1.0)
             transformed = transformed.at[0, 0, 0].set(0.0)
         transformed = transformed / denominator
-        restored = jnp.tensordot(jnp.asarray(self.axial_vectors), transformed, axes=([1], [2]))
+        restored = jnp.tensordot(axial_vectors, transformed, axes=([1], [2]))
         restored = jnp.moveaxis(restored, 0, 2)
-        restored = jnp.einsum("mji,imz->jmz", jnp.asarray(self.radial_vectors), restored)
+        restored = jnp.einsum("mji,imz->jmz", radial_vectors, restored)
         solution = jnp.real(jnp.fft.ifft(restored, axis=1))
         solution = solution / jnp.asarray(self.radial_scale[:, None, None], dtype=dtype)
         solution = solution / jnp.asarray(self.axial_scale[None, None, :], dtype=dtype)
         if self.singular:
             solution = solution - jnp.sum(volumes * solution) / jnp.sum(volumes)
-        return rhs.replace_data(solution)
+        return solution
 
 
 def fast_diagonal_polar_poisson(
@@ -213,12 +342,15 @@ def fast_diagonal_polar_poisson(
     *,
     shift: float = 0.0,
     coefficient: float = -1.0,
+    precision: str = "state",
+    refinements: int = 2,
 ) -> FastDiagonalPolarPoisson:
     """Factorize ``shift*I - coefficient*laplacian``, one eigendecomposition per azimuthal mode.
 
     The default leaves the Laplacian itself. A positive shift with a positive
     coefficient is the damped operator that preconditions a pipe at large
-    Hartmann number.
+    Hartmann number. ``precision="mixed"`` solves float64 right-hand sides in
+    float32 with ``refinements`` float64 corrections (module docstring).
     """
     if not grid.is_polar:
         raise ValueError("this factorization is for a polar grid; use fast_diagonal_poisson")
@@ -268,6 +400,8 @@ def fast_diagonal_polar_poisson(
         singular,
         float(shift),
         float(coefficient),
+        precision,
+        refinements,
     )
 
 
@@ -281,6 +415,16 @@ class FastDiagonalPoisson:
     values: tuple[np.ndarray, np.ndarray, np.ndarray]
     scales: tuple[np.ndarray, np.ndarray, np.ndarray]
     singular: bool
+    precision: str = "state"
+    refinements: int = 2
+    _low: dict | None = field(default=None, init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        _check_precision(self.precision, self.refinements)
+        if self.precision == "mixed":
+            object.__setattr__(
+                self, "_low", _single_bases(self.vectors, self.scales, self._eigenvalue_total())
+            )
 
     def solve(self, rhs: Field) -> Field:
         """Return the field whose Laplacian is ``rhs``."""
@@ -288,24 +432,33 @@ class FastDiagonalPoisson:
             raise ValueError("right-hand side must share the factorized grid")
         if rhs.offset != (CENTER, CENTER, CENTER):
             raise ValueError("right-hand side must be cell centred")
-        dtype = rhs.dtype
+
+        def operator(values):
+            return laplacian(rhs.replace_data(values), self.conditions).data
+
+        volumes = self.grid.cell_volumes() if self.singular else None
+        result = _refined(self, self._direct, operator, rhs.data, volumes)
+        return Field(result, (CENTER, CENTER, CENTER), self.grid)
+
+    def _direct(self, data: jnp.ndarray, single: bool = False) -> jnp.ndarray:
+        dtype = data.dtype
+        low = self._low if single else None
         volumes = jnp.asarray(self.grid.cell_volumes(), dtype=dtype)
-        data = rhs.data
         if self.singular:
             mean = jnp.sum(volumes * data) / jnp.sum(volumes)
             data = data - mean
-        scaled = self._apply_scales(data, dtype, inverse=False)
-        transformed = self._contract(scaled, dtype, transpose=True)
-        denominator = self._eigenvalue_sum(dtype)
+        scaled = _scaled(data, self.scales, low, inverse=False)
+        transformed = _contracted(scaled, self.vectors, low, transpose=True)
+        denominator = self._eigenvalue_sum(dtype) if low is None else jnp.asarray(low["denominator"])
         solution = transformed / denominator
         if self.singular:
             solution = solution.at[0, 0, 0].set(0.0)
-        restored = self._contract(solution, dtype, transpose=False)
-        result = self._apply_scales(restored, dtype, inverse=True)
+        restored = _contracted(solution, self.vectors, low, transpose=False)
+        result = _scaled(restored, self.scales, low, inverse=True)
         if self.singular:
             mean = jnp.sum(volumes * result) / jnp.sum(volumes)
             result = result - mean
-        return Field(result, (CENTER, CENTER, CENTER), self.grid)
+        return result
 
     def residual_norm(self, solution: Field, rhs: Field) -> jnp.ndarray:
         """Return the maximum absolute residual of a candidate solution."""
@@ -316,31 +469,28 @@ class FastDiagonalPoisson:
             difference = difference - jnp.sum(volumes * difference) / jnp.sum(volumes)
         return jnp.max(jnp.abs(difference))
 
-    def _eigenvalue_sum(self, dtype) -> jnp.ndarray:
+    def _eigenvalue_total(self) -> np.ndarray:
         total = self.values[0][:, None, None] + self.values[1][None, :, None] + self.values[2][None, None, :]
         if self.singular:
-            total = total.copy()
             total[0, 0, 0] = 1.0
-        return jnp.asarray(total, dtype=dtype)
+        return total
 
-    def _apply_scales(self, data: jnp.ndarray, dtype, *, inverse: bool) -> jnp.ndarray:
-        for axis, scale in enumerate(self.scales):
-            factor = 1.0 / scale if inverse else scale
-            shape = [-1 if position == axis else 1 for position in range(3)]
-            data = data * jnp.asarray(factor.reshape(shape), dtype=dtype)
-        return data
-
-    def _contract(self, data: jnp.ndarray, dtype, *, transpose: bool) -> jnp.ndarray:
-        for axis, vectors in enumerate(self.vectors):
-            matrix = jnp.asarray(vectors.T if transpose else vectors, dtype=dtype)
-            data = jnp.moveaxis(jnp.tensordot(matrix, data, axes=([1], [axis])), 0, axis)
-        return data
+    def _eigenvalue_sum(self, dtype) -> jnp.ndarray:
+        return jnp.asarray(self._eigenvalue_total(), dtype=dtype)
 
 
 def fast_diagonal_poisson(
-    grid: Grid, conditions: tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition]
+    grid: Grid,
+    conditions: tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition],
+    *,
+    precision: str = "state",
+    refinements: int = 2,
 ) -> FastDiagonalPoisson:
-    """Factorize the separable Laplacian for ``grid`` under ``conditions``."""
+    """Factorize the separable Laplacian for ``grid`` under ``conditions``.
+
+    ``precision="mixed"`` solves float64 right-hand sides in float32 with
+    ``refinements`` float64 corrections (module docstring).
+    """
     if len(conditions) != 3:
         raise ValueError("a factorization needs one boundary condition per axis")
     for axis, condition in enumerate(conditions):
@@ -371,7 +521,14 @@ def fast_diagonal_poisson(
         # Order the constant mode first so a single entry carries the nullspace.
         vectors, values = _promote_null_mode(vectors, values)
     return FastDiagonalPoisson(
-        grid, tuple(conditions), tuple(vectors), tuple(values), tuple(scales), singular
+        grid,
+        tuple(conditions),
+        tuple(vectors),
+        tuple(values),
+        tuple(scales),
+        singular,
+        precision,
+        refinements,
     )
 
 
@@ -419,8 +576,6 @@ def assemble_staggered_axis_operator(
     nothing, and the operator is read out of the production stencil rather than
     written a second time.
     """
-    from .ops import staggered_laplacian
-
     faces = [uniform_faces(1, 0.0, 1.0)] * 3
     faces[axis] = np.asarray(grid.faces[axis])
     line = Grid(*faces)
@@ -461,6 +616,14 @@ class FastDiagonalHelmholtz:
     values: tuple[np.ndarray, np.ndarray, np.ndarray]
     scales: tuple[np.ndarray, np.ndarray, np.ndarray]
     slices: tuple[slice, slice, slice]
+    precision: str = "state"
+    refinements: int = 1
+    _low: dict | None = field(default=None, init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        _check_precision(self.precision, self.refinements)
+        if self.precision == "mixed":
+            object.__setattr__(self, "_low", _single_bases(self.vectors, self.scales, self._denominator()))
 
     def solve(self, rhs: Field) -> Field:
         """Return the field this operator maps to ``rhs``.
@@ -470,28 +633,29 @@ class FastDiagonalHelmholtz:
         """
         if rhs.grid != self.grid or rhs.offset != self.offset:
             raise ValueError("right-hand side must match the factorized position")
-        dtype = rhs.dtype
-        interior = rhs.data[self.slices]
-        scaled = self._scale(interior, dtype, inverse=False)
-        transformed = self._contract(scaled, dtype, transpose=True)
-        total = self.values[0][:, None, None] + self.values[1][None, :, None] + self.values[2][None, None, :]
-        denominator = jnp.asarray(self.shift - self.coefficient * total, dtype=dtype)
-        restored = self._contract(transformed / denominator, dtype, transpose=False)
-        solution = self._scale(restored, dtype, inverse=True)
+
+        def operator(values):
+            embedded = rhs.replace_data(jnp.zeros(rhs.shape, dtype=values.dtype).at[self.slices].set(values))
+            laplacian_ = staggered_laplacian(embedded, self.conditions).data
+            return (self.shift * embedded.data - self.coefficient * laplacian_)[self.slices]
+
+        solution = _refined(self, self._direct, operator, rhs.data[self.slices], None)
         return rhs.replace_data(jnp.zeros_like(rhs.data).at[self.slices].set(solution))
 
-    def _scale(self, data: jnp.ndarray, dtype, *, inverse: bool) -> jnp.ndarray:
-        for axis, scale in enumerate(self.scales):
-            factor = 1.0 / scale if inverse else scale
-            shape = [-1 if position == axis else 1 for position in range(3)]
-            data = data * jnp.asarray(factor.reshape(shape), dtype=dtype)
-        return data
+    def _denominator(self) -> np.ndarray:
+        total = self.values[0][:, None, None] + self.values[1][None, :, None] + self.values[2][None, None, :]
+        return self.shift - self.coefficient * total
 
-    def _contract(self, data: jnp.ndarray, dtype, *, transpose: bool) -> jnp.ndarray:
-        for axis, vectors in enumerate(self.vectors):
-            matrix = jnp.asarray(vectors.T if transpose else vectors, dtype=dtype)
-            data = jnp.moveaxis(jnp.tensordot(matrix, data, axes=([1], [axis])), 0, axis)
-        return data
+    def _direct(self, interior: jnp.ndarray, single: bool = False) -> jnp.ndarray:
+        dtype = interior.dtype
+        low = self._low if single else None
+        scaled = _scaled(interior, self.scales, low, inverse=False)
+        transformed = _contracted(scaled, self.vectors, low, transpose=True)
+        denominator = (
+            jnp.asarray(self._denominator(), dtype=dtype) if low is None else jnp.asarray(low["denominator"])
+        )
+        restored = _contracted(transformed / denominator, self.vectors, low, transpose=False)
+        return _scaled(restored, self.scales, low, inverse=True)
 
 
 def fast_diagonal_helmholtz(
@@ -501,8 +665,14 @@ def fast_diagonal_helmholtz(
     *,
     shift: float = 1.0,
     coefficient: float = 1.0,
+    precision: str = "state",
+    refinements: int = 1,
 ) -> FastDiagonalHelmholtz:
-    """Factorize ``shift * I - coefficient * laplacian`` at one staggered position."""
+    """Factorize ``shift * I - coefficient * laplacian`` at one staggered position.
+
+    ``precision="mixed"`` solves float64 right-hand sides in float32 with
+    ``refinements`` float64 corrections (module docstring).
+    """
     if len(conditions) != 3:
         raise ValueError("a factorization needs one boundary condition per axis")
     for axis, condition in enumerate(conditions):
@@ -539,6 +709,8 @@ def fast_diagonal_helmholtz(
         tuple(values),
         tuple(scales),
         tuple(slices),
+        precision,
+        refinements,
     )
 
 

@@ -185,6 +185,39 @@ def test_the_budget_is_the_rate_of_change_of_kinetic_energy():
     assert errors[1] < 0.6 * errors[0], errors
 
 
+def test_a_mixed_precision_trajectory_follows_the_float64_one(true_float32_matmuls):
+    """Float32 solves with float64 corrections, twenty implicit steps on a layer-resolving duct."""
+    from lmx.grid import wall_resolving_faces
+
+    hartmann = 20.0
+    transverse, spanwise = (
+        wall_resolving_faces(24, -1.0, 1.0, layer_thickness=thickness, cells_in_layer=6, max_ratio=None)
+        for thickness in (1.0 / hartmann, 1.0 / np.sqrt(hartmann))
+    )
+    grid = Grid(uniform_faces(4, 0.0, 1.0), transverse, spanwise)
+    runs = {}
+    for precision in ("state", "mixed"):
+        problem = _uniform_duct(hartmann=hartmann, grid=grid, precision=precision)
+        runs[precision] = advance(
+            problem, 20, factorization=problem.factorization(), viscous=problem.viscous_factorizations()
+        )
+    reference, mixed = runs["state"], runs["mixed"]
+    scale = max(float(jnp.max(jnp.abs(field.data))) for field in reference.velocity)
+    difference = max(
+        float(jnp.max(jnp.abs(first.data - second.data)))
+        for first, second in zip(mixed.velocity, reference.velocity, strict=True)
+    )
+    assert difference < 1e-9 * scale
+    potential = reference.potential.data
+    assert float(jnp.max(jnp.abs(mixed.potential.data - potential))) < 1e-9 * float(
+        jnp.max(jnp.abs(potential))
+    )
+    # An axially uniform drive leaves no divergence to project: both pressures are round-off.
+    assert float(jnp.max(jnp.abs(mixed.pressure.data - reference.pressure.data))) < 1e-12
+    with pytest.raises(ValueError, match="precision must be"):
+        _uniform_duct(precision="half")
+
+
 def test_a_run_can_be_taken_in_chunks():
     """Restart is the same physics: the state is the whole of it."""
     problem = _problem()

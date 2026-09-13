@@ -139,6 +139,7 @@ class ChannelProblem:
     dt: float = 1.0e-3
     advection: str = "off"
     wall_conductance: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    precision: str = "state"
 
     def __post_init__(self) -> None:
         if len(self.conditions) != 3:
@@ -154,6 +155,8 @@ class ChannelProblem:
             raise ValueError("a channel needs one wall conductance per axis")
         if any(float(value) < 0.0 for value in self.wall_conductance):
             raise ValueError("wall conductance must not be negative")
+        if self.precision not in ("state", "mixed"):
+            raise ValueError(f"precision must be 'state' or 'mixed', got {self.precision!r}")
         # True float32 contractions unless the user chose a precision; see lmx.enable_x64.
         _pin_matmul_precision()
 
@@ -199,7 +202,8 @@ class ChannelProblem:
 
         Build these once on the host and pass them to :func:`step` to take
         diffusion implicitly. The shift carries the magnetic damping, so one
-        solve removes both stiff terms.
+        solve removes both stiff terms. :attr:`precision` selects the float32
+        solve with float64 correction of :mod:`lmx.poisson` for float64 states.
         """
         conditions = tuple(velocity_condition(self.conditions, axis) for axis in range(3))
         return tuple(
@@ -209,6 +213,7 @@ class ChannelProblem:
                 conditions,
                 shift=1.0 + float(self.dt) * self.damping_rates[component],
                 coefficient=float(self.dt) * float(self.viscosity),
+                precision=self.precision,
             )
             for component in range(3)
         )
@@ -219,8 +224,10 @@ class ChannelProblem:
         Both see the same homogeneous conditions, so one factorization serves
         both. Build it once outside a traced function and pass it to
         :func:`step`; the assembly reads concrete arrays and cannot be traced.
+        ``precision="mixed"`` solves float64 states in float32 with a float64
+        correction; float32 states are solved in float32 either way.
         """
-        return fast_diagonal_poisson(self.grid, self.scalar_conditions)
+        return fast_diagonal_poisson(self.grid, self.scalar_conditions, precision=self.precision)
 
 
 def face_currents(

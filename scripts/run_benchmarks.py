@@ -145,8 +145,12 @@ def _timed(jax, call, repeats: int) -> tuple[float, float, object]:
     return compile_seconds, warm, result
 
 
-def _core3d_case(jax, cells: int, steps: int, repeats: int) -> dict:
-    """One compiled trajectory of the staggered core on a cubic duct."""
+def _core3d_case(jax, cells: int, steps: int, repeats: int, precision: str = "state") -> dict:
+    """One compiled trajectory of the staggered core on a cubic duct.
+
+    ``precision="mixed"`` runs the fast-diagonal solves in float32 with float64
+    correction (:mod:`lmx.poisson`); the environment block records the matmul precision it needs.
+    """
     import jax.numpy as jnp
     import numpy as np
 
@@ -169,6 +173,7 @@ def _core3d_case(jax, cells: int, steps: int, repeats: int) -> dict:
         magnetic_field=(0.0, 20.0, 0.0),
         forcing=(1.0, 0.0, 0.0),
         dt=2.0e-3,
+        precision=precision,
     )
     factorization = problem.factorization()
     viscous = problem.viscous_factorizations()
@@ -193,6 +198,7 @@ def _core3d_case(jax, cells: int, steps: int, repeats: int) -> dict:
         "cells": cells**3,
         "shape": [cells, cells, cells],
         "steps": steps,
+        "precision": precision,
         "compile_seconds": compile_seconds,
         "warm_seconds": warm,
         "seconds_per_step": warm / steps,
@@ -350,6 +356,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--steps", type=int, default=20, help="Steps per timed trajectory.")
     parser.add_argument("--repeats", type=int, default=3, help="Timed repetitions after the first call.")
     parser.add_argument("--x64", default="1", choices=("0", "1"), help="Run in float64 (1) or float32 (0).")
+    parser.add_argument(
+        "--precision",
+        default="state",
+        choices=("state", "mixed"),
+        help="core3d solves in the state dtype, or float32 with float64 correction (mixed).",
+    )
     parser.add_argument("--output", default="", help="Where to write the JSON report.")
     arguments = parser.parse_args(argv)
 
@@ -389,7 +401,8 @@ def main(argv: list[str] | None = None) -> int:
         plan += [(_shard_case, size) for size in q2d_sizes]
     for builder, size in plan:
         try:
-            entry = builder(jax, size, arguments.steps, arguments.repeats)
+            options = {"precision": arguments.precision} if builder is _core3d_case else {}
+            entry = builder(jax, size, arguments.steps, arguments.repeats, **options)
         except Exception as error:  # a size that does not fit is a result, not a crash
             entry = {"case": builder.__name__, "shape": [size], "accepted": False, "error": str(error)[:200]}
         report["cases"].append(entry)
