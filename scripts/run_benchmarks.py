@@ -14,6 +14,19 @@ per step also gives constant time per step. Use traces to locate synchronization
 ``accepted`` is a correctness flag, not a timing one: a case that produced a
 non-finite field or drifted off its divergence-free constraint is reported and
 its timings are not to be quoted.
+
+Every report also records what a timing needs before it can be quoted:
+
+- JAX's ``jax_default_matmul_precision``;
+- the ``NVIDIA_TF32_OVERRIDE`` and ``XLA_FLAGS`` environment values;
+- the GPU driver and CUDA versions when a GPU is present;
+- the host load average.
+
+Left unset, the matmul precision lets Ampere GPUs run float32 contractions in
+TensorFloat-32. On an RTX A4000 those were 3e-4 from float64, against 2.6-6.1e-7
+at true float32. LMX pins ``'highest'`` unless the precision is already set, and
+this script refuses to write a float32 GPU report at any level that allows
+TensorFloat-32 (ADR 0005, D15).
 """
 
 from __future__ import annotations
@@ -22,12 +35,18 @@ import argparse
 import json
 import os
 import platform
+import re
 import socket
 import subprocess
 import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+# Levels at which JAX computes float32 dense contractions in float32 itself.
+# Unset, ``'default'``, ``'high'`` and ``'tensorfloat32'`` allow TensorFloat-32;
+# the bfloat16 and float8 presets are coarser still.
+TRUE_FLOAT32_MATMUL = frozenset({"highest", "float32", "F32_F32_F32", "F64_F64_F64"})
 
 
 def _commit() -> str:
@@ -51,8 +70,31 @@ def _commit() -> str:
     return result.stdout.strip() + ("-dirty" if dirty.stdout.strip() else "")
 
 
+def _gpu_versions() -> dict:
+    """Return the NVIDIA driver version and the CUDA version it reports, or nulls."""
+    versions = {"gpu_driver": None, "cuda_version": None}
+    try:
+        result = subprocess.run(["nvidia-smi"], capture_output=True, text=True, check=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return versions
+    for key, label in (("gpu_driver", "Driver Version"), ("cuda_version", "CUDA Version")):
+        match = re.search(rf"{label}:\s*([0-9.]+)", result.stdout)
+        if match:
+            versions[key] = match.group(1)
+    return versions
+
+
+def _load_average() -> list[float] | None:
+    """Return the 1, 5 and 15 minute load averages; a shared host times differently under load."""
+    try:
+        return [float(value) for value in os.getloadavg()]
+    except (AttributeError, OSError):
+        return None
+
+
 def _environment(jax) -> dict:
     devices = jax.devices()
+    on_gpu = devices[0].platform == "gpu"
     return {
         "host": socket.gethostname(),
         "platform": devices[0].platform,
@@ -62,8 +104,32 @@ def _environment(jax) -> dict:
         "python": platform.python_version(),
         "jax": jax.__version__,
         "x64": bool(jax.config.jax_enable_x64),
+        "jax_default_matmul_precision": jax.config.jax_default_matmul_precision,
+        "nvidia_tf32_override": os.environ.get("NVIDIA_TF32_OVERRIDE"),
+        "xla_flags": os.environ.get("XLA_FLAGS"),
+        **(_gpu_versions() if on_gpu else {"gpu_driver": None, "cuda_version": None}),
+        "load_average": _load_average(),
         "lmx_commit": _commit(),
     }
+
+
+def _unquotable_float32(environment: dict) -> str | None:
+    """Say why a report must not be written, or return None when it may.
+
+    Only float32 on a GPU is at stake: the matmul precision changes nothing on a
+    CPU or for float64 arrays.
+    """
+    if environment.get("platform") != "gpu" or environment.get("x64") is True:
+        return None
+    if "jax_default_matmul_precision" not in environment:
+        return "a float32 GPU report must record jax_default_matmul_precision"
+    precision = environment["jax_default_matmul_precision"]
+    if precision not in TRUE_FLOAT32_MATMUL:
+        return (
+            f"jax_default_matmul_precision={precision!r} allows TensorFloat-32, so these float32 GPU "
+            "timings are not float32; unset JAX_DEFAULT_MATMUL_PRECISION or set it to 'highest'"
+        )
+    return None
 
 
 def _timed(jax, call, repeats: int) -> tuple[float, float, object]:
@@ -302,8 +368,16 @@ def main(argv: list[str] | None = None) -> int:
 
     import jax
 
+    from lmx import _pin_matmul_precision
+
     jax.config.update("jax_enable_x64", arguments.x64 == "1")
-    report = {"environment": _environment(jax), "cases": []}
+    # Pin before reading the environment, so the report records the precision the cases run at.
+    _pin_matmul_precision()
+    environment = _environment(jax)
+    refusal = _unquotable_float32(environment) if arguments.output else None
+    if refusal:
+        parser.exit(2, f"{parser.prog}: error: {refusal}; no report written\n")
+    report = {"environment": environment, "cases": []}
     plan = []
     if "core3d" in requested:
         plan += [(_core3d_case, size) for size in core_sizes]

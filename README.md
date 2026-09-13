@@ -16,13 +16,13 @@ Reusable solvers and implicit derivatives come from
 
 - **Resolve the layers:** meshes chosen from `a/Ha` and `a/√Ha`, not from a cell count.
 - **Skip the transient:** the steady state as a differentiable root, not a march.
-- **Differentiate anything continuous:** drive, field strength, wall conductance, geometry.
+- **Differentiate the continuous inputs:** drive and field strength on the duct solves; wall conductance and geometry on the extruded fringing route.
 - **Check against something else:** an independent spectral solve that shares no code.
 - **Run where you like:** CPU or GPU, one compiled trajectory per run.
 
 ![Quasi-2D MHD turbulence](docs/_static/q2d_turbulence_256.webp)
 
-*Decaying quasi-2D MHD turbulence with Hartmann-layer friction — 256², 3,000 steps, 20 s on a laptop CPU.*
+*Decaying quasi-2D MHD turbulence with Hartmann-layer friction — 256², 3,000 steps, about 20 s on a laptop CPU with `python scripts/make_showcase_figures.py --only q2d`.*
 
 ## Install
 
@@ -126,7 +126,10 @@ print(jax.grad(throughput, argnums=(0, 1))(1.0, 1.0))
 - One adjoint solve at the root, through the implicit function theorem — not a
   tape of the iteration.
 - Agrees with central differences to **7e-12** in the drive and **1.2e-10** in
-  the field scale.
+  the field scale on the Ha ≤ 5 test ducts, where the test gate is 1e-6.
+- `solve_steady_state` and `solve_fully_developed_fields` differentiate the drive
+  and the field scale. Wall conductance and geometry are differentiable on the
+  extruded fringing route of `lmx.fringing`, which the demo command above optimizes.
 - A solve that stops short raises, rather than returning a plausible field and a
   gradient taken away from a root.
 
@@ -138,9 +141,12 @@ print(jax.grad(throughput, argnums=(0, 1))(1.0, 1.0))
 python examples/q2d_turbulence_demo.py
 ```
 
-- Vortex merging under Hartmann friction, with a `k^{−3}` enstrophy range.
+- Vortex merging under Hartmann friction. The spectrum panel draws `k^{−3}` as a
+  guide line, not a fitted slope.
 - Energy and enstrophy budget identities checked on every run.
-- 256² for 3,000 steps in about 20 s on a laptop CPU.
+- The figures above come from `python scripts/make_showcase_figures.py --only q2d`:
+  256² for 3,000 steps in about 20 s on a laptop CPU. The demo command runs 64²
+  for 160 steps.
 
 ## Performance
 
@@ -209,8 +215,11 @@ parameters and evidence status are in [`examples/catalog.toml`](examples/catalog
 - **Validated:** Hartmann, Shercliff and Hunt ducts against an independent
   spectral solve and against analytical profiles; the pipe against a second,
   independent spectral solve over Ha 0 to 100; implicit adjoints against finite differences;
-  the mechanical power balance to 1e-13; Q2D decay identities.
-- **Research stage:** three-dimensional ducts carry no convective transport, the
+  the steady mechanical power balance within a 1e-10 relative test gate (measured
+  3.6e-14 insulating, 6.3e-14 at wall conductance 0.027); Q2D decay identities.
+- **Research stage:** three-dimensional convective transport (`advection="central"`
+  or `"limited"`, from `lmx.advect`) is tested for conservation, order and
+  boundedness but not validated against a reference flow, the
   ALEX B1/B2 fringing benchmarks have production acceptance open, and
   multi-device execution is not yet established. The
   [validation matrix](https://lmx.readthedocs.io/en/latest/validation/index.html)

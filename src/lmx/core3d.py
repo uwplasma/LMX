@@ -70,6 +70,7 @@ import jax.numpy as jnp
 import numpy as np
 import solvax
 
+from . import _pin_matmul_precision
 from .advect import momentum_advection
 from .bc import DIRICHLET, PERIODIC, BoundaryCondition
 from .em import (
@@ -153,6 +154,8 @@ class ChannelProblem:
             raise ValueError("a channel needs one wall conductance per axis")
         if any(float(value) < 0.0 for value in self.wall_conductance):
             raise ValueError("wall conductance must not be negative")
+        # True float32 contractions unless the user chose a precision; see lmx.enable_x64.
+        _pin_matmul_precision()
 
     @property
     def conducting_walls(self) -> bool:

@@ -186,6 +186,10 @@ class CaseSpec:
             from . import enable_x64
 
             enable_x64()
+        # The case dtype is where LMX sets precision, float32 included; see lmx.enable_x64.
+        from . import _pin_matmul_precision
+
+        _pin_matmul_precision()
 
     @property
     def output_dir(self) -> Path | None:

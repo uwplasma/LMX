@@ -48,10 +48,37 @@ __all__ = [
 
 
 def enable_x64() -> None:
-    """Enable float64 arrays process-wide; call before constructing meshes or tracing."""
+    """Enable float64 arrays process-wide; call before constructing meshes or tracing.
+
+    This also sets JAX's ``jax_default_matmul_precision`` to ``'highest'`` when
+    that option is unset. ``'highest'`` is the same level as ``'float32'``.
+    Unset, JAX lets Ampere and newer GPUs run float32 matrix products and
+    convolutions in TensorFloat-32. On an RTX A4000, float32 contractions then
+    differed from float64 by 3e-4 relative. With the pinned precision the
+    difference was 2.6-6.1e-7. CPUs and float64 arrays are unaffected.
+
+    A value the user already chose is kept, whether set through
+    ``jax.config.update`` or the ``JAX_DEFAULT_MATMUL_PRECISION`` environment
+    variable. Constructing a case with a ``dtype``, a ``ChannelProblem`` or a
+    ``Q2DProblem`` applies the same rule.
+    """
     from jax import config
 
     config.update("jax_enable_x64", True)
+    _pin_matmul_precision()
+
+
+def _pin_matmul_precision() -> str:
+    """Set ``jax_default_matmul_precision`` to ``'highest'`` if unset; return the value in effect.
+
+    The option is part of JAX's compilation key, so functions traced before the
+    pin are traced again afterwards rather than silently keeping TensorFloat-32.
+    """
+    from jax import config
+
+    if config.jax_default_matmul_precision is None:
+        config.update("jax_default_matmul_precision", "highest")
+    return config.jax_default_matmul_precision
 
 
 _EXPORTS = {

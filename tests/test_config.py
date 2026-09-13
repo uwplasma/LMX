@@ -118,8 +118,10 @@ from dataclasses import replace
 from lmx import cases, mesh, physics, fringing, q2d
 initial = jax.config.x64_enabled
 assert initial == EXPECTED
+assert jax.config.jax_default_matmul_precision is None
 case32 = lmx.make_hartmann_case(ha=2, ny=8, nz=8, dtype="float32")
 assert jax.config.x64_enabled == initial
+assert jax.config.jax_default_matmul_precision == "highest"
 values = []
 for dtype in ("float32", "float64"):
     with warnings.catch_warnings(record=True) as recorded:
@@ -151,7 +153,10 @@ assert jnp.asarray(1.).dtype == jnp.float64
         [sys.executable, "-c", code],
         check=True,
         timeout=90,
-        env={**os.environ, "JAX_ENABLE_X64": x64},
+        env={
+            **{key: value for key, value in os.environ.items() if key != "JAX_DEFAULT_MATMUL_PRECISION"},
+            "JAX_ENABLE_X64": x64,
+        },
     )
 
 
@@ -608,6 +613,41 @@ def test_wall_conductivity_rejects_nonpositive_geometry(
             wall_thickness=wall_thickness,
             hartmann_half_spacing=hartmann_half_spacing,
         )
+
+
+def test_precision_setup_pins_true_float32_contractions_and_keeps_a_user_choice():
+    """Unset, JAX allows TensorFloat-32 contractions on Ampere GPUs (3e-4 from float64 on an A4000)."""
+    import jax
+    import jax.numpy as jnp
+
+    setups = {
+        "enable_x64": lmx.enable_x64,
+        "case dtype": lambda: lmx.make_hartmann_case(ha=2, ny=8, nz=8, dtype="float32"),
+        "ChannelProblem": lambda: lmx.duct_problem(hartmann=20.0, cells=24),
+        "Q2DProblem": lambda: lmx.Q2DProblem(jnp.zeros((8, 8), dtype=jnp.float32)),
+    }
+    initial = jax.config.jax_default_matmul_precision
+    try:
+        for name, setup in setups.items():
+            jax.config.update("jax_default_matmul_precision", None)
+            setup()
+            assert jax.config.jax_default_matmul_precision == "highest", name
+            jax.config.update("jax_default_matmul_precision", "tensorfloat32")
+            setup()
+            assert jax.config.jax_default_matmul_precision == "tensorfloat32", name
+
+        jax.config.update("jax_default_matmul_precision", None)
+        lmx.enable_x64()
+        left, right = jax.random.uniform(jax.random.PRNGKey(0), (2, 32, 32, 32), dtype=jnp.float64)
+
+        def contract(a, b):
+            return jnp.einsum("ijk,klm->ijlm", a, b)
+
+        exact = contract(left, right)
+        single = contract(left.astype(jnp.float32), right.astype(jnp.float32))
+        assert float(jnp.max(jnp.abs(single - exact) / exact)) <= 1.0e-6
+    finally:
+        jax.config.update("jax_default_matmul_precision", initial)
 
 
 EXPECTED_ROOT_API = {
