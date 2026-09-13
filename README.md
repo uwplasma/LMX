@@ -48,7 +48,9 @@ solution = lmx.solve(problem)
 `duct_problem` picks both transverse meshes from the layers the Hartmann number
 implies — `a/Ha` against the walls normal to the field, `a/√Ha` against the
 others — so the answer is converged rather than merely computed. `solve` finds
-the steady state by matrix-free Newton–Krylov.
+the steady state by preconditioned conjugate gradients, or by matrix-free
+Newton–Krylov when advection or a conducting wall makes the problem
+nonsymmetric; neither stores more than a restart cycle of vectors.
 
 ## Duct flows against an independent reference
 

@@ -170,8 +170,9 @@ def validation_ladder(
 ) -> None:
     """Rows 2-4 of the validation ladder, solved by the staggered core.
 
-    Every curve here is the steady Newton-Krylov solve of `lmx.steady` on a
-    wall-resolving mesh, and every reference is `validation.shercliff`, which
+    Every curve here is the steady solve of `lmx.steady` on a wall-resolving
+    mesh (conjugate gradients for insulating walls, Newton-Krylov for the
+    conducting ones), and every reference is `validation.shercliff`, which
     shares no operator, mesh or solver with the package. The point of the middle
     panel is that the error does not grow with the field: the Hartmann layer is
     resolved rather than tolerated.
