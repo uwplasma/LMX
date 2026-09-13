@@ -130,7 +130,7 @@ def test_advance_validates_its_length():
 
 
 def _uniform_duct(cells: int = 12, hartmann: float = 10.0, conductance: float = 0.0, **overrides):
-    """A duct on a uniform mesh, where the interpolations carry no stretching error."""
+    """A duct on a uniform mesh."""
     grid = Grid(uniform_faces(1, 0.0, 1.0), uniform_faces(cells, -1.0, 1.0), uniform_faces(cells, -1.0, 1.0))
     settings = dict(
         grid=grid,
@@ -153,6 +153,54 @@ def test_the_lorentz_force_does_exactly_minus_the_joule_dissipation():
     assert float(jnp.abs(budget.ohmic_defect / budget.scale)) < 1e-12
     assert float(budget.joule) > 0.0
     assert float(budget.lorentz) < 0.0
+
+
+@pytest.mark.parametrize(("hartmann", "cells"), [(20.0, 24), (100.0, 32)])
+def test_the_ohmic_identity_is_exact_on_a_layer_mesh(hartmann, cells):
+    """Stretched cells too: the force interpolation is the transpose of the electromotive one.
+
+    Discretely, Lorentz work plus Joule dissipation is ``<div J, phi>``, which the
+    potential solve makes zero to its own round-off. With the distance-weighted
+    interpolation the two sides differed by 1e-4 to 3e-3 on these meshes. The
+    defect is measured against the Joule dissipation itself, not the largest term
+    of the budget, so a small current cannot hide it.
+
+    A random divergence-free velocity carries currents as large as its
+    electromotive force, and the identity closes with nothing subtracted. In a
+    developed state the current is a small difference between the motional and
+    the potential terms, so the round-off of the potential solve is amplified by
+    the Hartmann number (1e-10 of the Joule term here); the charge term is then
+    subtracted, which leaves the interpolations alone under test.
+    """
+    import dataclasses
+
+    from lmx.core3d import duct_problem, face_currents, project, velocity_offset
+    from lmx.grid import Field
+    from lmx.ops import cell_inner_product
+
+    problem = dataclasses.replace(duct_problem(hartmann=hartmann, cells=cells), dt=1.0e-2)
+    marched = advance(problem, 10, viscous=problem.viscous_factorizations()).velocity
+    keys = jax.random.split(jax.random.PRNGKey(4), 3)
+    random = project(
+        tuple(
+            Field(
+                jax.random.normal(
+                    keys[axis], problem.grid.offset_shape(velocity_offset(axis)), dtype=jnp.float64
+                ),
+                velocity_offset(axis),
+                problem.grid,
+            )
+            for axis in range(3)
+        ),
+        problem,
+    )[0]
+    for state in (marched, random):
+        budget = energy_budget(state, problem)
+        potential, currents, _ = face_currents(state, problem)
+        charge = cell_inner_product(divergence(currents), potential)
+        assert float(budget.joule) > 0.0
+        assert float(jnp.abs((budget.ohmic_defect - charge) / budget.joule)) < 1e-12
+    assert float(jnp.abs(budget.ohmic_defect / budget.joule)) < 1e-12
 
 
 def test_a_conducting_wall_takes_power_out_through_the_boundary():

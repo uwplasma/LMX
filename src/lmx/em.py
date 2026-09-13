@@ -27,8 +27,19 @@ half-cells and therefore the right average across a fluid-wall jump; the
 arithmetic mean would overstate the current entering a poorly conducting wall.
 
 Velocities live on their own faces, so a transverse component is averaged to the
-cell centre and then interpolated to the face where the electromotive force is
-needed. Both steps are second order on a stretched mesh.
+cell centre and then carried to the face where the electromotive force is
+needed. The Lorentz force travels the same path backwards: each face current is
+averaged to the cell centre, and the force is carried from there to the velocity
+faces. Both paths use :func:`lmx.ops.face_average` and its transpose
+:func:`lmx.ops.face_average_adjoint`, so the force map is exactly minus the
+adjoint of the electromotive map in the volume-weighted inner products. That is
+the discrete form of :math:`\\int \\mathbf u\\cdot(\\mathbf J\\times\\mathbf B)
+= -\\int \\mathbf J\\cdot(\\mathbf u\\times\\mathbf B)`: the Lorentz force does
+exactly minus the Joule dissipation, and the steady Stokes operator is symmetric,
+on a stretched mesh as on a uniform one. The distance-weighted interpolation
+would be exact for a linear field on a stretched mesh, but its transpose is not
+an average there, and a force built from it does work the currents never
+dissipated.
 """
 
 from __future__ import annotations
@@ -38,7 +49,14 @@ import numpy as np
 
 from .bc import NEUMANN, BoundaryCondition, pad
 from .grid import CENTER, FACE, Field
-from .ops import axis_divergence, divergence, face_gradient, face_interpolate
+from .ops import (
+    axis_divergence,
+    divergence,
+    face_average,
+    face_average_adjoint,
+    face_gradient,
+    face_interpolate,
+)
 
 __all__ = [
     "cell_average",
@@ -103,15 +121,21 @@ def face_electromotive_force(
 
     ``velocity`` holds the three face-normal components in the marker-and-cell
     layout and ``magnetic_field`` the three cell-centred components. Both
-    transverse velocity components are averaged to cell centres and interpolated
-    to the target face, so the electromotive force is evaluated where the current
-    flux needs it.
+    transverse velocity components are averaged to cell centres with
+    :func:`lmx.ops.face_average_adjoint` and carried to the target face with
+    :func:`lmx.ops.face_average`, the transpose of the path
+    :func:`lorentz_force` and the momentum update take back, so the
+    electromotive force is evaluated where the current flux needs it.
     """
     grid = velocity[0].grid
     index = grid.axis_index(axis)
     _, first, second = _CYCLIC[index]
-    velocity_first = face_interpolate(cell_average(velocity[first], first), index, conditions[index])
-    velocity_second = face_interpolate(cell_average(velocity[second], second), index, conditions[index])
+    velocity_first = face_average(
+        face_average_adjoint(velocity[first], first, conditions[first]), index, conditions[index]
+    )
+    velocity_second = face_average(
+        face_average_adjoint(velocity[second], second, conditions[second]), index, conditions[index]
+    )
     field_first = face_interpolate(magnetic_field[first], index, conditions[index])
     field_second = face_interpolate(magnetic_field[second], index, conditions[index])
     emf = velocity_first.data * field_second.data - velocity_second.data * field_first.data
@@ -228,37 +252,27 @@ def lorentz_force(
          \\times\\mathbf B_f,
 
     which never forms a cell-centred current vector and evaluates the magnetic
-    field on the faces, so it stays correct where the field varies.
+    field on the faces, so it stays correct where the field varies. The
+    face-to-centre arm is half a cell, so the sum over the two faces of one axis
+    is :func:`lmx.ops.face_average_adjoint` of the current times the face field:
+    the transpose of the interpolation :func:`face_electromotive_force` uses.
     """
     grid = currents[0].grid
-    volumes = grid.cell_volumes()
     components = [jnp.zeros(grid.shape, dtype=currents[0].dtype) for _ in range(3)]
     for index, current in enumerate(currents):
         _, first, second = _CYCLIC[index]
-        area = np.asarray(grid.face_areas(index))
-        widths = np.asarray(grid.widths[index])
-        # The face-to-centre arm is half a cell along the face normal, negative on
-        # the lower face and positive on the upper one.
-        arm = 0.5 * widths
         field_first = face_interpolate(magnetic_field[first], index, conditions[index])
         field_second = face_interpolate(magnetic_field[second], index, conditions[index])
-        weighted = jnp.asarray(area, dtype=current.dtype) * current.data
-        lower = (slice(None),) * index + (slice(None, -1),)
-        upper = (slice(None),) * index + (slice(1, None),)
-        arm_shaped = _broadcast(arm, index, current.dtype)
         # With the current stored along the positive axis, the outward flux and the
         # face-to-centre arm change sign together on the lower face, so the two
         # faces add rather than cancel. The cross product e_k x B contributes
         # +B_first to the second transverse component and -B_second to the first.
         for target, source, sign in ((second, field_first, 1.0), (first, field_second, -1.0)):
-            contribution = (
-                sign
-                * arm_shaped
-                * (weighted[lower] * source.data[lower] + weighted[upper] * source.data[upper])
+            averaged = face_average_adjoint(
+                current.replace_data(current.data * source.data), index, conditions[index]
             )
-            components[target] = components[target] + contribution
-    volume_array = jnp.asarray(volumes, dtype=currents[0].dtype)
-    return tuple(Field(component / volume_array, (CENTER, CENTER, CENTER), grid) for component in components)
+            components[target] = components[target] + sign * averaged.data
+    return tuple(Field(component, (CENTER, CENTER, CENTER), grid) for component in components)
 
 
 def _broadcast(values: np.ndarray, axis: int, dtype) -> jnp.ndarray:
