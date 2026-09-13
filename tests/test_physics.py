@@ -738,6 +738,127 @@ def test_q2d_divergence_diagnostic_uses_reported_final_velocity(dtype, stride):
     )
 
 
+def _complex_transform_q2d(problem):
+    """NumPy IFRK4 on full-plane complex transforms, the layout the real-transform state replaced."""
+    omega, forcing = np.asarray(problem.initial_vorticity), np.asarray(problem.forcing)
+    nu, gamma, dt = problem.viscosity, problem.hartmann_friction, problem.dt
+    spacing = [side / size for side, size in zip(problem.length, omega.shape, strict=True)]
+    kx, ky = (2 * np.pi * np.fft.fftfreq(n, d=h) for n, h in zip(omega.shape, spacing, strict=True))
+    kx, ky = kx[:, None], ky[None, :]
+    k2 = kx**2 + ky**2
+    kept = [np.abs(np.fft.fftfreq(n) * n) <= n / 3 for n in omega.shape]
+    mask = kept[0][:, None] & kept[1][None, :]
+    decay = np.exp(-dt * (nu * k2 + gamma))
+    half = np.sqrt(decay)
+
+    def physical(field_hat):
+        return np.fft.ifftn(field_hat).real
+
+    def spectral(field):
+        field_hat = np.fft.fftn(field) * mask
+        field_hat[0, 0] = 0.0
+        return field_hat
+
+    def flow(w):
+        psi = np.divide(w, k2, out=np.zeros_like(w), where=k2 > 0)
+        return psi, physical(1j * ky * psi), physical(-1j * kx * psi)
+
+    forcing_hat = spectral(forcing)
+
+    def rate(w):
+        _, ux, uy = flow(w)
+        return (forcing_hat - np.fft.fftn(ux * physical(1j * kx * w) + uy * physical(1j * ky * w))) * mask
+
+    def measures(w):
+        psi, ux, uy = flow(w)
+        energy, enstrophy = 0.5 * np.mean(ux**2 + uy**2), 0.5 * np.mean(physical(w) ** 2)
+        courant = dt * np.max(np.abs(ux) / spacing[0] + np.abs(uy) / spacing[1])
+        return (
+            energy,
+            enstrophy,
+            courant,
+            -2 * (nu * enstrophy + gamma * energy) + np.mean(physical(psi) * forcing),
+        )
+
+    w = spectral(omega)
+    before = initial = measures(w)
+    budget, courant, frames = 0.0, initial[2], [physical(w)]
+    for step in range(1, problem.steps + 1):
+        first = rate(w)
+        second = rate(half * (w + 0.5 * dt * first))
+        third = rate(half * w + 0.5 * dt * second)
+        fourth = rate(decay * w + dt * half * third)
+        w = (decay * w + dt / 6 * (decay * first + 2 * half * (second + third) + fourth)) * mask
+        w[0, 0] = 0.0
+        after = measures(w)
+        budget += 0.5 * dt * (before[3] + after[3])
+        before, courant = after, max(courant, after[2])
+        if problem.history_stride and (step % problem.history_stride == 0 or step == problem.steps):
+            frames.append(physical(w))
+    _, ux, uy = flow(w)
+    residual = abs(before[0] - initial[0] - budget) / max(initial[0], abs(budget))
+    divergence = np.max(np.abs(physical(1j * kx * np.fft.fftn(ux) + 1j * ky * np.fft.fftn(uy))))
+    return (
+        physical(w),
+        ux,
+        uy,
+        np.stack(frames),
+        (initial[0], before[0], before[1], residual, divergence, courant),
+    )
+
+
+@pytest.mark.physics
+@pytest.mark.parametrize(
+    "shape,length,viscosity,friction,dt,steps,stride,forced",
+    [
+        ((16, 16), (3.0, 5.0), 1e-2, 0.1, 1e-3, 5, 2, False),
+        ((15, 20), (2.0, 3.0), 1e-2, 0.1, 5e-4, 6, 4, True),
+        ((9, 9), (2 * np.pi, 2 * np.pi), 3e-3, 4e-2, 5e-3, 4, 0, False),
+        ((64, 64), (2 * np.pi, 2 * np.pi), 0.0, 0.8, 4e-3, 100, 25, True),
+    ],
+)
+def test_q2d_real_transforms_match_the_complex_transform_reference(
+    shape, length, viscosity, friction, dt, steps, stride, forced
+):
+    # Odd and even axes, both Nyquist lines, unresolved initial spectra and a nonlinear 100-step run.
+    rng = np.random.default_rng(sum(shape) + steps)
+    forcing = jnp.asarray(0.5 * rng.normal(size=shape)) if forced else None
+    parameters = dict(length=length, viscosity=viscosity, hartmann_friction=friction, dt=dt, steps=steps)
+    problem = Q2DProblem(
+        jnp.asarray(rng.normal(size=shape)), forcing=forcing, history_stride=stride, **parameters
+    )
+    result = solve_q2d(problem)
+    evolved = lmx.evolve_q2d(problem.initial_vorticity, forcing=problem.forcing, **parameters)
+    vorticity, ux, uy, frames, expected = _complex_transform_q2d(problem)
+
+    assert result.vorticity.dtype == jnp.float64
+    references = (vorticity, ux, uy)
+    for actual, reference in zip(
+        (result.vorticity, result.velocity_x, result.velocity_y, *evolved), 2 * references
+    ):
+        np.testing.assert_allclose(actual, reference, rtol=0, atol=1e-12 * np.max(np.abs(reference)))
+    if stride:
+        np.testing.assert_allclose(
+            result.vorticity_history, frames, rtol=0, atol=1e-12 * np.max(np.abs(frames))
+        )
+    diagnostics = result.diagnostics
+    np.testing.assert_allclose(
+        [
+            diagnostics.kinetic_energy_initial,
+            diagnostics.kinetic_energy_final,
+            diagnostics.enstrophy_final,
+            diagnostics.max_courant,
+        ],
+        [expected[0], expected[1], expected[2], expected[5]],
+        rtol=1e-12,
+    )
+    # The residual is a defect normalized by the energy: both sides carry its round-off, about 1e-16.
+    assert diagnostics.energy_budget_residual == pytest.approx(expected[3], rel=1e-12, abs=1e-14)
+    # The final divergence is round-off in both layouts, so only its size is comparable.
+    scale = max(np.max(np.abs(ux)), np.max(np.abs(uy))) * np.pi * max(np.divide(shape, length))
+    assert abs(diagnostics.max_divergence - expected[4]) <= 100 * np.finfo(np.float64).eps * scale
+
+
 @pytest.mark.physics
 def test_q2d_energy_acceptance_matches_modal_budget_and_time_refinement():
     residuals = []
