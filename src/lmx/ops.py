@@ -40,6 +40,8 @@ __all__ = [
     "axis_divergence",
     "cell_inner_product",
     "divergence",
+    "face_average",
+    "face_average_adjoint",
     "face_distances",
     "face_gradient",
     "face_inner_product",
@@ -64,8 +66,18 @@ def face_distances(grid: Grid, axis: int, condition: BoundaryCondition) -> np.nd
     else:
         spacing = np.concatenate(([widths[0]], interior, [widths[-1]]))
     if grid.is_polar and axis == 1:
-        return np.asarray(grid.centers[0])[:, None, None] * spacing[None, :, None]
+        return _length_scale(grid, axis) * spacing[None, :, None]
     return spacing
+
+
+def _length_scale(grid: Grid, axis: int) -> np.ndarray | float:
+    """Return the factor turning a coordinate increment along ``axis`` into a length.
+
+    One everywhere except the azimuth of a polar grid, where it is the radius.
+    """
+    if grid.is_polar and axis == 1:
+        return np.asarray(grid.centers[0])[:, None, None]
+    return 1.0
 
 
 def _metric(values: np.ndarray, axis: int, dtype) -> jnp.ndarray:
@@ -135,6 +147,90 @@ def face_interpolate(field: Field, axis: int | str, condition: BoundaryCondition
     upper = _take(padded, index, slice(1, None))
     offset = tuple(FACE if position == index else CENTER for position in range(3))
     return Field(weight * lower + (1.0 - weight) * upper, offset, grid)
+
+
+def face_average(field: Field, axis: int | str, condition: BoundaryCondition) -> Field:
+    """Average a cell-centred field over the control volume straddling each face.
+
+    That control volume is half of each neighbouring cell, so the face value is
+    ``(h_L c_L + h_R c_R) / (h_L + h_R)``: weighted by the cell's own width, where
+    :func:`face_interpolate` weights by the opposite one. The two agree on a
+    uniform mesh. On a stretched one this average is not exact for a linear
+    field -- it is off by ``(h_R - h_L)/2`` times the slope -- but it is the one
+    two-point interpolation whose transpose, :func:`face_average_adjoint`, is
+    itself an average. The electromotive force and the Lorentz force need exactly
+    that pair, since each must be the adjoint of the other.
+
+    A polar metric scales both halves of the control volume by the same face
+    area and length scale, so the weights stay one dimensional.
+    """
+    grid = field.grid
+    index = grid.axis_index(axis)
+    _require_cell_centred(field)
+    padded = pad(field.data, index, condition, grid=grid)
+    ghosted = _ghosted_widths(np.asarray(grid.widths[index]), condition)
+    weight = _broadcast(ghosted[:-1] / (ghosted[:-1] + ghosted[1:]), index, field.dtype)
+    lower = _take(padded, index, slice(None, -1))
+    upper = _take(padded, index, slice(1, None))
+    offset = tuple(FACE if position == index else CENTER for position in range(3))
+    return Field(weight * lower + (1.0 - weight) * upper, offset, grid)
+
+
+def face_average_adjoint(face: Field, axis: int | str, condition: BoundaryCondition) -> Field:
+    """Return the transpose of :func:`face_average` under the volume-weighted inner products.
+
+    Each cell reads its two faces, weighted by the half of the cell each face's
+    control volume owns: ``m^-/V`` and ``m^+/V`` with ``m = A * l * h/2``, the face
+    area ``A``, the length scale ``l`` of the axis and the cell width ``h``. The
+    two halves add to the cell volume on Cartesian and polar grids alike, so the
+    result is a true average. With the face current and the face field as the
+    operand it is the face form of the Lorentz force of Ni et al.,
+    ``(1/V) sum_f J_f A_f (r_f - r_c) x B_f``.
+
+    The identity
+
+    .. math:: \\langle g, \\mathrm{face\\_average}(c)\\rangle_{\\mathrm{face}}
+       = \\langle \\mathrm{face\\_average\\_adjoint}(g), c\\rangle_{\\mathrm{cell}}
+
+    under :func:`face_inner_product` and :func:`cell_inner_product` holds to
+    round-off for every ``g`` that vanishes on the wall faces of a non-periodic
+    axis -- an impermeable velocity or an insulated current, which is what either
+    operator is applied to. On a periodic axis the duplicated wrap face is read as
+    the mean of its two copies, which is what the halved weight of each copy in
+    :func:`face_inner_product` transposes to, so there it holds for every ``g``.
+    """
+    grid = face.grid
+    index = grid.axis_index(axis)
+    _require_face(face, index)
+    data = face.data
+    if condition.is_periodic:
+        wrap = 0.5 * (_take(data, index, slice(None, 1)) + _take(data, index, slice(-1, None)))
+        data = jnp.concatenate((wrap, _take(data, index, slice(1, -1)), wrap), axis=index)
+    lower_weight, upper_weight = _half_cell_weights(grid, index)
+    lower = _take(data, index, slice(None, -1))
+    upper = _take(data, index, slice(1, None))
+    return Field(
+        _as_array(lower_weight, face.dtype) * lower + _as_array(upper_weight, face.dtype) * upper,
+        (CENTER, CENTER, CENTER),
+        grid,
+    )
+
+
+def _ghosted_widths(widths: np.ndarray, condition: BoundaryCondition) -> np.ndarray:
+    """Cell widths with the ghost cell on each end: the wrapped cell, or the mirrored wall cell."""
+    if condition.is_periodic:
+        return np.concatenate(([widths[-1]], widths, [widths[0]]))
+    return np.concatenate(([widths[0]], widths, [widths[-1]]))
+
+
+def _half_cell_weights(grid: Grid, axis: int) -> tuple[np.ndarray, np.ndarray]:
+    """Return the fraction of each cell owned by the control volumes of its lower and upper face."""
+    measure = grid.face_areas(axis) * _length_scale(grid, axis)
+    half = _shaped(0.5 * np.asarray(grid.widths[axis]), axis)
+    volumes = grid.cell_volumes()
+    lower = np.take(measure, np.arange(grid.shape[axis]), axis=axis) * half / volumes
+    upper = np.take(measure, np.arange(1, grid.shape[axis] + 1), axis=axis) * half / volumes
+    return lower, upper
 
 
 def cell_inner_product(left: Field, right: Field) -> jnp.ndarray:

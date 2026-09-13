@@ -246,6 +246,28 @@ conductivity is the distance-weighted harmonic mean, the series resistance of th
 two half-cells and therefore the right average across a fluid-wall jump; the
 arithmetic mean would let a poorly conducting wall draw too much current.
 
+The electromotive force and the Lorentz force travel the same interpolation path
+in opposite directions. A velocity component is averaged from its faces to the
+cell centres and carried to the current faces; the force is averaged from the
+current faces to the cell centres, which is Ni's face form above, and carried to
+the velocity faces. Every cell-to-face step is `lmx.ops.face_average`, the
+average of the piecewise-constant cell field over the control volume straddling
+the face, $(h_L c_L+h_R c_R)/(h_L+h_R)$, and every face-to-cell step is its
+transpose `lmx.ops.face_average_adjoint` under the cell volumes and the face
+weights $A_f d_f$, including the polar metric. The force map is then exactly
+minus the adjoint of the electromotive map, the discrete form of
+$\int\mathbf u\cdot(\mathbf J\times\mathbf B)=-\int\mathbf J\cdot(\mathbf u\times\mathbf B)$,
+so the Lorentz force does exactly minus the Joule dissipation and the steady
+Stokes operator is symmetric in the face-volume inner product on a stretched
+mesh, to round-off. The distance-weighted interpolation is exact for a linear
+field where the face average is not, but its transpose is not an average on a
+stretched mesh: with it the steady operator was asymmetric by 1e-2 on a Ha 100
+layer mesh and the ohmic identity was off by up to 3e-3. The two interpolations
+coincide on uniform cells. On the layer meshes of the validation ladder the face
+average moves each insulating duct flow rate towards the spectral reference, by
+at most 0.3 % of it. The pipe solver of `lmx.pipe` keeps its own interpolation
+pair for now.
+
 These modules supply geometry, operators, the scalar solve and the electric
 coupling. The momentum discretization and the time loop follow in their own plan
 steps, and the existing fully developed and extruded solvers continue to use

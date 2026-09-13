@@ -26,10 +26,10 @@ from dataclasses import dataclass
 import jax
 import jax.numpy as jnp
 
-from .core3d import ChannelProblem, face_currents, step, velocity_condition, zero_velocity
+from .core3d import ChannelProblem, face_currents, face_lorentz_force, step, velocity_condition, zero_velocity
 from .em import lorentz_force
 from .grid import Field
-from .ops import divergence, face_inner_product, face_interpolate, staggered_laplacian
+from .ops import divergence, face_inner_product, staggered_laplacian
 from .poisson import FastDiagonalHelmholtz, FastDiagonalPoisson
 
 __all__ = [
@@ -142,10 +142,9 @@ def energy_budget(
         )
         for axis, component in enumerate(velocity)
     )
+    body = face_lorentz_force(force, problem)
     lorentz = sum(
-        face_inner_product(
-            component, face_interpolate(force[axis], axis, scalar[axis]), axis, conditions[axis]
-        )
+        face_inner_product(component, body[axis], axis, conditions[axis])
         for axis, component in enumerate(velocity)
     )
     viscous = (

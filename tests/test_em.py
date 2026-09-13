@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx.bc import DIRICHLET, NEUMANN, BoundaryCondition
+from lmx.bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition
 from lmx.em import (
     cell_average,
     charge_residual,
@@ -16,11 +16,23 @@ from lmx.em import (
     thin_wall_flux,
     wall_insulated,
 )
-from lmx.grid import CENTER, FACE, Field, Grid, geometric_faces, tanh_faces, uniform_faces
+from lmx.grid import (
+    CENTER,
+    FACE,
+    Field,
+    Grid,
+    geometric_faces,
+    tanh_faces,
+    uniform_faces,
+    wall_resolving_faces,
+)
+from lmx.ops import cell_inner_product, face_average, face_average_adjoint, face_inner_product
+from lmx.pipe import pipe_grid
 
 pytestmark = pytest.mark.unit
 
 WALL = BoundaryCondition(NEUMANN)
+WRAP = BoundaryCondition(PERIODIC)
 WALLS = (WALL, WALL, WALL)
 STRETCHED = Grid(
     geometric_faces(6, 0.0, 3.0, 1.25),
@@ -28,6 +40,12 @@ STRETCHED = Grid(
     uniform_faces(5, -0.5, 0.5),
 )
 UNIFORM = Grid(uniform_faces(4, 0.0, 2.0), uniform_faces(5, -1.0, 1.0), uniform_faces(3, -0.5, 0.5))
+# Hartmann and side layers of a Ha 100 duct, with the cross-stream axis stretched as well.
+LAYERED = Grid(
+    geometric_faces(6, 0.0, 3.0, 1.25),
+    wall_resolving_faces(24, -1.0, 1.0, layer_thickness=0.01, cells_in_layer=6, max_ratio=None),
+    wall_resolving_faces(16, -1.0, 1.0, layer_thickness=0.1, cells_in_layer=6, max_ratio=None),
+)
 
 
 def _cells(grid: Grid, function) -> Field:
@@ -147,6 +165,117 @@ def test_lorentz_force_is_orthogonal_to_a_uniform_field():
     force = lorentz_force(currents, magnetic_field, WALLS)
     projection = sum(np.asarray(force[axis].data) * field_values[axis] for axis in range(3))
     assert np.max(np.abs(projection)) < 1e-13
+
+
+def _random_faces(grid: Grid, axis: int, key, condition: BoundaryCondition) -> Field:
+    """Random face data, zero on the wall faces of a non-periodic axis."""
+    data = jax.random.normal(key, grid.face_shape(axis), dtype=jnp.float64)
+    if not condition.is_periodic:
+        data = data.at[(slice(None),) * axis + (0,)].set(0.0).at[(slice(None),) * axis + (-1,)].set(0.0)
+    return Field(data, tuple(FACE if position == axis else CENTER for position in range(3)), grid)
+
+
+@pytest.mark.parametrize(
+    ("grid", "conditions"),
+    [
+        (LAYERED, (WALL, WALL, WALL)),
+        (LAYERED, (WRAP, WALL, WRAP)),
+        (pipe_grid(16, 24, 100.0), (WALL, WRAP, WRAP)),
+    ],
+    ids=["layered-walls", "layered-periodic", "polar-pipe"],
+)
+def test_the_face_average_and_its_adjoint_are_exact_transposes(grid, conditions):
+    """The interpolation pair of the electromotive and Lorentz forces, under the volume weights."""
+    keys = jax.random.split(jax.random.PRNGKey(11), 6)
+    for axis in range(3):
+        condition = conditions[axis]
+        cells = Field(jax.random.normal(keys[axis], grid.shape, dtype=jnp.float64), (CENTER,) * 3, grid)
+        faces = _random_faces(grid, axis, keys[3 + axis], condition)
+        left = float(face_inner_product(faces, face_average(cells, axis, condition), axis, condition))
+        right = float(cell_inner_product(face_average_adjoint(faces, axis, condition), cells))
+        assert abs(left - right) <= 1e-13 * abs(left)
+
+        # The same statement through JAX's own transpose of the interpolation.
+        weights = jax.grad(
+            lambda data, faces=faces, condition=condition: face_inner_product(
+                faces.replace_data(data), faces.replace_data(jnp.ones_like(data)), axis, condition
+            )
+        )(jnp.zeros_like(faces.data))
+        (transposed,) = jax.linear_transpose(
+            lambda data, condition=condition: face_average(cells.replace_data(data), axis, condition).data,
+            cells.data,
+        )(weights * faces.data)
+        expected = transposed / jnp.asarray(grid.cell_volumes())
+        adjoint = face_average_adjoint(faces, axis, condition).data
+        assert float(jnp.max(jnp.abs(adjoint - expected))) <= 1e-13 * float(jnp.max(jnp.abs(expected)))
+
+        # Both halves are averages, so constants survive either direction.
+        ones = faces.replace_data(jnp.ones_like(faces.data))
+        assert float(jnp.max(jnp.abs(face_average_adjoint(ones, axis, condition).data - 1.0))) < 1e-12
+        flat = cells.replace_data(jnp.ones_like(cells.data))
+        assert float(jnp.max(jnp.abs(face_average(flat, axis, condition).data - 1.0))) < 1e-14
+
+
+def test_the_face_average_is_the_distance_weighted_interpolation_on_uniform_cells():
+    """The two differ only where neighbouring cells differ in width."""
+    from lmx.ops import face_interpolate
+
+    field = _cells(UNIFORM, lambda x, y, z: jnp.sin(x + 2.0 * y) * jnp.cos(3.0 * z))
+    for axis in range(3):
+        averaged = np.asarray(face_average(field, axis, WALL).data)
+        interpolated = np.asarray(face_interpolate(field, axis, WALL).data)
+        assert np.max(np.abs(averaged - interpolated)) < 1e-15
+    stretched = _cells(STRETCHED, lambda x, y, z: x + y + z)
+    assert (
+        np.max(
+            np.abs(
+                np.asarray(face_average(stretched, 0, WALL).data - face_interpolate(stretched, 0, WALL).data)
+            )
+        )
+        > 1e-2
+    )
+
+
+def test_the_lorentz_force_is_minus_the_adjoint_of_the_electromotive_force():
+    """The work the face force does on a velocity is minus the current dotted with its electromotive force.
+
+    That is the discrete form of `u.(J x B) = -J.(u x B)`, and it holds exactly on a
+    stretched mesh with a field that varies in space. It is what makes the Lorentz
+    force do exactly minus the Joule dissipation and the steady Stokes operator
+    symmetric, which the conjugate-gradient solve of plan step 1.7d depends on.
+    """
+    grid = LAYERED
+    conditions = (WRAP, WALL, WALL)
+    magnetic_field = (
+        _cells(grid, lambda x, y, z: 0.3 + 0.1 * jnp.sin(y) + 0.0 * x * z),
+        _cells(grid, lambda x, y, z: 1.0 + 0.2 * jnp.cos(z) * jnp.sin(x)),
+        _cells(grid, lambda x, y, z: -0.4 + 0.1 * y * z + 0.0 * x),
+    )
+    keys = jax.random.split(jax.random.PRNGKey(7), 6)
+    velocity = tuple(_random_faces(grid, axis, keys[axis], conditions[axis]) for axis in range(3))
+    currents = tuple(_random_faces(grid, axis, keys[3 + axis], conditions[axis]) for axis in range(3))
+
+    power = sum(
+        float(
+            face_inner_product(
+                currents[axis],
+                face_electromotive_force(velocity, magnetic_field, axis, conditions),
+                axis,
+                conditions[axis],
+            )
+        )
+        for axis in range(3)
+    )
+    force = lorentz_force(currents, magnetic_field, conditions)
+    work = sum(
+        float(
+            face_inner_product(
+                velocity[axis], face_average(force[axis], axis, conditions[axis]), axis, conditions[axis]
+            )
+        )
+        for axis in range(3)
+    )
+    assert abs(work + power) <= 1e-13 * abs(power)
 
 
 def test_a_divergence_free_current_leaves_no_charge_residual():

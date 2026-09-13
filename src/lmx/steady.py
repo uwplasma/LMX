@@ -44,12 +44,13 @@ from .core3d import (
     ChannelProblem,
     electric_state,
     enforce_face_constraints,
+    face_lorentz_force,
     project,
     velocity_condition,
     zero_velocity,
 )
 from .grid import Field
-from .ops import face_interpolate, staggered_laplacian
+from .ops import staggered_laplacian
 from .poisson import FastDiagonalHelmholtz, FastDiagonalPoisson
 
 __all__ = ["SteadySolution", "solve_steady_state", "steady_residual"]
@@ -83,9 +84,9 @@ def steady_residual(
     """
     factorization = problem.factorization() if factorization is None else factorization
     velocity = enforce_face_constraints(velocity, problem)
-    scalar = problem.scalar_conditions
     drive = problem.forcing if forcing is None else forcing
     _, force = electric_state(velocity, problem, factorization, field_scale)
+    body = face_lorentz_force(force, problem)
     conditions = tuple(velocity_condition(problem.conditions, axis) for axis in range(3))
     transport = (
         None
@@ -97,10 +98,9 @@ def steady_residual(
         # The damping rate is a preconditioning device, not a term: the conservative
         # face force already carries the whole Lorentz contribution, so subtracting
         # it here as well would count the same physics twice.
-        body = face_interpolate(force[component], component, scalar[component])
         value = (
             problem.viscosity * staggered_laplacian(field, conditions).data
-            + (body.data + drive[component]) / problem.density
+            + (body[component].data + drive[component]) / problem.density
         )
         if transport is not None:
             value = value - transport[component].data

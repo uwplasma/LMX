@@ -196,6 +196,64 @@ def test_the_adjoint_matches_finite_differences_where_the_layers_are_thin(hartma
     assert float(gradient[1]) < 0.0
 
 
+def _stokes_operator_samples(problem: ChannelProblem):
+    """Return <v, A u>, <u, A v> and <u, A u> for two random divergence-free velocities."""
+    from lmx.core3d import project, velocity_condition, velocity_offset
+    from lmx.grid import Field
+    from lmx.ops import face_inner_product
+
+    factorization = problem.factorization()
+    rest = steady_residual(zero_velocity(problem), problem, factorization)
+
+    def operator(velocity):
+        value = steady_residual(velocity, problem, factorization)
+        return tuple(
+            field.replace_data(field.data - base.data) for field, base in zip(value, rest, strict=True)
+        )
+
+    def sample(seed):
+        keys = jax.random.split(jax.random.PRNGKey(seed), 3)
+        raw = tuple(
+            Field(
+                jax.random.normal(
+                    keys[axis], problem.grid.offset_shape(velocity_offset(axis)), dtype=jnp.float64
+                ),
+                velocity_offset(axis),
+                problem.grid,
+            )
+            for axis in range(3)
+        )
+        return project(raw, problem, factorization)[0]
+
+    def inner(left, right):
+        return sum(
+            float(face_inner_product(a, b, axis, velocity_condition(problem.conditions, axis)))
+            for axis, (a, b) in enumerate(zip(left, right, strict=True))
+        )
+
+    u, v = sample(1), sample(2)
+    return inner(v, operator(u)), inner(u, operator(v)), inner(u, operator(u))
+
+
+@pytest.mark.parametrize("conductance", [0.0, 0.05])
+def test_the_stokes_operator_is_symmetric_on_a_layer_mesh(conductance):
+    """The electromotive and force interpolations are adjoint, so conjugate gradients apply.
+
+    The Stokes-limit residual is affine in the velocity. Its linear part was
+    symmetric in the face-volume inner product on a uniform mesh and 1e-2 away
+    from it on this one, because the force was interpolated with a stencil that
+    was not the transpose of the electromotive one. The conducting wall is not
+    gated here: its closure is first order and is replaced in plan step 1.3b.
+    """
+    problem = duct_problem(hartmann=100.0, cells=32, wall_conductance=conductance)
+    forward, backward, energy = _stokes_operator_samples(problem)
+    asymmetry = abs(forward - backward) / max(abs(forward), abs(backward))
+    if not conductance:
+        assert asymmetry <= 1e-12
+    # Viscosity and Joule dissipation both remove energy.
+    assert energy < 0.0
+
+
 def test_a_solve_that_does_not_converge_raises():
     """A plausible field and a gradient taken away from a root are worse than an error."""
     problem = _duct(16, 20.0)

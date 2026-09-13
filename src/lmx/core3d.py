@@ -82,7 +82,7 @@ from .em import (
     wall_insulated,
 )
 from .grid import CENTER, FACE, Field, Grid, uniform_faces, wall_resolving_faces
-from .ops import divergence, face_gradient, face_interpolate, staggered_laplacian
+from .ops import divergence, face_average, face_gradient, staggered_laplacian
 from .poisson import (
     FastDiagonalHelmholtz,
     FastDiagonalPoisson,
@@ -95,6 +95,7 @@ __all__ = [
     "duct_problem",
     "electric_state",
     "face_currents",
+    "face_lorentz_force",
     "enforce_face_constraints",
     "project",
     "step",
@@ -279,6 +280,21 @@ def electric_state(
     return potential, lorentz_force(currents, field, problem.scalar_conditions)
 
 
+def face_lorentz_force(
+    force: tuple[Field, Field, Field], problem: ChannelProblem
+) -> tuple[Field, Field, Field]:
+    """Carry the cell-centred Lorentz force onto the velocity faces.
+
+    :func:`lmx.ops.face_average` is the transpose of the cell average that
+    :func:`lmx.em.face_electromotive_force` applies to the velocity, so the work
+    this force does on any impermeable velocity is exactly minus the face
+    current dotted with that velocity's electromotive force. The step, the
+    steady residual and the energy budget all take the force from here.
+    """
+    scalar = problem.scalar_conditions
+    return tuple(face_average(component, axis, scalar[axis]) for axis, component in enumerate(force))
+
+
 def _closed_current(
     potential: Field, conductivity: Field, emf: Field, axis: int, problem: ChannelProblem
 ) -> Field:
@@ -456,8 +472,8 @@ def step(
     :attr:`ChannelProblem.diffusive_step_limit`.
     """
     factorization = problem.factorization() if factorization is None else factorization
-    scalar = problem.scalar_conditions
     potential, force = electric_state(velocity, problem, factorization)
+    body = face_lorentz_force(force, problem)
 
     velocity_conditions = tuple(velocity_condition(problem.conditions, axis) for axis in range(3))
     transport = (
@@ -467,8 +483,7 @@ def step(
     )
     predicted = []
     for component, component_field in enumerate(velocity):
-        body = face_interpolate(force[component], component, scalar[component])
-        drive = (body.data + problem.forcing[component]) / problem.density
+        drive = (body[component].data + problem.forcing[component]) / problem.density
         if transport is not None:
             drive = drive - transport[component].data
         rate = problem.damping_rates[component]
