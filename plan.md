@@ -659,7 +659,8 @@ Process: pyOpenSci README guide · JOSS review criteria · Google small CLs · D
 
 1. **Before touching code**: `git fetch`; read `ROADMAP.md`, this Section 6 for
    your phase, and the ADRs; check open PRs and the nightly `benchmarks` branch;
-   never work in another session's checkout (use a worktree).
+   never work in another session's checkout (use a worktree). After the #122
+   privacy rewrite, use a fresh clone; do not merge pre-rewrite ancestry back.
 2. **Pick the next unblocked step** in the dependency graph; open an issue with
    the step ID, the hypothesis, the budget and the exit criterion.
 3. **Implement in one PR per step** (≤ 400 lines). Tests in the same PR. Run
