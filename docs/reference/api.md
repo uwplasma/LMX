@@ -2,6 +2,11 @@
 
 `enable_x64` explicitly enables JAX float64 arrays process-wide. Call it before
 constructing meshes or tracing functions; importing LMX does not change precision.
+`enable_x64`, a case `dtype`, `ChannelProblem` and `Q2DProblem` also set JAX's
+`jax_default_matmul_precision` to `'highest'` when it is unset. Float32 matrix
+products on Ampere GPUs then run in float32 rather than TensorFloat-32, which
+was 3e-4 from float64 on an RTX A4000. A value you set yourself, in
+`jax.config` or through `JAX_DEFAULT_MATMUL_PRECISION`, is kept.
 Case factories and TOML `[case]` accept `dtype="float32"` or `dtype="float64"`
 (default). During the transition, constructing a float64 case with x64 disabled
 enables it with a `DeprecationWarning`; explicit activation avoids that warning.

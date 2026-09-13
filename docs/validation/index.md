@@ -64,10 +64,13 @@ externally validated result. Final `pass` remains fail-closed.
 
 The Q2D Taylor--Green case matches its exact viscous/Hartmann decay, and a
 nonlinear three-grid test compares $12^2$ and $24^2$ solutions with a $48^2$
-reference. On the documented $256^2$, 80-step float32 workload, one RTX A4000
-is 25.78x faster than CPU after compilation; final fields agree to relative
-$L_2=2.38\times10^{-6}$. This is a measured backend-parity and performance
-result, not external physics validation.
+reference. On a $256^2$, 80-step float32 workload run with JAX 0.6.2, the final
+CPU and RTX A4000 fields agree to relative $L_2=2.38\times10^{-6}$. This is a
+backend-parity result, not external physics validation. Its GPU speed-up is not
+quoted. The JAX 0.10.2 float32 timings in `benchmarks/results` put the $256^2$
+ratio at 14.15x on a different, 20-step workload, and none of those reports
+records the matmul precision a float32 GPU number must carry (ADR 0005, D15).
+Plan step 2.1 re-measures them.
 
 ## Test gates
 

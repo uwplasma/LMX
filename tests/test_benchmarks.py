@@ -113,6 +113,94 @@ def test_trajectory_timing_does_not_certify_host_synchronization(monkeypatch):
     assert result["accepted"] and not result["host_sync_verified"]
 
 
+def test_device_environment_records_precision_provenance(monkeypatch):
+    from scripts import run_benchmarks as runner
+
+    monkeypatch.setenv("NVIDIA_TF32_OVERRIDE", "0")
+    monkeypatch.setenv("XLA_FLAGS", "--xla_gpu_autotune_level=2")
+    monkeypatch.setattr(runner, "_commit", lambda: "abc1234")
+    header = "| NVIDIA-SMI 535.183.01    Driver Version: 535.183.01    CUDA Version: 12.2 |\n"
+    queried = []
+
+    def nvidia_smi(command, **options):
+        queried.append(command[0])
+        return SimpleNamespace(stdout=header)
+
+    monkeypatch.setattr(runner.subprocess, "run", nvidia_smi)
+    gpu = SimpleNamespace(
+        __version__="0.10.2",
+        devices=lambda: [SimpleNamespace(platform="gpu", device_kind="NVIDIA RTX A4000")],
+        config=SimpleNamespace(jax_enable_x64=False, jax_default_matmul_precision="highest"),
+    )
+    environment = runner._environment(gpu)
+    assert queried == ["nvidia-smi"]
+    assert environment["jax_default_matmul_precision"] == "highest"
+    assert environment["nvidia_tf32_override"] == "0"
+    assert environment["xla_flags"] == "--xla_gpu_autotune_level=2"
+    assert (environment["gpu_driver"], environment["cuda_version"]) == ("535.183.01", "12.2")
+    assert len(environment["load_average"]) == 3
+    assert runner._unquotable_float32(environment) is None
+
+    def missing(command, **options):
+        raise FileNotFoundError(command[0])
+
+    monkeypatch.setattr(runner.subprocess, "run", missing)
+    monkeypatch.delattr(runner.os, "getloadavg")
+    environment = runner._environment(gpu)
+    assert (environment["gpu_driver"], environment["cuda_version"]) == (None, None)
+    assert environment["load_average"] is None
+
+
+def test_device_environment_does_not_query_a_gpu_on_cpu(monkeypatch):
+    import jax
+
+    from scripts import run_benchmarks as runner
+
+    monkeypatch.delenv("NVIDIA_TF32_OVERRIDE", raising=False)
+    monkeypatch.setattr(runner, "_commit", lambda: "abc1234")
+    monkeypatch.setattr(runner, "_gpu_versions", lambda: pytest.fail("queried a GPU on a CPU host"))
+    environment = runner._environment(jax)
+    assert environment["platform"] == "cpu"
+    assert environment["jax_default_matmul_precision"] == jax.config.jax_default_matmul_precision
+    assert environment["nvidia_tf32_override"] is None
+    assert (environment["gpu_driver"], environment["cuda_version"]) == (None, None)
+
+
+_FLOAT32_GPU = {"platform": "gpu", "x64": False}
+
+
+@pytest.mark.parametrize(
+    ("environment", "written"),
+    [
+        (_FLOAT32_GPU, False),
+        ({**_FLOAT32_GPU, "jax_default_matmul_precision": None}, False),
+        ({**_FLOAT32_GPU, "jax_default_matmul_precision": "default"}, False),
+        ({**_FLOAT32_GPU, "jax_default_matmul_precision": "tensorfloat32"}, False),
+        ({**_FLOAT32_GPU, "jax_default_matmul_precision": "highest"}, True),
+        ({"platform": "gpu", "x64": True, "jax_default_matmul_precision": None}, True),
+        ({"platform": "cpu", "x64": False, "jax_default_matmul_precision": None}, True),
+    ],
+)
+def test_device_benchmark_refuses_float32_gpu_reports_without_true_precision(
+    tmp_path, monkeypatch, environment, written
+):
+    from scripts import run_benchmarks as runner
+
+    built = []
+    monkeypatch.setattr(runner, "_environment", lambda jax: environment)
+    monkeypatch.setattr(runner, "_q2d_case", lambda *args: built.append(args) or {"accepted": True})
+    output = tmp_path / "report.json"
+    arguments = ["--cases", "q2d", "--q2d-sizes", "8", "--output", str(output)]
+    if written:
+        assert runner.main(arguments) == 0
+        assert json.loads(output.read_text())["environment"] == environment
+    else:
+        with pytest.raises(SystemExit) as error:
+            runner.main(arguments)
+        assert error.value.code == 2
+        assert not output.exists() and not built
+
+
 _MATCHED = ("matched_contract",)
 _SHARED = _MATCHED + ("shared",)
 _EQUATIONS = _SHARED + ("equations",)

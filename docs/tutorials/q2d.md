@@ -75,11 +75,17 @@ needed; use `evolve_q2d` inside `grad`, `jvp`, `vjp`, or `vmap`.
 
 The same public API selects JAX's active backend. A controlled office-host run
 used JAX 0.6.2, float32 fields, a $256\times256$ grid, 80 steps, one compilation
-run, and five warm repetitions. The warm median was 2.233 s on CPU and 0.08663 s
-on one NVIDIA RTX A4000, a 25.78x speedup. The final CPU and GPU vorticity fields
-agreed to relative $L_2=2.38\times10^{-6}$ and
-$L_\infty=3.67\times10^{-6}$; warm-time coefficients of variation were 0.21%
-and 1.39%, respectively.
+run, and five warm repetitions. The final CPU and NVIDIA RTX A4000 vorticity
+fields agreed to relative $L_2=2.38\times10^{-6}$ and
+$L_\infty=3.67\times10^{-6}$.
+
+That run's speed-up is not quoted. A float32 GPU timing counts only when its
+report records a true-float32 `jax_default_matmul_precision`, because JAX's
+default lets Ampere cards use TensorFloat-32 (ADR 0005, D15). The JAX 0.10.2
+reports in `benchmarks/results` record no precision; they put the $256^2$
+float32 ratio at 14.15x on a 20-step workload. Plan step 2.1 re-measures them.
+LMX sets the precision to `'highest'` when a `Q2DProblem` is built, unless you
+have already chosen one.
 
 These figures characterize this workload and hardware, not every grid or
 device. Timings exclude compilation, use identical precision and inputs, and
