@@ -104,7 +104,7 @@ Repeat with two devices and `--x64 0` for float32. Each run compares a
 single-device trajectory against the same input distributed over all devices,
 checks solver completion and field agreement, and records synchronized times.
 The grid's first dimension must divide evenly by the device count.
-[JAX CPU devices](https://docs.jax.dev/en/latest/config_options.html#num-cpu-devices)
+[JAX CPU devices](https://docs.jax.dev/en/latest/config_options.html)
 share host cores and memory: the reported efficiency is a **logical-device
 placement comparison**, not fixed-core strong scaling or a prediction for a GPU
 interconnect. Record thread settings and host load; one CPU device can already
