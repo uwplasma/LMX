@@ -139,9 +139,12 @@ def test_the_reference_values_are_what_the_spectral_solve_returns():
         assert flow_rate(hartmann, 96 if hartmann > 300.0 else 64) == pytest.approx(cached, rel=2e-4)
 
 
-def test_the_adjoint_matches_finite_differences():
+@pytest.mark.parametrize(
+    ("cells", "hartmann", "conductance"), [(4, 0.0, 0.0), (10, 5.0, 0.0), (6, 5.0, 0.027)]
+)
+def test_the_adjoint_matches_finite_differences(cells, hartmann, conductance):
     """One linearised solve at the root, not a tape of the iteration."""
-    problem = _duct(10, 5.0)
+    problem = _duct(cells, hartmann, conductance=conductance)
 
     def throughput(drive, scale):
         solution = solve_steady_state(
@@ -150,6 +153,10 @@ def test_the_adjoint_matches_finite_differences():
         return jnp.mean(solution.velocity[0].data)
 
     value, gradient = jax.value_and_grad(throughput, argnums=(0, 1))(1.0, 1.0)
+    compiled_value, compiled_gradient = jax.jit(jax.value_and_grad(throughput, argnums=(0, 1)))(1.0, 1.0)
+    np.testing.assert_allclose(compiled_value, value, rtol=1e-10, atol=1e-12)
+    np.testing.assert_allclose(compiled_gradient, gradient, rtol=1e-8, atol=1e-12)
+    assert float(jax.jit(throughput)(1.0, 1.0)) == pytest.approx(float(value), rel=1e-10)
     size = 1.0e-5
     for index, argument in enumerate(((1.0, 1.0), (1.0, 1.0))):
         raised = list(argument)
@@ -180,6 +187,8 @@ def test_a_rejected_root_cannot_produce_a_finite_objective_or_gradient(drive):
     with pytest.raises(RuntimeError, match="did not converge"):
         objective(drive)
     value, gradient = jax.value_and_grad(objective)(drive)
+    assert not np.isfinite(value) and not np.isfinite(gradient)
+    value, gradient = jax.jit(jax.value_and_grad(objective))(drive)
     assert not np.isfinite(value) and not np.isfinite(gradient)
 
 

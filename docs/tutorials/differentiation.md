@@ -17,9 +17,10 @@ For `lmx.steady.solve_steady_state`, a rejected primal residual or linearized
 solve raises eagerly. During autodiff tracing, failure instead produces
 nonfinite fields or derivatives without host callbacks: reject any nonfinite
 objective **or** gradient before accepting an optimizer step. Drive and field
-scale are continuous inputs; problem geometry/materials stay static. Its
-host-built factorizations currently prevent wrapping the whole reporting
-solve in an outer `jax.jit`; use the field interface below for compiled design.
+scale are continuous inputs; close over static problem geometry/materials and
+solver controls to compile objectives with `jax.jit(jax.value_and_grad(objective))`.
+Host factorizations are assembled once per trace, not differentiated; changing
+the static problem requires a new trace. Compiled failures remain nonfinite.
 
 ## Steady duct response
 
