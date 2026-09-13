@@ -146,6 +146,10 @@ def test_factorization_refuses_inhomogeneous_boundary_data():
 def test_factorization_validates_its_inputs():
     with pytest.raises(ValueError, match="one boundary condition per axis"):
         fast_diagonal_poisson(SMALL, (FIXED, FIXED))
+    with pytest.raises(ValueError, match="precision must be one of"):
+        fast_diagonal_poisson(SMALL, (FIXED, FIXED, FIXED), precision="half")
+    with pytest.raises(ValueError, match="refinements must be a positive integer"):
+        fast_diagonal_poisson(SMALL, (FIXED, FIXED, FIXED), precision="mixed", refinements=0)
     factorization = fast_diagonal_poisson(SMALL, (FIXED, FIXED, FIXED))
     other = Grid(uniform_faces(5, 0.0, 1.0), *SMALL.faces[1:])
     with pytest.raises(ValueError, match="share the factorized grid"):
@@ -321,3 +325,124 @@ def test_the_polar_factorization_states_what_it_needs():
     )
     with pytest.raises(ValueError, match="needs a uniform azimuth"):
         azimuthal_eigenvalues(stretched)
+
+
+# --- Mixed precision: float32 contractions, float64 residual corrections (D16) ---
+
+
+def _layer_grid(cells: int, layer: float, axial: int = 4) -> Grid:
+    """A duct cross-section resolving a wall layer of ``layer``; 1e-3 at 64 cells is width ratio 2,831."""
+    from lmx.grid import wall_resolving_faces
+
+    faces = wall_resolving_faces(cells, -1.0, 1.0, layer_thickness=layer, cells_in_layer=6, max_ratio=None)
+    return Grid(uniform_faces(axial, 0.0, 1.0), faces, faces)
+
+
+def _relative(candidate, reference) -> float:
+    return float(jnp.max(jnp.abs(candidate - reference)) / jnp.max(jnp.abs(reference)))
+
+
+@pytest.mark.parametrize(("cells", "layer"), [(32, 0.05), (64, 1.0e-3)], ids=["ha20-layer", "ha1000-layer"])
+def test_mixed_precision_poisson_reaches_the_float64_solve(true_float32_matmuls, cells, layer):
+    """The singular pressure operator of a duct, periodic along it and insulating across."""
+    grid, conditions = _layer_grid(cells, layer), (WRAPPED, WALL, WALL)
+    rhs = _random_cells(grid, seed=23)
+    reference = fast_diagonal_poisson(grid, conditions).solve(rhs)
+    mixed = fast_diagonal_poisson(grid, conditions, precision="mixed").solve(rhs)
+    assert mixed.dtype == jnp.float64
+    assert _relative(mixed.data, reference.data) < 1e-10
+    volumes = jnp.asarray(grid.cell_volumes())
+    assert abs(float(jnp.sum(volumes * mixed.data))) < 1e-14 * float(jnp.sum(volumes * jnp.abs(mixed.data)))
+
+
+def test_mixed_precision_is_as_accurate_as_float64_where_float64_is_not_exact(true_float32_matmuls):
+    """At width ratio 3e5 the float64 solve is itself 1e-7 off; mixed lands on its float64 correction."""
+    grid, conditions = _layer_grid(24, 1.0e-3), (WRAPPED, WALL, WALL)
+    exact = fast_diagonal_poisson(grid, conditions)
+    rhs = _random_cells(grid, seed=37)
+    first = exact.solve(rhs)
+    volumes = jnp.asarray(grid.cell_volumes())
+    defect = rhs.data - laplacian(first, conditions).data
+    corrected = first.data + exact.solve(rhs.replace_data(defect)).data
+    corrected = corrected - jnp.sum(volumes * corrected) / jnp.sum(volumes)
+    assert _relative(corrected, first.data) > 1e-9
+    mixed = fast_diagonal_poisson(grid, conditions, precision="mixed").solve(rhs)
+    assert _relative(mixed.data, corrected) < 1e-12
+
+
+@pytest.mark.parametrize("component", [0, 1, 2], ids=["u", "v", "w"])
+def test_mixed_precision_helmholtz_reaches_the_float64_solve(true_float32_matmuls, component):
+    """The implicit viscous solve of each velocity component on the Ha 1000 layer mesh."""
+    from lmx.core3d import velocity_offset
+    from lmx.poisson import fast_diagonal_helmholtz
+
+    grid, conditions = _layer_grid(64, 1.0e-3), (WRAPPED, FIXED, FIXED)
+    offset = velocity_offset(component)
+    # Ha 20 across y at dt 2e-3: the shift carries the damping of the u and w components.
+    settings = dict(shift=1.0 + 2.0e-3 * (0.0 if component == 1 else 400.0), coefficient=2.0e-3)
+    rhs = Field(
+        jnp.asarray(np.random.default_rng(component).normal(size=grid.offset_shape(offset))), offset, grid
+    )
+    reference = fast_diagonal_helmholtz(grid, offset, conditions, **settings).solve(rhs)
+    mixed = fast_diagonal_helmholtz(grid, offset, conditions, precision="mixed", **settings).solve(rhs)
+    assert _relative(mixed.data, reference.data) < 1e-10
+    assert np.all(np.asarray(mixed.data)[reference.data == 0.0] == 0.0)
+
+
+@pytest.mark.parametrize("radial_condition", [WALL, FIXED], ids=["neumann", "dirichlet"])
+def test_mixed_precision_polar_poisson_reaches_the_float64_solve(true_float32_matmuls, radial_condition):
+    """A pipe section resolving the Ha 1000 layer, singular under the insulating wall."""
+    from lmx.pipe import pipe_grid
+    from lmx.poisson import fast_diagonal_polar_poisson
+
+    grid, conditions = pipe_grid(48, 32, 1000.0), (radial_condition, WRAPPED, WRAPPED)
+    rhs = _random_cells(grid, seed=41)
+    reference = fast_diagonal_polar_poisson(grid, conditions).solve(rhs)
+    mixed = fast_diagonal_polar_poisson(grid, conditions, precision="mixed").solve(rhs)
+    assert _relative(mixed.data, reference.data) < 1e-10
+
+
+def test_mixed_precision_differentiates_like_float64(true_float32_matmuls):
+    """Reverse mode runs the transposed corrections, which converge like the forward ones."""
+    grid, conditions = _layer_grid(64, 1.0e-3), (WRAPPED, WALL, WALL)
+    weights = _random_cells(grid, seed=43).data
+
+    def functional(factorization):
+        def value(values):
+            return jnp.sum(weights * factorization.solve(Field(values, (CENTER,) * 3, grid)).data ** 2)
+
+        return value
+
+    values = _random_cells(grid, seed=47).data
+    reference = jax.grad(functional(fast_diagonal_poisson(grid, conditions)))(values)
+    mixed = jax.jit(jax.grad(functional(fast_diagonal_poisson(grid, conditions, precision="mixed"))))(values)
+    assert _relative(mixed, reference) < 1e-8
+
+
+def test_mixed_precision_leaves_float32_states_alone():
+    """A float32 right-hand side takes the plain float32 solve, bit for bit."""
+    from lmx.pipe import pipe_grid
+    from lmx.poisson import fast_diagonal_helmholtz, fast_diagonal_polar_poisson
+
+    grid, polar = _layer_grid(24, 0.05), pipe_grid(12, 8, 20.0)
+    builders = [
+        (lambda **option: fast_diagonal_poisson(grid, (WRAPPED, WALL, WALL), **option), grid, (CENTER,) * 3),
+        (
+            lambda **option: fast_diagonal_helmholtz(
+                grid, (CENTER, 0.0, CENTER), (WRAPPED, FIXED, FIXED), **option
+            ),
+            grid,
+            (CENTER, 0.0, CENTER),
+        ),
+        (
+            lambda **option: fast_diagonal_polar_poisson(polar, (WALL, WRAPPED, WRAPPED), **option),
+            polar,
+            (CENTER,) * 3,
+        ),
+    ]
+    for build, where, offset in builders:
+        data = np.random.default_rng(3).normal(size=where.offset_shape(offset))
+        rhs = Field(jnp.asarray(data, dtype=jnp.float32), offset, where)
+        state, mixed = build().solve(rhs), build(precision="mixed").solve(rhs)
+        assert mixed.dtype == state.dtype
+        assert np.array_equal(np.asarray(mixed.data), np.asarray(state.data))
