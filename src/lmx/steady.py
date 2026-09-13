@@ -149,7 +149,8 @@ def solve_steady_state(
     """Find the steady state by matrix-free Newton-Krylov, differentiably.
 
     The drive and ``field_scale`` are differentiable through :func:`solvax.root_solve`;
-    ``problem`` and factorization geometry are static. Rejected roots raise eagerly
+    close over static ``problem`` and solver controls when using :func:`jax.jit`.
+    Factorizations are assembled at trace time. Rejected roots raise eagerly
     or yield nonfinite fields and derivatives during tracing.
     """
     step = float(problem.dt if pseudo_step is None else pseudo_step)
@@ -160,8 +161,9 @@ def solve_steady_state(
     ):
         if not np.isfinite(value) or value <= 0.0:
             raise ValueError(f"{name} must be positive and finite")
-    factorization = problem.factorization()
-    viscous = dataclasses.replace(problem, dt=step).viscous_factorizations()
+    with jax.ensure_compile_time_eval():
+        factorization = problem.factorization()
+        viscous = dataclasses.replace(problem, dt=step).viscous_factorizations()
     start = zero_velocity(problem) if velocity is None else enforce_face_constraints(velocity, problem)
 
     def residual(state):
