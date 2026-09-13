@@ -129,7 +129,13 @@ def test_the_steady_solve_reproduces_the_marched_state_far_faster(monkeypatch):
     # such application is paired with a counted one: a Krylov iteration with its
     # preconditioner, a restart cycle's true residual with its Newton step's residual.
     # Doubling the count therefore bounds the work of the whole solve.
-    assert 2 * projections[0] < marched
+    newton = projections[0]
+    # A count of zero means the solve no longer projects through the patched names, and
+    # would pass the comparison below without measuring anything.
+    assert newton > 0, "the steady solve applied no counted projection; the counter no longer sees it"
+    assert 2 * newton < marched, (
+        f"steady solve: {newton} projections (bound {2 * newton}); marching: {marched}"
+    )
 
 
 @pytest.mark.parametrize(
