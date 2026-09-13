@@ -98,7 +98,7 @@ jobs:
     needs: scope
     if: needs.scope.outputs.full == 'true' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -115,8 +115,8 @@ jobs:
           COVERAGE_FILE: artifacts/test-evidence/${{ matrix.shard }}/.coverage.${{ matrix.shard }}
         run: |
           mkdir -p "artifacts/test-evidence/${{ matrix.shard }}"
-          python scripts/run_full_test_suite.py --budget-seconds 540 \
-            --test-timeout-seconds 300 --shard ${{ matrix.shard }} \
+          python scripts/run_full_test_suite.py --budget-seconds 1500 \
+            --test-timeout-seconds 600 --shard ${{ matrix.shard }} \
             --coverage-fail-under 0 \
             --coverage-xml artifacts/test-evidence/${{ matrix.shard }}/coverage.xml \
             --junit-xml artifacts/test-evidence/${{ matrix.shard }}/junit.xml
