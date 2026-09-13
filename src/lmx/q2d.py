@@ -159,37 +159,44 @@ def make_q2d_case(
     )
 
 
-def _flow(omega_hat, eigenvalues, kx, ky):
+def _physical(field_hat, shape):
+    """Invert a real transform; ``shape`` fixes the parity the half plane cannot store."""
+    return jnp.fft.irfftn(field_hat, s=shape)
+
+
+def _flow(omega_hat, eigenvalues, kx, ky, shape):
     psi_hat = solve_periodic_poisson_spectral(omega_hat, eigenvalues=eigenvalues)
-    ux = jnp.fft.ifftn(1j * ky * psi_hat).real
-    uy = jnp.fft.ifftn(-1j * kx * psi_hat).real
+    ux = _physical(1j * ky * psi_hat, shape)
+    uy = _physical(-1j * kx * psi_hat, shape)
     return psi_hat, ux, uy
 
 
-def _nonlinear(omega_hat, forcing_hat, eigenvalues, kx, ky, dealias):
-    _, ux, uy = _flow(omega_hat, eigenvalues, kx, ky)
-    omega_x = jnp.fft.ifftn(1j * kx * omega_hat).real
-    omega_y = jnp.fft.ifftn(1j * ky * omega_hat).real
-    return (forcing_hat - jnp.fft.fftn(ux * omega_x + uy * omega_y)) * dealias
+def _nonlinear(omega_hat, forcing_hat, eigenvalues, kx, ky, dealias, shape):
+    _, ux, uy = _flow(omega_hat, eigenvalues, kx, ky, shape)
+    omega_x = _physical(1j * kx * omega_hat, shape)
+    omega_y = _physical(1j * ky * omega_hat, shape)
+    return (forcing_hat - jnp.fft.rfftn(ux * omega_x + uy * omega_y)) * dealias
 
 
-def _step(omega_hat, forcing_hat, eigenvalues, kx, ky, dealias, dt, decay, half_decay):
-    first = _nonlinear(omega_hat, forcing_hat, eigenvalues, kx, ky, dealias)
+def _step(omega_hat, forcing_hat, eigenvalues, kx, ky, dealias, dt, decay, half_decay, shape):
+    first = _nonlinear(omega_hat, forcing_hat, eigenvalues, kx, ky, dealias, shape)
     a = half_decay * (omega_hat + 0.5 * dt * first)
-    second = _nonlinear(a, forcing_hat, eigenvalues, kx, ky, dealias)
+    second = _nonlinear(a, forcing_hat, eigenvalues, kx, ky, dealias, shape)
     b = half_decay * omega_hat + 0.5 * dt * second
-    third = _nonlinear(b, forcing_hat, eigenvalues, kx, ky, dealias)
+    third = _nonlinear(b, forcing_hat, eigenvalues, kx, ky, dealias, shape)
     c = decay * omega_hat + dt * half_decay * third
-    fourth = _nonlinear(c, forcing_hat, eigenvalues, kx, ky, dealias)
+    fourth = _nonlinear(c, forcing_hat, eigenvalues, kx, ky, dealias, shape)
     updated = decay * omega_hat + (dt / 6.0) * (decay * first + 2.0 * half_decay * (second + third) + fourth)
     return (updated * dealias).at[0, 0].set(0.0)
 
 
 @jax.jit
 def _measures(omega_hat, forcing, eigenvalues, kx, ky, dt, spacing, viscosity, friction):
-    psi_hat, ux, uy = _flow(omega_hat, eigenvalues, kx, ky)
-    omega = jnp.fft.ifftn(omega_hat).real
-    psi = jnp.fft.ifftn(psi_hat).real
+    # Physical-space means are Parseval-exact, so the half plane needs no mode weights.
+    shape = forcing.shape
+    psi_hat, ux, uy = _flow(omega_hat, eigenvalues, kx, ky, shape)
+    omega = _physical(omega_hat, shape)
+    psi = _physical(psi_hat, shape)
     energy = 0.5 * jnp.mean(ux**2 + uy**2)
     enstrophy = 0.5 * jnp.mean(omega**2)
     courant = dt * jnp.max(jnp.abs(ux) / spacing[0] + jnp.abs(uy) / spacing[1])
@@ -219,9 +226,11 @@ def _integrate(
     steps,
     checkpoint_size,
 ):
+    shape = forcing.shape
+
     def advance(_index, carry):
         omega, before, budget, max_courant = carry
-        updated = _step(omega, forcing_hat, eigenvalues, kx, ky, dealias, dt, decay, half_decay)
+        updated = _step(omega, forcing_hat, eigenvalues, kx, ky, dealias, dt, decay, half_decay, shape)
         after = _measures(updated, forcing, eigenvalues, kx, ky, dt, spacing, viscosity, friction)
         budget += 0.5 * dt * (before[-1] + after[-1])
         return updated, after, budget, jnp.maximum(max_courant, after[-2])
@@ -232,30 +241,37 @@ def _integrate(
 
 @jax.jit
 def _setup(initial_vorticity, forcing, length, viscosity, friction, dt):
+    """Build the real-transform state: full ``x`` axis, non-negative ``y`` half plane."""
     shape, dtype = initial_vorticity.shape, initial_vorticity.dtype
     spacing = (length[0] / shape[0], length[1] / shape[1])
-    eigenvalues = periodic_poisson_eigenvalues(shape, spacing).astype(dtype)
-    kx = (2.0 * jnp.pi * jnp.fft.fftfreq(shape[0], d=spacing[0])).astype(dtype)[:, None]
-    ky = (2.0 * jnp.pi * jnp.fft.fftfreq(shape[1], d=spacing[1])).astype(dtype)[None, :]
-    ix, iy = jnp.fft.fftfreq(shape[0]) * shape[0], jnp.fft.fftfreq(shape[1]) * shape[1]
-    dealias = (jnp.abs(ix[:, None]) <= shape[0] / 3.0) & (jnp.abs(iy[None, :]) <= shape[1] / 3.0)
-    omega_hat = (jnp.fft.fftn(initial_vorticity) * dealias).at[0, 0].set(0.0)
-    forcing_hat = (jnp.fft.fftn(forcing) * dealias).at[0, 0].set(0.0)
+    half = shape[1] // 2 + 1
+    # The first ``half`` full-plane columns carry |ky| of the rfft columns, Nyquist included.
+    eigenvalues = periodic_poisson_eigenvalues(shape, spacing).astype(dtype)[:, :half]
+    kx = 2.0 * jnp.pi * jnp.fft.fftfreq(shape[0], d=spacing[0])
+    ky = 2.0 * jnp.pi * jnp.fft.rfftfreq(shape[1], d=spacing[1])
+    # An odd derivative of a real field has no real Nyquist component; ``ifftn(...).real`` dropped it.
+    kx = jnp.where(jnp.arange(shape[0]) * 2 == shape[0], 0.0, kx).astype(dtype)[:, None]
+    ky = jnp.where(jnp.arange(half) * 2 == shape[1], 0.0, ky).astype(dtype)[None, :]
+    ix, iy = jnp.fft.fftfreq(shape[0]) * shape[0], jnp.fft.rfftfreq(shape[1]) * shape[1]
+    dealias = (jnp.abs(ix[:, None]) <= shape[0] / 3.0) & (iy[None, :] <= shape[1] / 3.0)
+    omega_hat = (jnp.fft.rfftn(initial_vorticity) * dealias).at[0, 0].set(0.0)
+    forcing_hat = (jnp.fft.rfftn(forcing) * dealias).at[0, 0].set(0.0)
     decay = jnp.exp(-dt * (viscosity * eigenvalues + friction))
     return omega_hat, forcing_hat, eigenvalues, kx, ky, dealias, decay, spacing
 
 
 def _evolve(initial_vorticity, forcing, length, viscosity, friction, dt, steps, checkpoint_size):
+    shape = initial_vorticity.shape
     omega_hat, forcing_hat, eigenvalues, kx, ky, dealias, decay, _ = _setup(
         initial_vorticity, forcing, length, viscosity, friction, dt
     )
 
     def advance(_index, current):
-        return _step(current, forcing_hat, eigenvalues, kx, ky, dealias, dt, decay, jnp.sqrt(decay))
+        return _step(current, forcing_hat, eigenvalues, kx, ky, dealias, dt, decay, jnp.sqrt(decay), shape)
 
     omega_hat = checkpointed_fori_loop(0, steps, advance, omega_hat, checkpoint_size=checkpoint_size)
-    _, ux, uy = _flow(omega_hat, eigenvalues, kx, ky)
-    return jnp.fft.ifftn(omega_hat).real, ux, uy
+    _, ux, uy = _flow(omega_hat, eigenvalues, kx, ky, shape)
+    return _physical(omega_hat, shape), ux, uy
 
 
 def evolve_q2d(
@@ -321,7 +337,7 @@ def solve_q2d(problem: Q2DProblem) -> Q2DResult:
     budget, max_courant, completed = jnp.asarray(0.0, dtype=dtype), initial[-2], 0
     final = initial
     if problem.history_stride:
-        frames.append(jnp.fft.ifftn(omega_hat).real)
+        frames.append(_physical(omega_hat, shape))
         frame_steps.append(0)
     while completed < problem.steps:
         segment = min(stride, problem.steps - completed)
@@ -347,12 +363,12 @@ def solve_q2d(problem: Q2DProblem) -> Q2DResult:
         )
         completed += segment
         if problem.history_stride:
-            frames.append(jnp.fft.ifftn(omega_hat).real)
+            frames.append(_physical(omega_hat, shape))
             frame_steps.append(completed)
-    psi_hat, ux, uy = _flow(omega_hat, eigenvalues, kx, ky)
-    vorticity = frames[-1] if frames else jnp.fft.ifftn(omega_hat).real
+    psi_hat, ux, uy = _flow(omega_hat, eigenvalues, kx, ky, shape)
+    vorticity = frames[-1] if frames else _physical(omega_hat, shape)
     # Divergence is a final-field diagnostic; energy and Courant remain checked at every step.
-    divergence = jnp.max(jnp.abs(jnp.fft.ifftn(1j * kx * jnp.fft.fftn(ux) + 1j * ky * jnp.fft.fftn(uy)).real))
+    divergence = jnp.max(jnp.abs(_physical(1j * kx * jnp.fft.rfftn(ux) + 1j * ky * jnp.fft.rfftn(uy), shape)))
     budget_residual = jnp.abs(final[0] - initial[0] - budget) / jnp.maximum(
         jnp.maximum(initial[0], jnp.abs(budget)), jnp.finfo(vorticity.dtype).tiny
     )
