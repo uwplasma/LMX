@@ -109,4 +109,5 @@ adr/0001-plan-adoption
 adr/0002-core-discretization
 adr/0003-precision-and-derivatives
 adr/0004-process
+adr/0005-review-2026-09-13
 ```

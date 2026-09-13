@@ -154,10 +154,16 @@ python scripts/make_showcase_figures.py --only scaling
 Measured on a 36-core CPU and one RTX A4000, both from the same commit, with the
 compile time, the warm time and the time per step kept apart.
 
-- **Float32 meets both targets:** 29.6× on the 3-D core at 128³, 54.5× on Q2D at 1024².
-- **Float64 does not, and the reason is the card:** an A4000 runs float64 at 1/64
-  of its float32 rate, and the fast-diagonalization contractions are `O(N⁴)`, so
-  the 3-D core goes flop-bound — 3.4× at 128³, falling as the problem grows.
+- **Float32, as recorded:** 29.6× on the 3-D core at 128³, 54.5× on Q2D at 1024².
+  Those runs used JAX's default matmul precision, which is TensorFloat-32 on this
+  card; the 3-D core's float32 accuracy there is 3e-4, and true float32 costs
+  15–30 % more per step. They are being re-measured with the precision pinned
+  and recorded ([plan](plan.md), step 2.1).
+- **Float64:** 3.4× at 128³ and 17.0× on Q2D. An earlier claim that the card runs
+  float64 at 1/64 of its float32 rate was wrong: a true-float32 contraction beats
+  float64 by 0.9× at 64³, 4.1× at 128³ and 12× at 192³. A float32 solve with one
+  float64 residual correction returns float64 accuracy (2e-11) at 2.4–4.5× the
+  float64 step speed (64³–192³, measured on the A4000) and is plan step 1.11.
 - **Trajectory-length scaling:** 10 and 40 steps cost about the same per step;
   this timing ratio alone does not establish absence of host synchronization.
 - Every number carries an `accepted` flag judged against the precision it was
