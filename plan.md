@@ -95,11 +95,32 @@ loop, explicit precision, VJP NaN) or superseded by the rows below.
 
 | PR / issue | Disposition |
 |---|---|
-| #123 | open; small and correct; merge when its fringing and support shards pass on the exact head |
-| #113 | resolved by D19 (affine reporting), not by a longer cold-start campaign |
+| #123 | merged (`b5dbb06`) |
+| #113 | closed by #129 (D19: certified affine reporting) |
 | #75 | CI tiers merged; the office nightly and benchmark publication remain the open half |
 | #122 | done; fresh clones only, no pre-rewrite ancestry |
 | `codex/*` branches other than #123 | not development lanes; inspect their PR state before touching |
+| #130 | open: the Li-AlN intact-wall model does not certify (residual 2.7); waits for 1.3b |
+
+### 2.4 Progress after the review (2026-09-13, `main` at `94ef978`)
+
+Each row replaces the matching 2.2 finding; numbers are from the PR descriptions,
+measured on the M3 Max unless an A4000 is named.
+
+| Step | PR | Result |
+|---|---|---|
+| 2.0 precision provenance | #126 | `jax_default_matmul_precision` pinned to `'highest'` when unset (by `enable_x64`, a case dtype, `ChannelProblem`, `Q2DProblem`); benchmark JSON records precision, TF32 override, XLA flags, driver, CUDA and load, and refuses float32 GPU reports without a true-float32 precision; float32 contraction 4.2e-7 from float64; stale README and validation claims corrected. Renaming the old JSON provenance moves to 2.1 |
+| 1.7c preconditioned adjoint | #127 | the primal projection preconditioner in the tangent solve and its exact `jax.linear_transpose` in the transpose; transpose GMRES at Ha 100 on 24²: 3600 iterations and NaN → 92; gradients against central differences 2.1e-11 / 6.7e-9 (Ha 100) and 6.4e-10 / 7.8e-9 (Ha 300); warm compiled `value_and_grad` 0.16 s (Ha 100) and 2.6–3.6 s (Ha 300); the defect began at Ha 100, not 300. Ha 1000 stays with 1.7e |
+| 1.11 mixed precision | #128 | `precision="mixed"` on the three factorizations and `ChannelProblem`; float64 floor after two Poisson / one Helmholtz correction on CPU and A4000 (≤ 2.4e-11 on 64³–192³ layer meshes; 2.0e-11 polar at Ha 1000); gradient 4.8e-11; trajectories within 2.1e-11; A4000 step 1.9× / 3.4× / 4.3× at 64³ / 128³ / 192³ on a shared card (absolute times to be re-measured in 2.1); TF32 stalls the correction at 2.7e-5 |
+| 3.0 Q2D real transforms | #125 | `rfftn`/`irfftn` on the half plane; fields, history, `evolve_q2d` and its gradient within 1e-15 of the complex code; IFRK4 step 1.5–2.9× and `solve_q2d` loop 1.35–2.3× on a loaded host |
+| 3b.4 / D19 affine reporting | #129 | the cold-start floor of #113 was a round-off mean subtraction in `solvers._solve_potential` that made the coupled map non-affine at 2e-8; steady mode is now one certified affine GMRES solve (21 iterations); cold Hunt Ha 20: fixed-point residual 3.0e-13, momentum and charge residuals from the assembled operator 4.0e-13 / 2.6e-13, field against a SciPy sparse direct solve 2.8e-13; the transient loop keeps diagnostics on the device; `status` is `converged`/`not_converged` and `steps` counts GMRES iterations in steady mode |
+| 1.7d part i, adjoint-consistent EM | #131 | `ops.face_average` and its transpose carry the velocity to the electromotive force and the Lorentz force back; steady-operator asymmetry on `duct_problem(100, 32)` 1.0e-2 → 3.3e-14 (Ha 300 on 48²: 4.2e-13); ohmic defect 2.4e-4 → 2.6e-15; Shercliff errors Ha 20/100/300/1000 1.29/0.83/1.03/0.53 % → 1.03/0.75/0.96/0.48 %; Hunt c 0.027/0.1 1.04/0.52 % → 0.84/0.72 %; the pipe keeps its interpolation until 1.3b because the adjoint pair there exposes the first-order wall (conducting-pipe order 2.51 → −0.53) |
+
+Still open from 2.2: 1.7d part ii (O(1)-memory PCG steady solve), 1.7e
+(Ha-robust preconditioning and `duct_problem` at Ha 1000), 1.3b (thin wall),
+1.9a–1.9d (fringing), 1.10b (parity with the older fully developed solver),
+2.1 (controlled GPU campaign; both A4000s were busy with other users' jobs all
+day) and 2.3 (nightly).
 
 ---
 
@@ -682,14 +703,14 @@ concern and one page:
 
 | # | Step | Size | Evidence attached |
 |---|---|---|---|
-| 1 | merge #123 on its exact head | done | CI |
-| 2 | 2.0: pin matmul precision, record it, retract "1/64" in plan, README and `docs/validation`; fix the stale README claims of Section 2.2 | ≈ 30 lines + docs | the 2026-09-13 precision logs |
-| 3 | 1.7c: preconditioned tangent and transpose solves; Ha 100/300 adjoint regressions | ≈ 10 lines + tests | Ha 300 gradient against central differences |
-| 4 | 3b.4 / D19: affine reporting; #113 closed | ≈ 40 lines + test | cold Hunt residual and field check |
-| 5 | 1.11: mixed precision through SOLVAX | ≈ 40 lines + tests | CPU and A4000 JSON with precision recorded |
-| 6 | 3.0: Q2D real transforms | ≈ 20 lines | per-stage timing |
-| 7 | 2.1: controlled campaign on an idle card; 2.3 nightly observed | JSON | protocol record |
-| 8 | 1.7d, 1.3b, 1.9a in parallel worktrees | one PR each | their exit columns |
+| 1 | merge #123 on its exact head | **done** (`b5dbb06`) | CI |
+| 2 | 2.0: pin matmul precision, record it, retract "1/64" in plan, README and `docs/validation`; fix the stale README claims of Section 2.2 | **done**, #126 | the 2026-09-13 precision logs |
+| 3 | 1.7c: preconditioned tangent and transpose solves; Ha 100/300 adjoint regressions | **done**, #127 | Ha 300 gradient against central differences |
+| 4 | 3b.4 / D19: affine reporting; #113 closed | **done**, #129 | cold Hunt residual and field check |
+| 5 | 1.11: mixed precision through SOLVAX | **done**, #128 | CPU and A4000 JSON with precision recorded |
+| 6 | 3.0: Q2D real transforms | **done**, #125 | per-stage timing |
+| 7 | 2.1: controlled campaign on an idle card; 2.3 nightly observed | waiting for an idle A4000 | protocol record |
+| 8 | 1.7d part i (adjoint-consistent EM) **done**, #131; 1.7d part ii (PCG steady solve) and 1.3b (thin wall) in progress; 1.9a after 1.3b; load-robust steady tests, #132 | one PR each | their exit columns |
 
 Everything else waits (D21): no new features on the legacy fully developed
 stack, no Q2D trims below a profiled 10 %, no thermal or device work before
@@ -887,4 +908,5 @@ Process: pyOpenSci README guide · JOSS review criteria · Google small CLs · D
 | 2026-09-07 | Phase 2.4a: the two-GPU block was `lmx.q2d` building its wavenumber grids with `jax.numpy` outside any trace, which commits them to one device so a sharded state cannot be combined with them. `solve_q2d` is never traced -- it reports a status, so it cannot be -- and handing the constants on as NumPy leaves them uncommitted. The differentiable path through `evolve_q2d` is untouched, because there they may depend on traced geometry. With that removed the 1-GPU and 2-GPU fields are **bit-identical** at 512², 1024² and 2048² in both precisions, and the strong-scaling efficiency of the unaided placement is 0.25–0.27 in float64 and 0.14–0.20 in float32: two devices cost about twice one, because the transforms all-gather every step across PCIe. The correctness half of G5 is met and the scaling half is not, with the reason measured rather than assumed | Phase 2.4b: a decomposition designed for the interconnect |
 | 2026-09-07 | Phase 1.8d closes Phase 1: `validation/pipe.py` is a spectral pipe reference that shares no operator with the package. The axis is removed rather than treated -- the field is written on the *diameter* with an odd Chebyshev count so no point lands on the centre, and `f(-r, θ) = f(r, θ+π)` is built into the operators, so the axis is an interior point needing no condition. Against it the insulating pipe is within 0.04 %, 0.15 %, 0.37 % and 0.43 % at Ha 0, 5, 20 and 100, and the conducting wall converges at order 2.5–3.0, reaching 0.43 % at 96 radial cells: the thin-wall closure is first order in the wall potential and is the accuracy bottleneck, as the duct's energy budget also found. One trap: the area element carries `|r|`, whose kink at the axis costs a Chebyshev rule its accuracy, so the flow rate converged at *first* order while the field it integrates was exact to 1e-13. Gauss-Legendre on `[0, 1]` after a barycentric interpolation gives `1/8` exactly at every resolution | Phase 2 |
 | 2026-09-13 | Review of `main` at `270063d`, #106–#123, the plan and its sources, with fresh measurements (Section 2) and five further literature and code surveys (Section 3.6). Findings: the float32 GPU numbers were TensorFloat-32 (accuracy 3e-4) and the "1/64" explanation of G4 was wrong (true float32 beats float64 by 0.9–12× depending on size); D4's mixed precision was never built and works through SOLVAX as-is (float64 accuracy at 2.4–4.5× the step speed on the A4000); the tangent and transpose solves are unpreconditioned and the adjoint fails from Ha 300 while the primal converges; the steady solver's GMRES(400) basis rules out 3-D and its iteration count grows linearly with Ha; the stretched-mesh electromagnetic interpolations are not discrete adjoints (asymmetry 3.7e-2, the first-order ohmic identity); the thin-wall closure is first order with an asymmetric operator (0.27) and its inner GMRES can be a direct solve (rank-2·n_y perturbation, Woodbury to 8e-12; Krasnov et al. 2023 fold it into the one-dimensional operators); the fully developed reporting loop cannot certify (#113) while the affine solve can; the new core is 2.2–13× slower than the legacy solve it should replace; Hua et al. 1988 is an inertialess SOR solution and ALEX walls are thick, so the B2 gates are re-tiered around the core-flow model; nothing since 2026-09-08 advanced 1.9, 1.10b or Phase 4. Decisions D15–D21 in ADR 0005; Sections 1, 2, 3.6, 6, 7, 9 and 12 revised; the order of work fixed | PR 2 of the order of work (2.0), then 1.7c and D19 |
+| 2026-09-13 | First batch of the order of work merged within the day: #125 (Q2D real transforms), #126 (precision pin and provenance, stale claims), #127 (preconditioned tangent and exact transposed preconditioner), #128 (mixed-precision fast diagonalization), #129 (certified affine reporting, closes #113), #131 (adjoint-consistent electromagnetic interpolation). Two findings changed the picture: the #113 floor was a round-off mean subtraction in the potential solve rather than a stopping rule, and the adjoint defect already appeared at Ha 100. Agents ran focused tests locally and left the regression tier to hosted CI after five parallel local runs saturated the host; reviewed PRs with no failing check were admin-merged. Section 2.4 records the numbers | 1.7d part ii and 1.3b in progress; then 1.9a, 1.7e, 2.1 on an idle card |
 | 2026-09-07 | Environment: the long-lived Python 3.11 venv caps at JAX 0.10.2, while a Python 3.13 venv installs JAX 0.11.1, the version the office box runs. The full suite passes on both, 642 tests in 138 s on 3.11 and 408 s on 3.13 with a cold compilation cache. Release gate 7.1 therefore has a local 3.13 result, though not a controlled speed comparison | Keep the 3.13 environment for the release smoke |
