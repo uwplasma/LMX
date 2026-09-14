@@ -48,12 +48,12 @@ import jax.numpy as jnp
 import numpy as np
 
 from .bc import NEUMANN, BoundaryCondition, pad
-from .grid import CENTER, FACE, Field
+from .grid import CENTER, FACE, Field, Grid
 from .ops import (
-    axis_divergence,
     divergence,
     face_average,
     face_average_adjoint,
+    face_distances,
     face_gradient,
     face_interpolate,
 )
@@ -65,6 +65,7 @@ __all__ = [
     "face_current",
     "face_electromotive_force",
     "lorentz_force",
+    "thin_wall_current",
     "thin_wall_flux",
     "wall_insulated",
 ]
@@ -166,50 +167,84 @@ def wall_insulated(flux: Field, axis: int | str, condition: BoundaryCondition) -
     return flux.replace_data(data)
 
 
-def thin_wall_flux(
-    potential: Field,
-    axis: int | str,
-    condition: BoundaryCondition,
-    conductance: float,
-    tangential: tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition],
-) -> Field:
-    """Return the current a thin conducting wall carries, on its two wall faces.
+def thin_wall_current(potential: Field, wall_potential: Field, conductivity: Field, axis: int | str) -> Field:
+    """Return the current the fluid sends into a thin conducting wall, on its two wall faces.
 
-    A wall of conductance :math:`\\sigma_w t_w` conducts along itself, with a
-    surface current :math:`\\mathbf K = -c\\nabla_\\tau\\varphi` for
-    :math:`c = \\sigma_w t_w/(\\sigma a)`. Charge conservation in the sheet,
-    :math:`\\nabla_\\tau\\cdot\\mathbf K = \\mathbf J\\cdot\\mathbf n`, makes
-    the wall-normal current :math:`-c\\nabla_\\tau^2\\varphi` -- Walker's thin-wall
-    condition, and the reason a Hunt duct carries a fraction of its current
-    through the wall instead of through the Hartmann layer.
-
-    The tangential Laplacian is evaluated on the layer of cells against the wall,
-    which is where the potential is prescribed to first order. ``conductance``
-    zero returns zeros, which is the insulating wall of :func:`wall_insulated`.
+    A thin wall is a sheet with a potential of its own, reached across the half
+    cell against it: Ohm's law over that half cell, ``sigma (phi_P - phi_w)/(h_P/2)``
+    outward, with no electromotive force because the wall does not move. It is the
+    prescribed-value wall of :func:`face_current` with the sheet potential as the
+    value, second order where the adjacent cell value was first. Only the two wall
+    entries of ``wall_potential`` (on the faces normal to ``axis``) are read; one
+    equal to the adjacent cell carries no current. Interior faces are zero, so the
+    result adds to an insulated :func:`face_current`.
     """
     grid = potential.grid
     index = grid.axis_index(axis)
     offset = tuple(FACE if position == index else CENTER for position in range(3))
-    flux = jnp.zeros(grid.face_shape(index), dtype=potential.dtype)
-    if condition.is_periodic or not conductance:
-        return Field(flux, offset, grid)
-    surface = None
-    for other in range(3):
-        if other == index:
+    if wall_potential.offset != offset or wall_potential.shape != grid.face_shape(index):
+        raise ValueError(f"the wall potential must live on the faces normal to axis {index}")
+    if conductivity.offset != offset or conductivity.shape != grid.face_shape(index):
+        raise ValueError("conductivity must live on the wall faces")
+    widths, current = np.asarray(grid.widths[index]), jnp.zeros(grid.face_shape(index), dtype=potential.dtype)
+    # The stored value points along the axis: outward on the upper wall, inward on the lower.
+    for face, cell, sign in ((0, 0, 1.0), (-1, -1, -1.0)):
+        at = (slice(None),) * index + (face,)
+        difference = wall_potential.data[at] - potential.data[(slice(None),) * index + (cell,)]
+        current = current.at[at].set(sign * conductivity.data[at] * difference / (0.5 * float(widths[cell])))
+    return Field(current, offset, grid)
+
+
+def thin_wall_flux(
+    wall_potential: Field,
+    axis: int | str,
+    condition: BoundaryCondition,
+    conductance: float | tuple[float, float],
+    tangential: tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition],
+) -> Field:
+    """Return the current a thin conducting wall carries away along itself, on its two wall faces.
+
+    A wall of conductance :math:`\\sigma_w t_w` conducts along itself, with a
+    surface current :math:`\\mathbf K = -c\\nabla_\\tau\\varphi_w` for
+    :math:`c = \\sigma_w t_w/(\\sigma a)`. Charge conservation in the sheet,
+    :math:`\\nabla_\\tau\\cdot\\mathbf K = \\mathbf J\\cdot\\mathbf n`, makes
+    the wall-normal current :math:`-c\\nabla_\\tau^2\\varphi_w` -- Walker's thin-wall
+    condition, and the reason a Hunt duct carries a fraction of its current
+    through the wall instead of through the Hartmann layer. The sheet balance
+    holds where this equals :func:`thin_wall_current`.
+
+    ``wall_potential`` is read as in :func:`thin_wall_current`, and the five-point
+    surface Laplacian is taken on the sheet with the wall's own metric: on a polar
+    grid the azimuthal term of a radial wall divides by the wall radius, not by the
+    radius of the cells beside it. ``tangential`` closes the sheet's edges.
+    ``conductance`` is one value or a ``(lower, upper)`` pair; zero conducts nothing.
+    """
+    grid = wall_potential.grid
+    index = grid.axis_index(axis)
+    offset = tuple(FACE if position == index else CENTER for position in range(3))
+    if wall_potential.offset != offset or wall_potential.shape != grid.face_shape(index):
+        raise ValueError(f"the wall potential must live on the faces normal to axis {index}")
+    pair = (conductance, conductance) if np.ndim(conductance) == 0 else conductance
+    flux = jnp.zeros(grid.face_shape(index), dtype=wall_potential.dtype)
+    for position, value, sign in ((0, float(pair[0]), 1.0), (-1, float(pair[1]), -1.0)):
+        if condition.is_periodic or not value:
             continue
-        along = axis_divergence(face_gradient(potential, other, tangential[other]), other).data
-        surface = along if surface is None else surface + along
-    layer = float(conductance) * surface
-    # The stored face value points along the axis, so it is the outward current on
-    # the upper wall and its negative on the lower one.
-    selection = (slice(None),) * index
-    flux = flux.at[selection + (0,)].set(_slice_along(layer, index, 0))
-    flux = flux.at[selection + (-1,)].set(-_slice_along(layer, index, -1))
+        at = (slice(None),) * index + (slice(position, position + 1) if position == 0 else slice(-1, None),)
+        sheet, total = wall_potential.data[at], 0.0
+        for other in (other for other in range(3) if other != index):
+            # The azimuth of a polar grid is an angle: lengths along it scale with the sheet's radius.
+            scale = float(grid.faces[index][position]) if grid.is_polar and (index, other) == (0, 1) else 1.0
+            gradient = jnp.diff(pad(sheet, other, tangential[other]), axis=other) / _broadcast(
+                scale * np.asarray(face_distances(Grid(*grid.faces), other, tangential[other])),
+                other,
+                sheet.dtype,
+            )
+            total = total + jnp.diff(gradient, axis=other) / _broadcast(
+                scale * grid.widths[other], other, sheet.dtype
+            )
+        # The stored value points along the axis: outward on the upper wall, inward on the lower.
+        flux = flux.at[at].set(sign * value * total)
     return Field(flux, offset, grid)
-
-
-def _slice_along(data: jnp.ndarray, axis: int, position: int) -> jnp.ndarray:
-    return data[(slice(None),) * axis + (position,)]
 
 
 def face_current(

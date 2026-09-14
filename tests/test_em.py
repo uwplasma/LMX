@@ -13,6 +13,7 @@ from lmx.em import (
     face_current,
     face_electromotive_force,
     lorentz_force,
+    thin_wall_current,
     thin_wall_flux,
     wall_insulated,
 )
@@ -391,14 +392,22 @@ def test_only_an_insulating_wall_is_closed_off():
     assert float(jnp.max(jnp.abs(insulated.data[:, 1:-1]))) == 1.0
 
 
+def _sheets(grid: Grid, axis: int, function) -> Field:
+    """A wall potential: ``function`` on the two walls normal to ``axis``, zero on the interior faces."""
+    data = np.array(_faces(grid, axis, function).data)
+    data[(slice(None),) * axis + (slice(1, -1),)] = 0.0
+    offset = tuple(FACE if position == axis else CENTER for position in range(3))
+    return Field(jnp.asarray(data), offset, grid)
+
+
 def test_a_thin_wall_conducts_only_what_the_tangential_potential_drives():
-    """The wall current is the surface Laplacian of the potential on the wall layer."""
+    """The wall current is the surface Laplacian of the sheet's own potential."""
     grid = UNIFORM
     conditions = (WALL, WALL, WALL)
-    uniform = _cells(grid, lambda x, y, z: 3.0 + 0.0 * x)
+    uniform = _sheets(grid, 1, lambda x, y, z: 3.0 + 0.0 * x)
     assert float(jnp.max(jnp.abs(thin_wall_flux(uniform, 1, WALL, 0.05, conditions).data))) < 1e-14
 
-    curved = _cells(grid, lambda x, y, z: z**2)
+    curved = _sheets(grid, 1, lambda x, y, z: z**2 + 0.0 * x)
     doubled = thin_wall_flux(curved, 1, WALL, 0.10, conditions)
     driven = thin_wall_flux(curved, 1, WALL, 0.05, conditions)
     assert float(jnp.max(jnp.abs(driven.data[:, 0]))) > 0.0
@@ -407,12 +416,47 @@ def test_a_thin_wall_conducts_only_what_the_tangential_potential_drives():
     assert float(jnp.max(jnp.abs(driven.data[:, 1:-1]))) == 0.0
     # A wall twice as conductive carries twice the current.
     assert np.allclose(np.asarray(doubled.data), 2.0 * np.asarray(driven.data))
+    # Away from the sheet's edges the five-point Laplacian of z^2 is exactly 2.
+    np.testing.assert_allclose(np.asarray(driven.data[:, 0, 1:-1]), 0.05 * 2.0, rtol=1e-12)
+    # A separate conductance per wall.
+    lower_only = thin_wall_flux(curved, 1, WALL, (0.05, 0.0), conditions)
+    assert np.array_equal(np.asarray(lower_only.data[:, 0]), np.asarray(driven.data[:, 0]))
+    assert float(jnp.max(jnp.abs(lower_only.data[:, -1]))) == 0.0
 
 
 def test_no_wall_conducts_without_a_conductance_or_without_a_wall():
     grid = UNIFORM
     conditions = (WALL, WALL, WALL)
-    curved = _cells(grid, lambda x, y, z: z**2)
+    curved = _sheets(grid, 1, lambda x, y, z: z**2 + 0.0 * x)
     assert float(jnp.max(jnp.abs(thin_wall_flux(curved, 1, WALL, 0.0, conditions).data))) == 0.0
     periodic = BoundaryCondition("periodic")
     assert float(jnp.max(jnp.abs(thin_wall_flux(curved, 1, periodic, 0.05, conditions).data))) == 0.0
+    with pytest.raises(ValueError, match="the wall potential must live on the faces normal to axis 1"):
+        thin_wall_flux(_cells(grid, lambda x, y, z: z**2), 1, WALL, 0.05, conditions)
+
+
+def test_a_thin_wall_draws_the_half_cell_current_of_its_own_potential():
+    """Ohm's law across the half cell against the wall, exact for a potential linear in the normal."""
+    grid, sigma, slope = STRETCHED, 2.5, 0.7
+    potential = _cells(grid, lambda x, y, z: 1.0 + slope * y + 0.3 * z + 0.0 * x)
+    walls = _sheets(grid, 1, lambda x, y, z: 1.0 + slope * y + 0.3 * z + 0.0 * x)
+    conductivity = face_conductivity(_cells(grid, lambda x, y, z: sigma + 0.0 * x), 1, WALL)
+    current = thin_wall_current(potential, walls, conductivity, 1)
+    # The stretched wall cells differ in width, and the difference is still exact.
+    np.testing.assert_allclose(np.asarray(current.data[:, [0, -1]]), -sigma * slope, rtol=1e-12)
+    assert float(jnp.max(jnp.abs(current.data[:, 1:-1]))) == 0.0
+    with pytest.raises(ValueError, match="the wall potential must live on the faces normal to axis 1"):
+        thin_wall_current(potential, potential, conductivity, 1)
+
+
+def test_a_sheet_on_a_pipe_wall_takes_the_azimuthal_metric_of_the_wall():
+    """The surface Laplacian of a radial wall divides by the wall radius, not the adjacent centre's."""
+    grid = pipe_grid(6, 16, 0.0)
+    angles, step = np.asarray(grid.centers[1]), float(grid.widths[1][0])
+    data = np.zeros(grid.face_shape(0))
+    data[-1] = np.cos(angles)[:, None]
+    flux = thin_wall_flux(
+        Field(jnp.asarray(data), (FACE, CENTER, CENTER), grid), 0, WALL, 0.1, (WALL, WRAP, WRAP)
+    )
+    expected = 0.1 * 4.0 * np.sin(0.5 * step) ** 2 / step**2 * np.cos(angles)
+    np.testing.assert_allclose(np.asarray(flux.data[-1, :, 0]), expected, atol=1e-14)

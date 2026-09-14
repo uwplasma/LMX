@@ -43,9 +43,9 @@ import numpy as np
 import solvax
 
 from .bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition
-from .em import cell_average, thin_wall_flux, wall_insulated
-from .grid import CENTER, POLAR, Field, Grid, uniform_faces, wall_resolving_faces
-from .ops import divergence, face_gradient, face_interpolate
+from .em import thin_wall_current, wall_insulated
+from .grid import CENTER, FACE, POLAR, Field, Grid, uniform_faces, wall_resolving_faces
+from .ops import divergence, face_average, face_average_adjoint, face_gradient
 from .poisson import fast_diagonal_polar_poisson
 
 __all__ = ["PipeProblem", "pipe_grid", "pipe_problem", "solve_pipe"]
@@ -78,8 +78,8 @@ class PipeProblem:
         return (_INSULATING, _WRAP, _WRAP)
 
     def factorization(self):
-        """Factorize the potential Laplacian."""
-        return fast_diagonal_polar_poisson(self.grid, self.conditions)
+        """Factorize the potential Laplacian, with the thin wall's sheet node when the wall conducts."""
+        return fast_diagonal_polar_poisson(self.grid, self.conditions, wall_conductance=self.wall_conductance)
 
     def preconditioner(self):
         """Factorize the damped operator that preconditions the velocity solve."""
@@ -120,9 +120,9 @@ def pipe_problem(
     return PipeProblem(pipe_grid(radial, azimuthal, hartmann), float(hartmann), float(wall_conductance))
 
 
-def _angles(grid: Grid, axis: int) -> tuple[np.ndarray, np.ndarray]:
-    """Return ``sin`` and ``cos`` of the azimuth where the faces of ``axis`` live."""
-    angle = np.asarray(grid.faces[1] if axis == 1 else grid.centers[1])
+def _angles(grid: Grid) -> tuple[np.ndarray, np.ndarray]:
+    """Return ``sin`` and ``cos`` of the azimuth at the cell centres."""
+    angle = np.asarray(grid.centers[1])
     return np.sin(angle)[None, :, None], np.cos(angle)[None, :, None]
 
 
@@ -131,52 +131,55 @@ def _face_emf(velocity: Field, problem: PipeProblem) -> tuple[Field, Field, Fiel
 
     A uniform Cartesian field has ``B_r = B cos(theta)`` and
     ``B_theta = -B sin(theta)``, so an axial velocity drives ``B u sin(theta)``
-    through a radial face and ``B u cos(theta)`` through an azimuthal one.
+    through a radial face and ``B u cos(theta)`` through an azimuthal one. The
+    motional field is rotated at the cell centre, where the velocity lives, and
+    carried to the faces by :func:`lmx.ops.face_average`; :func:`_axial_force`
+    takes the transpose path back, so the force does exactly minus the work the
+    currents dissipate, as in :mod:`lmx.em`.
     """
     grid = problem.grid
-    field = float(problem.hartmann)
-    radial = face_interpolate(velocity, 0, _WALL)
-    azimuthal = face_interpolate(velocity, 1, _WRAP)
-    radial_sin, _ = _angles(grid, 0)
-    _, azimuthal_cos = _angles(grid, 1)
-    axial = Field(jnp.zeros(grid.face_shape(2), dtype=velocity.dtype), (CENTER, CENTER, 0.0), grid)
+    sine, cosine = (jnp.asarray(value, dtype=velocity.dtype) for value in _angles(grid))
+    motional = float(problem.hartmann) * velocity.data
+    axial = Field(jnp.zeros(grid.face_shape(2), dtype=velocity.dtype), (CENTER, CENTER, FACE), grid)
     return (
-        radial.replace_data(field * radial.data * jnp.asarray(radial_sin, dtype=velocity.dtype)),
-        azimuthal.replace_data(field * azimuthal.data * jnp.asarray(azimuthal_cos, dtype=velocity.dtype)),
+        face_average(velocity.replace_data(motional * sine), 0, _WALL),
+        face_average(velocity.replace_data(motional * cosine), 1, _WRAP),
         axial,
     )
 
 
-def _face_currents(velocity: Field, potential: Field, problem: PipeProblem) -> tuple[Field, Field, Field]:
-    """Return the face-normal currents, closed at the wall by its own model."""
+def _face_currents(
+    velocity: Field, potential: Field, problem: PipeProblem, wall: Field | None = None
+) -> tuple[Field, Field, Field]:
+    """Return the face-normal currents, closed at the wall by its own model.
+
+    ``wall`` is the potential of a thin conducting wall on the radial faces, as
+    :func:`_potential` returns it; the current into the wall is Ohm's law across
+    the half cell against it (:func:`lmx.em.thin_wall_current`).
+    """
     conditions = problem.conditions
     emf = _face_emf(velocity, problem)
     currents = []
     for axis in range(3):
         gradient = face_gradient(potential, axis, conditions[axis])
         ohmic = wall_insulated(gradient.replace_data(emf[axis].data - gradient.data), axis, conditions[axis])
-        if axis == 0 and problem.wall_conductance:
-            wall = thin_wall_flux(potential, 0, conditions[0], problem.wall_conductance, conditions)
-            ohmic = ohmic.replace_data(ohmic.data + wall.data)
+        if axis == 0 and wall is not None:
+            unit = gradient.replace_data(jnp.ones_like(gradient.data))
+            ohmic = ohmic.replace_data(ohmic.data + thin_wall_current(potential, wall, unit, 0).data)
         currents.append(ohmic)
     return tuple(currents)
 
 
 def _axial_force(currents: tuple[Field, Field, Field], problem: PipeProblem) -> jnp.ndarray:
-    """Return ``(J x B)_z`` at cell centres, from the same currents the charge balance uses."""
-    grid = problem.grid
-    sine, _ = _angles(grid, 0)
-    _, cosine = _angles(grid, 0)
-    radial = cell_average(currents[0], 0).data
-    azimuthal = cell_average(currents[1], 1).data
-    dtype = radial.dtype
-    return -float(problem.hartmann) * (
-        radial * jnp.asarray(sine, dtype=dtype) + azimuthal * jnp.asarray(cosine, dtype=dtype)
-    )
+    """Return ``(J x B)_z`` at cell centres: the transpose of :func:`_face_emf`, from the same currents."""
+    sine, cosine = (jnp.asarray(value, dtype=currents[0].dtype) for value in _angles(problem.grid))
+    radial = face_average_adjoint(currents[0], 0, _WALL).data
+    azimuthal = face_average_adjoint(currents[1], 1, _WRAP).data
+    return -float(problem.hartmann) * (radial * sine + azimuthal * cosine)
 
 
-def _potential(velocity: Field, problem: PipeProblem, factorization) -> Field:
-    """Solve the charge balance for the potential the velocity induces."""
+def _potential(velocity: Field, problem: PipeProblem, factorization) -> tuple[Field, Field | None]:
+    """Solve the charge balance directly for the induced potential and the wall's (``None`` if insulating)."""
     conditions = problem.conditions
     motional = tuple(
         wall_insulated(component, axis, conditions[axis])
@@ -184,26 +187,16 @@ def _potential(velocity: Field, problem: PipeProblem, factorization) -> Field:
     )
     source = divergence(motional)
     if not problem.wall_conductance:
-        return factorization.solve(source)
-
-    def operator(potential: Field) -> Field:
-        zero = potential.replace_data(jnp.zeros_like(potential.data))
-        currents = _face_currents(zero, potential, problem)
-        balance = divergence(currents)
-        return balance.replace_data(-balance.data)
-
-    def solve(matvec, target):
-        return solvax.gmres(matvec, target, precond=factorization.solve, rtol=1.0e-12, max_restarts=20).x
-
-    return jax.lax.custom_linear_solve(operator, source, solve, solve)
+        return factorization.solve(source), None
+    return factorization.solve_with_wall(source)
 
 
 def pipe_residual(velocity: Field, problem: PipeProblem, factorization) -> Field:
     """Return the steady axial momentum residual of a candidate velocity."""
     from .ops import laplacian
 
-    potential = _potential(velocity, problem, factorization)
-    currents = _face_currents(velocity, potential, problem)
+    potential, wall = _potential(velocity, problem, factorization)
+    currents = _face_currents(velocity, potential, problem, wall)
     viscous = laplacian(velocity, (_WALL, _WRAP, _WRAP))
     return velocity.replace_data(viscous.data + _axial_force(currents, problem) + float(problem.forcing))
 
@@ -239,7 +232,7 @@ def solve_pipe(problem: PipeProblem, *, tolerance: float = 1.0e-11, max_restarts
             f"the pipe solve did not converge: residual {remaining:.3e} against a drive of {scale:.3e}; "
             "raise max_restarts or resolve the wall layer"
         )
-    return velocity, _potential(velocity, problem, factorization)
+    return velocity, _potential(velocity, problem, factorization)[0]
 
 
 def flow_rate(velocity: Field) -> float:

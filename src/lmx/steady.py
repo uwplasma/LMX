@@ -14,15 +14,15 @@ that :math:`\\mathbf u` induces. A root of :math:`\\mathbf R` is a steady state
 of :func:`lmx.core3d.step`, and the projection keeps the iteration inside the
 subspace the time stepper never leaves.
 
-Without advection and with insulating walls the residual is affine,
+Without advection the residual is affine,
 :math:`\\mathbf R(\\mathbf u) = A\\mathbf u + \\mathbf b`, and :math:`-A` is
 symmetric positive definite on the constrained divergence-free fields in the
 face-volume inner product, because the electromotive and force interpolations
-are discrete adjoints. That case is one preconditioned conjugate-gradient
-solve, differentiated by one more. Advection, or a conducting wall, whose
-closure is not symmetric, takes matrix-free Newton-Krylov with restarted
-GMRES, and the implicit function theorem differentiates its root with tangent
-and transpose solves. Neither keeps more than a restart cycle of vectors.
+are discrete adjoints and the thin-wall closure is a symmetric direct solve.
+That case is one preconditioned conjugate-gradient solve, differentiated by
+one more. Advection takes matrix-free Newton-Krylov with restarted GMRES, and
+the implicit function theorem differentiates its root with tangent and
+transpose solves. Neither keeps more than a restart cycle of vectors.
 
 The preconditioner projects a viscous inverse damped at :math:`\\sigma|B|^2/\\rho`
 in every component, approaching :math:`(\\lambda - \\nu\\nabla^2)^{-1}` as the
@@ -266,7 +266,7 @@ def solve_steady_state(
 ) -> SteadySolution:
     """Find the steady state, differentiably, in memory independent of the iteration count.
 
-    Without advection and with insulating walls the problem is affine and
+    Without advection, with insulating or thin conducting walls, the problem is affine and
     symmetric, and one preconditioned conjugate-gradient solve answers it; its
     budget is ``linear_restart * linear_max_restarts`` iterations, and
     ``linear_tolerance`` does not apply. Otherwise matrix-free Newton-Krylov
@@ -296,9 +296,7 @@ def solve_steady_state(
 
     precond = _preconditioner(problem, factorization, viscous, step)
 
-    # The thin-wall closure is not symmetric yet (plan step 1.3b), so CG and its
-    # symmetric adjoint are reserved for insulating walls.
-    if problem.advection == "off" and not problem.conducting_walls:
+    if problem.advection == "off":
         root, _ = _stokes_limit_root(
             problem,
             jax.lax.stop_gradient(_orthogonal_projection(start, problem, factorization)),

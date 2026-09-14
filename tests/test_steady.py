@@ -194,8 +194,8 @@ def test_the_adjoint_matches_finite_differences(cells, hartmann, conductance):
     np.testing.assert_allclose(compiled_value, value, rtol=1e-10, atol=1e-12)
     np.testing.assert_allclose(compiled_gradient, gradient, rtol=1e-8, atol=1e-12)
     # The compiled objective is held to the eager one, then reused for the differences:
-    # an eager call traces and compiles the Newton loop, and a conducting wall's nested
-    # potential GMRES, every time, which was most of this test's cost.
+    # an eager call traces and compiles the steady solve every time, which was most of
+    # this test's cost.
     compiled = jax.jit(throughput)
     assert float(compiled(1.0, 1.0)) == pytest.approx(float(value), rel=1e-10)
     size = 1.0e-5
@@ -366,14 +366,14 @@ def test_the_stokes_operator_is_symmetric_on_a_layer_mesh(conductance):
     The Stokes-limit residual is affine in the velocity. Its linear part was
     symmetric in the face-volume inner product on a uniform mesh and 1e-2 away
     from it on this one, because the force was interpolated with a stencil that
-    was not the transpose of the electromotive one. The conducting wall is not
-    gated here: its closure is first order and is replaced in plan step 1.3b.
+    was not the transpose of the electromotive one. A thin conducting wall is a
+    sheet of potential joined to the fluid by the half-cell flux and solved
+    directly, so it keeps the operator symmetric as well.
     """
     problem = duct_problem(hartmann=100.0, cells=32, wall_conductance=conductance)
     forward, backward, energy = _stokes_operator_samples(problem)
     asymmetry = abs(forward - backward) / max(abs(forward), abs(backward))
-    if not conductance:
-        assert asymmetry <= 1e-12
+    assert asymmetry <= 1e-12
     # Viscosity and Joule dissipation both remove energy.
     assert energy < 0.0
 
@@ -439,14 +439,18 @@ def test_a_wall_of_no_conductance_is_the_insulating_duct():
         _mean(problem, solve_steady_state(problem, pseudo_step=100.0).velocity)
         for problem in (_duct(16, 5.0), _duct(16, 5.0, conductance=0.0))
     ]
-    assert rates[0] == pytest.approx(rates[1], rel=1e-14)
+    assert rates[0] == rates[1]
 
 
-def test_the_answer_follows_the_hartmann_number_and_not_the_conductivity():
-    """Only `sigma B^2` is physical, so the potential has to be scaled by sigma."""
+@pytest.mark.parametrize("conductance", [0.0, 0.027])
+def test_the_answer_follows_the_hartmann_number_and_not_the_conductivity(conductance):
+    """Only `sigma B^2` is physical, so the potential has to be scaled by sigma, and a sheet's conduction with it."""
     rates = [
         _mean(problem, solve_steady_state(problem, pseudo_step=100.0).velocity)
-        for problem in (_duct(16, 5.0), _duct(16, 5.0, conductivity=4.0))
+        for problem in (
+            _duct(16, 5.0, conductance=conductance),
+            _duct(16, 5.0, conductance=conductance, conductivity=4.0),
+        )
     ]
     assert rates[0] == pytest.approx(rates[1], rel=1e-12)
 

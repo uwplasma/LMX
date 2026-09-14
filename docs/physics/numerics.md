@@ -265,8 +265,28 @@ stretched mesh: with it the steady operator was asymmetric by 1e-2 on a Ha 100
 layer mesh and the ohmic identity was off by up to 3e-3. The two interpolations
 coincide on uniform cells. On the layer meshes of the validation ladder the face
 average moves each insulating duct flow rate towards the spectral reference, by
-at most 0.3 % of it. The pipe solver of `lmx.pipe` keeps its own interpolation
-pair for now.
+at most 0.3 % of it. The pipe solver of `lmx.pipe` uses the same pair, with the
+polar rotation of the field taken at the cell centres.
+
+A thin conducting wall of conductance ratio $c=\sigma_w t_w/(\sigma a)$ is a
+sheet with a potential $\varphi_w$ of its own (Walker's condition). The fluid
+reaches it across the half cell against the wall,
+$J_n=\sigma(\varphi_P-\varphi_w)/(h_P/2)$, and the sheet carries that current
+along itself, $J_n=-c\,\sigma\nabla_\tau^2\varphi_w$, with the five-point surface
+Laplacian in the metric of the wall. On the wall-normal axis the sheet is one
+more node, weighted by $c$ times the wall area where a cell is weighted by its
+volume, so the tangential operators act on it as on a cell and the potential
+operator stays a Kronecker sum. The solve is therefore the same three
+contractions as for an insulating wall (`lmx.poisson.fast_diagonal_thin_wall_poisson`
+and the `wall_conductance` option of the polar factorization), with no inner
+Krylov iteration, and it is symmetric in the cell volumes. Taking the adjacent
+cell value as the wall potential, as before, was first order: a manufactured
+wall potential now converges at second order, the ohmic identity closes to
+round-off through the wall, and the conducting pipe reaches second order
+under joint refinement. Where two conducting walls meet, the corner node
+joins the sheets in series, so one delivers what the other receives, and a
+rank-four Woodbury correction per mode of the third axis removes the conduction
+the Kronecker sum would otherwise give the corner edge.
 
 These modules supply geometry, operators, the scalar solve and the electric
 coupling. The momentum discretization and the time loop follow in their own plan

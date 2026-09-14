@@ -204,20 +204,24 @@ def test_the_ohmic_identity_is_exact_on_a_layer_mesh(hartmann, cells):
 
 
 def test_a_conducting_wall_takes_power_out_through_the_boundary():
-    """Leaving the boundary work out is a large error, not a small one."""
+    """Leaving the boundary work out is a large error; with it the ohmic identity closes to round-off.
+
+    The sheet takes its current across the half cell and dissipates it at its own potential. The adjacent
+    cell value as the wall potential left a first-order defect: 2.7e-3 and 1.3e-3 on these meshes.
+    """
     budgets = {}
     for cells in (12, 24):
         problem = _uniform_duct(cells, conductance=0.05)
-        budgets[cells] = energy_budget(advance(problem, 20).velocity, problem)
+        budgets[cells] = energy_budget(
+            advance(problem, 20, viscous=problem.viscous_factorizations()).velocity, problem
+        )
     budget = budgets[12]
     assert float(budget.wall) > 0.0
-    # Dropping the boundary work is a percent-level error, an order above the closure itself.
+    # Dropping the boundary work is a percent-level error.
     without = float(jnp.abs((budget.joule + budget.lorentz) / budget.scale))
-    assert without > 20.0 * abs(float(budget.ohmic_defect / budget.scale))
-    # The wall potential is the adjacent cell value, so the closure is first order.
-    assert abs(float(budgets[24].ohmic_defect / budgets[24].scale)) < 0.75 * abs(
-        float(budget.ohmic_defect / budget.scale)
-    )
+    assert without > 1.0e-2
+    for budget in budgets.values():
+        assert abs(float(budget.ohmic_defect / budget.scale)) < 1e-12
 
 
 def test_the_budget_is_the_rate_of_change_of_kinetic_energy():
