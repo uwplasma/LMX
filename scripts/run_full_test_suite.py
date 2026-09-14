@@ -36,6 +36,8 @@ _TEST_SHARDS = {
         "tests/test_benchmarks.py",
         "tests/test_example_runner.py",
         "tests/test_design.py",
+    ),
+    "operators": (
         "tests/test_advect.py",
         "tests/test_grid.py",
         "tests/test_ops.py",
@@ -46,8 +48,36 @@ _TEST_SHARDS = {
         "tests/test_momentum_placement_oracle.py",
     ),
     "fringing": ("tests/test_fringing.py",),
+    "fringing_pipe": tuple(
+        f"tests/test_fringing.py::{name}"
+        for name in (
+            "test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow",
+            "test_pipe_fields_share_the_production_update_and_checked_derivative",
+            "test_pipe_projection_supports_explicit_conducting_annulus_and_fixed_flow",
+            "test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradient",
+        )
+    ),
     "channel": ("tests/test_core3d.py", "tests/test_pipe.py"),
+    "plane": tuple(
+        f"tests/test_core3d.py::{name}"
+        for name in (
+            "test_implicit_and_explicit_viscosity_reach_the_same_steady_state",
+            "test_the_plane_channel_converges_at_second_order",
+            "test_plane_channel_matches_the_analytic_parabola",
+            "test_a_transverse_field_reduces_the_channel_throughput",
+        )
+    ),
     "steady": ("tests/test_steady.py",),
+    "gradients": tuple(
+        f"tests/test_steady.py::{name}"
+        for name in (
+            "test_the_adjoint_matches_finite_differences",
+            "test_the_adjoint_matches_finite_differences_where_the_layers_are_thin",
+            "test_the_adjoint_matches_finite_differences_in_a_varying_field",
+            "test_a_rejected_root_cannot_produce_a_finite_objective_or_gradient",
+            "test_a_failed_tangent_solve_is_rejected_eagerly_and_under_jit",
+        )
+    ),
     "physics": (
         "tests/test_physics.py",
         "tests/test_q2d_identities.py",
@@ -168,6 +198,23 @@ def _test_environment() -> dict[str, str]:
     return environment
 
 
+def _shard_selection(shards: tuple[str, ...]) -> list[str]:
+    """Return the pytest arguments selecting the union of ``shards``.
+
+    A shard may claim single test functions (``file::test``) of a file another shard
+    owns. The owner deselects them, so a test added to that file later runs with it.
+    """
+    entries = list(dict.fromkeys(entry for shard in shards for entry in _TEST_SHARDS[shard]))
+    files = {entry for entry in entries if "::" not in entry}
+    selection = [entry for entry in entries if entry.split("::", 1)[0] not in files or "::" not in entry]
+    for shard, others in _TEST_SHARDS.items():
+        if shard not in shards:
+            for entry in others:
+                if "::" in entry and entry.split("::", 1)[0] in files:
+                    selection.extend(("--deselect", entry))
+    return selection
+
+
 def _default_workers() -> int:
     return max(1, min(6, os.cpu_count() or 1))
 
@@ -185,7 +232,7 @@ def main(argv: list[str] | None = None) -> int:
         help="run only tests affected since a Git ref; implies --no-coverage",
     )
     parser.add_argument("--no-compilation-cache", action="store_true")
-    parser.add_argument("--shard", choices=tuple(_TEST_SHARDS))
+    parser.add_argument("--shard", action="append", choices=tuple(_TEST_SHARDS), help="repeatable")
     parser.add_argument("--tier", choices=tuple(_TEST_TIERS))
     parser.add_argument("--coverage-fail-under", type=float, default=95.0)
     parser.add_argument("--coverage-xml", default="coverage.xml")
@@ -195,7 +242,7 @@ def main(argv: list[str] | None = None) -> int:
 
     workers = args.workers
     if workers is None:
-        workers = 1 if args.shard == "support" else _default_workers()
+        workers = 1 if args.shard == ["support"] else _default_workers()
     if workers < 1:
         parser.error("--workers must be positive")
     if args.budget_seconds <= 0.0:
@@ -249,9 +296,7 @@ def main(argv: list[str] | None = None) -> int:
         command.extend(("-m", _TEST_TIERS[args.tier]))
     elif not args.shard and not selected_tests:
         command.extend(("-m", "not curated"))
-    command.extend(_TEST_SHARDS[args.shard] if args.shard else selected_tests or ["tests"])
-    if args.shard == "fringing":
-        command.extend(("-k", f"not {_HEAVY_FRINGING_TEST}"))
+    command.extend(_shard_selection(tuple(args.shard)) if args.shard else selected_tests or ["tests"])
 
     environment = _test_environment()
     environment.setdefault("MPLBACKEND", "Agg")

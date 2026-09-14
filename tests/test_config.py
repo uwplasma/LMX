@@ -93,18 +93,24 @@ def test_ci_tiers_cover_collection_without_overlapping_pr_work():
     assert covered == tiers["unit"] | tiers["regression"]
 
 
-def _shard_members(all_tests: set[str], shard: str) -> set[str]:
-    """Return the tests a file shard runs, mirroring the runner's own selection."""
-    from scripts.run_full_test_suite import _HEAVY_FRINGING_TEST, _TEST_SHARDS
+def _shard_members(all_tests: set[str], shards: str) -> set[str]:
+    """Return the tests the runner selects for space-separated shards, with pytest's semantics.
 
-    entries = _TEST_SHARDS[shard]
-    files = {entry for entry in entries if "::" not in entry}
-    nodes = tuple(entry for entry in entries if "::" in entry)
-    members = {test for test in all_tests if test.split("::", 1)[0] in files}
-    members |= {test for test in all_tests if test.startswith(nodes)} if nodes else set()
-    if shard == "fringing":
-        members -= {test for test in all_tests if _HEAVY_FRINGING_TEST in test}
-    return members
+    A path selects its file, ``file::test`` that function and its parametrizations,
+    and ``--deselect`` removes every node id it prefixes.
+    """
+    from scripts.run_full_test_suite import _shard_selection
+
+    arguments = _shard_selection(tuple(shards.split()))
+    deselected = tuple(arguments[index + 1] for index, value in enumerate(arguments) if value == "--deselect")
+    paths = [value for value in arguments if value != "--deselect" and value not in deselected]
+    members = {
+        test
+        for test in all_tests
+        for path in paths
+        if test.split("::", 1)[0] == path or test == path or test.startswith(path + "[")
+    }
+    return {test for test in members if not test.startswith(deselected)}
 
 
 @pytest.mark.parametrize("x64", ["false", "true"])
