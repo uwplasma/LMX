@@ -24,10 +24,13 @@ one more. Advection takes matrix-free Newton-Krylov with restarted GMRES, and
 the implicit function theorem differentiates its root with tangent and
 transpose solves. Neither keeps more than a restart cycle of vectors.
 
-The preconditioner projects a viscous inverse damped at :math:`\\sigma|B|^2/\\rho`
-in every component, approaching :math:`(\\lambda - \\nu\\nabla^2)^{-1}` as the
-pseudo-step grows. Its conditioning still degrades with the Hartmann number on
-layer-resolving meshes, so the iteration count grows with it.
+The preconditioner is a projected per-component inverse. A component along a
+periodic axis, across an axis-aligned field, is solved exactly along each field
+line in the discrete induction form of the insulating duct, and approximately
+across the lines. The other components take a viscous inverse damped at
+:math:`\\sigma|B|^2/\\rho`. On ``duct_problem`` meshes of 48 cells, CG needs
+4 / 15 / 44 / 79 iterations at Ha 20 / 100 / 300 / 1000, against 33 / 148 /
+403 / 804 with the damped inverse alone, and 68 against 714 on 64 cells at Ha 1000.
 
 Primal residuals and tangent/transpose convergence are certified. Rejection
 raises eagerly; during tracing, it produces nonfinite fields and derivatives
@@ -55,9 +58,14 @@ from .core3d import (
     velocity_offset,
     zero_velocity,
 )
-from .grid import Field
+from .grid import CENTER, FACE, Field
 from .ops import face_inner_product, staggered_laplacian
-from .poisson import FastDiagonalHelmholtz, FastDiagonalPoisson, fast_diagonal_helmholtz
+from .poisson import (
+    FastDiagonalHelmholtz,
+    FastDiagonalPoisson,
+    assemble_staggered_axis_operator,
+    fast_diagonal_helmholtz,
+)
 
 __all__ = ["SteadySolution", "solve_steady_state", "steady_residual"]
 
@@ -118,13 +126,14 @@ def steady_residual(
 def _preconditioner(
     problem: ChannelProblem,
     factorization: FastDiagonalPoisson,
-    viscous: tuple[FastDiagonalHelmholtz, ...],
+    viscous: tuple,
     pseudo_step: float,
 ):
     """One projection step: the conjugate-gradient and the Newton-GMRES preconditioner.
 
+    ``viscous`` holds one solve per component, from :func:`_projection_solves`.
     It ends in :func:`lmx.core3d.project`, whose copy of the first periodic face
-    completes the viscous solve, which returns that duplicate face as zero.
+    completes a solve that returns that duplicate face as zero.
 
     ``viscous`` has to be factorized at ``pseudo_step`` and not at the problem's
     own step: a preconditioner built at the wrong step is a different operator,
@@ -165,6 +174,131 @@ def _isotropic_viscous(problem: ChannelProblem, pseudo_step: float) -> tuple[Fas
         )
         for component in range(3)
     )
+
+
+_factor_lines = jax.jit(jax.vmap(functools.partial(solvax.lu_factor_banded, lower_bw=2, upper_bw=2)))
+
+
+class _FieldLine:
+    """The projection-step solve of a velocity component across an axis-aligned field.
+
+    With insulating walls and a flow invariant along the component, the
+    divergence-free face currents are the discrete curl of a streamfunction on the
+    cell edges, so the component's Lorentz operator is ``lambda K* L^-1 K``: ``K``
+    is the compact gradient along the field after the average onto the
+    electromotive faces, ``L`` the edge Laplacian. Its inverse is the velocity
+    block of ``[[S, tau c K*], [-tau c K, S_e]]``, ``S = 1 - tau nu Lap`` at both
+    positions and ``c^2 = lambda nu``: Shercliff's induction form. Along the field
+    the block is pentadiagonal with velocity and streamfunction interleaved, and
+    each line is factorized once. Across it the velocity eigenbasis carries the
+    block, each mode's average represented by its norm and the edge Laplacian by
+    its Rayleigh quotient, which is exact on uniform or periodic axes. A wide
+    collocated difference in place of ``K`` misses the checkerboard modes, and its
+    condition number grows with the Hartmann number instead.
+    """
+
+    def __init__(self, problem: ChannelProblem, component: int, axis: int, pseudo_step: float):
+        grid, coefficient = problem.grid, pseudo_step * float(problem.viscosity)
+        conditions = tuple(velocity_condition(problem.conditions, position) for position in range(3))
+        offset = velocity_offset(component)
+        edge = tuple(CENTER if position == component else FACE for position in range(3))
+        velocity = fast_diagonal_helmholtz(grid, offset, conditions, coefficient=coefficient)
+        stream = fast_diagonal_helmholtz(grid, edge, conditions, coefficient=coefficient)
+        self.velocity, self.axis = velocity, axis
+        self.across = [position for position in range(3) if position != axis]
+        weights, laplacians = [], []
+        for at in self.across:
+            average = _average(np.asarray(grid.widths[at]), offset[at], conditions[at])
+            unscaled = velocity.vectors[at] / velocity.scales[at][:, None]
+            modes = stream.vectors[at].T @ (stream.scales[at][:, None] * (average @ unscaled))
+            weights.append(np.sum(modes**2, axis=0))
+            laplacians.append(stream.values[at] @ modes**2 / np.maximum(weights[-1], np.finfo(float).tiny))
+
+        def pair(first, second):
+            return (first[:, None] + second[None, :]).reshape(-1)
+
+        rate = float(problem.conductivity) * float(np.dot(problem.magnetic_field, problem.magnetic_field))
+        speed = pseudo_step * np.sqrt(rate * float(problem.viscosity) / float(problem.density))
+        shift = 1.0 - coefficient * pair(*(velocity.values[at] for at in self.across))
+        coefficients = [np.ones_like(shift), shift, 1.0 - coefficient * pair(*laplacians)]
+        coefficients.append(speed * np.sqrt(np.outer(*weights).reshape(-1)))
+        widths = np.asarray(grid.widths[axis])
+        size, distances = 2 * widths.size - 1, 0.5 * (widths[:-1] + widths[1:])
+        gradient = np.diff(np.eye(widths.size), axis=0) / distances[:, None]
+        u, e = np.arange(0, size, 2), np.arange(1, size, 2)
+        blocks = np.zeros((4, size, size))
+        for index, at in ((u, offset), (e, edge)):
+            operator = assemble_staggered_axis_operator(grid, axis, at, conditions[axis])
+            blocks[0][np.ix_(index, index)] = -coefficient * operator
+        blocks[1][u, u], blocks[2][e, e] = 1.0, 1.0
+        blocks[3][np.ix_(u, e)] = gradient.T * distances[None, :] / widths[:, None]
+        blocks[3][np.ix_(e, u)] = -gradient
+        # solvax band storage: bands[r, j] = A[j + r - 2, j].
+        rows = np.arange(5)[:, None] + np.arange(size)[None, :] - 2
+        inside = (rows >= 0) & (rows < size)
+        bands = np.where(inside, blocks[:, np.clip(rows, 0, size - 1), np.arange(size)], 0.0)
+        self.factors = _factor_lines(jnp.asarray(np.einsum("km,krj->mrj", np.stack(coefficients), bands)))
+
+    def solve(self, rhs: Field) -> Field:
+        velocity = self.velocity
+        data = rhs.data[velocity.slices]
+        for at in self.across:
+            data = _modal(data * _along(velocity.scales[at], at, data), velocity.vectors[at].T, at)
+        lines = jnp.moveaxis(data, self.axis, -1)
+        flat = lines.reshape(-1, lines.shape[-1])
+        interleaved = jnp.zeros((flat.shape[0], 2 * flat.shape[1] - 1), flat.dtype).at[:, ::2].set(flat)
+        flat = jax.vmap(solvax.lu_solve_banded)(self.factors, interleaved)[:, ::2]
+        data = jnp.moveaxis(flat.reshape(lines.shape), -1, self.axis)
+        for at in self.across:
+            data = _modal(data, velocity.vectors[at], at) / _along(velocity.scales[at], at, data)
+        return rhs.replace_data(jnp.zeros_like(rhs.data).at[velocity.slices].set(data))
+
+
+def _along(values: np.ndarray, axis: int, like: jnp.ndarray) -> jnp.ndarray:
+    shape = [-1 if position == axis else 1 for position in range(3)]
+    return jnp.asarray(values.reshape(shape), dtype=like.dtype)
+
+
+def _modal(data: jnp.ndarray, matrix: np.ndarray, axis: int) -> jnp.ndarray:
+    matrix = jnp.asarray(matrix, dtype=data.dtype)
+    return jnp.moveaxis(jnp.tensordot(matrix, data, axes=([1], [axis])), 0, axis)
+
+
+def _average(widths: np.ndarray, position: float, condition) -> np.ndarray:
+    """The electromotive average between free entries: centres to faces, or its half-weight transpose."""
+    count = widths.size
+    if condition.is_periodic:
+        faces, left, right = np.arange(count), (np.arange(count) - 1) % count, np.arange(count)
+    else:
+        faces, left, right = np.arange(count - 1), np.arange(count - 1), np.arange(1, count)
+    share = widths[left] / (widths[left] + widths[right])
+    matrix = np.zeros((faces.size, count) if position == CENTER else (count, faces.size))
+    for cells, weight in ((left, share), (right, 1.0 - share)):
+        if position == CENTER:
+            np.add.at(matrix, (faces, cells), weight)
+        else:
+            np.add.at(matrix, (cells, faces), 0.5)
+    return matrix
+
+
+def _projection_solves(problem: ChannelProblem, pseudo_step: float) -> tuple:
+    """Field lines for a periodic-axis component across an axis-aligned walled field; damped otherwise.
+
+    The induction form is exact for a component along an axis the flow is
+    invariant on, which only a periodic axis can be. The other components keep one
+    common damping, since the projection couples them and different shifts
+    reopen the Schur-complement deficit. Field lines on those as well gave CG 85
+    iterations instead of 44 on ``duct_problem(hartmann=300, cells=48)``, and
+    1408 instead of 540 on the Ha 1000 test mesh.
+    """
+    solves = list(_isotropic_viscous(problem, pseudo_step))
+    field = np.asarray(problem.magnetic_field, dtype=float) * float(problem.conductivity)
+    axis = int(np.argmax(np.abs(field)))
+    if np.count_nonzero(field) == 1 and not problem.conditions[axis].is_periodic:
+        for component in range(3):
+            if component != axis and problem.conditions[component].is_periodic:
+                solves[component] = _FieldLine(problem, component, axis, pseudo_step)
+    return tuple(solves)
 
 
 def _face_weights(problem: ChannelProblem) -> tuple[Field, Field, Field]:
@@ -286,7 +420,7 @@ def solve_steady_state(
             raise ValueError(f"{name} must be positive and finite")
     with jax.ensure_compile_time_eval():
         factorization = problem.factorization()
-        viscous = _isotropic_viscous(problem, step)
+        viscous = _projection_solves(problem, step)
     start = zero_velocity(problem) if velocity is None else enforce_face_constraints(velocity, problem)
 
     def residual(state):
