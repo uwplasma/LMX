@@ -428,14 +428,20 @@ def benchmark_scaling() -> None:
             axes[2].loglog(
                 shared, [cpu[n] / gpu[n] for n in shared], style, marker="o", ms=4, color=color, label=label
             )
+    low, high = axes[2].get_ylim()
+    axes[2].set_ylim(min(low, 5.0), max(high, 30.0))
     for target, name in ((10.0, "3-D core target"), (20.0, "Q2D target")):
         axes[2].axhline(target, color="k", ls=":", lw=1)
         axes[2].annotate(name, (axes[2].get_xlim()[0], target), fontsize=7, va="bottom")
+    plain = matplotlib.ticker.FuncFormatter(lambda value, _: f"{value:g}x")
+    axes[2].yaxis.set_major_formatter(plain)
+    axes[2].yaxis.set_minor_formatter(plain)
+    axes[2].tick_params(axis="y", which="minor", labelsize=7)
     axes[2].set_xlabel("cells")
     axes[2].set_ylabel("GPU speed-up over CPU")
     axes[2].set_title("Targets: 10x (3-D core), 20x (Q2D)", fontsize=11)
     axes[2].legend(frameon=False, fontsize=8)
-    _save_webp(fig, STATIC / "device_scaling.webp")
+    _save_webp(fig, STATIC / "device_scaling.webp", dpi=100)
 
 
 def _save_webp(fig: plt.Figure, path: Path, dpi: int = 120) -> None:
