@@ -27,7 +27,7 @@ import jax
 import jax.numpy as jnp
 
 from .core3d import ChannelProblem, face_currents, face_lorentz_force, step, velocity_condition, zero_velocity
-from .em import lorentz_force
+from .em import lorentz_force, wall_insulated
 from .grid import Field
 from .ops import divergence, face_inner_product, staggered_laplacian
 from .poisson import FastDiagonalHelmholtz, FastDiagonalPoisson
@@ -133,7 +133,9 @@ def energy_budget(
     scalar = problem.scalar_conditions
     conditions = tuple(velocity_condition(problem.conditions, axis) for axis in range(3))
     potential, currents, field = face_currents(velocity, problem, factorization)
-    force = lorentz_force(currents, field, scalar)
+    force = lorentz_force(
+        tuple(wall_insulated(c, axis, scalar[axis]) for axis, c in enumerate(currents)), field, scalar
+    )
     density = float(problem.density)
     drive = sum(
         float(problem.forcing[axis])

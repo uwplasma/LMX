@@ -237,6 +237,65 @@ def test_the_adjoint_matches_finite_differences_where_the_layers_are_thin(hartma
     assert float(gradient[1]) < 0.0
 
 
+def _varying_duct() -> ChannelProblem:
+    """``B_y`` varying along a Ha 20 duct with a thin wall, and a ``B_x`` across it."""
+    duct = duct_problem(hartmann=20.0, cells=24, wall_conductance=0.05)
+    grid = Grid(uniform_faces(4, 0.0, 4.0), duct.grid.y_faces, duct.grid.z_faces)
+    x, y = grid.centers[0][:, None, None], grid.centers[1][None, :, None]
+    along = 20.0 * (0.75 + 0.25 * np.cos(np.pi * x / 2.0)) * np.ones(grid.shape)
+    across = -2.0 * np.sin(np.pi * x / 2.0) * y * np.ones(grid.shape)
+    return dataclasses.replace(duct, grid=grid, magnetic_field=(across, along, 0.0))
+
+
+def test_a_varying_field_takes_the_damped_preconditioner_and_still_converges():
+    """The field-line solve is exact only for a uniform axis-aligned field, so a varying one falls back.
+
+    Every component then takes the damped inverse at the peak ``|B|^2``; the operator stays symmetric to
+    the round-off of this layer mesh (8e-12 for a uniform field) and CG certifies the solve.
+    """
+    from lmx.poisson import FastDiagonalHelmholtz
+    from lmx.steady import _projection_solves
+
+    problem = _varying_duct()
+    solves = _projection_solves(problem, 1.0e3)
+    peak = 1.0 + 1.0e3 * float(
+        np.max(problem.magnetic_field.components[0] ** 2 + problem.magnetic_field.components[1] ** 2)
+    )
+    assert all(
+        isinstance(solve, FastDiagonalHelmholtz) and solve.shift == pytest.approx(peak) for solve in solves
+    )
+    forward, backward, energy = _stokes_operator_samples(problem)
+    assert abs(forward - backward) <= 1e-11 * max(abs(forward), abs(backward)) and energy < 0.0
+    solution = solve_steady_state(problem, pseudo_step=1.0e3, tolerance=1.0e-8)
+    assert np.isfinite(float(solution.residual_norm)) and _mean(problem, solution.velocity) > 0.0
+
+
+def test_the_adjoint_matches_finite_differences_in_a_varying_field():
+    """Plan step 1.9a: ``B_y`` varying along the duct and a ``B_x`` across it, with a thin wall, at Ha 20.
+
+    Measured against central differences: 3.1e-11 in the drive and 5.8e-9 in the field scale (4.3e-9
+    without the wall). A three-dimensional pressure leaves the conjugate-gradient solve a floor near 1e-9
+    of its right-hand side, where a uniform field reaches 2e-13, so the tolerance sits above it.
+    """
+    problem = _varying_duct()
+
+    def throughput(drive, scale):
+        solution = solve_steady_state(
+            problem, pseudo_step=1.0e3, forcing=(drive, 0.0, 0.0), field_scale=scale, tolerance=1.0e-9
+        )
+        return jnp.mean(solution.velocity[0].data)
+
+    _, gradient = jax.jit(jax.value_and_grad(throughput, argnums=(0, 1)))(1.0, 1.0)
+    compiled, size = jax.jit(throughput), 1.0e-4
+    for index in range(2):
+        raised, lowered = [1.0, 1.0], [1.0, 1.0]
+        raised[index] += size
+        lowered[index] -= size
+        difference = (compiled(*raised) - compiled(*lowered)) / (2.0 * size)
+        assert float(gradient[index]) == pytest.approx(float(difference), rel=1e-6)
+    assert float(gradient[1]) < 0.0
+
+
 def _random_velocity(problem: ChannelProblem, seed: int):
     """A random velocity with no constraint imposed: wall faces and periodic copies are free."""
     from lmx.core3d import velocity_offset
@@ -398,7 +457,7 @@ def test_mixed_precision_reaches_the_same_steady_duct():
     assert mixed == pytest.approx(state, rel=1e-9)
 
 
-@pytest.mark.parametrize("conductance", [0.0, 0.05])
+@pytest.mark.parametrize("conductance", [0.0, 0.05, (0.0, 0.0, 0.05)])
 def test_the_stokes_operator_is_symmetric_on_a_layer_mesh(conductance):
     """The electromotive and force interpolations are adjoint, so conjugate gradients apply.
 
@@ -409,11 +468,31 @@ def test_the_stokes_operator_is_symmetric_on_a_layer_mesh(conductance):
     sheet of potential joined to the fluid by the half-cell flux and solved
     directly, so it keeps the operator symmetric as well.
     """
-    problem = duct_problem(hartmann=100.0, cells=32, wall_conductance=conductance)
+    # The last case conducts along the side walls, parallel to the field: 1.1e-3 asymmetric at Ha 20 while
+    # the half-cell current into a wall pushed on the field with no electromotive force to match.
+    walls = conductance if isinstance(conductance, tuple) else (0.0, conductance, 0.0)
+    problem = dataclasses.replace(duct_problem(hartmann=100.0, cells=32), wall_conductance=walls)
     forward, backward, energy = _stokes_operator_samples(problem)
     asymmetry = abs(forward - backward) / max(abs(forward), abs(backward))
     assert asymmetry <= 1e-12
     # Viscosity and Joule dissipation both remove energy.
+    assert energy < 0.0
+
+
+@pytest.mark.parametrize("conductance", [0.0, 0.05])
+def test_the_stokes_operator_stays_symmetric_in_a_varying_field(conductance):
+    """Plan step 1.9a: the ANL fringe and its solenoidal pair on a layer mesh, so conjugate gradients still apply.
+
+    Without the wall-face closure of :func:`lmx.core3d.electric_state` a thin wall's half-cell current
+    pushed on the fringe's ``B_x`` with no electromotive force to match: 1.0e-6 asymmetric at Ha 20.
+    """
+    from lmx.core3d import fringe_field
+
+    duct = duct_problem(hartmann=100.0, cells=32, wall_conductance=conductance)
+    grid = Grid(uniform_faces(8, -6.0, 6.0), duct.grid.y_faces, duct.grid.z_faces)
+    problem = dataclasses.replace(duct, grid=grid, magnetic_field=fringe_field(grid, strength=100.0))
+    forward, backward, energy = _stokes_operator_samples(problem)
+    assert abs(forward - backward) <= 1e-12 * max(abs(forward), abs(backward))
     assert energy < 0.0
 
 
@@ -498,6 +577,43 @@ def test_the_answer_follows_the_hartmann_number_and_not_the_conductivity(conduct
 def test_the_hunt_reference_values_are_what_the_spectral_solve_returns():
     for conductance, cached in HUNT_FLOW_RATE.items():
         assert flow_rate(20.0, 64, hartmann_wall=conductance) == pytest.approx(cached, rel=2e-4)
+
+
+@pytest.mark.parametrize(
+    ("variation", "bound"), [(0.2, 1e-2), pytest.param(0.1, 5e-3, marks=pytest.mark.slow)]
+)
+def test_each_station_of_a_gradually_varying_field_carries_its_local_shercliff_profile(variation, bound):
+    """Plan step 1.9a: ``B_y = 20 (1 + e cos(2 pi x / 32))``, variation length 25 (e = 0.2) and 50 (e = 0.1).
+
+    Bounds fixed before running: each station's profile, normalised by the flow rate, within 3 % of the
+    spectral one at its own field (the uniform-field mesh error here is 2 %) and within 1 % of this mesh's
+    uniform-field solve, half that at twice the length. Measured: 0.72 % and 0.25 % at 25, 0.66 % and
+    0.076 % at 50. The local pressure gradient is not local to the same degree: 4.6 % and 2.3 % from the
+    uniform-field value, halving with the curvature of the field.
+    """
+    from scipy.interpolate import BarycentricInterpolator
+
+    from validation.shercliff import duct_flow
+
+    duct = duct_problem(hartmann=20.0 * (1.0 + variation), cells=24)
+    grid = Grid(uniform_faces(16, 0.0, 32.0), duct.grid.y_faces, duct.grid.z_faces)
+    field = 20.0 * (1.0 + variation * np.cos(np.pi * grid.centers[0] / 16.0))
+    problem = dataclasses.replace(
+        duct, grid=grid, magnetic_field=(0.0, field[:, None, None] * np.ones(grid.shape), 0.0)
+    )
+    axial = np.asarray(solve_steady_state(problem, pseudo_step=1.0e3, tolerance=1.0e-8).velocity[0].data)
+    volumes = np.asarray(grid.cell_volumes())[0]
+    for face in (0, 4, 8):
+        hartmann = 0.5 * (field[face - 1] + field[face])
+        local = dataclasses.replace(duct, magnetic_field=(0.0, hartmann, 0.0))
+        uniform = np.asarray(solve_steady_state(local, pseudo_step=1.0e3).velocity[0].data)[0]
+        nodes, spectral, _ = duct_flow(hartmann, 40)
+        spectral = BarycentricInterpolator(nodes, spectral, axis=0)(grid.centers[1])
+        spectral = BarycentricInterpolator(nodes, spectral, axis=1)(grid.centers[2])
+        station = axial[face] / np.sum(axial[face] * volumes)
+        for reference, tolerance in ((spectral, 3e-2), (uniform, bound)):
+            shape = reference / np.sum(reference * volumes)
+            assert np.max(np.abs(station - shape)) <= tolerance * np.max(shape)
 
 
 def test_the_steady_state_closes_its_mechanical_power_balance():

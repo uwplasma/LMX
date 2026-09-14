@@ -25,10 +25,11 @@ the implicit function theorem differentiates its root with tangent and
 transpose solves. Neither keeps more than a restart cycle of vectors.
 
 The preconditioner is a projected per-component inverse. A component along a
-periodic axis, across an axis-aligned field, is solved exactly along each field
-line in the discrete induction form of the insulating duct, and approximately
-across the lines. The other components take a viscous inverse damped at
-:math:`\\sigma|B|^2/\\rho`. On ``duct_problem`` meshes of 48 cells, CG needs
+periodic axis, across a uniform axis-aligned field, is solved exactly along each
+field line in the discrete induction form of the insulating duct, and
+approximately across the lines. The other components, and all three in a
+varying field, take a viscous inverse damped at :math:`\\sigma|B|^2/\\rho` with
+the peak :math:`|B|^2` over the cells. On ``duct_problem`` meshes of 48 cells, CG needs
 4 / 15 / 44 / 79 iterations at Ha 20 / 100 / 300 / 1000, against 33 / 148 /
 403 / 804 with the damped inverse alone, and 68 against 714 on 64 cells at Ha 1000.
 
@@ -50,6 +51,7 @@ import solvax
 from .advect import momentum_advection
 from .core3d import (
     ChannelProblem,
+    ImposedField,
     electric_state,
     enforce_face_constraints,
     face_lorentz_force,
@@ -161,7 +163,7 @@ def _isotropic_viscous(problem: ChannelProblem, pseudo_step: float) -> tuple[Fas
     ``[2.2e-3, 2.0e3]`` and CG takes 3638 iterations; with one shift it spans
     ``[2.2e-3, 8.5]`` and CG takes 399.
     """
-    rate = float(problem.conductivity) * float(np.dot(problem.magnetic_field, problem.magnetic_field))
+    rate = float(problem.conductivity) * problem.peak_field_squared
     conditions = tuple(velocity_condition(problem.conditions, axis) for axis in range(3))
     return tuple(
         fast_diagonal_helmholtz(
@@ -217,7 +219,7 @@ class _FieldLine:
         def pair(first, second):
             return (first[:, None] + second[None, :]).reshape(-1)
 
-        rate = float(problem.conductivity) * float(np.dot(problem.magnetic_field, problem.magnetic_field))
+        rate = float(problem.conductivity) * problem.peak_field_squared
         speed = pseudo_step * np.sqrt(rate * float(problem.viscosity) / float(problem.density))
         shift = 1.0 - coefficient * pair(*(velocity.values[at] for at in self.across))
         coefficients = [np.ones_like(shift), shift, 1.0 - coefficient * pair(*laplacians)]
@@ -291,6 +293,8 @@ def _projection_solves(problem: ChannelProblem, pseudo_step: float) -> tuple:
     iterations instead of 44 on ``duct_problem(hartmann=300, cells=48)``, and
     1408 instead of 540 on the Ha 1000 test mesh.
     """
+    if isinstance(problem.magnetic_field, ImposedField):
+        return _isotropic_viscous(problem, pseudo_step)
     solves = list(_isotropic_viscous(problem, pseudo_step))
     field = np.asarray(problem.magnetic_field, dtype=float) * float(problem.conductivity)
     axis = int(np.argmax(np.abs(field)))
