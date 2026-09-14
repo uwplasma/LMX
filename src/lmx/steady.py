@@ -178,7 +178,21 @@ def _isotropic_viscous(problem: ChannelProblem, pseudo_step: float) -> tuple[Fas
     )
 
 
-_factor_lines = jax.jit(jax.vmap(functools.partial(solvax.lu_factor_banded, lower_bw=2, upper_bw=2)))
+def _factor_lines(bands: np.ndarray) -> solvax.BandedLUFactors:
+    """Factorize pentadiagonal lines on the host, in the storage of :func:`solvax.lu_solve_banded`.
+
+    Doolittle without pivoting: weighted by the widths, each block has a positive definite
+    symmetric part, so no pivot vanishes. On the host it compiles nothing and runs under
+    :func:`jax.ensure_compile_time_eval`, where JAX 0.6.2 cannot evaluate a scan.
+    """
+    lu, size = np.array(bands, dtype=float), bands.shape[-1]
+    for j in range(size - 1):
+        for i in range(1, min(3, size - j)):
+            lu[:, 2 + i, j] /= lu[:, 2, j]
+            for k in range(1, min(3, size - j)):
+                lu[:, 2 + i - k, j + k] -= lu[:, 2 + i, j] * lu[:, 2 - k, j + k]
+    lower, upper, scale = (jnp.asarray(part) for part in (lu[:, 3:], lu[:, :3], np.ones(lu.shape[::2])))
+    return solvax.BandedLUFactors(lower, upper, scale, jnp.zeros(lu.shape[0], jnp.int32))
 
 
 class _FieldLine:
@@ -239,7 +253,7 @@ class _FieldLine:
         rows = np.arange(5)[:, None] + np.arange(size)[None, :] - 2
         inside = (rows >= 0) & (rows < size)
         bands = np.where(inside, blocks[:, np.clip(rows, 0, size - 1), np.arange(size)], 0.0)
-        self.factors = _factor_lines(jnp.asarray(np.einsum("km,krj->mrj", np.stack(coefficients), bands)))
+        self.factors = _factor_lines(np.einsum("km,krj->mrj", np.stack(coefficients), bands))
 
     def solve(self, rhs: Field) -> Field:
         velocity = self.velocity
@@ -504,7 +518,8 @@ def _tangent_solve(operator, target, precond=None):
     ``precond`` is the primal projection step. The transposed solve uses its
     exact transpose: the step is symmetric only in the face-volume inner product,
     and GMRES measures in the Euclidean one, where a stretched mesh makes the two
-    differ by the width ratio.
+    differ by the width ratio. It is the step's pullback, because JAX 0.6.2 cannot
+    :func:`jax.linear_transpose` the scans of the field-line solve.
     """
 
     def solve(matvec, rhs):
@@ -513,7 +528,7 @@ def _tangent_solve(operator, target, precond=None):
     def transpose_solve(vecmat, rhs):
         if precond is None:
             return _krylov(vecmat, rhs)
-        transposed = jax.linear_transpose(precond, rhs)
+        _, transposed = jax.vjp(precond, rhs)
         return _krylov(vecmat, rhs, lambda direction: transposed(direction)[0])
 
     return jax.lax.custom_linear_solve(operator, target, solve, transpose_solve)
