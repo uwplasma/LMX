@@ -163,6 +163,18 @@ jobs:
           path: artifacts/test-evidence/physics
           key: lmx-test-evidence-${{ github.run_id }}-physics
           fail-on-cache-miss: true
+      - name: Restore channel evidence
+        uses: actions/cache/restore@v6
+        with:
+          path: artifacts/test-evidence/channel
+          key: lmx-test-evidence-${{ github.run_id }}-channel
+          fail-on-cache-miss: true
+      - name: Restore steady evidence
+        uses: actions/cache/restore@v6
+        with:
+          path: artifacts/test-evidence/steady
+          key: lmx-test-evidence-${{ github.run_id }}-steady
+          fail-on-cache-miss: true
       - name: Combine and enforce coverage
         run: |
           python -m coverage combine artifacts/test-evidence/*

@@ -256,14 +256,21 @@ def test_draft_ci_defers_numerics_without_skipping_ready_or_coverage_jobs(tmp_pa
                 assert result.returncode == (0 if enabled else 1), (job, event, draft, full, targeted)
 
 
-def test_every_test_file_belongs_to_a_covered_shard():
-    """A file outside every shard never runs in the coverage lane and scores zero."""
+def test_every_test_file_reaches_the_combined_coverage():
+    """A file outside every shard, or a shard the coverage job does not restore, scores zero."""
     from scripts.run_full_test_suite import _TEST_SHARDS
 
     sharded = {entry.split("::", 1)[0] for shard in _TEST_SHARDS.values() for entry in shard}
     present = {f"tests/{path.name}" for path in Path("tests").glob("test_*.py")}
     assert present - sharded == set(), "add these files to a shard in _TEST_SHARDS"
     assert sharded - present == set(), "these shard entries no longer exist"
+
+    workflow = Path(".github/workflows/ci.yml").read_text()
+    matrix = workflow.split("\n  compatibility:\n", 1)[1].split("shard: [", 1)[1].split("]", 1)[0]
+    coverage = workflow.split("\n  coverage:\n", 1)[1].split("\n  pr-tests:\n", 1)[0]
+    restored = re.findall(r"-(\w+)\n\s+fail-on-cache-miss: true", coverage)
+    assert {shard.strip() for shard in matrix.split(",")} == set(_TEST_SHARDS)
+    assert sorted(restored) == sorted(_TEST_SHARDS), "restore every shard's evidence before combining"
 
 
 @pytest.mark.parametrize(
