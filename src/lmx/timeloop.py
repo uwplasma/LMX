@@ -156,8 +156,15 @@ def energy_budget(
         )
     )
     conductivity = float(problem.conductivity)
+    half_cells, wall = _wall_power(potential, currents, problem)
     joule = (
-        sum(face_inner_product(current, current, axis, scalar[axis]) for axis, current in enumerate(currents))
+        (
+            sum(
+                face_inner_product(current, current, axis, scalar[axis])
+                for axis, current in enumerate(currents)
+            )
+            - half_cells
+        )
         / conductivity
         if conductivity
         else jnp.zeros(())
@@ -167,30 +174,39 @@ def energy_budget(
         jnp.asarray(lorentz),
         jnp.asarray(viscous),
         jnp.asarray(joule),
-        jnp.asarray(_wall_power(potential, currents, problem)),
+        jnp.asarray(wall),
     )
 
 
 def _wall_power(potential: Field, currents: tuple[Field, Field, Field], problem: ChannelProblem):
-    """Return the electrical power the fluid delivers to its conducting walls.
+    """Return the excess Joule weight on conducting wall faces and the power the sheets dissipate.
 
-    The outward current at a wall face times the potential there, which is what
-    the sheet dissipates. The stored face value points along the axis, so the
-    outward direction is negative on the lower wall.
+    A current into a thin wall crosses only the half cell against it, so its
+    Joule term is weighted by ``h/2`` where :func:`lmx.ops.face_inner_product`
+    weights the whole cell; the sheets take the outward current at their own
+    potential, ``phi_w = phi_P - J h / (2 sigma)``. With both, the Lorentz work
+    is exactly minus the dissipation. Outward is negative on the lower wall.
     """
     grid = problem.grid
     scalar = problem.scalar_conditions
+    conductivity = float(problem.conductivity)
+    half_cells = jnp.zeros((), dtype=potential.dtype)
     total = jnp.zeros((), dtype=potential.dtype)
+    if not conductivity:
+        return half_cells, total
     for axis in range(3):
         if scalar[axis].is_periodic or not float(problem.wall_conductance[axis]):
             continue
         area = jnp.asarray(grid.face_areas(axis), dtype=potential.dtype)
+        widths = grid.widths[axis]
         for position, sign in ((0, -1.0), (-1, 1.0)):
             selection = (slice(None),) * axis + (position,)
-            total = total + sign * jnp.sum(
-                potential.data[selection] * currents[axis].data[selection] * area[selection]
-            )
-    return total
+            half = 0.5 * float(widths[position])
+            outward = sign * currents[axis].data[selection]
+            sheet = potential.data[selection] - outward * half / conductivity
+            half_cells = half_cells + jnp.sum(outward**2 * area[selection]) * half
+            total = total + jnp.sum(sheet * outward * area[selection])
+    return half_cells, total
 
 
 def advance(

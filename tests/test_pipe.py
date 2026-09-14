@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx.grid import Grid, uniform_faces
+from lmx.grid import CENTER, FACE, Field, Grid, uniform_faces
 from lmx.ops import divergence
 from lmx.pipe import (
     PipeProblem,
@@ -68,7 +68,9 @@ def test_the_face_currents_conserve_charge():
     residual = float(jnp.max(jnp.abs(divergence(currents).data)))
     assert residual < 1e-8 * float(jnp.max(jnp.abs(velocity.data)))
     # The potential the solve reports is the one the residual was built on.
-    assert float(jnp.max(jnp.abs(_potential(velocity, problem, factorization).data - potential.data))) < 1e-12
+    assert (
+        float(jnp.max(jnp.abs(_potential(velocity, problem, factorization)[0].data - potential.data))) < 1e-12
+    )
 
 
 def test_the_pipe_states_what_it_needs():
@@ -112,14 +114,50 @@ def test_the_pipe_matches_an_independent_spectral_solve(hartmann, radial, azimut
 
 
 def test_the_conducting_pipe_converges_to_the_reference():
-    """The thin-wall closure is the accuracy bottleneck, so it needs the refinement."""
+    """Second order under a refinement of every length the solution has.
+
+    Refining the radius alone at a fixed azimuth measured the thin-wall closure
+    only while that closure was first order: its error dominated and shrank. The
+    closure is second order now, and ``pipe_grid`` keeps a fixed number of cells
+    in the ``1/Ha`` layer, so a radial-only sequence stalls on the azimuthal
+    truncation and the unrefined layer -- the insulating pipe, which never sees
+    the wall, stalls the same way (0.44, 0.32, 0.31 % at 24, 48, 96 radial
+    cells). Radial cells, azimuthal cells and cells in the layer are therefore
+    doubled together, and the bound is the pre-asymptotic one of the azimuthal
+    gate. Measured: 0.96, 0.24, 0.060 % (orders 2.00, 2.00); with the first-order
+    wall the same sequence gave 8.7, 3.0, 1.2 % (orders 1.51, 1.39).
+    """
     exact = SPECTRAL_FLOW_RATE[(20.0, 0.1)]
     errors = []
-    for radial in (32, 64):
-        problem = pipe_problem(hartmann=20.0, radial=radial, azimuthal=64, wall_conductance=0.1)
-        errors.append(abs(flow_rate(solve_pipe(problem)[0]) - exact) / exact)
-    assert errors[1] < 0.02
-    assert np.log2(errors[0] / errors[1]) > 2.0, errors
+    for radial, azimuthal, layer in ((24, 32, 3), (48, 64, 6), (96, 128, 12)):
+        grid = pipe_grid(radial, azimuthal, 20.0, cells_in_layer=layer)
+        errors.append(abs(flow_rate(solve_pipe(PipeProblem(grid, 20.0, 0.1))[0]) - exact) / exact)
+    # The default 48-cell mesh is the middle level: within 0.5 % of the reference.
+    assert errors[1] < 5e-3, errors
+    assert np.log2(errors[1] / errors[2]) > 1.8, errors
+
+
+def test_the_pipe_force_is_minus_the_adjoint_of_its_electromotive_force():
+    """``<u, F(J)> = -<J, E(u)>`` for currents that vanish on the wall: the force does the work the currents dissipate."""
+    from lmx.ops import cell_inner_product, face_inner_product
+    from lmx.pipe import _WALL, _WRAP, _axial_force, _face_emf
+
+    problem = pipe_problem(hartmann=7.0, radial=10, azimuthal=12)
+    grid = problem.grid
+    generator = np.random.default_rng(3)
+    velocity = Field(jnp.asarray(generator.standard_normal(grid.shape)), (CENTER, CENTER, CENTER), grid)
+    radial, azimuthal = (generator.standard_normal(grid.face_shape(axis)) for axis in (0, 1))
+    radial[[0, -1]], azimuthal[:, -1] = 0.0, azimuthal[:, 0]
+    currents = [Field(jnp.asarray(radial), (FACE, CENTER, CENTER), grid)]
+    currents.append(Field(jnp.asarray(azimuthal), (CENTER, FACE, CENTER), grid))
+    emf = _face_emf(velocity, problem)
+    force = _axial_force((*currents, emf[2]), problem)
+    work = float(cell_inner_product(velocity, velocity.replace_data(force)))
+    dissipation = sum(
+        float(face_inner_product(current, emf[axis], axis, condition))
+        for axis, (current, condition) in enumerate(zip(currents, (_WALL, _WRAP), strict=True))
+    )
+    assert abs(work + dissipation) < 1e-12 * abs(dissipation)
 
 
 @pytest.mark.slow

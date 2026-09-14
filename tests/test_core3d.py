@@ -28,7 +28,7 @@ from lmx.core3d import (
     velocity_offset,
     zero_velocity,
 )
-from lmx.grid import CENTER, Field, Grid, uniform_faces, wall_resolving_faces
+from lmx.grid import CENTER, Field, Grid, tanh_faces, uniform_faces, wall_resolving_faces
 from lmx.ops import divergence
 from lmx.timeloop import advance
 from validation.shercliff import flow_rate
@@ -445,3 +445,149 @@ def test_the_public_solve_reaches_the_new_core():
     scale = max(float(np.sqrt(sum(np.sum(np.asarray(field.data) ** 2) for field in at_rest))), 1.0)
     assert float(np.mean(np.asarray(solution.velocity[0].data))) > 0.0
     assert float(solution.residual_norm) <= 10.0 * 1.0e-9 * scale
+
+
+# Thin conducting walls (plan step 1.3b): each wall is a sheet with its own potential, reached across
+# the half cell and conducting along itself (Walker's condition), solved directly as separable nodes.
+
+
+def _mean_free(problem: ChannelProblem, seed: int) -> Field:
+    volumes = jnp.asarray(problem.grid.cell_volumes())
+    data = jax.random.normal(jax.random.PRNGKey(seed), problem.grid.shape, dtype=jnp.float64)
+    return Field(data - jnp.sum(volumes * data) / jnp.sum(volumes), (CENTER,) * 3, problem.grid)
+
+
+def _charge(problem: ChannelProblem, potential: Field, walls):
+    """Charge balance at rest and sheet residuals; ``walls=None`` is the replaced first-order closure."""
+    from lmx.em import face_conductivity, face_current, thin_wall_current, thin_wall_flux, wall_insulated
+
+    scalar = problem.scalar_conditions
+    sigma = Field(jnp.full(problem.grid.shape, float(problem.conductivity)), (CENTER,) * 3, problem.grid)
+    currents, sheets = [], []
+    for axis in range(3):
+        conductivity = face_conductivity(sigma, axis, scalar[axis])
+        rest = conductivity.replace_data(jnp.zeros_like(conductivity.data))
+        current = wall_insulated(
+            face_current(potential, conductivity, rest, axis, scalar[axis]), axis, scalar[axis]
+        )
+        conduction = float(problem.wall_conductance[axis] * problem.conductivity)
+        if conduction and walls is None:
+            layer = rest.replace_data(rest.data.at[:, [0, -1]].set(potential.data[:, [0, -1]]))
+            current = current.replace_data(
+                current.data + thin_wall_flux(layer, axis, scalar[axis], conduction, scalar).data
+            )
+        elif conduction:
+            inflow = thin_wall_current(potential, walls[axis], conductivity, axis)
+            carried = thin_wall_flux(walls[axis], axis, scalar[axis], conduction, scalar)
+            sheets.append(float(jnp.max(jnp.abs(inflow.data - carried.data))))
+            current = current.replace_data(current.data + inflow.data)
+        currents.append(current)
+    return divergence(tuple(currents)), sheets
+
+
+@pytest.mark.parametrize("stretch", [None, 1.6])
+def test_the_wall_potential_converges_at_second_order(stretch):
+    """``phi = (y^2 + a) cos(pi z)``, ``a = -1 - 2/(c pi^2)``, meets Walker's ``d_n phi = c d_tt phi`` exactly.
+
+    The adjacent cell value as the wall potential was first order; the sheet unknown is second order.
+    """
+    shift = -1.0 - 2.0 / (0.1 * np.pi**2)
+    errors = []
+    for cells in (8, 16, 32):
+        faces = uniform_faces(cells, -1.0, 1.0) if stretch is None else tanh_faces(cells, -1.0, 1.0, stretch)
+        problem = _problem(Grid(uniform_faces(1, 0.0, 1.0), faces, faces), wall_conductance=(0.0, 0.1, 0.0))
+        y, z = problem.grid.centers[1][None, :, None], np.cos(np.pi * problem.grid.centers[2][None, None, :])
+        source = Field(jnp.asarray((2.0 - np.pi**2 * (y**2 + shift)) * z), (CENTER,) * 3, problem.grid)
+        potential, walls = problem.potential_factorization().solve_with_walls(source)
+        exact, volumes = (y**2 + shift) * z, problem.grid.cell_volumes()
+        gauge = np.sum(volumes * exact) / np.sum(volumes)
+        sheet = np.asarray(walls[1].data)[:, [0, -1]] - ((1.0 + shift) * z - gauge)
+        errors.append([np.max(np.abs(sheet)), np.max(np.abs(np.asarray(potential.data) - exact + gauge))])
+    # The bound of the other order gates, over the last two levels (tanh wall potential: 1.49, then 1.90).
+    assert np.all(np.log2(np.divide(errors[1], errors[2])) > 1.8), errors
+
+
+def test_a_thin_wall_conserves_charge_and_keeps_the_solve_symmetric():
+    """Per cell and per sheet element, with a solve map self-adjoint in the cell volumes."""
+    from lmx.core3d import _solve_potential
+    from lmx.ops import cell_inner_product
+
+    problem = duct_problem(hartmann=20.0, cells=24, wall_conductance=0.05)
+    factorization = problem.factorization()
+    source, first, second = (_mean_free(problem, seed) for seed in (1, 2, 3))
+
+    def solve(rhs, case=problem):
+        return _solve_potential(rhs, case, factorization)
+
+    potential, walls = solve(source)
+    balance, sheets = _charge(problem, potential, walls)
+    scale = float(jnp.max(jnp.abs(source.data)))
+    assert max(float(jnp.max(jnp.abs(balance.data + source.data))), *sheets) < 1e-10 * scale
+    forward, backward = (
+        float(cell_inner_product(a, solve(b)[0])) for a, b in ((first, second), (second, first))
+    )
+    assert abs(forward - backward) <= 1e-12 * abs(forward)
+    # Mixed precision solves the same sheets, and a vanishing conductance approaches the insulating wall.
+    mixed = solve(source, dataclasses.replace(problem, precision="mixed"))[0].data
+    assert float(jnp.max(jnp.abs(mixed - potential.data))) < 1e-10 * float(jnp.max(jnp.abs(potential.data)))
+    insulating = duct_problem(hartmann=20.0, cells=24).factorization().solve(source).data
+    faint = solve(source, dataclasses.replace(problem, wall_conductance=(0.0, 1.0e-8, 0.0)))[0].data
+    assert float(jnp.max(jnp.abs(faint - insulating))) < 1e-6 * float(jnp.max(jnp.abs(insulating)))
+
+
+def test_two_conducting_walls_meet_in_a_charge_conserving_corner():
+    """What one sheet delivers to the corner the other receives, and the corner edge conducts nothing."""
+    from lmx.core3d import _solve_potential
+
+    faces = (uniform_faces(5, 0.0, 1.0), tanh_faces(12, -1.0, 1.0, 1.3), tanh_faces(10, -1.0, 1.0, 1.3))
+    problem = _problem(Grid(*faces), wall_conductance=(0.0, 0.05, 0.08), conductivity=2.0)
+    source = _mean_free(problem, 4)
+    potential, walls = _solve_potential(source, problem, problem.factorization())
+    balance, _ = _charge(problem, potential, walls)
+    assert float(jnp.max(jnp.abs(balance.data + source.data))) < 1e-10 * float(jnp.max(jnp.abs(source.data)))
+    factorization = problem.potential_factorization()
+    augmented = factorization._corrected(jnp.pad(source.data / 2.0, ((0, 0), (1, 1), (1, 1))))
+    inner = augmented[:, 1:-1, 1:-1]
+    np.testing.assert_allclose(inner - inner.mean(), potential.data - potential.data.mean(), atol=1e-12)
+    assert float(jnp.max(jnp.abs(factorization._apply(augmented)[:, 1:-1, 1:-1] - source.data / 2.0))) < 1e-10
+    heights, widths = problem.grid.widths[1:]
+    for row, column in ((0, 0), (0, -1), (-1, 0), (-1, -1)):
+        corner = augmented[:, row, column]
+        along_y = 0.05 * (augmented[:, row, 1 if column == 0 else -2] - corner) / (0.5 * widths[column])
+        along_z = 0.08 * (augmented[:, 1 if row == 0 else -2, column] - corner) / (0.5 * heights[row])
+        assert float(jnp.max(jnp.abs(along_y + along_z))) < 1e-12 * float(jnp.max(jnp.abs(along_y)))
+
+
+def test_the_thin_wall_solve_is_ten_times_faster_than_the_krylov_route():
+    """Warm and compiled at Ha 100 on 48^2, against GMRES on the first-order closure it replaced."""
+    import time
+
+    import solvax
+
+    from lmx.core3d import _solve_potential
+
+    problem = duct_problem(hartmann=100.0, cells=48, wall_conductance=0.05)
+    factorization, source = problem.factorization(), _mean_free(problem, 0)
+    problem.potential_factorization()
+
+    def first_order(potential):
+        balance = _charge(problem, potential, None)[0]
+        return balance.replace_data(-balance.data)
+
+    def krylov(data, inverse=factorization.solve):
+        rhs = source.replace_data(data)
+        return solvax.gmres(first_order, rhs, precond=inverse, rtol=1e-12, max_restarts=20).x.data
+
+    routes = (
+        jax.jit(krylov),
+        jax.jit(lambda data: _solve_potential(source.replace_data(data), problem, factorization)[0].data),
+    )
+    times = ([], [])
+    for _ in range(10):
+        for route, samples in zip(routes, times, strict=True):
+            start = time.perf_counter()
+            np.asarray(route(source.data))
+            samples.append(time.perf_counter() - start)
+    # The first call of each route compiles it.
+    ratio = np.median(times[0][1:]) / np.median(times[1][1:])
+    assert ratio > 10.0, ratio

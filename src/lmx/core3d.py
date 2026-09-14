@@ -63,12 +63,12 @@ layers bounded. Transport is explicit, so switching it on bounds the step by
 
 from __future__ import annotations
 
+import functools
 from dataclasses import dataclass
 
 import jax
 import jax.numpy as jnp
 import numpy as np
-import solvax
 
 from . import _pin_matmul_precision
 from .advect import momentum_advection
@@ -78,7 +78,7 @@ from .em import (
     face_current,
     face_electromotive_force,
     lorentz_force,
-    thin_wall_flux,
+    thin_wall_current,
     wall_insulated,
 )
 from .grid import CENTER, FACE, Field, Grid, uniform_faces, wall_resolving_faces
@@ -86,8 +86,10 @@ from .ops import divergence, face_average, face_gradient, staggered_laplacian
 from .poisson import (
     FastDiagonalHelmholtz,
     FastDiagonalPoisson,
+    FastDiagonalThinWallPoisson,
     fast_diagonal_helmholtz,
     fast_diagonal_poisson,
+    fast_diagonal_thin_wall_poisson,
 )
 
 __all__ = [
@@ -227,8 +229,27 @@ class ChannelProblem:
         :func:`step`; the assembly reads concrete arrays and cannot be traced.
         ``precision="mixed"`` solves float64 states in float32 with a float64
         correction; float32 states are solved in float32 either way.
+
+        A thin conducting wall changes the potential's operator but not the
+        pressure's; the potential then uses :meth:`potential_factorization`.
         """
         return fast_diagonal_poisson(self.grid, self.scalar_conditions, precision=self.precision)
+
+    def potential_factorization(self) -> FastDiagonalPoisson:
+        """Factorize the charge operator, with a sheet of potential unknowns on each conducting wall.
+
+        :meth:`factorization` when no wall conducts; otherwise
+        :func:`lmx.poisson.fast_diagonal_thin_wall_poisson`, built once per grid,
+        conditions, conductances and precision, and reused under tracing.
+        """
+        if not self.conducting_walls:
+            return self.factorization()
+        return _thin_wall_factorization(
+            self.grid,
+            self.scalar_conditions,
+            tuple(float(value) for value in self.wall_conductance),
+            self.precision,
+        )
 
 
 def face_currents(
@@ -262,9 +283,10 @@ def face_currents(
         )
         for axis in range(3)
     )
-    potential = _solve_potential(divergence(motional), problem, factorization)
+    potential, walls = _solve_potential(divergence(motional), problem, factorization)
     currents = tuple(
-        _closed_current(potential, conductivities[axis], emfs[axis], axis, problem) for axis in range(3)
+        _closed_current(potential, walls[axis], conductivities[axis], emfs[axis], axis, problem)
+        for axis in range(3)
     )
     return potential, currents, field
 
@@ -296,66 +318,32 @@ def face_lorentz_force(
 
 
 def _closed_current(
-    potential: Field, conductivity: Field, emf: Field, axis: int, problem: ChannelProblem
+    potential: Field, wall: Field | None, conductivity: Field, emf: Field, axis: int, problem: ChannelProblem
 ) -> Field:
-    """Ohm's law inside, and whatever the wall itself conducts on the wall faces."""
+    """Ohm's law inside, and the half-cell current into a thin conducting wall on its wall faces."""
     scalar = problem.scalar_conditions
     ohmic = wall_insulated(face_current(potential, conductivity, emf, axis, scalar[axis]), axis, scalar[axis])
-    if not problem.conducting_walls:
+    if wall is None:
         return ohmic
-    wall = thin_wall_flux(potential, axis, scalar[axis], problem.wall_conductance[axis], scalar)
-    return ohmic.replace_data(ohmic.data + wall.data)
+    return ohmic.replace_data(ohmic.data + thin_wall_current(potential, wall, conductivity, axis).data)
 
 
-def _charge_operator(potential: Field, problem: ChannelProblem) -> Field:
-    """Return the charge balance of a potential alone, with no motional term."""
-    scalar = problem.scalar_conditions
-    zero = tuple(
-        Field(
-            jnp.zeros(problem.grid.face_shape(axis), dtype=potential.dtype), _face_offset(axis), problem.grid
-        )
-        for axis in range(3)
-    )
-    conductivities = [
-        face_conductivity(_constant(problem.grid, problem.conductivity), axis, scalar[axis])
-        for axis in range(3)
-    ]
-    currents = tuple(
-        _closed_current(potential, conductivities[axis], zero[axis], axis, problem) for axis in range(3)
-    )
-    balance = divergence(currents)
-    return balance.replace_data(-balance.data)
+def _solve_potential(
+    source: Field, problem: ChannelProblem, factorization: FastDiagonalPoisson
+) -> tuple[Field, tuple[Field | None, Field | None, Field | None]]:
+    """Solve the charge equation for the potential and each conducting wall's sheet potential.
 
-
-def _face_offset(axis: int) -> tuple[float, float, float]:
-    return tuple(FACE if position == axis else CENTER for position in range(3))
-
-
-def _solve_potential(source: Field, problem: ChannelProblem, factorization: FastDiagonalPoisson) -> Field:
-    """Solve the charge equation for the potential.
-
-    With insulating walls the operator is the scalar Laplacian and the exact
-    factorization answers in three contractions. A conducting wall adds a
-    tangential surface operator on the wall layer, which is not separable; the
-    factorization then becomes the preconditioner of a Krylov solve, and the
-    solve is wrapped in :func:`jax.lax.custom_linear_solve` so the adjoint runs
-    on the transposed operator instead of through the iteration.
+    A thin conducting wall is a sheet of unknowns joined to the fluid by the
+    half-cell flux, and the operator stays a Kronecker sum, so either closure is
+    three contractions: a fixed linear map that differentiates with no iteration.
     """
     scale = 1.0 / float(problem.conductivity) if float(problem.conductivity) else 0.0
-
-    def preconditioner(residual: Field) -> Field:
-        return factorization.solve(residual.replace_data(scale * residual.data))
-
+    scaled = source.replace_data(scale * source.data)
     if not problem.conducting_walls:
-        return preconditioner(source)
-
-    def operator(potential: Field) -> Field:
-        return _charge_operator(potential, problem)
-
-    def solve(matvec, target):
-        return solvax.gmres(matvec, target, precond=preconditioner, rtol=1.0e-12, max_restarts=20).x
-
-    return jax.lax.custom_linear_solve(operator, source, solve, solve)
+        return factorization.solve(scaled), (None, None, None)
+    with jax.ensure_compile_time_eval():
+        walls = problem.potential_factorization()
+    return walls.solve_with_walls(scaled)
 
 
 def duct_problem(
@@ -498,6 +486,21 @@ def step(
 
     corrected, pressure = project(tuple(predicted), problem, factorization)
     return corrected, pressure, potential
+
+
+@functools.lru_cache(maxsize=16)
+def _thin_wall_factorization(
+    grid: Grid,
+    conditions: tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition],
+    conductance: tuple[float, float, float],
+    precision: str,
+) -> FastDiagonalThinWallPoisson:
+    """Build the thin-wall factorization once; a periodic axis has no wall, so its conductance is ignored."""
+    walls = tuple(
+        0.0 if condition.is_periodic else value for condition, value in zip(conditions, conductance)
+    )
+    with jax.ensure_compile_time_eval():
+        return fast_diagonal_thin_wall_poisson(grid, conditions, walls, precision=precision)
 
 
 def _constant(grid: Grid, value: float) -> Field:
