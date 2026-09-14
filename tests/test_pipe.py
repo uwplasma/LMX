@@ -124,7 +124,7 @@ def test_the_conducting_pipe_converges_to_the_reference():
     the wall, stalls the same way (0.44, 0.32, 0.31 % at 24, 48, 96 radial
     cells). Radial cells, azimuthal cells and cells in the layer are therefore
     doubled together, and the bound is the pre-asymptotic one of the azimuthal
-    gate. Measured: 0.96, 0.24, 0.060 % (orders 2.00, 2.00); with the first-order
+    gate. Measured: 0.99, 0.25, 0.062 % (orders 2.00, 2.00); with the first-order
     wall the same sequence gave 8.7, 3.0, 1.2 % (orders 1.51, 1.39).
     """
     exact = SPECTRAL_FLOW_RATE[(20.0, 0.1)]
@@ -158,6 +158,41 @@ def test_the_pipe_force_is_minus_the_adjoint_of_its_electromotive_force():
         for axis, (current, condition) in enumerate(zip(currents, (_WALL, _WRAP), strict=True))
     )
     assert abs(work + dissipation) < 1e-12 * abs(dissipation)
+
+
+def test_the_current_into_a_conducting_pipe_wall_exerts_no_force():
+    """Both identities with the currents a conducting wall really takes, which do not vanish on the wall.
+
+    The half-cell current into the sheet carries no electromotive force; while it exerted a force,
+    the adjoint and the ohmic identity both missed by 5.1e-4 here. The wall power is taken at the
+    sheet potential, as in ``timeloop._wall_power``. An insulated wall is closed already: bit for bit.
+    """
+    from lmx.ops import cell_inner_product, face_average_adjoint, face_inner_product
+    from lmx.pipe import _WALL, _WRAP, _angles, _axial_force, _face_emf
+
+    values = np.random.default_rng(5).standard_normal((24, 32, 1))
+    for conductance in (0.1, 0.0):
+        problem = pipe_problem(hartmann=20.0, radial=24, azimuthal=32, wall_conductance=conductance)
+        grid, conditions = problem.grid, problem.conditions
+        velocity = Field(jnp.asarray(values), (CENTER,) * 3, grid)
+        potential, sheets = _potential(velocity, problem, problem.factorization())
+        currents = _face_currents(velocity, potential, problem, sheets)
+        force = _axial_force(currents, problem)
+        if not conductance:
+            sine, cosine = _angles(grid)
+            adjoint = [face_average_adjoint(currents[a], a, c).data for a, c in ((0, _WALL), (1, _WRAP))]
+            assert bool(jnp.all(force == -20.0 * (adjoint[0] * sine + adjoint[1] * cosine)))
+            continue
+        emf, outward = _face_emf(velocity, problem), currents[0].data[-1]
+        assert float(jnp.max(jnp.abs(outward))) > 0.1 * float(jnp.max(jnp.abs(currents[0].data)))
+        work = float(cell_inner_product(velocity, velocity.replace_data(force)))
+        pairing = sum(float(face_inner_product(currents[a], emf[a], a, conditions[a])) for a in range(3))
+        half, area = 0.5 * float(grid.widths[0][-1]), jnp.asarray(grid.face_areas(0)[-1])
+        wall = float(jnp.sum((potential.data[-1] - outward * half) * outward * area))
+        joule = sum(float(face_inner_product(c, c, a, conditions[a])) for a, c in enumerate(currents))
+        joule -= float(jnp.sum(outward**2 * area)) * half
+        assert abs(work + pairing) < 1e-12 * abs(pairing)
+        assert abs(joule + wall + work) < 1e-12 * joule
 
 
 @pytest.mark.slow
