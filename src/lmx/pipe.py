@@ -171,9 +171,15 @@ def _face_currents(
 
 
 def _axial_force(currents: tuple[Field, Field, Field], problem: PipeProblem) -> jnp.ndarray:
-    """Return ``(J x B)_z`` at cell centres: the transpose of :func:`_face_emf`, from the same currents."""
+    """Return ``(J x B)_z`` at cell centres: the transpose of :func:`_face_emf`, from the same currents.
+
+    The half-cell current into a thin wall carries no electromotive force, so it exerts no force,
+    as in :func:`lmx.core3d.electric_state`: with it the Lorentz work missed the dissipation by
+    1.2e-4 (c 0.1, Ha 20); the charge balance keeps it.
+    """
     sine, cosine = (jnp.asarray(value, dtype=currents[0].dtype) for value in _angles(problem.grid))
-    radial = face_average_adjoint(currents[0], 0, _WALL).data
+    closed = wall_insulated(currents[0], 0, problem.conditions[0])
+    radial = face_average_adjoint(closed, 0, _WALL).data
     azimuthal = face_average_adjoint(currents[1], 1, _WRAP).data
     return -float(problem.hartmann) * (radial * sine + azimuthal * cosine)
 
