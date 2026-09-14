@@ -103,6 +103,11 @@ jobs:
       fail-fast: false
       matrix:
         shard: [support, fringing, physics, channel, steady]
+        include:
+          # Coverage on the steady shard peaks near 12 GB of resident memory with four
+          # workers, against 16 GB on a hosted runner; two workers keep it well inside.
+          - shard: steady
+            workers: 2
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-lmx
@@ -115,8 +120,10 @@ jobs:
           COVERAGE_FILE: artifacts/test-evidence/${{ matrix.shard }}/.coverage.${{ matrix.shard }}
         run: |
           mkdir -p "artifacts/test-evidence/${{ matrix.shard }}"
+          workers=()
+          if [[ -n "${{ matrix.workers }}" ]]; then workers=(--workers "${{ matrix.workers }}"); fi
           python scripts/run_full_test_suite.py --budget-seconds 1500 \
-            --test-timeout-seconds 600 --shard ${{ matrix.shard }} \
+            --test-timeout-seconds 600 --shard ${{ matrix.shard }} "${workers[@]}" \
             --coverage-fail-under 0 \
             --coverage-xml artifacts/test-evidence/${{ matrix.shard }}/coverage.xml \
             --junit-xml artifacts/test-evidence/${{ matrix.shard }}/junit.xml
