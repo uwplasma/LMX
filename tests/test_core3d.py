@@ -258,6 +258,60 @@ def test_channel_problem_validates_its_inputs():
         ChannelProblem(grid=grid, conditions=(WALL,) * 3, conductivity=-1.0)
 
 
+def test_a_constant_field_given_as_arrays_is_the_uniform_field_bit_for_bit():
+    """Plan step 1.9a: arrays take the same arithmetic as three numbers, down to the implicit shifts."""
+    grid = Grid(uniform_faces(3, 0.0, 1.0), tanh_faces(10, -1.0, 1.0, 1.5), tanh_faces(8, -1.0, 1.0, 1.3))
+    values = (0.3, 20.0, -1.7)
+    uniform = _problem(grid, magnetic_field=values, forcing=(1.0, 0.2, 0.0), dt=1.0e-2)
+    arrays = dataclasses.replace(
+        uniform, magnetic_field=tuple(np.full(grid.shape, value) for value in values)
+    )
+    assert arrays.damping_rates == uniform.damping_rates
+    assert arrays.peak_field_squared == uniform.peak_field_squared
+    keys = jax.random.split(jax.random.PRNGKey(3), 3)
+    velocity = tuple(
+        Field(
+            jax.random.normal(keys[axis], grid.offset_shape(velocity_offset(axis))),
+            velocity_offset(axis),
+            grid,
+        )
+        for axis in range(3)
+    )
+    runs = [
+        step(velocity, problem, problem.factorization(), problem.viscous_factorizations())
+        for problem in (uniform, arrays)
+    ]
+    for first, second in zip(*(jax.tree.leaves(run) for run in runs), strict=True):
+        assert np.array_equal(np.asarray(first), np.asarray(second))
+
+
+def test_a_varying_field_is_validated_and_keeps_the_problem_static():
+    from lmx.core3d import ImposedField
+
+    grid = _duct(ny=4, nz=4)
+    along = np.linspace(1.0, 2.0, grid.shape[0])[:, None, None] * np.ones(grid.shape)
+    problem = _problem(grid, magnetic_field=(0.5, along, 0.0), conductivity=2.0, density=4.0)
+    assert isinstance(problem.magnetic_field, ImposedField)
+    twin = _problem(grid, magnetic_field=(0.5, along.copy(), 0.0), conductivity=2.0, density=4.0)
+    assert problem == twin and hash(problem) == hash(twin)
+    assert problem != dataclasses.replace(twin, magnetic_field=(0.5, 2.0 * along, 0.0))
+    with pytest.raises(ValueError, match="read-only"):
+        problem.magnetic_field.components[1][0, 0, 0] = 0.0
+    # One shift per component: the largest rate over the cells, sigma (|B|^2 - B_c^2) / rho.
+    assert problem.damping_rates == pytest.approx((2.0 * 4.0 / 4.0, 2.0 * 0.25 / 4.0, 2.0 * 4.25 / 4.0))
+    assert problem.peak_field_squared == pytest.approx(4.25)
+    for field, message in (
+        ((0.0, along[:, :2], 0.0), "do not match"),
+        ((0.0, np.where(along > 1.5, np.nan, along), 0.0), "must be finite"),
+        ((0.0, np.inf, 0.0), "must be finite"),
+        ((1.0, 2.0), "three magnetic field components"),
+    ):
+        with pytest.raises(ValueError, match=message):
+            _problem(grid, magnetic_field=field)
+    with pytest.raises(ValueError, match="different grid"):
+        _problem(_duct(ny=6, nz=6), magnetic_field=problem.magnetic_field)
+
+
 def test_the_step_differentiates_and_jits():
     grid = _duct(ny=6, nz=6, nx=2)
     base = _problem(grid, dt=5.0e-3)

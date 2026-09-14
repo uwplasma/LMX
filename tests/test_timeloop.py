@@ -224,6 +224,38 @@ def test_a_conducting_wall_takes_power_out_through_the_boundary():
         assert abs(float(budget.ohmic_defect / budget.scale)) < 1e-12
 
 
+@pytest.mark.parametrize("conductance", [0.0, 0.05])
+def test_the_ohmic_identity_holds_in_a_varying_field(conductance):
+    """Plan step 1.9a: the ANL fringe with its solenoidal pair, on a layer mesh, with and without a thin wall.
+
+    The field is a coefficient on the current faces of both paths, so the identity stays exact. A thin
+    wall's half-cell current carries no electromotive force and so exerts no force; with the force taken
+    from it, the fringe's ``B_x`` at the Hartmann walls left a defect of 2.3e-6 of the Joule term.
+    """
+    import dataclasses
+
+    from lmx.core3d import duct_problem, fringe_field, project, velocity_offset
+    from lmx.grid import Field
+
+    duct = duct_problem(hartmann=20.0, cells=24, wall_conductance=conductance)
+    grid = Grid(uniform_faces(8, -6.0, 6.0), duct.grid.y_faces, duct.grid.z_faces)
+    problem = dataclasses.replace(duct, grid=grid, magnetic_field=fringe_field(grid, strength=20.0))
+    keys = jax.random.split(jax.random.PRNGKey(4), 3)
+    offsets = [velocity_offset(axis) for axis in range(3)]
+    random = tuple(
+        Field(
+            jax.random.normal(keys[axis], grid.offset_shape(offsets[axis]), dtype=jnp.float64),
+            offsets[axis],
+            grid,
+        )
+        for axis in range(3)
+    )
+    budget = energy_budget(project(random, problem)[0], problem)
+    assert float(budget.joule) > 0.0
+    assert (float(budget.wall) > 0.0) == (conductance > 0.0)
+    assert float(jnp.abs(budget.ohmic_defect / budget.joule)) < 1e-12
+
+
 def test_the_budget_is_the_rate_of_change_of_kinetic_energy():
     """`defect` is dE/dt, so a step of half the size halves the error against it."""
     errors = []

@@ -94,10 +94,12 @@ from .poisson import (
 
 __all__ = [
     "ChannelProblem",
+    "ImposedField",
     "duct_problem",
     "electric_state",
     "face_currents",
     "face_lorentz_force",
+    "fringe_field",
     "enforce_face_constraints",
     "project",
     "step",
@@ -128,16 +130,65 @@ def velocity_condition(
     return conditions[axis] if conditions[axis].is_periodic else _NO_SLIP
 
 
+@dataclass(frozen=True, eq=False)
+class ImposedField:
+    """An imposed magnetic field that varies in space, at the cell centres of one grid.
+
+    ``components`` are ``(B_x, B_y, B_z)`` of ``grid.shape``; the optional ``faces``
+    are the face-normal components whose discrete divergence :func:`fringe_field`
+    controls. The arrays are copied read-only and compared by value, as
+    :class:`lmx.grid.Grid` is, so a problem carrying the field stays static. Both
+    the electromotive force and the Lorentz force multiply a component at the
+    current face, so the force stays exactly minus the adjoint of the other.
+    """
+
+    grid: Grid
+    components: tuple[np.ndarray, np.ndarray, np.ndarray]
+    faces: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
+
+    def __post_init__(self) -> None:
+        shapes = {"components": (self.grid.shape,) * 3, "faces": tuple(map(self.grid.face_shape, range(3)))}
+        for name, expected in shapes.items():
+            arrays = getattr(self, name)
+            if arrays is None:
+                continue
+            if len(arrays) != 3:
+                raise ValueError(f"an imposed field needs three {name}")
+            frozen = tuple(np.array(array, dtype=np.float64) for array in arrays)
+            for array, shape in zip(frozen, expected, strict=True):
+                if array.shape != shape:
+                    raise ValueError(f"imposed field {name} of shape {array.shape} do not match {shape}")
+                if not np.all(np.isfinite(array)):
+                    raise ValueError(f"imposed field {name} must be finite")
+                array.setflags(write=False)
+            object.__setattr__(self, name, frozen)
+
+    def _key(self) -> tuple:
+        arrays = self.components + (self.faces or ())
+        return (self.grid, self.faces is None, *(array.tobytes() for array in arrays))
+
+    def __hash__(self) -> int:
+        return hash(self._key())
+
+    def __eq__(self, other: object) -> bool:
+        return self._key() == other._key() if isinstance(other, ImposedField) else NotImplemented
+
+
 @dataclass(frozen=True)
 class ChannelProblem:
-    """A duct segment with uniform material properties and a uniform imposed field."""
+    """A duct segment with uniform material properties and an imposed field.
+
+    ``magnetic_field`` is three numbers for a uniform field, or a varying one: an
+    :class:`ImposedField`, or three arrays of ``grid.shape`` at the cell centres
+    (scalars broadcast), which become one.
+    """
 
     grid: Grid
     conditions: tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition]
     density: float = 1.0
     viscosity: float = 1.0
     conductivity: float = 1.0
-    magnetic_field: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    magnetic_field: tuple[float, float, float] | ImposedField = (0.0, 0.0, 0.0)
     forcing: tuple[float, float, float] = (0.0, 0.0, 0.0)
     dt: float = 1.0e-3
     advection: str = "off"
@@ -160,6 +211,20 @@ class ChannelProblem:
             raise ValueError("wall conductance must not be negative")
         if self.precision not in ("state", "mixed"):
             raise ValueError(f"precision must be 'state' or 'mixed', got {self.precision!r}")
+        field = self.magnetic_field
+        if not isinstance(field, ImposedField):
+            if len(field) != 3:
+                raise ValueError("a channel needs three magnetic field components")
+            if any(np.ndim(value) for value in field):
+                shape = self.grid.shape
+                field = ImposedField(
+                    self.grid, tuple(np.broadcast_to(v, shape) if np.ndim(v) == 0 else v for v in field)
+                )
+                object.__setattr__(self, "magnetic_field", field)
+            elif not np.all(np.isfinite(np.asarray(field, dtype=float))):
+                raise ValueError("the magnetic field must be finite")
+        if isinstance(field, ImposedField) and field.grid != self.grid:
+            raise ValueError("the imposed field is sampled on a different grid")
         # True float32 contractions unless the user chose a precision; see lmx.enable_x64.
         _pin_matmul_precision()
 
@@ -174,6 +239,14 @@ class ChannelProblem:
         return tuple(condition if condition.is_periodic else _INSULATING for condition in self.conditions)
 
     @property
+    def peak_field_squared(self) -> float:
+        """Return the largest :math:`|\\mathbf B|^2` over the cells: a uniform field's own."""
+        field = self.magnetic_field
+        if isinstance(field, ImposedField):
+            return float(np.max(sum(np.square(component) for component in field.components)))
+        return float(np.dot(field, field))
+
+    @property
     def damping_rates(self) -> tuple[float, float, float]:
         """Return the implicit damping rate of each velocity component.
 
@@ -181,8 +254,20 @@ class ChannelProblem:
         is used. Off-diagonal coupling stays in the explicit conservative force,
         which is exact for a field aligned with an axis and a documented
         approximation otherwise.
+
+        A varying field takes the largest rate over the cells, since the fast solve
+        needs one shift: a cell of rate ``r`` then updates by ``1 - dt r/(1 + dt lambda)``
+        in ``(0, 1]``, where the volume mean overshoots once ``dt r > 2 (1 + dt lambda)``.
         """
-        squared = float(np.dot(self.magnetic_field, self.magnetic_field))
+        field = self.magnetic_field
+        if isinstance(field, ImposedField):
+            squares = [np.square(component) for component in field.components]
+            total = sum(squares)
+            return tuple(
+                float(self.conductivity) * float(np.max(total - square)) / float(self.density)
+                for square in squares
+            )
+        squared = float(np.dot(field, field))
         return tuple(
             float(self.conductivity) * (squared - float(component) ** 2) / float(self.density)
             for component in self.magnetic_field
@@ -267,8 +352,7 @@ def face_currents(
     factorization = problem.factorization() if factorization is None else factorization
     scalar = problem.scalar_conditions
     field = tuple(
-        _constant(problem.grid, value).replace_data(field_scale * _constant(problem.grid, value).data)
-        for value in problem.magnetic_field
+        component.replace_data(field_scale * component.data) for component in _imposed_field(problem)
     )
     conductivities = [
         face_conductivity(_constant(problem.grid, problem.conductivity), axis, scalar[axis])
@@ -297,9 +381,17 @@ def electric_state(
     factorization: FastDiagonalPoisson | None = None,
     field_scale: float | jnp.ndarray = 1.0,
 ) -> tuple[Field, tuple[Field, Field, Field]]:
-    """Return the induced potential and the Lorentz force it carries."""
+    """Return the induced potential and the Lorentz force it carries.
+
+    A thin wall's half-cell current carries no electromotive force, so it exerts no
+    force: with it, conducting side walls in a uniform field left the Stokes operator
+    asymmetric by 1.1e-3 (Ha 20, 24 cells); without, round-off, and the flow rate
+    moves by at most 2.2e-4 of itself on 24 and 48 cells.
+    """
     potential, currents, field = face_currents(velocity, problem, factorization, field_scale)
-    return potential, lorentz_force(currents, field, problem.scalar_conditions)
+    scalar = problem.scalar_conditions
+    closed = tuple(wall_insulated(current, axis, scalar[axis]) for axis, current in enumerate(currents))
+    return potential, lorentz_force(closed, field, scalar)
 
 
 def face_lorentz_force(
@@ -501,6 +593,58 @@ def _thin_wall_factorization(
     )
     with jax.ensure_compile_time_eval():
         return fast_diagonal_thin_wall_poisson(grid, conditions, walls, precision=precision)
+
+
+def fringe_field(
+    grid: Grid,
+    *,
+    half_length: float = 3.0,
+    centre: float = 0.0,
+    strength: float = 1.0,
+    solenoidal: bool = True,
+) -> ImposedField:
+    """Return the ANL fringe (ANL/FPP/TM-228; plan Section 3.1 items 7-8), divergence free on the grid.
+
+    With ``s = x - centre``, ``x0 = half_length``, ``B0 = strength`` and
+    ``k = pi / (2 x0)``, the midplane field falls as ``B_y = B0 (1 - sin(ks)) / 2``
+    over ``|s| <= x0`` and is uniform outside. ``solenoidal=False`` keeps that
+    profile at every ``y``; ``True`` adds the companion Votyakov et al. (2009) ask
+    for, ``B_y + i B_x = B0 (1 - sin k(s + iy)) / 2``, curl and divergence free in
+    and outside the fringe. The profile is not analytic at ``s = +-x0``: there
+    ``B_x = 0`` keeps the divergence continuous and ``B_y`` jumps by
+    ``B0 (cosh(ky) - 1) / 2``, 7.0 % of ``B0`` at ``|y| = 1`` for ``x0 = 3``.
+    Both come from ``A = -B0 [s/2 + cos(ks) cosh(ky) / (2k)]`` (``cosh`` replaced
+    by one when not solenoidal), with ``B_x = dA/dy``, ``B_y = -dA/dx``: each face
+    holds the mean of its normal component, a difference of ``A``, so
+    :func:`lmx.ops.divergence` of the faces is round-off, and the cells average
+    their two faces. ``y`` is measured from the magnet midplane.
+    """
+    if grid.is_polar:
+        raise ValueError("the fringe field is built on a Cartesian grid")
+    if half_length <= 0.0:
+        raise ValueError("half_length must be positive")
+    k = np.pi / (2.0 * half_length)
+    s = np.asarray(grid.x_faces)[:, None] - centre
+    inside = np.clip(s, -half_length, half_length)
+    rise = np.cosh(k * np.asarray(grid.y_faces) * (1.0 if solenoidal else 0.0))[None, :]
+    corners = -strength * (
+        inside / 2.0 + np.cos(k * inside) * rise / (2.0 * k) + np.minimum(s + half_length, 0.0)
+    )
+    along_x = np.diff(corners, axis=1) / grid.widths[1][None, :]
+    along_y = -np.diff(corners, axis=0) / grid.widths[0][:, None]
+    faces = tuple(np.repeat(values[:, :, None], grid.shape[2], axis=2) for values in (along_x, along_y))
+    components = (0.5 * (faces[0][:-1] + faces[0][1:]), 0.5 * (faces[1][:, :-1] + faces[1][:, 1:]))
+    return ImposedField(grid, (*components, np.zeros(grid.shape)), (*faces, np.zeros(grid.face_shape(2))))
+
+
+def _imposed_field(problem: ChannelProblem) -> tuple[Field, Field, Field]:
+    """Return the imposed field at the cell centres: three constants, or the arrays of a varying one."""
+    field = problem.magnetic_field
+    if not isinstance(field, ImposedField):
+        return tuple(_constant(problem.grid, value) for value in field)
+    with jax.ensure_compile_time_eval():
+        data = tuple(jnp.asarray(component, dtype=jnp.result_type(float)) for component in field.components)
+    return tuple(Field(values, (CENTER,) * 3, problem.grid) for values in data)
 
 
 def _constant(grid: Grid, value: float) -> Field:

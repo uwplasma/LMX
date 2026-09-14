@@ -279,6 +279,52 @@ def test_the_lorentz_force_is_minus_the_adjoint_of_the_electromotive_force():
     assert abs(work + power) <= 1e-13 * abs(power)
 
 
+def test_the_anl_fringe_is_divergence_free_on_the_grid():
+    """Plan step 1.9a: face means of one flux function cancel in the discrete divergence.
+
+    Measured: 0 on uniform cells and 2.6e-16 on this tanh mesh. The analytic pair has a divergence and a
+    curl of round-off (6e-17). Away from the two joins, where ``B_y`` jumps by ``(cosh(ky) - 1)/2``
+    (0.070 of ``B0`` at ``|y| = 1``), the cells hold it to the midpoint error of averaging two faces,
+    ``h^2 k^2 B0 cosh(k) / 8``: 1.2e-3 measured here against that bound of 4.9e-3.
+    """
+    from lmx.core3d import fringe_field
+    from lmx.ops import divergence
+
+    grid = Grid(uniform_faces(48, -6.0, 6.0), tanh_faces(24, -1.0, 1.0, 2.0), uniform_faces(3, -1.0, 1.0))
+    k, x, y = np.pi / 6.0, grid.centers[0][:, None], grid.centers[1][None, :]
+    for solenoidal in (True, False):
+        field = fringe_field(grid, strength=2.0, solenoidal=solenoidal)
+        offsets = [tuple(FACE if position == axis else CENTER for position in range(3)) for axis in range(3)]
+        faces = tuple(Field(jnp.asarray(data), offsets[axis], grid) for axis, data in enumerate(field.faces))
+        assert float(jnp.max(jnp.abs(divergence(faces).data))) <= 1e-12
+        rise = np.cosh(k * y) if solenoidal else 1.0
+        inside = np.clip(x, -3.0, 3.0)
+        expected = (
+            -np.cos(k * inside) * np.sinh(k * y) * float(solenoidal) * (np.abs(x) < 3.0),
+            1.0 - np.sin(k * inside) * rise + np.where(np.abs(x) < 3.0, 0.0, np.sign(-x) * (1.0 - rise)),
+        )
+        away = np.abs(np.abs(grid.centers[0]) - 3.0) > 0.3
+        bound = 0.25**2 * k**2 * 2.0 * np.cosh(k) / 8.0
+        for component, values in zip(field.components, expected, strict=False):
+            assert np.max(np.abs(component[away, :, 0] - values[away])) <= bound
+        assert np.all(field.components[2] == 0.0)
+
+    def pair(point):
+        return jnp.stack(
+            [
+                -jnp.cos(k * point[0]) * jnp.sinh(k * point[1]),
+                1.0 - jnp.sin(k * point[0]) * jnp.cosh(k * point[1]),
+            ]
+        )
+
+    points = jnp.asarray(np.random.default_rng(0).uniform([-2.99, -1.0], [2.99, 1.0], size=(64, 2)))
+    gradient = jax.vmap(jax.jacfwd(pair))(points)
+    assert float(jnp.max(jnp.abs(gradient[:, 0, 0] + gradient[:, 1, 1]))) <= 1e-14
+    assert float(jnp.max(jnp.abs(gradient[:, 1, 0] - gradient[:, 0, 1]))) <= 1e-14
+    with pytest.raises(ValueError, match="Cartesian"):
+        fringe_field(pipe_grid(16, 24, 100.0))
+
+
 def test_a_divergence_free_current_leaves_no_charge_residual():
     grid = STRETCHED
     currents = (

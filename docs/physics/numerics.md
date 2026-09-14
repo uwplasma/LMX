@@ -286,7 +286,38 @@ round-off through the wall, and the conducting pipe reaches second order
 under joint refinement. Where two conducting walls meet, the corner node
 joins the sheets in series, so one delivers what the other receives, and a
 rank-four Woodbury correction per mode of the third axis removes the conduction
-the Kronecker sum would otherwise give the corner edge.
+the Kronecker sum would otherwise give the corner edge. The half-cell current
+into a sheet carries no electromotive force, so it exerts no Lorentz force
+either: `lmx.core3d.electric_state` closes the wall faces before forming the
+force. Its product with a field tangential to the wall would be work the Joule
+dissipation never sees; with conducting side walls in a uniform field that left
+the steady operator asymmetric by 1.1e-3 at Ha 20, and closing the faces moves
+the flow rate by at most 2.2e-4 of itself on 24 and 48 cells.
+
+The imposed field may vary in space. `ChannelProblem.magnetic_field` takes
+three numbers, or an `lmx.core3d.ImposedField` of cell-centred arrays (three
+arrays become one); both paths carry each component to the current face with the
+same interpolation and multiply it there, so the adjoint pairing above holds for
+any field, and a constant field given as arrays reproduces the three numbers bit
+for bit. `lmx.core3d.fringe_field` builds the fringe of the ANL benchmark (square
+duct, $x_0=3$): with $s=x-x_c$ and $k=\pi/(2x_0)$, the midplane profile
+$B_y=\tfrac12 B_0[1-\sin(ks)]$ over $|s|\le x_0$, and, as Votyakov et al. (2009)
+ask of a fringe model, the companion that makes it divergence and curl free,
+$B_y+iB_x=\tfrac12 B_0[1-\sin k(s+iy)]$:
+
+$$
+B_x=-\tfrac12 B_0\cos(ks)\sinh(ky),\qquad
+B_y=\tfrac12 B_0\left[1-\sin(ks)\cosh(ky)\right].
+$$
+
+The profile is not analytic at $s=\pm x_0$, so no harmonic field keeps it on the
+whole midplane: $B_x$ vanishes there, which keeps the divergence continuous, and
+$B_y$ jumps by $\tfrac12 B_0(\cosh ky-1)$, 7.0 % of $B_0$ at $|y|=1$. Both
+components come from one flux function, $B_x=\partial_y A$ and $B_y=-\partial_x A$;
+each face-normal value is the mean of the field over its face, a difference of
+$A$, so the discrete divergence of the faces cancels to round-off (0 on uniform
+cells, 2.6e-16 on a tanh mesh), and the cells take the average of their two
+faces.
 
 These modules supply geometry, operators, the scalar solve and the electric
 coupling. The momentum discretization and the time loop follow in their own plan
@@ -309,7 +340,13 @@ $$
 $$
 
 so the correction vanishes with the right-hand side and changes the path to a
-steady state but not the steady state itself. Viscosity is left explicit and its
+steady state but not the steady state itself. The fast solve needs one shift per
+component, so a varying field takes the largest rate over the cells; in the
+diagonal model a cell of rate $r$ then updates by $1-\Delta t\,r/(1+\Delta t\,\lambda)$,
+inside $(0,1]$ wherever $r\le\lambda$, where a smaller shift such as the volume
+mean would overshoot past $-1$ once $\Delta t\,r>2(1+\Delta t\,\lambda)$. The
+steady preconditioner of `lmx.steady` takes the peak $|\mathbf B|^2$ for the same
+reason. Viscosity is left explicit and its
 limit is reported by `ChannelProblem.diffusive_step_limit` rather than enforced,
 so a caller sweeping a parameter sees the constraint instead of a silently
 clipped step. The magnetic stiffness grows as $Ha^2$ and must go; the viscous one
