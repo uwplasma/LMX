@@ -97,6 +97,12 @@ def steady_residual(
     ``forcing`` and ``field_scale`` are the continuous design inputs and may be
     traced; everything ``problem`` carries is static, because the factorizations
     read concrete arrays.
+
+    The projection is applied twice, which is one defect correction of its pressure
+    solve. One pass leaves about 1e-13 of what the pressure removes outside the
+    divergence-free fields, where the CG preconditioner cannot see it. The gradient part of a
+    varying field's force is large, so that leak set the CG floor: 5e-10 of the right-hand
+    side at Ha 20 and 6e-7 at Ha 100, against 1e-13 and 3e-12 with the correction (#145).
     """
     factorization = problem.factorization() if factorization is None else factorization
     velocity = enforce_face_constraints(velocity, problem)
@@ -121,7 +127,7 @@ def steady_residual(
         if transport is not None:
             value = value - transport[component].data
         terms.append(field.replace_data(value))
-    corrected, _ = project(tuple(terms), problem, factorization)
+    corrected, _ = project(project(tuple(terms), problem, factorization)[0], problem, factorization)
     return corrected
 
 

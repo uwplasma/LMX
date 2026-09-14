@@ -379,6 +379,29 @@ over 8, 16 and 32 cells across the channel. Convective transport is omitted;
 that is the Stokes limit, appropriate at blanket interaction parameters and
 stated rather than implied.
 
+The steady residual of `lmx.steady` projects twice. One projection's pressure
+comes from the fast diagonal solve, exact only to round-off, and on a stretched
+mesh that round-off leaves about $10^{-13}$ of the removed gradient outside the
+divergence-free fields. The conjugate-gradient preconditioner ends in a
+projection, so it cannot see that part of a residual, and CG stalls on it. A
+uniform duct's force is nearly solenoidal and the leak does not matter; a varying
+field's force has a large gradient part, and on the four-cell varying duct of the
+tests the floor was $5.0\times10^{-10}$ of the right-hand side at Ha 20 and
+$6.4\times10^{-7}$ at Ha 100. The second projection is one defect correction of
+the pressure solve: the floors fall to $1.2\times10^{-13}$ and $3\times10^{-12}$,
+and the certificate reads the same field CG converged. Every varying-field duct
+measured, the ANL fringe included, certifies at the default tolerance $10^{-9}$
+through Ha 300, with iteration counts on uniform ducts unchanged.
+
+Above Ha 300 a floor remains. On the fringe mesh of the tests (24 cells, 16 axial)
+CG stalls at $1.5\times10^{-10}$ of its right-hand side at Ha 300,
+$7.5\times10^{-10}$ at Ha 600 and $1.5\times10^{-8}$ at Ha 1000, where round-off
+in the potential solve leaves the operator asymmetric by $6\times10^{-7}$. Steps
+1.9b–1.9d therefore take a tolerance of $10^{-9}$ through Ha 300, $10^{-8}$ to
+Ha 600 and $10^{-7}$ to Ha 1000, with `linear_max_restarts=600` (36,000 CG
+iterations) above Ha 300: the three solves take 5,581, 12,056 and 19,299.
+`test_the_fringe_certifies_at_the_tolerance_rule` holds the fringe to that rule.
+
 ## Running the step as one compiled trajectory
 
 A Python loop around the projection step dispatches every operation from the

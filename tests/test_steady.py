@@ -237,21 +237,61 @@ def test_the_adjoint_matches_finite_differences_where_the_layers_are_thin(hartma
     assert float(gradient[1]) < 0.0
 
 
-def _varying_duct() -> ChannelProblem:
-    """``B_y`` varying along a Ha 20 duct with a thin wall, and a ``B_x`` across it."""
-    duct = duct_problem(hartmann=20.0, cells=24, wall_conductance=0.05)
+def _varying_duct(hartmann: float = 20.0, wall_conductance: float = 0.05) -> ChannelProblem:
+    """``B_y`` varying along a duct with a thin wall, and a ``B_x`` across it of a tenth its strength."""
+    duct = duct_problem(hartmann=hartmann, cells=24, wall_conductance=wall_conductance)
     grid = Grid(uniform_faces(4, 0.0, 4.0), duct.grid.y_faces, duct.grid.z_faces)
     x, y = grid.centers[0][:, None, None], grid.centers[1][None, :, None]
-    along = 20.0 * (0.75 + 0.25 * np.cos(np.pi * x / 2.0)) * np.ones(grid.shape)
-    across = -2.0 * np.sin(np.pi * x / 2.0) * y * np.ones(grid.shape)
+    along = hartmann * (0.75 + 0.25 * np.cos(np.pi * x / 2.0)) * np.ones(grid.shape)
+    across = -0.1 * hartmann * np.sin(np.pi * x / 2.0) * y * np.ones(grid.shape)
     return dataclasses.replace(duct, grid=grid, magnetic_field=(across, along, 0.0))
+
+
+@pytest.mark.parametrize(("hartmann", "conductance"), [(20.0, 0.0), (100.0, 0.05), (300.0, 0.0)])
+def test_a_varying_field_certifies_at_the_default_tolerance(hartmann, conductance):
+    """Issue #145: one projection left ~1e-13 of the removed gradient outside the divergence-free fields.
+
+    The preconditioner cannot see that part of a residual, so CG stalled on it: 5e-10 of the right-hand
+    side at Ha 20, 6.4e-7 at Ha 100, and no certificate at 1e-9 above Ha 20. Projecting the residual twice
+    measured 122 / 794 / 2886 iterations here, with the certificate at 0.90 / 0.60 / 0.81 of its bound.
+    """
+    from lmx.steady import _norm
+
+    problem = _varying_duct(hartmann, conductance)
+    solution = solve_steady_state(problem, pseudo_step=1.0e3)
+    scale = float(_norm(steady_residual(zero_velocity(problem), problem)))
+    assert float(solution.residual_norm) <= 10.0 * 1.0e-9 * scale and _mean(problem, solution.velocity) > 0.0
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(("hartmann", "tolerance"), [(300.0, 1.0e-9), (600.0, 1.0e-8), (1000.0, 1.0e-7)])
+def test_the_fringe_certifies_at_the_tolerance_rule(hartmann, tolerance):
+    """The rule for steps 1.9b-1.9d: 1e-9 through Ha 300, 1e-8 to Ha 600, 1e-7 to Ha 1000, 36000 CG steps above 300.
+
+    The ANL fringe on 24 cells with 16 axial ones: CG's floor with the residual projected twice is 1.5e-10 at
+    Ha 300, 7.5e-10 at Ha 600 and 1.5e-8 at Ha 1000, where round-off in the potential solve leaves the operator
+    asymmetric by 6e-7. Each tolerance is at least 6.7 times its floor; the solves took 5581 / 12,056 / 19,299
+    iterations, so the budget above Ha 300 keeps 1.9 times headroom.
+    """
+    from lmx.core3d import fringe_field
+
+    duct = duct_problem(hartmann=hartmann, cells=24)
+    grid = Grid(uniform_faces(16, -8.0, 8.0), duct.grid.y_faces, duct.grid.z_faces)
+    field = fringe_field(grid, strength=hartmann, solenoidal=False)
+    problem = dataclasses.replace(duct, grid=grid, magnetic_field=field)
+    restarts = 200 if hartmann <= 300.0 else 600
+    solution = solve_steady_state(
+        problem, pseudo_step=1.0e3, tolerance=tolerance, linear_max_restarts=restarts
+    )
+    assert np.isfinite(float(solution.residual_norm)) and _mean(problem, solution.velocity) > 0.0
 
 
 def test_a_varying_field_takes_the_damped_preconditioner_and_still_converges():
     """The field-line solve is exact only for a uniform axis-aligned field, so a varying one falls back.
 
     Every component then takes the damped inverse at the peak ``|B|^2``; the operator stays symmetric to
-    the round-off of this layer mesh (8e-12 for a uniform field) and CG certifies the solve.
+    the round-off of this layer mesh (8e-12 for a uniform field) and CG certifies the solve at the default
+    tolerance, which took 1e-8 before #145.
     """
     from lmx.poisson import FastDiagonalHelmholtz
     from lmx.steady import _projection_solves
@@ -266,18 +306,18 @@ def test_a_varying_field_takes_the_damped_preconditioner_and_still_converges():
     )
     forward, backward, energy = _stokes_operator_samples(problem)
     assert abs(forward - backward) <= 1e-11 * max(abs(forward), abs(backward)) and energy < 0.0
-    solution = solve_steady_state(problem, pseudo_step=1.0e3, tolerance=1.0e-8)
+    solution = solve_steady_state(problem, pseudo_step=1.0e3)
     assert np.isfinite(float(solution.residual_norm)) and _mean(problem, solution.velocity) > 0.0
 
 
-def test_the_adjoint_matches_finite_differences_in_a_varying_field():
-    """Plan step 1.9a: ``B_y`` varying along the duct and a ``B_x`` across it, with a thin wall, at Ha 20.
+@pytest.mark.parametrize("hartmann", [20.0, 100.0])
+def test_the_adjoint_matches_finite_differences_in_a_varying_field(hartmann):
+    """Plan step 1.9a: ``B_y`` varying along the duct and a ``B_x`` across it, with a thin wall.
 
-    Measured against central differences: 3.1e-11 in the drive and 5.8e-9 in the field scale (4.3e-9
-    without the wall). A three-dimensional pressure leaves the conjugate-gradient solve a floor near 1e-9
-    of its right-hand side, where a uniform field reaches 2e-13, so the tolerance sits above it.
+    Measured against central differences at Ha 20: 3.1e-11 in the drive and 5.8e-9 in the field scale
+    (4.3e-9 without the wall). Ha 100 held only once the residual was projected twice (#145).
     """
-    problem = _varying_duct()
+    problem = _varying_duct(hartmann)
 
     def throughput(drive, scale):
         solution = solve_steady_state(
