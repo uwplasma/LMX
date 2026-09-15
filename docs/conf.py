@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 project = "LMX"
 author = "LMX contributors"
 copyright = f"{datetime.now(timezone.utc).year}, LMX contributors"
-release = "1.3.0"
+release = "1.4.0"
 
 extensions = [
     "myst_parser",
