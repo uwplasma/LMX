@@ -59,7 +59,7 @@ def test_device_benchmark_rejects_invalid_requests(arguments):
 def test_device_benchmark_exit_matches_retained_evidence(tmp_path, monkeypatch, verdict):
     from scripts import run_benchmarks as runner
 
-    def build(*args):
+    def build(*args, **options):
         if verdict == "exception":
             raise RuntimeError("bounded allocation failure")
         return {"accepted": verdict}
@@ -103,7 +103,7 @@ def test_trajectory_timing_does_not_certify_host_synchronization(monkeypatch):
     monkeypatch.setattr(
         runner,
         "_core3d_case",
-        lambda jax, cells, steps, repeats: {
+        lambda jax, cells, steps, repeats, **options: {
             "accepted": True,
             "seconds_per_step": float(steps),
         },
@@ -118,7 +118,7 @@ def test_device_environment_records_precision_provenance(monkeypatch):
 
     monkeypatch.setenv("NVIDIA_TF32_OVERRIDE", "0")
     monkeypatch.setenv("XLA_FLAGS", "--xla_gpu_autotune_level=2")
-    monkeypatch.setattr(runner, "_commit", lambda: "abc1234")
+    monkeypatch.setattr(runner, "_commit", lambda *root: "abc1234")
     header = "| NVIDIA-SMI 535.183.01    Driver Version: 535.183.01    CUDA Version: 12.2 |\n"
     queried = []
 
@@ -157,7 +157,7 @@ def test_device_environment_does_not_query_a_gpu_on_cpu(monkeypatch):
     from scripts import run_benchmarks as runner
 
     monkeypatch.delenv("NVIDIA_TF32_OVERRIDE", raising=False)
-    monkeypatch.setattr(runner, "_commit", lambda: "abc1234")
+    monkeypatch.setattr(runner, "_commit", lambda *root: "abc1234")
     monkeypatch.setattr(runner, "_gpu_versions", lambda: pytest.fail("queried a GPU on a CPU host"))
     environment = runner._environment(jax)
     assert environment["platform"] == "cpu"
@@ -188,7 +188,9 @@ def test_device_benchmark_refuses_float32_gpu_reports_without_true_precision(
 
     built = []
     monkeypatch.setattr(runner, "_environment", lambda jax: environment)
-    monkeypatch.setattr(runner, "_q2d_case", lambda *args: built.append(args) or {"accepted": True})
+    monkeypatch.setattr(
+        runner, "_q2d_case", lambda *args, **options: built.append(args) or {"accepted": True}
+    )
     output = tmp_path / "report.json"
     arguments = ["--cases", "q2d", "--q2d-sizes", "8", "--output", str(output)]
     if written:
@@ -199,6 +201,37 @@ def test_device_benchmark_refuses_float32_gpu_reports_without_true_precision(
             runner.main(arguments)
         assert error.value.code == 2
         assert not output.exists() and not built
+
+
+def test_device_benchmark_discards_warmups_and_pools_alternating_runs(tmp_path):
+    from scripts import run_benchmarks as runner
+
+    calls = []
+    compile_seconds, samples, _ = runner._timed(
+        SimpleNamespace(block_until_ready=lambda value: value), lambda: calls.append(1), repeats=3, warmups=2
+    )
+    assert len(calls) == 6 and len(samples) == 3
+    median, (low, high) = runner._median_ci([1.0, 2.0, 3.0, 4.0, 100.0])
+    assert median == 3.0 and low <= median <= high <= 100.0
+
+    def report(samples, commit="79ba6e4"):
+        case = {"case": "q2d_evolve", "shape": [8, 8], "steps": 2, "compile_seconds": 1.0, "accepted": True}
+        environment = {"platform": "cpu", "x64": True, "lmx_commit": commit, "load_average": [1.0, 1.0, 1.0]}
+        return {"environment": environment, "cases": [{**case, **runner._timing(1.0, samples, 2)}]}
+
+    paths = [tmp_path / name for name in ("a.json", "b.json", "c.json")]
+    for path, contents in zip(
+        paths, (report([2.0, 4.0]), report([6.0, 8.0]), report([1.0], "other")), strict=True
+    ):
+        path.write_text(json.dumps(contents))
+    output = tmp_path / "pooled.json"
+    assert runner.main(["--combine", str(paths[0]), str(paths[1]), "--output", str(output)]) == 0
+    pooled = json.loads(output.read_text())
+    assert pooled["environment"]["rounds"] == 2 and pooled["cases"][0]["warm_samples"] == [2.0, 4.0, 6.0, 8.0]
+    assert pooled["cases"][0]["seconds_per_step"] == 2.5
+    with pytest.raises(SystemExit) as error:
+        runner.main(["--combine", str(paths[0]), str(paths[2]), "--output", str(output)])
+    assert error.value.code == 2
 
 
 _MATCHED = ("matched_contract",)
