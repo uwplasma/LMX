@@ -8,8 +8,10 @@ import numpy as np
 import pytest
 
 import lmx
+from lmx.core3d import duct_problem
 from lmx.design import (
     DuctResponse,
+    channel_cross_section_weights,
     drive_for_flow_rate,
     fixed_flow_hydraulic_power,
     fluid_cell_areas,
@@ -84,6 +86,17 @@ def test_fluid_areas_sum_to_the_open_cross_section(factory):
     value, gradient = integrate(velocity)
     assert float(value) == pytest.approx(float(areas.sum()), rel=1e-12)
     np.testing.assert_array_equal(gradient, areas)
+
+
+def test_channel_cross_section_weights_sum_to_the_full_area():
+    """Every transverse cell is fluid, on a uniform mesh and on a wall-resolving one alike."""
+    for hartmann in (0.0, 20.0):
+        problem = duct_problem(hartmann=hartmann, cells=32)
+        weights = np.asarray(channel_cross_section_weights(problem))
+        assert weights.shape == problem.grid.shape[1:]
+        assert np.all(weights > 0.0)
+        extent = problem.grid.extent
+        assert float(weights.sum()) == pytest.approx(extent[1] * extent[2], rel=1e-12)
 
 
 def test_flow_rate_is_linear_in_the_drive():

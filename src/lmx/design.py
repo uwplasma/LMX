@@ -16,11 +16,13 @@ import jax
 import jax.numpy as jnp
 
 from .cases import solve_fully_developed_fields
+from .core3d import ChannelProblem
 from .solvers import _build_mesh
 from .specs import CaseSpec
 
 __all__ = [
     "DuctResponse",
+    "channel_cross_section_weights",
     "drive_for_flow_rate",
     "fluid_cell_areas",
     "hydraulic_power",
@@ -36,6 +38,19 @@ def fluid_cell_areas(case: CaseSpec) -> jnp.ndarray:
         mesh = _build_mesh(case)
         areas = jnp.asarray(mesh.dy)[:, None] * jnp.asarray(mesh.dz)[None, :]
         return areas if mesh.fluid_mask is None else jnp.where(mesh.fluid_mask, areas, 0.0)
+
+
+def channel_cross_section_weights(problem: ChannelProblem) -> jnp.ndarray:
+    """Return the cross-section integration weights of a :class:`ChannelProblem`.
+
+    Axis 0 is the flow axis of every channel this package builds (see
+    :func:`lmx.core3d.duct_problem`), so a cell's weight is its transverse
+    ``(y, z)`` area alone, independent of the axial spacing -- unlike
+    :func:`fluid_cell_areas`, a channel carries no fluid mask, so every
+    transverse cell counts.
+    """
+    _, dy, dz = problem.grid.widths
+    return jnp.asarray(dy)[:, None] * jnp.asarray(dz)[None, :]
 
 
 def volumetric_flow_rate(case: CaseSpec, velocity: jnp.ndarray) -> jnp.ndarray:

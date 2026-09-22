@@ -68,6 +68,34 @@ independent physical reference. Its JSON summary records flow, drive,
 This is fully developed segment work, excluding entry/exit, manifolds and
 thermal effects. It is not a complete blanket pumping budget.
 
+## Cross-section weights on the staggered core
+
+`lmx.design.channel_cross_section_weights(problem)` is the `ChannelProblem`
+counterpart of `fluid_cell_areas`: it returns the transverse `(y, z)`
+integration weight of every cell, $\Delta y_j \Delta z_k$, for a
+`lmx.core3d.ChannelProblem`. Axis 0 is the flow axis of every channel this
+package builds (`lmx.core3d.duct_problem` and every other constructor put the
+periodic axis there), so the weight of a cell does not depend on the axial
+spacing. A channel carries no fluid mask -- every transverse cell counts, so
+the weights sum to the full cross-section area:
+
+```python
+import numpy as np
+
+from lmx.core3d import duct_problem
+from lmx.design import channel_cross_section_weights
+
+problem = duct_problem(hartmann=20.0, cells=32)
+weights = np.asarray(channel_cross_section_weights(problem))
+extent = problem.grid.extent
+assert weights.shape == problem.grid.shape[1:]
+assert np.isclose(weights.sum(), extent[1] * extent[2])
+```
+
+This is a mesh-geometry query, not a solve, so it has no convergence or
+precision envelope to fail; it is the building block the new core's throughput
+and pumping-power metrics are measured against.
+
 ## Fit a measured velocity profile
 
 Use this bounded inverse problem to infer a positive pressure-gradient drive
