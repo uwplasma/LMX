@@ -67,10 +67,14 @@ nonlinear three-grid test compares $12^2$ and $24^2$ solutions with a $48^2$
 reference. On a $256^2$, 80-step float32 workload run with JAX 0.6.2, the final
 CPU and RTX A4000 fields agree to relative $L_2=2.38\times10^{-6}$. This is a
 backend-parity result, not external physics validation. Its GPU speed-up is not
-quoted. The JAX 0.10.2 float32 timings in `benchmarks/results` put the $256^2$
-ratio at 14.15x on a different, 20-step workload, and none of those reports
-records the matmul precision a float32 GPU number must carry (ADR 0005, D15).
-Plan step 2.1 re-measures them.
+quoted. G4 is stated as absolute throughput (ADR 0006, D23): on one RTX A4000
+with matmul precision `highest` (plan step 2.1), the $128^3$ 3-D core takes
+17.5 ms per step float64-accurate (mixed precision, 8.4 ns per cell per step)
+and 4.84 ms in true float32. Against the same JAX code on XLA:CPU on the host's
+36 cores in float64 (138 ms, controlled 2026-09-14 rows) that is 7.85x; the 10x
+float64 target on an A4000 is withdrawn. The two CPU reports in
+`benchmarks/results` are from the uncontrolled 2026-09-07 run and record no
+matmul precision; no ratio is quoted from them.
 
 ## Test gates
 
