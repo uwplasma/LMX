@@ -463,6 +463,24 @@ def test_field_lines_invert_the_fully_developed_operator_on_a_uniform_mesh():
     assert _conjugate_gradient_iterations(_duct(24, 300.0), _projection_solves) <= 5
 
 
+def test_field_line_inverses_match_the_banded_solve(monkeypatch):
+    """The GPU applies each line's velocity-block inverse; the banded substitutions agree, as do the pullbacks."""
+    from lmx import steady
+
+    problem = _extruded(duct_problem(hartmann=10.0, cells=16), 3, 10.0, 16)
+    monkeypatch.setattr(steady, "_LINE_INVERSE_BACKENDS", (jax.default_backend(),))
+    dense = steady._FieldLine(problem, 0, 1, 1.0e3)
+    monkeypatch.setattr(steady, "_LINE_INVERSE_BYTES", -1)
+    banded = steady._FieldLine(problem, 0, 1, 1.0e3)
+    assert dense.factors is None and banded.factors is not None
+    rhs = zero_velocity(problem)[0]
+    rhs = rhs.replace_data(jnp.asarray(np.random.default_rng(0).standard_normal(rhs.data.shape)))
+    for route in (lambda solve: solve(rhs), lambda solve: jax.vjp(solve, rhs)[1](rhs)[0]):
+        expected = route(banded.solve).data
+        error = float(jnp.max(jnp.abs(route(dense.solve).data - expected)))
+        assert error <= 1e-13 * float(jnp.max(jnp.abs(expected)))
+
+
 def test_the_conjugate_gradient_route_agrees_with_newton_krylov():
     """A unidirectional duct flow does not advect itself, so both routes answer the same question.
 
