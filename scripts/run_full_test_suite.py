@@ -57,7 +57,7 @@ _TEST_SHARDS = {
             "test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradient",
         )
     ),
-    "channel": ("tests/test_core3d.py", "tests/test_pipe.py"),
+    "channel": ("tests/test_core3d.py", "tests/test_pipe.py", "tests/test_table_i.py"),
     "plane": tuple(
         f"tests/test_core3d.py::{name}"
         for name in (
