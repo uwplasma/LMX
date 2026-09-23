@@ -71,6 +71,11 @@ from .poisson import (
 
 __all__ = ["SteadySolution", "solve_steady_state", "steady_residual"]
 
+# Field lines apply dense velocity-block inverses (lines * n^2 * 8 bytes) up to this size on these
+# backends, and the banded solve otherwise: measured faster there, and no slower to compile (2b.11).
+_LINE_INVERSE_BYTES = 64 * 2**20
+_LINE_INVERSE_BACKENDS = ("gpu", "cuda", "rocm")
+
 
 @dataclass(frozen=True)
 class SteadySolution:
@@ -184,7 +189,7 @@ def _isotropic_viscous(problem: ChannelProblem, pseudo_step: float) -> tuple[Fas
     )
 
 
-def _factor_lines(bands: np.ndarray) -> solvax.BandedLUFactors:
+def _factor_lines(bands: np.ndarray) -> np.ndarray:
     """Factorize pentadiagonal lines on the host, in the storage of :func:`solvax.lu_solve_banded`.
 
     Doolittle without pivoting: weighted by the widths, each block has a positive definite
@@ -197,8 +202,30 @@ def _factor_lines(bands: np.ndarray) -> solvax.BandedLUFactors:
             lu[:, 2 + i, j] /= lu[:, 2, j]
             for k in range(1, min(3, size - j)):
                 lu[:, 2 + i - k, j + k] -= lu[:, 2 + i, j] * lu[:, 2 - k, j + k]
-    lower, upper, scale = (jnp.asarray(part) for part in (lu[:, 3:], lu[:, :3], np.ones(lu.shape[::2])))
-    return solvax.BandedLUFactors(lower, upper, scale, jnp.zeros(lu.shape[0], jnp.int32))
+    return lu
+
+
+def _velocity_inverses(lu: np.ndarray, chunk: int = 512) -> np.ndarray:
+    """The velocity-to-velocity block of each factorized line's inverse, ``(lines, n, n)``, on the host.
+
+    The substitutions of :func:`solvax.lu_solve_banded` run once here on the unit
+    velocity columns, so the device applies one batched product instead of 2n scan steps.
+    """
+    size = lu.shape[-1]
+    blocks = []
+    for start in range(0, lu.shape[0], chunk):
+        part = lu[start : start + chunk]
+        x = np.zeros((part.shape[0], size, (size + 1) // 2))
+        x[:, ::2] = np.eye((size + 1) // 2)
+        for j in range(size):
+            for i in range(1, min(3, size - j)):
+                x[:, j + i] -= part[:, 2 + i, j, None] * x[:, j]
+        for j in range(size - 1, -1, -1):
+            for k in range(1, min(3, size - j)):
+                x[:, j] -= part[:, 2 - k, j + k, None] * x[:, j + k]
+            x[:, j] /= part[:, 2, j, None]
+        blocks.append(x[:, ::2])
+    return np.concatenate(blocks)
 
 
 class _FieldLine:
@@ -259,7 +286,13 @@ class _FieldLine:
         rows = np.arange(5)[:, None] + np.arange(size)[None, :] - 2
         inside = (rows >= 0) & (rows < size)
         bands = np.where(inside, blocks[:, np.clip(rows, 0, size - 1), np.arange(size)], 0.0)
-        self.factors = _factor_lines(np.einsum("km,krj->mrj", np.stack(coefficients), bands))
+        lu = _factor_lines(np.einsum("km,krj->mrj", np.stack(coefficients), bands))
+        dense = lu.shape[0] * widths.size**2 * 8 <= _LINE_INVERSE_BYTES
+        if dense and jax.default_backend() in _LINE_INVERSE_BACKENDS:
+            self.inverses, self.factors = jnp.asarray(_velocity_inverses(lu)), None
+        else:
+            lower, upper, scale = jnp.asarray(lu[:, 3:]), jnp.asarray(lu[:, :3]), jnp.ones(lu.shape[::2])
+            self.factors = solvax.BandedLUFactors(lower, upper, scale, jnp.zeros(lu.shape[0], jnp.int32))
 
     def solve(self, rhs: Field) -> Field:
         velocity = self.velocity
@@ -268,8 +301,11 @@ class _FieldLine:
             data = _modal(data * _along(velocity.scales[at], at, data), velocity.vectors[at].T, at)
         lines = jnp.moveaxis(data, self.axis, -1)
         flat = lines.reshape(-1, lines.shape[-1])
-        interleaved = jnp.zeros((flat.shape[0], 2 * flat.shape[1] - 1), flat.dtype).at[:, ::2].set(flat)
-        flat = jax.vmap(solvax.lu_solve_banded)(self.factors, interleaved)[:, ::2]
+        if self.factors is None:
+            flat = jnp.einsum("lij,lj->li", self.inverses, flat, precision=jax.lax.Precision.HIGHEST)
+        else:
+            interleaved = jnp.zeros((flat.shape[0], 2 * flat.shape[1] - 1), flat.dtype).at[:, ::2].set(flat)
+            flat = jax.vmap(solvax.lu_solve_banded)(self.factors, interleaved)[:, ::2]
         data = jnp.moveaxis(flat.reshape(lines.shape), -1, self.axis)
         for at in self.across:
             data = _modal(data, velocity.vectors[at], at) / _along(velocity.scales[at], at, data)
@@ -525,7 +561,7 @@ def _tangent_solve(operator, target, precond=None):
     exact transpose: the step is symmetric only in the face-volume inner product,
     and GMRES measures in the Euclidean one, where a stretched mesh makes the two
     differ by the width ratio. It is the step's pullback, because JAX 0.6.2 cannot
-    :func:`jax.linear_transpose` the scans of the field-line solve.
+    :func:`jax.linear_transpose` the scans of the banded field-line solve.
     """
 
     def solve(matvec, rhs):
