@@ -154,32 +154,46 @@ python examples/q2d_turbulence_demo.py
 
 ![Time per step against problem size, CPU and GPU, both precisions](docs/_static/device_scaling.webp)
 
+*The figure is from the uncontrolled 2026-09-07 run and is not yet redrawn from the tables below.*
+
 ```console
 python scripts/run_benchmarks.py --output benchmarks/results/mine.json
 python scripts/make_showcase_figures.py --only scaling
 ```
 
-Measured on a 36-core CPU and one RTX A4000, both from the same commit, with the
-compile time, the warm time and the time per step kept apart.
+G4 is stated as absolute throughput ([ADR 0006](docs/adr/0006-review-2026-09-22.md), D23):
+milliseconds per step and nanoseconds per cell per step, with the float64-accurate
+mode (mixed precision) and true float32 reported separately. Measured on one idle
+RTX A4000 (JAX 0.10.2, matmul precision `highest`, median of 12 timed runs;
+[plan](plan.md) step 2.1):
 
-- **Float32, as recorded:** 29.6× on the 3-D core at 128³, 54.5× on Q2D at 1024².
-  Those runs used JAX's default matmul precision, which is TensorFloat-32 on this
-  card; the 3-D core's float32 accuracy there is 3e-4, and true float32 costs
-  15–30 % more per step. They are being re-measured with the precision pinned
-  and recorded ([plan](plan.md), step 2.1).
-- **Float64:** 3.4× at 128³ and 17.0× on Q2D. An earlier claim that the card runs
-  float64 at 1/64 of its float32 rate was wrong: a true-float32 contraction beats
-  float64 by 0.9× at 64³, 4.1× at 128³ and 12× at 192³. A float32 solve with one
-  float64 residual correction returns float64 accuracy (2e-11) at 2.4–4.5× the
-  float64 step speed (64³–192³, measured on the A4000) and is plan step 1.11.
-- **Trajectory-length scaling:** 10 and 40 steps cost about the same per step;
-  this timing ratio alone does not establish absence of host synchronization.
+| 3-D core, one A4000 | 64³ | 128³ | 192³ | 256³ |
+|---|---|---|---|---|
+| float64-accurate (mixed), ms per step | 2.14 | 17.5 | 69.7 | 166 |
+| ns per cell per step | 8.2 | 8.4 | 9.8 | 9.9 |
+| true float32, ms per step | 0.515 | 4.84 | 19.3 | 48.0 |
+| ns per cell per step | 2.0 | 2.3 | 2.7 | 2.9 |
+
+- **256³ fits on one 16 GB card** in every mode. Q2D at 2048² takes 75.9 ms per
+  step in float64 and 16.0 ms in true float32.
+- **Same-code CPU/GPU ratio:** against this JAX code on XLA:CPU on the host's 36
+  cores in float64 (138 ms per step at 128³, controlled 2026-09-14 rows), the GPU's
+  mixed mode is 7.85× faster. The baseline is XLA:CPU running this code, not a tuned
+  CPU solver. The 10× float64 target on an A4000 is withdrawn: GA10x runs float64
+  at 1/64 of its float32 rate, which bounds a fair single-card float64 speed-up
+  near the memory-bandwidth ratio.
+- **CPU reports:** `benchmarks/results/office-cpu-*.json` are from the 2026-09-07
+  run, taken without load control or a recorded matmul precision; no ratio is
+  quoted from them.
+- **Trajectory-length scaling:** per step, 80 steps against 20 cost 0.83 in float64
+  and 0.92 in float32; this timing ratio alone does not establish absence of host
+  synchronization.
 - Every number carries an `accepted` flag judged against the precision it was
   computed in; a run that lost its divergence-free constraint is reported, not quoted.
 
 Two GPUs give the **same answer bit for bit** on the Q2D solve, and no speed-up:
-the strong-scaling efficiency of an unaided placement is 0.25 in float64 and
-0.14 in float32 at 2048², because the transforms all-gather every step across
+the strong-scaling efficiency of an unaided placement is 0.20 in float64 and
+0.10 in float32 at 2048², because the transforms all-gather every step across
 PCIe. Correct, not yet faster — the numbers are in
 [`benchmarks/results`](benchmarks/results) and the next step is in the [plan](plan.md).
 

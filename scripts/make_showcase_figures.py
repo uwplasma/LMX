@@ -362,73 +362,86 @@ def benchmark_scaling() -> None:
     reports = sorted(RESULTS.glob("*.json"))
     if not reports:
         raise SystemExit(f"no benchmark JSON in {RESULTS}; run scripts/run_benchmarks.py first")
-    series = {}
+    # (case, device, mode) -> {cells: (median, low, high)} seconds per step, where the
+    # mode is fp32, fp64, or mixed (float32 solves with float64 correction).
+    series: dict = {}
     for path in reports:
         report = json.loads(path.read_text(encoding="utf-8"))
         environment = report["environment"]
-        label = (
-            f"{environment['device_count']}x {environment['platform'].upper()}"
-            f"{'' if environment['device_count'] == 1 else ''}"
-            f", {'fp64' if environment['x64'] else 'fp32'}"
-        )
         for entry in report["cases"]:
             # The host-sync and sharding cases report their own numbers; this
             # figure is about time against size on one device.
-            if not entry.get("accepted") or not isinstance(entry.get("seconds_per_step"), float):
+            median = entry.get("seconds_per_step")
+            if not entry.get("accepted") or not isinstance(median, float):
                 continue
-            series.setdefault((entry["case"], label), []).append((entry["cells"], entry["seconds_per_step"]))
+            mode = (
+                "fp32" if not environment["x64"] else "mixed" if entry.get("precision") == "mixed" else "fp64"
+            )
+            low, high = entry.get("seconds_per_step_ci95", (median, median))
+            key = (entry["case"], environment["platform"].upper(), mode)
+            series.setdefault(key, {})[entry["cells"]] = (median, low, high)
 
     fig, axes = plt.subplots(1, 3, figsize=(14.0, 4.2), constrained_layout=True)
-    styles = {"fp64": "-", "fp32": "--"}
+    styles = {"fp64": "-", "fp32": "--", "mixed": ":"}
     colors = {"CPU": "tab:blue", "GPU": "tab:red"}
     for index, case in enumerate(("core3d_advance", "q2d_evolve")):
-        for (name, label), points in sorted(series.items()):
+        for (name, device, mode), points in sorted(series.items()):
             if name != case:
                 continue
-            cells, seconds = (np.array(values) for values in zip(*sorted(points), strict=True))
-            kind = "GPU" if "GPU" in label else "CPU"
-            axes[index].loglog(
+            cells = np.array(sorted(points))
+            median, low, high = (np.array(values) for values in zip(*(points[n] for n in cells), strict=True))
+            axes[index].errorbar(
                 cells,
-                seconds,
-                styles["fp64" if "fp64" in label else "fp32"],
+                median,
+                yerr=(median - low, high - median),
+                fmt=styles[mode],
                 marker="o",
                 ms=4,
-                color=colors[kind],
-                label=label,
+                capsize=2,
+                color=colors[device],
+                label=f"{device}, {mode}",
             )
+        axes[index].set_xscale("log")
+        axes[index].set_yscale("log")
         axes[index].set_xlabel("cells")
-        axes[index].set_ylabel("seconds per step")
+        axes[index].set_ylabel("seconds per step (median, 95 % CI)")
         axes[index].legend(frameon=False, fontsize=8)
     axes[0].set_title("Staggered 3-D core", fontsize=11)
     axes[1].set_title("Quasi-2D evolution", fontsize=11)
 
-    for precision, style in styles.items():
-        for case, marker in (("core3d_advance", "o"), ("q2d_evolve", "s")):
-            host = {label: dict(points) for (name, label), points in series.items() if name == case}
-            cpu = next((v for k, v in host.items() if "CPU" in k and precision in k), None)
-            gpu = next((v for k, v in host.items() if "GPU" in k and precision in k), None)
-            if not cpu or not gpu:
-                continue
-            shared = sorted(set(cpu) & set(gpu))
-            if not shared:
-                continue
+    def fastest(case: str, device: str, modes: tuple[str, ...]) -> dict:
+        """Per size, the fastest median among the given modes on one device."""
+        times = [series.get((case, device, mode), {}) for mode in modes]
+        return {n: min(t[n][0] for t in times if n in t) for n in set().union(*times)}
+
+    # Each device in its fastest float64-accurate mode, and float32 against float32.
+    comparisons = (
+        ("core3d_advance", ("fp64", "mixed"), "-", "tab:purple", "3-D core, float64-accurate"),
+        ("core3d_advance", ("fp32",), "--", "tab:purple", "3-D core, fp32"),
+        ("q2d_evolve", ("fp64",), "-", "tab:green", "Q2D, fp64"),
+        ("q2d_evolve", ("fp32",), "--", "tab:green", "Q2D, fp32"),
+    )
+    for case, modes, style, color, label in comparisons:
+        cpu, gpu = fastest(case, "CPU", modes), fastest(case, "GPU", modes)
+        shared = sorted(set(cpu) & set(gpu))
+        if shared:
             axes[2].loglog(
-                shared,
-                [cpu[cells] / gpu[cells] for cells in shared],
-                style,
-                marker=marker,
-                ms=4,
-                color="tab:purple" if case == "core3d_advance" else "tab:green",
-                label=f"{'3-D core' if case == 'core3d_advance' else 'Q2D'}, {precision}",
+                shared, [cpu[n] / gpu[n] for n in shared], style, marker="o", ms=4, color=color, label=label
             )
+    low, high = axes[2].get_ylim()
+    axes[2].set_ylim(min(low, 5.0), max(high, 30.0))
     for target, name in ((10.0, "3-D core target"), (20.0, "Q2D target")):
         axes[2].axhline(target, color="k", ls=":", lw=1)
         axes[2].annotate(name, (axes[2].get_xlim()[0], target), fontsize=7, va="bottom")
+    plain = matplotlib.ticker.FuncFormatter(lambda value, _: f"{value:g}x")
+    axes[2].yaxis.set_major_formatter(plain)
+    axes[2].yaxis.set_minor_formatter(plain)
+    axes[2].tick_params(axis="y", which="minor", labelsize=7)
     axes[2].set_xlabel("cells")
     axes[2].set_ylabel("GPU speed-up over CPU")
     axes[2].set_title("Targets: 10x (3-D core), 20x (Q2D)", fontsize=11)
     axes[2].legend(frameon=False, fontsize=8)
-    _save_webp(fig, STATIC / "device_scaling.webp")
+    _save_webp(fig, STATIC / "device_scaling.webp", dpi=100)
 
 
 def _save_webp(fig: plt.Figure, path: Path, dpi: int = 120) -> None:
