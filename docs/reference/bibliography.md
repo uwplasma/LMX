@@ -9,6 +9,19 @@ Core references used by the implemented models and validation contracts include:
 - U. Müller and L. Bühler, *Magnetofluiddynamics in Channels and Containers*,
   Springer, 2001 — inductionless duct equations, wall effects, and canonical
   Hartmann/Shercliff/Hunt regimes.
+- T. Q. Hua, J. S. Walker, B. F. Picologlou, and C. B. Reed, “Three-dimensional
+  MHD flows in rectangular ducts of liquid-metal-cooled blankets,” Argonne
+  National Laboratory report ANL/FPP/TM-228, 1988,
+  [OSTI 6789158](https://www.osti.gov/biblio/6789158) — the inertialess
+  core-flow equations, the side-layer closure and the ANL fringe reference of
+  `lmx.coreflow`.
+- J. S. Walker, “Magnetohydrodynamic flows in rectangular ducts with thin
+  conducting walls. Part I,” *Journal de Mécanique* 20, 1981 — the fully
+  developed thin-wall limits.
+- C. Mistrangelo et al., *Fusion Engineering and Design* 173, 2021, 112795 —
+  the `N^(-1/3)` inertial correction to inertialess pressure drops.
+- S. Molokov and A. Politis, *Fusion Engineering and Design* 209, 2024, 114688
+  — the core-flow model of a circular pipe.
 - S. Smolentsev et al., “An approach to verification and validation of MHD
   codes for fusion applications,” *Fusion Engineering and Design*,
   [doi:10.1016/j.fusengdes.2014.04.049](https://doi.org/10.1016/j.fusengdes.2014.04.049).
