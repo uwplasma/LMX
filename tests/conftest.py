@@ -1,9 +1,14 @@
 """Reference tests explicitly request double precision before collection."""
 
+import os
+
 import jax
 import pytest
 
-import lmx
+# Tests measure compiles and must not share programs through the user's disk cache.
+os.environ.setdefault("LMX_COMPILATION_CACHE", "0")
+
+import lmx  # noqa: E402
 
 lmx.enable_x64()
 
