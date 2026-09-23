@@ -66,6 +66,13 @@ restart, progress, logging, and timing hooks in their owning modules.
    :members:
 ```
 
+## Inertialess core flow
+
+```{eval-rst}
+.. automodule:: lmx.coreflow
+   :members:
+```
+
 ## Quasi-two-dimensional flow
 
 ```{eval-rst}
