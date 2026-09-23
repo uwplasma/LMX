@@ -178,7 +178,11 @@ enabled = os.environ["LMX_COMPILATION_CACHE"] != "0" and not unsafe
 assert (jax.config.jax_compilation_cache_dir == os.environ["LMX_COMPILATION_CACHE"]) == enabled
 assert jax.config.jax_compilation_cache_max_size == (2**31 if enabled else -1)
 """
-    environment = {key: value for key, value in os.environ.items() if key != "XLA_FLAGS"}
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key != "XLA_FLAGS" and not key.startswith(("JAX_COMPILATION_CACHE", "JAX_PERSISTENT_CACHE"))
+    }
     environment["LMX_COMPILATION_CACHE"] = choice if choice == "0" else str(tmp_path / choice)
     subprocess.run([sys.executable, "-c", code], check=True, timeout=90, env=environment)
 
