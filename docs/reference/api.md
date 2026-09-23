@@ -39,8 +39,13 @@ live in the module that owns their concepts.
 | Evidence | Power balance in `lmx.solvers` and the analytical, conservation, and packaged benchmark tools in `lmx.validation` |
 | Runtime | `enable_compilation_cache` |
 
-`solve(model)` accepts a `ChannelProblem`, `CaseSpec`,
-`ExtrudedInductionlessProblem`, or `Q2DProblem`.
+`solve(model)` accepts a `ChannelProblem`, a steady `CaseSpec`, or a
+`Q2DProblem`; a fully developed `CaseSpec` runs on the staggered core through
+`lmx.fully_developed`, as does `solve_fully_developed_fields`. The extruded
+fringing lanes are research-stage and are solved with
+`lmx.fringing.solve_extruded_inductionless`; the cell-centred fully developed
+solver of `lmx.cases` (`solve_steady`, `solve_transient`) is the validation
+lane plan step 4.6 retires.
 
 `duct_problem(hartmann=..., cells=..., wall_conductance=...)` builds a square
 insulating or Hunt duct with meshes that resolve the layers that exist -- `a/Ha`
@@ -80,7 +85,14 @@ restart, progress, logging, and timing hooks in their owning modules.
    :members:
 ```
 
-## Differentiation
+## Fully developed cases on the staggered core
+
+```{eval-rst}
+.. automodule:: lmx.fully_developed
+   :members:
+```
+
+## Case builders and the cell-centred validation lane
 
 ```{eval-rst}
 .. automodule:: lmx.cases

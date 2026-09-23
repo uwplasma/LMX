@@ -17,7 +17,7 @@ def _stub_validation_cli(
     solution = SimpleNamespace(state=SimpleNamespace(time=1.25, residual=0.01), mesh=SimpleNamespace())
     recorded: dict[str, object] = {}
     monkeypatch.setattr(cli, "_build_case", lambda args: case)
-    monkeypatch.setattr(cli, "solve_steady", lambda built_case: solution)
+    monkeypatch.setattr(cli, "solve_fully_developed", lambda built_case, **_: solution)
     monkeypatch.setattr(cli, "write_paraview", lambda solved, out_dir: [])
     monkeypatch.setattr(cli, "write_profile_csv", lambda path, profile: path)
     monkeypatch.setattr(cli, "extract_centerline", lambda solved: {"y": [0.0], "u": [1.0]})
@@ -155,8 +155,8 @@ def test_cli_run_branch_uses_case_builder_and_solver(
     monkeypatch.setattr(cli, "_build_case", lambda args: case)
     monkeypatch.setattr(
         cli,
-        "solve_steady",
-        lambda built_case: recorded.append(("solve", built_case)) or solution,
+        "solve_fully_developed",
+        lambda built_case, **_: recorded.append(("solve", built_case)) or solution,
     )
     monkeypatch.setattr(
         cli,
@@ -629,32 +629,36 @@ def test_cli_validate_hartmann_branch_writes_analytic_report(
     assert '"y_l2_error": 0.2' not in capsys.readouterr().out
 
 
-def test_solve_case_with_optional_logger_falls_back_on_typeerror(
+def test_solve_case_with_optional_logger_routes_steady_to_the_core(
     monkeypatch: pytest.MonkeyPatch,
 ):
     case = SimpleNamespace(name="demo")
-    calls: list[tuple[str, object]] = []
+    calls: list[tuple[str, object, dict]] = []
 
     def fake_transient(case, **kwargs):
         if kwargs:
             raise TypeError("old signature")
-        calls.append(("transient", case))
+        calls.append(("transient", case, kwargs))
         return "transient-ok"
 
     def fake_steady(case, **kwargs):
-        if kwargs:
-            raise TypeError("old signature")
-        calls.append(("steady", case))
+        calls.append(("steady", case, kwargs))
         return "steady-ok"
 
     monkeypatch.setattr(cli, "solve_transient", fake_transient)
-    monkeypatch.setattr(cli, "solve_steady", fake_steady)
+    monkeypatch.setattr(cli, "solve_fully_developed", fake_steady)
+    logger = object()
 
+    assert cli._solve_case_with_optional_logger(case, solve_mode="transient", logger=logger) == "transient-ok"
+    restart = SimpleNamespace(time=2.5)
     assert (
-        cli._solve_case_with_optional_logger(case, solve_mode="transient", logger=object()) == "transient-ok"
+        cli._solve_case_with_optional_logger(case, solve_mode="steady", logger=logger, initial_state=restart)
+        == "steady-ok"
     )
-    assert cli._solve_case_with_optional_logger(case, solve_mode="steady", logger=object()) == "steady-ok"
-    assert calls == [("transient", case), ("steady", case)]
+    assert calls == [
+        ("transient", case, {}),
+        ("steady", case, {"logger": logger, "start_time": 2.5}),
+    ]
 
 
 def test_write_run_summary_respects_disabled_json_summary(tmp_path: Path):

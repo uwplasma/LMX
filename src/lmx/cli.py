@@ -10,7 +10,7 @@ from pathlib import Path
 
 import jax.numpy as jnp
 
-from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case, solve_steady, solve_transient
+from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case, solve_transient
 from .fringing import (
     build_extruded_problem_from_case,
     build_layered_duct_extruded_problem,
@@ -18,6 +18,7 @@ from .fringing import (
     build_square_duct_extruded_problem,
     solve_extruded_inductionless,
 )
+from .fully_developed import case_mesh, solve_fully_developed
 from .io import (
     _portable_path,
     load_extruded_restart_bundle,
@@ -128,17 +129,8 @@ def _solve_case_with_optional_logger(
             )
         except TypeError:
             return solve_transient(case)
-    try:
-        return solve_steady(
-            case,
-            logger=logger,
-            initial_state=initial_state,
-            initial_diagnostics=initial_diagnostics,
-            append_diagnostics=append_diagnostics,
-            restart_info=restart_info,
-        )
-    except TypeError:
-        return solve_steady(case)
+    start_time = 0.0 if initial_state is None else float(initial_state.time)
+    return solve_fully_developed(case, logger=logger, start_time=start_time)
 
 
 def _runtime_summary(
@@ -336,7 +328,7 @@ def _run_config(config: RunConfig) -> dict[str, object]:
         restart_bundle = load_restart_bundle(config.restart.path)
         validate_restart_bundle(
             restart_bundle,
-            mesh=_build_mesh(case),
+            mesh=_build_mesh(case) if case.solver.mode == "transient" else case_mesh(case),
             geometry_kind=case.geometry.kind,
             case_name=case.name,
         )

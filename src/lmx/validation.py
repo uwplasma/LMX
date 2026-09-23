@@ -1056,13 +1056,13 @@ def benchmark_b_pressure_observable(solution, case_id: str) -> jnp.ndarray:
 def benchmark_solver(
     repeats: int = 3, ha: float = 20.0, ny: int = 48, nz: int = 48
 ) -> dict[str, float | str]:
-    from .cases import solve_steady
+    from .fully_developed import solve_fully_developed
 
     case = make_hartmann_case(ha=ha, ny=ny, nz=nz)
     timings = []
     for _ in range(repeats):
         start = time.perf_counter()
-        solution = solve_steady(case)
+        solution = solve_fully_developed(case)
         jax.block_until_ready((solution.fields.u, solution.fields.phi))
         timings.append(time.perf_counter() - start)
     cold = timings[0]

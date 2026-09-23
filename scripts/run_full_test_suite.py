@@ -67,7 +67,7 @@ _TEST_SHARDS = {
             "test_a_transverse_field_reduces_the_channel_throughput",
         )
     ),
-    "steady": ("tests/test_steady.py",),
+    "steady": ("tests/test_steady.py", "tests/test_fully_developed.py"),
     "gradients": tuple(
         f"tests/test_steady.py::{name}"
         for name in (
@@ -90,12 +90,13 @@ _ALL_TESTS = tuple(dict.fromkeys(path.split("::")[0] for shard in _TEST_SHARDS.v
 _CHANGE_TEST_NAMES = {
     "__init__": "config cli example_runner",
     "__main__": "cli",
-    "cases": "config solver physics fringing benchmarks",
+    "cases": "config solver physics fringing benchmarks fully_developed",
     "cli": "cli example_runner",
     "advect": "advect core3d",
     "core3d": "core3d timeloop advect steady",
-    "design": "design",
-    "steady": "steady",
+    "design": "design fully_developed",
+    "fully_developed": "fully_developed design config cli solver example_runner",
+    "steady": "steady fully_developed",
     "bc": "ops staggered_laplacian core3d timeloop advect steady pipe",
     "grid": "grid ops staggered_laplacian core3d timeloop advect steady pipe",
     "timeloop": "timeloop",

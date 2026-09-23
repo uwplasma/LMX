@@ -16,27 +16,31 @@ for case in (hartmann, shercliff, hunt):
 ```
 
 Hartmann applies the field normal to insulating Hartmann walls. Shercliff
-orients it so side layers control the profile. Hunt resolves conducting Hartmann
+orients it so side layers control the profile. Hunt has conducting Hartmann
 walls and insulating side walls.
 
-The discrete fully developed problem is linear, so a steady solve is one
-affine fixed-point GMRES solve, not a march in pseudo-time. Each iteration
-applies one potential solve and one momentum solve. `result.residual` is the
-relative fixed-point residual `||G(u) - u|| / ||G(0)||`. `result.converged` is
-true only when that residual meets `steady_tolerance` and the final potential
-and momentum solves meet their gates. `result.steps` counts GMRES iterations.
-Set the solver mode to `"transient"` for a time history.
+`lmx.solve` runs a case on the staggered core (`lmx.fully_developed`): the
+cross-section becomes a `ChannelProblem` with one periodic axial cell, and the
+steady state is one preconditioned conjugate-gradient solve, compiled once per
+case and reused for any drive. `ny` and `nz` are fluid cells, clustered to the
+Hartmann layer `a/Ha` on the walls normal to the field and to the side layer
+`a/sqrt(Ha)` on the others, exactly as `lmx.duct_problem` does. Hunt's
+conducting walls are thin walls of conductance ratio `c = sigma_w t_w / (sigma a)`:
+the solution covers the fluid, and `wall_cells` do not enter. On 32-64 cells
+the flow rate is within 1 % of the spectral reference from Ha 20 to 1000.
+`result.residual` is the relative steady residual `||R(u)|| / ||R(0)||`,
+certified to 1e-9; a solve that fails raises. The case's pseudo-time controls
+(time step, relaxation, potential and coupling iterations) do not enter.
+`lmx.solve` refuses a `"transient"` case: the pseudo-time loop of the
+cell-centred solver is `lmx.cases.solve_transient`, and a time history on the
+core is `lmx.advance` on `lmx.fully_developed.channel_problem(case)`.
 
 Use `dataclasses.replace` to change a visible part of a frozen case:
 
 ```python
 from dataclasses import replace
 
-case = replace(
-    hartmann,
-    forcing=2.0,
-    time_stepper=replace(hartmann.time_stepper, steady_tolerance=1e-9),
-)
+case = replace(hartmann, forcing=2.0)
 ```
 
 After solving, check more than the update norm:
@@ -46,11 +50,12 @@ from lmx.validation import hartmann_validation, validation_summary
 
 comparison = hartmann_validation(result, ha=20)
 metrics = validation_summary(result, case.name, ha=20)
-print(comparison.l2_error, metrics["charge_balance_relative"])
+print(comparison.l2_error, metrics["div_current_max"])
 ```
 
-`lmx.solvers.fully_developed_power_balance(case, result)` reports applied, viscous,
-Lorentz, and residual power using the same discrete operators as the solve.
+`result.diagnostics` holds the flow rate, the Lorentz and ohmic power and the
+largest cell divergence of the current. `lmx.solvers.fully_developed_power_balance`
+audits the cell-centred solver of `lmx.cases`, not this one.
 Increase wall and fluid resolution together for high Hartmann number cases;
 the mesh-quality helpers report cells across Hartmann and side layers.
 
@@ -60,7 +65,7 @@ Run `python examples/hunt_example.py` for a conducting-wall duct with a
 requested flow rate. Edit `TARGET_FLOW_RATE` and `DUCT_LENGTH` near the top;
 set the target to `None` to prescribe `FORCING` instead. The example solves at
 unit drive to measure the flow per unit drive `G`, eliminates the required
-drive analytically, and solves again from rest at that drive. Both solves must
+drive analytically, and solves again at that drive. Both solves must
 report `converged`, and the second must reproduce `G*drive` to a `1e-8`
 relative flow check. This checks the linear drive-to-flow relation, not an
 independent physical reference. Its JSON summary records flow, drive,

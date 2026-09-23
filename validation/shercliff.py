@@ -27,7 +27,9 @@ to the field is Hunt's case.
 
 The discretization is spectral, so the answer is converged to eight digits by
 about forty points per direction and can be treated as exact when a finite-volume
-result is compared against it. At :math:`B=0` it reproduces the analytic
+result is compared against it, up to Ha 100. Beyond that the full-domain solve
+resolves neither the Hartmann layer nor its own round-off by 96 points (Ha 1000:
+0.60 % high); :func:`quadrant_flow_rate` is the reference there. At :math:`B=0` it reproduces the analytic
 Poiseuille duct maximum 0.29468541 for unit forcing on ``[-1, 1]^2``.
 """
 
@@ -35,7 +37,7 @@ from __future__ import annotations
 
 import numpy as np
 
-__all__ = ["chebyshev_weights", "duct_flow", "flow_rate"]
+__all__ = ["chebyshev_weights", "duct_flow", "flow_rate", "quadrant_flow_rate"]
 
 
 def _differentiation_matrix(points: int) -> tuple[np.ndarray, np.ndarray]:
@@ -130,3 +132,66 @@ def flow_rate(hartmann: float, points: int = 40, *, forcing: float = 1.0, **wall
     _, velocity, _ = duct_flow(hartmann, points, forcing=forcing, **walls)
     weights = chebyshev_weights(points)
     return float(weights @ velocity @ weights) / 4.0
+
+
+def quadrant_flow_rate(
+    hartmann: float, points: int = 48, *, beta: float = 5.0, hartmann_wall: float = 0.0
+) -> float:
+    """Return ``Q / A`` from one quadrant, with the collocation points mapped onto the walls.
+
+    The same equations and wall closures as :func:`duct_flow`, on ``[0, 1]^2``
+    using the parity of the solution: ``u`` is even in ``y`` and ``z``, the
+    potential even in ``y`` and odd in ``z``, so the symmetry lines carry
+    ``du/dn = 0``, ``dphi/dy = 0`` (``y = 0``) and ``phi = 0`` (``z = 0``). The
+    collocation variable ``t`` is mapped to ``x = 1 - sinh(beta (1 - t)) / sinh(beta)``,
+    which refines the wall by ``beta / sinh(beta)`` and keeps spectral
+    convergence. The dense system (1-norm condition about 5e16 at Ha 1000) is
+    row-equilibrated, factorized once and refined twice, which removes the
+    round-off scatter of a plain solve. Shercliff Ha 1000 is 0.00097210343 at
+    48 points and 0.00097210342 at 64; Hunt Ha 300 converges monotonically from
+    below at ``beta = 5`` (``beta = 7`` returns garbage at 64-80 points).
+    """
+    import scipy.linalg
+
+    derivative, nodes = _differentiation_matrix(points)
+    t = 0.5 * (1.0 + nodes)
+    x = 1.0 - np.sinh(beta * (1.0 - t)) / np.sinh(beta)
+    first = 2.0 * derivative / (beta * np.cosh(beta * (1.0 - t)) / np.sinh(beta))[:, None]
+    count = points + 1
+    identity = np.eye(count)
+    along_y, along_z = np.kron(first, identity), np.kron(identity, first)
+    second_z = np.kron(identity, first @ first)
+    size = count * count
+    field = float(hartmann)
+    operator = np.zeros((2 * size, 2 * size))
+    source = np.zeros(2 * size)
+    operator[:size, :size] = np.kron(first @ first, identity) + second_z - field**2 * np.eye(size)
+    operator[:size, size:] = field * along_z
+    source[:size] = -1.0
+    operator[size:, :size] = -field * along_z
+    operator[size:, size:] = operator[:size, :size] + field**2 * np.eye(size)
+    y, z = np.repeat(x, count), np.tile(x, count)
+    wall_y, wall_z, line_y, line_z = (
+        np.isclose(v, edge) for v, edge in ((y, 1.0), (z, 1.0), (y, 0.0), (z, 0.0))
+    )
+    for row in np.flatnonzero(wall_y | wall_z | line_y | line_z):
+        operator[row, :], source[row] = 0.0, 0.0
+        if wall_y[row] or wall_z[row]:
+            operator[row, row] = 1.0
+        else:
+            operator[row, :size] = along_y[row] if line_y[row] else along_z[row]
+        charge = size + row
+        operator[charge, :] = 0.0
+        if line_z[row]:
+            operator[charge, charge] = 1.0
+        elif wall_y[row]:
+            operator[charge, size:] = along_y[row] - hartmann_wall * second_z[row]
+        else:
+            operator[charge, size:] = along_z[row] if wall_z[row] else along_y[row]
+    scale = 1.0 / np.abs(operator).max(axis=1)
+    factors = scipy.linalg.lu_factor(operator * scale[:, None], check_finite=False)
+    solution = scipy.linalg.lu_solve(factors, source * scale, check_finite=False)
+    for _ in range(2):
+        solution += scipy.linalg.lu_solve(factors, (source - operator @ solution) * scale, check_finite=False)
+    weights = 0.5 * chebyshev_weights(points) * beta * np.cosh(beta * (1.0 - t)) / np.sinh(beta)
+    return float(weights @ solution[:size].reshape(count, count) @ weights)

@@ -88,7 +88,7 @@ _EXPORTS = {
     "make_hunt_case": ("lmx.cases", "make_hunt_case"),
     "make_q2d_case": ("lmx.q2d", "make_q2d_case"),
     "evolve_q2d": ("lmx.q2d", "evolve_q2d"),
-    "solve_fully_developed_fields": ("lmx.cases", "solve_fully_developed_fields"),
+    "solve_fully_developed_fields": ("lmx.fully_developed", "solve_fully_developed_fields"),
     "ChannelProblem": ("lmx.core3d", "ChannelProblem"),
     "duct_problem": ("lmx.core3d", "duct_problem"),
     "solve_steady_state": ("lmx.steady", "solve_steady_state"),

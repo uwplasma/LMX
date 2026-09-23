@@ -44,14 +44,14 @@ def objective(forcing, field_scale):
 value, gradient = jax.jit(jax.value_and_grad(objective, argnums=(0, 1)))(1.0, 1.0)
 ```
 
-This path assembles the same mesh, material coefficients, potential equation,
-momentum equation, no-slip interpolation, and current/Lorentz fields as
-`solve`. The coupled affine state and its nested linear systems use implicit
-SOLVAX derivatives, so iteration histories are absent from the reverse tape.
-The current continuous inputs are pressure forcing and a scalar multiplier on
-the imposed magnetic field. Rectangular Hartmann/Shercliff and layered Hunt
-cases pass production-field and independent adjoint gates. Fixed-flow and 3-D
-cases remain outside this API until their own gates pass.
+This path is the staggered-core solve `lmx.solve` runs on the same case, one
+compiled program shared by both. The steady state is a conjugate-gradient solve
+differentiated by one more (`lmx.steady.solve_steady_state`), so iteration
+histories are absent from the reverse tape. The continuous inputs are pressure
+forcing and a scalar multiplier on the imposed magnetic field. Rectangular
+Hartmann/Shercliff and thin-wall Hunt cases pass central-difference gates; a
+prescribed flow rate is met by scaling the unit-drive solution, which keeps it
+differentiable. 3-D cases remain outside this API until their own gates pass.
 
 ## Three-dimensional fringe response
 

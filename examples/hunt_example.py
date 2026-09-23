@@ -9,8 +9,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
-from lmx import make_hunt_case
-from lmx.cases import solve_steady
+from lmx import make_hunt_case, solve
 from lmx.design import hydraulic_power, volumetric_flow_rate
 from lmx.io import write_case_overview_plots, write_solution_outputs
 from lmx.validation import validation_summary
@@ -22,39 +21,31 @@ WIDTH = 2.0
 HEIGHT = 2.0
 NY = 24
 NZ = 24
-WALL_CELLS = 3
 WALL_THICKNESS = 0.1
 WALL_CONDUCTANCE_RATIO = 0.05
-INSULATOR_CONDUCTIVITY_RATIO = 1.0e-12
 FLUID_CONDUCTIVITY = 1.0
 DENSITY = 1.0
 VISCOSITY = 1.0
 FORCING = 1.0
 TARGET_FLOW_RATE = 0.05  # Set to None to prescribe FORCING instead.
 DUCT_LENGTH = 2.5  # Fully developed segment length, not a complete blanket.
-POTENTIAL_ITERATIONS = 160
-STEADY_TOLERANCE = 1.0e-12  # Relative residual ||G(u) - u|| / ||G(0)|| of the steady solve.
-POTENTIAL_RESIDUAL_GATE = 1.0e-10  # Max-norm potential residual; it floors near 3e-12 here.
 WRITE_PARAVIEW = True
 WRITE_CSV = True
 WRITE_NPZ = True
 WRITE_PLOTS = False
 
 
-# Set up the layered wall regions and solver controls with public dataclasses.
+# Set up the duct. The conducting Hartmann walls are thin walls of conductance
+# ratio c = sigma_w t_w / (sigma a) on the staggered core; the side walls insulate.
 case = make_hunt_case(
     ha=HARTMANN_NUMBER,
     width=WIDTH,
     height=HEIGHT,
     ny=NY,
     nz=NZ,
-    wall_cells=WALL_CELLS,
     wall_thickness=WALL_THICKNESS,
-    insulator_cells=WALL_CELLS,
-    insulator_thickness=WALL_THICKNESS,
     fluid_conductivity=FLUID_CONDUCTIVITY,
     wall_conductance_ratio=WALL_CONDUCTANCE_RATIO,
-    insulator_conductivity_ratio=INSULATOR_CONDUCTIVITY_RATIO,
     density=DENSITY,
     viscosity=VISCOSITY,
     output_dir=str(OUTPUT_DIR),
@@ -62,12 +53,6 @@ case = make_hunt_case(
 case = replace(
     case,
     forcing=FORCING,
-    time_stepper=replace(
-        case.time_stepper,
-        potential_iterations=POTENTIAL_ITERATIONS,
-        steady_tolerance=STEADY_TOLERANCE,
-        steady_potential_tolerance=POTENTIAL_RESIDUAL_GATE,
-    ),
     output=replace(
         case.output,
         write_paraview=WRITE_PARAVIEW,
@@ -79,14 +64,15 @@ case = replace(
 
 # The problem is linear, so a unit-drive solve gives the flow per unit drive:
 # Q = G * drive. That eliminates the drive from a fixed-throughput design.
-unit = solve_steady(replace(case, forcing=1.0))
+unit = solve(replace(case, forcing=1.0))
 conductance = float(volumetric_flow_rate(case, unit.state.u))
 if TARGET_FLOW_RATE is not None:
     case = replace(case, forcing=TARGET_FLOW_RATE / conductance)
 
-# Run the design solve from rest at that drive. Each steady solve is one affine
-# GMRES solve whose residual is certified; the flow check tests Q = G * drive.
-solution = solve_steady(case)
+# Run the design solve at that drive. Each steady solve is one conjugate-gradient
+# solve whose residual is certified, and the second reuses the compiled program of
+# the first because the drive is an argument; the flow check tests Q = G * drive.
+solution = solve(case)
 flow_rate = float(volumetric_flow_rate(case, solution.state.u))
 expected_flow = conductance * case.forcing
 flow_error = abs(flow_rate - expected_flow) / max(abs(expected_flow), 1e-30)
@@ -94,8 +80,7 @@ if not (unit.converged and solution.converged) or not flow_error <= 1e-8:
     raise RuntimeError(
         f"Hunt throughput verification failed: status={solution.status}, "
         f"residual={solution.residual:g}, relative flow error={flow_error:g}, "
-        f"potential residual={float(solution.diagnostics.potential_residual_history[-1]):g}, "
-        f"linear residual={float(solution.diagnostics.linear_residual_history[-1]):g}"
+        f"charge balance={float(solution.diagnostics.div_current_max_history[-1]):g}"
     )
 generated = write_solution_outputs(solution, case, OUTPUT_DIR)
 plots = (
@@ -114,7 +99,6 @@ summary = {
         "verification": "cold certified steady solve",
         "status": solution.status,
         "steady_residual": solution.residual,
-        "gmres_iterations": solution.steps,
         "target_flow_rate": TARGET_FLOW_RATE,
         "flow_rate": flow_rate,
         "drive": case.forcing,

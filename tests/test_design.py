@@ -79,22 +79,32 @@ def _flow(case, drive, scale=1.0):
 
 
 @pytest.mark.parametrize("factory", [lmx.make_hartmann_case, lmx.make_hunt_case])
-def test_fluid_areas_sum_to_the_open_cross_section(factory):
-    from lmx.physics import build_material_fields
-    from lmx.solvers import _build_mesh
+def test_fluid_areas_are_the_cross_section_the_case_is_solved_on(factory):
+    """A Hunt duct's walls are thin sheets on the core, so its mesh is the fluid alone."""
+    from lmx.fully_developed import case_mesh
 
     case = factory(ha=5, ny=12, nz=12)
     areas = np.asarray(fluid_cell_areas(case))
-    mesh = _build_mesh(case)
-    expected = np.where(build_material_fields(case, mesh).fluid_mask, mesh.dy[:, None] * mesh.dz[None, :], 0)
-    np.testing.assert_array_equal(areas, expected)
-    assert np.all(areas >= 0.0)
+    mesh = case_mesh(case)
+    np.testing.assert_array_equal(areas, np.asarray(mesh.dy)[:, None] * np.asarray(mesh.dz)[None, :])
+    assert areas.shape == (12, 12) and np.all(areas > 0.0)
     assert float(np.sum(areas)) == pytest.approx(case.geometry.width * case.geometry.height, rel=1e-12)
     velocity = jnp.ones(areas.shape)
     integrate = jax.jit(jax.value_and_grad(lambda u: volumetric_flow_rate(case, u)))
     value, gradient = integrate(velocity)
     assert float(value) == pytest.approx(float(areas.sum()), rel=1e-12)
     np.testing.assert_array_equal(gradient, areas)
+
+
+def test_a_case_and_its_channel_problem_have_one_response():
+    """``linear_flow_response`` of a case is ``channel_flow_response`` of the problem it routes to."""
+    from lmx.fully_developed import channel_problem
+
+    case = lmx.make_hunt_case(ha=20.0, ny=16, nz=16, wall_conductance_ratio=0.027)
+    for scale in (1.0, 1.5):
+        routed = float(linear_flow_response(case, magnetic_field_scale=scale).flow_per_unit_drive)
+        native = channel_flow_response(channel_problem(case), magnetic_field_scale=scale).flow_per_unit_drive
+        assert routed == pytest.approx(float(native), rel=1e-8)
 
 
 def test_channel_cross_section_weights_sum_to_the_full_area():
@@ -253,20 +263,25 @@ def test_channel_flow_rate_is_exactly_linear_in_the_drive():
 
 
 @pytest.mark.parametrize(("hartmann", "bound"), [(0.0, 2e-3), (5.0, 2e-2)])
-def test_channel_flow_response_reconciles_with_the_legacy_route_on_a_matched_uniform_mesh(hartmann, bound):
-    """Measured 0.104% at Ha 0, 1.498% at Ha 5.
+def test_channel_flow_response_reconciles_with_the_cell_centred_route_on_a_matched_uniform_mesh(
+    hartmann, bound
+):
+    """Measured 0.104% at Ha 0, 1.498% at Ha 5, against the older solver of ``lmx.cases``.
 
     NOT gated at Ha 20: a uniform mesh resolves neither route's a/Ha layer there
     (see test_core3d.py's own Ha 20 test), so both are already >10% off spectral.
     """
+    from lmx.cases import solve_fully_developed_fields as cell_centred_fields
+    from lmx.solvers import _build_mesh
+
     cells = 32
     new = float(channel_flow_response(_uniform_duct(hartmann, cells)).flow_per_unit_drive)
     case = lmx.make_hartmann_case(ha=hartmann, width=2.0, height=2.0, ny=cells, nz=cells)
-    uniform_geometry = dataclasses.replace(case.geometry, target_ha=None)
-    legacy = float(
-        linear_flow_response(dataclasses.replace(case, geometry=uniform_geometry)).flow_per_unit_drive
-    )
-    assert abs(new - legacy) / legacy < bound
+    case = dataclasses.replace(case, geometry=dataclasses.replace(case.geometry, target_ha=None))
+    mesh = _build_mesh(case)
+    areas = np.asarray(mesh.dy)[:, None] * np.asarray(mesh.dz)[None, :]
+    older = float(np.sum(areas * np.asarray(cell_centred_fields(case, forcing=1.0)[0])))
+    assert abs(new - older) / older < bound
 
 
 def test_channel_fixed_flow_power_matches_finite_differences_in_the_field_scale():

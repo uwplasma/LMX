@@ -69,7 +69,9 @@ from .poisson import (
     fast_diagonal_helmholtz,
 )
 
-__all__ = ["SteadySolution", "solve_steady_state", "steady_residual"]
+__all__ = ["SteadySolution", "solve_compiled", "solve_steady_state", "steady_residual"]
+
+_MAX_STEPS = 40
 
 
 @dataclass(frozen=True)
@@ -414,7 +416,7 @@ def solve_steady_state(
     velocity: tuple[Field, Field, Field] | None = None,
     *,
     tolerance: float = 1.0e-9,
-    max_steps: int = 40,
+    max_steps: int = _MAX_STEPS,
     pseudo_step: float | None = None,
     forcing: tuple[float, float, float] | None = None,
     field_scale: float | jnp.ndarray = 1.0,
@@ -483,6 +485,28 @@ def solve_steady_state(
     tangent_solve = functools.partial(_tangent_solve, precond=precond)
     root = solvax.root_solve(residual, start, solver, tangent_solve=tangent_solve)
     return _finish(root, residual, scale, tolerance, problem, factorization, field_scale, max_steps)
+
+
+def solve_compiled(problem: ChannelProblem) -> SteadySolution:
+    """Run :func:`solve_steady_state` at its defaults as one compiled program; raise if it fails.
+
+    The program is cached per problem. Compiling the whole solve replaces the
+    dispatch of each operation from the host, which is most of the time of an
+    eager solve, cold or warm.
+    """
+    velocity, pressure, potential, residual = _program(problem)()
+    if not all(bool(jnp.all(jnp.isfinite(field.data))) for field in velocity):
+        raise RuntimeError("the steady solve did not converge")
+    return SteadySolution(velocity, pressure, potential, residual, _MAX_STEPS)
+
+
+@functools.lru_cache(maxsize=16)
+def _program(problem: ChannelProblem):
+    def run():
+        solution = solve_steady_state(problem, max_steps=_MAX_STEPS)
+        return solution.velocity, solution.pressure, solution.potential, solution.residual_norm
+
+    return jax.jit(run)
 
 
 def _finish(

@@ -52,7 +52,6 @@ from .specs import (
     CaseSpec,
     Diagnostics,
     ExtrudedInductionlessProblem,
-    ExtrudedInductionlessSolution,
     FringingProfile,
     GeometrySpec,
     MagneticFieldSpec,
@@ -1376,37 +1375,45 @@ def solve_steady(
 
 
 def solve(
-    model: "ChannelProblem | CaseSpec | ExtrudedInductionlessProblem | Q2DProblem",
-) -> "SteadySolution | Solution | ExtrudedInductionlessSolution | Q2DResult":
-    """Solve a duct, a fully developed case, a fringing problem, or a Q2D one.
+    model: "ChannelProblem | CaseSpec | Q2DProblem",
+) -> "SteadySolution | Solution | Q2DResult":
+    """Solve a duct, a fully developed case, or a Q2D problem.
 
     A :class:`lmx.core3d.ChannelProblem` goes to the staggered core's steady
-    solve, :func:`lmx.steady.solve_steady_state`; the configured mode selects steady or transient
-    execution for ``CaseSpec``. Advanced restart, mesh, logging, progress, and
-    timing hooks remain on the specialized functions in :mod:`lmx.cases`,
-    :mod:`lmx.steady` and :mod:`lmx.fringing`.
+    solve, :func:`lmx.steady.solve_steady_state`, and so does a fully developed
+    ``CaseSpec``, through :func:`lmx.fully_developed.solve_fully_developed`,
+    which reports it on the case's cross-section. Each is compiled once per
+    problem. The pseudo-time loop of a transient ``CaseSpec`` and the extruded
+    fringing lanes are validation and research paths with their own entry
+    points, :func:`solve_transient` and
+    :func:`lmx.fringing.solve_extruded_inductionless`.
     """
 
     from .core3d import ChannelProblem
 
     if isinstance(model, ChannelProblem):
-        from .steady import solve_steady_state
+        from .steady import solve_compiled
 
-        return solve_steady_state(model)
+        return solve_compiled(model)
     if isinstance(model, CaseSpec):
-        return solve_transient(model) if model.solver.mode == "transient" else solve_steady(model)
-    if isinstance(model, ExtrudedInductionlessProblem):
-        from .fringing import solve_extruded_inductionless
+        if model.solver.mode == "transient":
+            raise ValueError(
+                "lmx.solve returns the steady state of a CaseSpec; its pseudo-time loop is "
+                "lmx.cases.solve_transient, and a time history on the staggered core is lmx.advance"
+            )
+        from .fully_developed import solve_fully_developed
 
-        return solve_extruded_inductionless(model)
+        return solve_fully_developed(model)
+    if isinstance(model, ExtrudedInductionlessProblem):
+        raise TypeError(
+            "extruded fringing problems are research-stage: solve them with "
+            "lmx.fringing.solve_extruded_inductionless"
+        )
     from .q2d import Q2DProblem, solve_q2d
 
     if isinstance(model, Q2DProblem):
         return solve_q2d(model)
-    raise TypeError(
-        "solve expects ChannelProblem, CaseSpec, ExtrudedInductionlessProblem, or Q2DProblem, "
-        f"got {type(model).__name__}"
-    )
+    raise TypeError(f"solve expects ChannelProblem, CaseSpec or Q2DProblem, got {type(model).__name__}")
 
 
 def solve_fully_developed_fields(
@@ -1415,9 +1422,11 @@ def solve_fully_developed_fields(
     forcing: float | jax.Array | None = None,
     magnetic_field_scale: float | jax.Array = 1.0,
 ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array]:
-    """Return steady duct fields through the production discretization.
+    """Return steady duct fields from the cell-centred affine solve of this module.
 
-    ``forcing`` and ``magnetic_field_scale`` are continuous design inputs.
+    This is the validation lane that plan step 4.6 retires; the public
+    :func:`lmx.solve_fully_developed_fields` solves the same case on the
+    staggered core (:mod:`lmx.fully_developed`). ``forcing`` and ``magnetic_field_scale`` are continuous design inputs.
     The coupled affine state uses a SOLVAX implicit tangent/transpose solve,
     so reverse mode does not retain potential, momentum, or coupling
     iterations. Meshes, material regions, boundary kinds, and solver controls

@@ -9,7 +9,7 @@ case = lmx.make_hartmann_case(ha=5.0, ny=8, nz=8)
 result = lmx.solve(case)
 
 assert result.converged, result.status
-print(f"steps={result.steps} residual={result.residual:.3e}")
+print(f"status={result.status} residual={result.residual:.3e}")
 ```
 
 `CaseSpec` groups geometry, regions, magnetic field, boundary conditions,

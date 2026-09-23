@@ -460,19 +460,20 @@ def test_public_solvers_reject_unknown_solver_kind(solver, mode):
         solver(bad)
 
 
-def test_common_solve_dispatches_configured_mode_and_fringing(monkeypatch: pytest.MonkeyPatch):
+def test_common_solve_routes_cases_to_the_core_and_refuses_the_lanes(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    steady_result, transient_result, extruded_result = object(), object(), object()
-    monkeypatch.setattr(cases_impl, "solve_steady", lambda model: steady_result)
-    monkeypatch.setattr(cases_impl, "solve_transient", lambda model: transient_result)
+    steady_result = object()
+    monkeypatch.setattr("lmx.fully_developed.solve_fully_developed", lambda model: steady_result)
+    monkeypatch.setattr(cases_impl, "solve_steady", lambda model: pytest.fail("older solver reached"))
     assert cases_impl.solve(case) is steady_result
-    assert cases_impl.solve(replace(case, solver=replace(case.solver, mode="transient"))) is transient_result
+    with pytest.raises(ValueError, match="lmx.cases.solve_transient"):
+        cases_impl.solve(replace(case, solver=replace(case.solver, mode="transient")))
 
     profile = FringingProfile(x=jnp.ones(1), field_scale=jnp.ones(1), axis="z")
     problem = ExtrudedInductionlessProblem(case=case, profile=profile)
-    monkeypatch.setattr("lmx.fringing.solve_extruded_inductionless", lambda model: extruded_result)
-    assert cases_impl.solve(problem) is extruded_result
-    with pytest.raises(TypeError, match="CaseSpec, ExtrudedInductionlessProblem, or Q2DProblem"):
+    with pytest.raises(TypeError, match="lmx.fringing.solve_extruded_inductionless"):
+        cases_impl.solve(problem)
+    with pytest.raises(TypeError, match="ChannelProblem, CaseSpec or Q2DProblem"):
         cases_impl.solve(SimpleNamespace())
 
 
