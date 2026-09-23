@@ -732,17 +732,21 @@ def test_stable_root_api_is_small_lazy_and_resolvable(
     api_reference = Path("docs/reference/api.md").read_text()
     assert all(f"`{name}`" in api_reference for name in lmx.__all__)
 
+    import jax
+
     updates = []
     monkeypatch.setattr("lmx.io.jax.config.update", lambda *args: updates.append(args))
     cache = lmx.enable_compilation_cache(
-        tmp_path / "jax-cache", min_compile_time_secs=2.0, min_entry_size_bytes=4096
+        tmp_path / "jax-cache", min_compile_time_secs=2.0, min_entry_size_bytes=4096, share_across_values=True
     )
     assert cache.is_dir()
     assert updates == [
         ("jax_compilation_cache_dir", str(cache)),
         ("jax_persistent_cache_min_entry_size_bytes", 4096),
         ("jax_persistent_cache_min_compile_time_secs", 2.0),
-    ]
+    ] + [("jax_use_simplified_jaxpr_constants", True)] * (
+        "jax_use_simplified_jaxpr_constants" in jax.config.values
+    )
 
 
 def test_advanced_api_uses_owning_module() -> None:

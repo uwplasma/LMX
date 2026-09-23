@@ -36,8 +36,10 @@ solved in float32 as before.
 
 from __future__ import annotations
 
+import functools
 from dataclasses import dataclass, field
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import solvax
@@ -185,6 +187,24 @@ def _require_separable(grid: Grid) -> None:
         )
 
 
+def _probe(
+    apply, line: Grid, offset: tuple[float, float, float], positions, selection=slice(None)
+) -> np.ndarray:
+    """Return the matrix of a linear stencil, one column per unit vector at ``positions``.
+
+    All unit vectors go through the stencil in one batched, compiled call on the
+    host CPU. Probing them one by one as eager operations dispatched hundreds of
+    small kernels, which was most of the cold start (4 s on a CPU, 20 s on a GPU
+    host, for a 48-cell duct).
+    """
+    units = np.zeros((len(positions),) + line.offset_shape(offset))
+    for column, position in enumerate(positions):
+        units[(column,) + tuple(position)] = 1.0
+    with jax.default_device(jax.devices("cpu")[0]):
+        applied = jax.jit(jax.vmap(lambda data: apply(Field(data, offset, line)).data))(units)
+    return np.asarray(applied).reshape(len(positions), -1)[:, selection].T
+
+
 def assemble_axis_laplacian(grid: Grid, axis: int, condition: BoundaryCondition) -> np.ndarray:
     """Return the dense one-dimensional Laplacian :mod:`lmx.ops` applies along ``axis``.
 
@@ -193,20 +213,18 @@ def assemble_axis_laplacian(grid: Grid, axis: int, condition: BoundaryCondition)
     stencil the three-dimensional operator uses along ``axis``.
     """
     _require_separable(grid)
-    count = grid.shape[axis]
     faces = [uniform_faces(1, 0.0, 1.0)] * 3
     faces[axis] = np.asarray(grid.faces[axis])
-    line = Grid(*faces)
+    return _axis_laplacian(Grid(*faces), axis, condition).copy()
+
+
+@functools.lru_cache(maxsize=64)
+def _axis_laplacian(line: Grid, axis: int, condition: BoundaryCondition) -> np.ndarray:
     conditions = tuple(
         condition if position == axis else BoundaryCondition("neumann") for position in range(3)
     )
-    columns = []
-    for index in range(count):
-        unit = np.zeros(line.shape)
-        unit[(0,) * axis + (index,) + (0,) * (2 - axis)] = 1.0
-        field = Field(jnp.asarray(unit), (CENTER,) * 3, line)
-        columns.append(np.asarray(laplacian(field, conditions).data).reshape(count))
-    return np.stack(columns, axis=1)
+    positions = [(0,) * axis + (index,) + (0,) * (2 - axis) for index in range(line.shape[axis])]
+    return _probe(lambda field: laplacian(field, conditions), line, (CENTER,) * 3, positions)
 
 
 def assemble_radial_laplacian(grid: Grid, condition: BoundaryCondition) -> np.ndarray:
@@ -219,21 +237,20 @@ def assemble_radial_laplacian(grid: Grid, condition: BoundaryCondition) -> np.nd
     so what is left is exactly ``(1/r) d/dr (r d/dr)`` as the production stencil
     discretizes it, including the zero-area face on the axis.
     """
-    count = grid.shape[0]
     line = Grid(
         np.asarray(grid.x_faces),
         uniform_faces(1, 0.0, 2.0 * np.pi),
         uniform_faces(1, 0.0, 1.0),
         geometry=POLAR,
     )
+    return _radial_laplacian(line, condition).copy()
+
+
+@functools.lru_cache(maxsize=16)
+def _radial_laplacian(line: Grid, condition: BoundaryCondition) -> np.ndarray:
     conditions = (condition, BoundaryCondition(PERIODIC), BoundaryCondition(NEUMANN))
-    columns = []
-    for index in range(count):
-        unit = np.zeros(line.shape)
-        unit[index, 0, 0] = 1.0
-        field = Field(jnp.asarray(unit), (CENTER,) * 3, line)
-        columns.append(np.asarray(laplacian(field, conditions).data).reshape(count))
-    return np.stack(columns, axis=1)
+    positions = [(index, 0, 0) for index in range(line.shape[0])]
+    return _probe(lambda field: laplacian(field, conditions), line, (CENTER,) * 3, positions)
 
 
 def azimuthal_eigenvalues(grid: Grid) -> np.ndarray:
@@ -858,23 +875,23 @@ def assemble_staggered_axis_operator(
     """
     faces = [uniform_faces(1, 0.0, 1.0)] * 3
     faces[axis] = np.asarray(grid.faces[axis])
-    line = Grid(*faces)
     line_offset = tuple(offset[axis] if position == axis else CENTER for position in range(3))
+    return _staggered_axis_operator(Grid(*faces), axis, line_offset, condition).copy()
+
+
+@functools.lru_cache(maxsize=64)
+def _staggered_axis_operator(
+    line: Grid, axis: int, line_offset: tuple[float, float, float], condition: BoundaryCondition
+) -> np.ndarray:
     conditions = tuple(
         condition if position == axis else BoundaryCondition("neumann") for position in range(3)
     )
-    selection = free_slice(line, axis, offset[axis], condition)
-    count = len(range(*selection.indices(line.offset_shape(line_offset)[axis])))
-    columns = []
-    for index in range(count):
-        unit = np.zeros(line.offset_shape(line_offset))
-        position = [0, 0, 0]
-        position[axis] = range(*selection.indices(unit.shape[axis]))[index]
-        unit[tuple(position)] = 1.0
-        field = Field(jnp.asarray(unit), line_offset, line)
-        applied = np.asarray(staggered_laplacian(field, conditions).data).reshape(-1)
-        columns.append(applied[selection])
-    return np.stack(columns, axis=1)
+    selection = free_slice(line, axis, line_offset[axis], condition)
+    free = range(*selection.indices(line.offset_shape(line_offset)[axis]))
+    positions = [tuple(index if position == axis else 0 for position in range(3)) for index in free]
+    return _probe(
+        lambda field: staggered_laplacian(field, conditions), line, line_offset, positions, selection
+    )
 
 
 @dataclass(frozen=True)

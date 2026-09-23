@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 
@@ -93,4 +94,5 @@ def _wall_widths(axis: int, condition: BoundaryCondition, grid: Grid | None) -> 
 
 def _slice(data: jnp.ndarray, axis: int, index: int) -> jnp.ndarray:
     """Return one entry along ``axis``, keeping the axis so concatenation works."""
-    return jnp.take(data, jnp.asarray([index % data.shape[axis]]), axis=axis)
+    start = index % data.shape[axis]
+    return jax.lax.slice_in_dim(data, start, start + 1, axis=axis)
