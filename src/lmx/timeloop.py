@@ -28,7 +28,7 @@ import jax.numpy as jnp
 
 from .core3d import ChannelProblem, face_currents, face_lorentz_force, step, velocity_condition, zero_velocity
 from .em import lorentz_force, wall_insulated
-from .grid import Field
+from .grid import CENTER, Field
 from .ops import divergence, face_inner_product, staggered_laplacian
 from .poisson import FastDiagonalHelmholtz, FastDiagonalPoisson
 
@@ -232,11 +232,14 @@ def advance(
     factorization = problem.factorization() if factorization is None else factorization
     velocity = zero_velocity(problem) if velocity is None else velocity
 
-    def single(state, _):
-        updated, pressure, potential = step(state, problem, factorization, viscous)
-        return updated, (*trajectory_diagnostics(updated, problem), pressure, potential)
+    def single(carry, _):
+        updated, pressure, potential = step(carry[0], problem, factorization, viscous)
+        return (updated, pressure, potential), trajectory_diagnostics(updated, problem)
 
+    # The last pressure and potential ride in the carry: stacked as scan outputs they cost two
+    # cell fields per step (3.1 GiB over 100 steps at 128^3 in float64) to return the last one.
+    cell = Field(jnp.zeros(problem.grid.shape, velocity[0].dtype), (CENTER,) * 3, problem.grid)
+    start = (velocity, cell, cell)
     body = jax.checkpoint(single) if checkpoint else single
-    final, (residual, energy, pressures, potentials) = jax.lax.scan(body, velocity, xs=None, length=steps)
-    last = jax.tree_util.tree_map(lambda leaf: leaf[-1], (pressures, potentials))
-    return Trajectory(final, last[0], last[1], residual, energy)
+    (final, pressure, potential), (residual, energy) = jax.lax.scan(body, start, xs=None, length=steps)
+    return Trajectory(final, pressure, potential, residual, energy)

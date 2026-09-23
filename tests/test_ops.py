@@ -10,6 +10,7 @@ from lmx.grid import CENTER, FACE, POLAR, Field, Grid, geometric_faces, tanh_fac
 from lmx.ops import (
     cell_inner_product,
     divergence,
+    face_average_adjoint,
     face_distances,
     face_gradient,
     face_inner_product,
@@ -290,6 +291,28 @@ def _polar(radial: int, azimuthal: int) -> Grid:
         uniform_faces(1, 0.0, 1.0),
         geometry=POLAR,
     )
+
+
+@pytest.mark.parametrize("grid", [STRETCHED, _polar(6, 8)], ids=["stretched", "polar"])
+def test_the_stencils_capture_no_cell_sized_metric(grid):
+    """Volumes, areas and half-cell weights are broadcast factors, not constants captured per call.
+
+    Captured, they were 1.0 of the 1.1 GiB of constants in a compiled 64^3 steady duct solve.
+    """
+    grid = Grid(*grid.faces[:2], uniform_faces(3, 0.0, 1.0), geometry=grid.geometry)
+    faces = tuple(_faces(grid, axis, lambda x, y, z: x + y * z) for axis in range(3))
+    cells = _cells(grid, lambda x, y, z: x * y + z)
+
+    def stencils(faces, cells):
+        return (
+            divergence(faces),
+            cell_inner_product(cells, cells),
+            *(face_average_adjoint(face, axis, WRAP) for axis, face in enumerate(faces)),
+            *(face_inner_product(face, face, axis, WRAP) for axis, face in enumerate(faces)),
+        )
+
+    captured = jax.make_jaxpr(stencils)(faces, cells).consts
+    assert max(np.size(value) for value in captured) < np.prod(grid.shape)
 
 
 def _polar_cells(grid: Grid, function) -> Field:

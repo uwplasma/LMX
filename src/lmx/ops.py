@@ -102,11 +102,9 @@ def axis_divergence(face: Field, axis: int | str) -> Field:
     grid = face.grid
     index = grid.axis_index(axis)
     _require_face(face, index)
-    area = _as_array(grid.face_areas(index), face.dtype)
-    flux = area * face.data
+    flux = _product(grid.area_factors(index), face.dtype) * face.data
     contribution = _take(flux, index, slice(1, None)) - _take(flux, index, slice(None, -1))
-    volumes = _as_array(grid.cell_volumes(), face.dtype)
-    return Field(contribution / volumes, (CENTER, CENTER, CENTER), grid)
+    return Field(contribution / _product(grid.volume_factors(), face.dtype), (CENTER, CENTER, CENTER), grid)
 
 
 def divergence(faces: tuple[Field, Field, Field]) -> Field:
@@ -224,7 +222,13 @@ def _ghosted_widths(widths: np.ndarray, condition: BoundaryCondition) -> np.ndar
 
 
 def _half_cell_weights(grid: Grid, axis: int) -> tuple[np.ndarray, np.ndarray]:
-    """Return the fraction of each cell owned by the control volumes of its lower and upper face."""
+    """Return the fraction of each cell owned by the control volumes of its lower and upper face.
+
+    The widths across the axis cancel between the face measure and the cell volume, and so does the
+    axis's own width: one half each on a Cartesian grid, a function of the radius on a polar one. So
+    they are formed on one radial line and broadcast, not captured per cell and per call.
+    """
+    grid = Grid(grid.x_faces, grid.y_faces[[0, -1]], grid.z_faces[[0, -1]], grid.geometry)
     measure = grid.face_areas(axis) * _length_scale(grid, axis)
     half = _shaped(0.5 * np.asarray(grid.widths[axis]), axis)
     volumes = grid.cell_volumes()
@@ -239,8 +243,7 @@ def cell_inner_product(left: Field, right: Field) -> jnp.ndarray:
     _require_cell_centred(right)
     if left.grid != right.grid:
         raise ValueError("fields must share one grid")
-    volumes = _as_array(left.grid.cell_volumes(), left.dtype)
-    return jnp.sum(volumes * left.data * right.data)
+    return jnp.sum(_product(left.grid.volume_factors(), left.dtype) * left.data * right.data)
 
 
 def face_inner_product(
@@ -268,8 +271,8 @@ def face_inner_product(
         distances = distances.copy()
         wrap = (slice(None),) * index + ([0, -1],) if distances.ndim == 3 else ([0, -1],)
         distances[wrap] *= 0.5
-    weights = grid.face_areas(index) * (distances if distances.ndim == 3 else _shaped(distances, index))
-    return jnp.sum(_as_array(weights, left.dtype) * left.data * right.data)
+    shaped = distances if distances.ndim == 3 else _shaped(distances, index)
+    return jnp.sum(_product((*grid.area_factors(index), shaped), left.dtype) * left.data * right.data)
 
 
 def _require_cell_centred(field: Field) -> None:
@@ -301,6 +304,14 @@ def _broadcast(values: np.ndarray, axis: int, dtype) -> jnp.ndarray:
 
 def _as_array(values: np.ndarray, dtype) -> jnp.ndarray:
     return jnp.asarray(values, dtype=dtype)
+
+
+def _product(factors: tuple[np.ndarray, ...], dtype) -> jnp.ndarray:
+    """Multiply broadcastable metric factors left to right on the device, where XLA fuses them."""
+    total = _as_array(factors[0], dtype)
+    for factor in factors[1:]:
+        total = total * _as_array(factor, dtype)
+    return total
 
 
 def staggered_laplacian(
