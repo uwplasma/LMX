@@ -518,14 +518,16 @@ conductances, the field scale and the drive are exact in both modes, and the
 adjoint reuses the factorization.
 
 On the ANL fringe ($x_0=3$, $c_t=c_s=0.02$, $a=1$, a domain running past the
-fringe into the capped zero field) the three-dimensional excess over the
-locally fully developed drop between $x=-6$ and $x=2$ is 0.01796, 0.01785 and
-0.01781 on stations 0.2, 0.1 and 0.05 apart with 10, 20 and 40 cells across each
-wall, against TM-228's 0.0178 and its Figure 10 value $0.126\,c^{1/2}=0.01782$. The quadrature
-of TM-228's own fully developed gradient over $[-6,2]$ is 0.07757, 2.9 % above
-its quoted 0.0754; both quoted numbers hold on an interval starting at
-$x=-5.853$, where that quadrature is 0.0754 and LMX's drop is 0.09319 against
-0.0932. The model neglects inertia, an error that scales as $N^{-1/3}$
+fringe into the capped zero field) the gated quantity is the three-dimensional
+excess of the drop between $x=-6$ and $x=2$ over the locally fully developed
+drop, both computed by LMX on the same mesh: 0.01791, 0.01783 and 0.01781 on
+stations 0.2, 0.1 and 0.05 apart with 10, 20 and 40 cells across each wall,
+against TM-228's $0.0932-0.0754=0.0178$ (1 %) and its Figure 10 value
+$0.126\,c^{1/2}=0.01782$. The absolute drop is reported and not gated: 0.0951
+against TM-228's 0.0932 (2.0 %) on a domain of exactly $[-6,2]$ with fully
+developed ends, 0.0954 on the longer domain, because TM-228's own fully
+developed gradient integrates to 0.0776 over $[-6,2]$, not the quoted 0.0754.
+The model neglects inertia, an error that scales as $N^{-1/3}$
 (Mistrangelo et al. 2021); at ALEX B2 ($N=540$) it is as large as the
 three-dimensional excess, which is why B2 keeps a 5--10 % tolerance.
 

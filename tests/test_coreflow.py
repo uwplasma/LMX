@@ -68,18 +68,17 @@ def test_the_coupled_operator_is_symmetric_and_indefinite():
 
 @pytest.mark.validation
 def test_the_anl_fringe_reproduces_tm228():
-    """ANL/FPP/TM-228 section 4.1: x0 = 3, c_t = c_s = 0.02, a = 1, 0.0932 against 0.0754 from x = -6 to 2.
+    """ANL/FPP/TM-228 section 4.1 (x0 = 3, c_t = c_s = 0.02, a = 1): row 7 of the validation ladder.
 
-    The domain runs past the fringe into the zero field, as TM-228's cap on
-    ``1/B`` implies. The quadrature of TM-228's own fully developed gradient
-    over ``[-6, 2]`` is 0.07757, 2.9 % above the quoted 0.0754; the quoted pair
-    is consistent with an interval starting at ``x_s = -5.853``, where that
-    quadrature is exactly 0.0754, so both the three-dimensional excess and the
-    drop over ``[x_s, 2]`` are gated.
+    The gate is the excess of the drop from x = -6 to 2 over the locally fully
+    developed drop, both computed by LMX on the same mesh, against TM-228's
+    0.0932 - 0.0754 = 0.0178. The absolute drop (0.0954 here, 0.0951 on exactly
+    [-6, 2]) is reported, not gated: TM-228's own fully developed gradient
+    integrates to 0.0776 over [-6, 2], not the quoted 0.0754 (plan, D27a).
     """
     gradient = fully_developed_gradient(0.02, 0.02)
-    local = gradient * _anl_square_integral(-6.0)
-    assert local == pytest.approx(0.0775728, rel=1e-6)
+    assert gradient * _anl_square_integral(-6.0) == pytest.approx(0.0775728, rel=1e-6)
+    # The domain runs past the fringe into the zero field, as TM-228's cap on 1/B implies.
     x = np.linspace(-10.0, 6.0, 161)
     model = CoreFlow(x, nz=20, ny=20)
     result = model.solve(_anl(x), c_t=0.02, c_s=0.02)
@@ -88,11 +87,16 @@ def test_the_anl_fringe_reproduces_tm228():
     assert float(jnp.ptp(result.axial_flux)) < 1e-10
     pressure = np.asarray(result.pressure).mean(axis=1)
     drop = np.interp(-6.0, x, pressure) - np.interp(2.0, x, pressure)
+    # LMX's own fully developed gradient on the same cross-section mesh, integrated over the same stations.
+    uniform = CoreFlow(np.linspace(0.0, 2.0, 9), nz=20, ny=20).solve(np.ones(9), c_t=0.02, c_s=0.02)
+    inside = (x > -6.0 - 1e-9) & (x < 2.0 + 1e-9)
+    square = _anl(x[inside]) ** 2
+    local = (
+        float(uniform.pressure_drop)
+        / 2.0
+        * float(np.sum(0.5 * (square[1:] + square[:-1]) * np.diff(x[inside])))
+    )
     assert drop - local == pytest.approx(0.0932 - 0.0754, rel=0.01)
-    assert drop / local == pytest.approx(0.0932 / 0.0754, rel=0.01)
-    start = -6.0 + (local - 0.0754) / gradient
-    assert gradient * _anl_square_integral(start) == pytest.approx(0.0754, rel=1e-12)
-    assert np.interp(start, x, pressure) - np.interp(2.0, x, pressure) == pytest.approx(0.0932, rel=0.01)
     # Figure 10: the three-dimensional excess is k c^(1/2) with k = 0.126 for x0 = 3.
     assert drop - local == pytest.approx(0.126 * 0.02**0.5, rel=0.01)
 
