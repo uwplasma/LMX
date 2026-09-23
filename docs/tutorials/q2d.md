@@ -1,14 +1,14 @@
 # Evolve a Q2D vortex field
 
 The Sommeria--Moreau (SM82) model describes a depth-averaged conducting flow
-under a strong transverse magnetic field. LMX evolves periodic vorticity with
+under a strong transverse magnetic field. LMhdX evolves periodic vorticity with
 viscous diffusion and linear Hartmann-layer friction.
 
 ```python
 import jax.numpy as jnp
-import lmx
+import lmhdx
 
-case = lmx.make_q2d_case(
+case = lmhdx.make_q2d_case(
     shape=(64, 64),
     viscosity=2.0e-3,
     hartmann_friction=4.0e-2,
@@ -16,7 +16,7 @@ case = lmx.make_q2d_case(
     steps=160,
     history_stride=4,
 )
-result = lmx.solve(case)
+result = lmhdx.solve(case)
 
 assert result.converged
 print(result.diagnostics.kinetic_energy_final)
@@ -47,7 +47,7 @@ import jax
 
 
 def objective(friction):
-    vorticity, velocity_x, velocity_y = lmx.evolve_q2d(
+    vorticity, velocity_x, velocity_y = lmhdx.evolve_q2d(
         case.initial_vorticity,
         viscosity=case.viscosity,
         hartmann_friction=friction,
@@ -84,7 +84,7 @@ report records a true-float32 `jax_default_matmul_precision`, because JAX's
 default lets Ampere cards use TensorFloat-32 (ADR 0005, D15). The JAX 0.10.2
 reports in `benchmarks/results` record no precision; they put the $256^2$
 float32 ratio at 14.15x on a 20-step workload. Plan step 2.1 re-measures them.
-LMX sets the precision to `'highest'` when a `Q2DProblem` is built, unless you
+LMhdX sets the precision to `'highest'` when a `Q2DProblem` is built, unless you
 have already chosen one.
 
 These figures characterize this workload and hardware, not every grid or

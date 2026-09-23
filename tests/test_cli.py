@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from lmx import cli
-from lmx.specs import FringingSpec, LoggingSpec, RestartSpec, RunConfig
+from lmhdx import cli
+from lmhdx.specs import FringingSpec, LoggingSpec, RestartSpec, RunConfig
 
 pytestmark = pytest.mark.unit
 
@@ -286,9 +286,9 @@ def test_python_module_entrypoint_delegates_to_cli_main(
 ):
     recorded: dict[str, object] = {}
 
-    monkeypatch.setattr("lmx.cli.main", lambda argv=None: recorded.update(argv=argv) or 0)
+    monkeypatch.setattr("lmhdx.cli.main", lambda argv=None: recorded.update(argv=argv) or 0)
     with pytest.raises(SystemExit) as excinfo:
-        runpy.run_module("lmx", run_name="__main__")
+        runpy.run_module("lmhdx", run_name="__main__")
 
     assert excinfo.value.code == 0
     assert recorded["argv"] is None

@@ -5,8 +5,8 @@ The convenience builder supplies a rectangular duct with a smooth entry and
 exit fringe:
 
 ```python
-import lmx
-from lmx.fringing import build_square_duct_extruded_problem
+import lmhdx
+from lmhdx.fringing import build_square_duct_extruded_problem
 
 problem = build_square_duct_extruded_problem(
     ha_peak=20,
@@ -20,7 +20,7 @@ problem = build_square_duct_extruded_problem(
     exit_center=4.5,
     transition_width=0.35,
 )
-result = lmx.solve(problem)
+result = lmhdx.solve(problem)
 ```
 
 `problem.case.time_stepper.max_steps` is the maximum number of additional

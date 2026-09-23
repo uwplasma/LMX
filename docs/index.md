@@ -1,9 +1,9 @@
-# LMX
+# LMhdX
 
-LMX solves inductionless liquid-metal MHD with JAX. It provides
+LMhdX solves inductionless liquid-metal MHD with JAX. It provides
 analytical-reference fully developed flows, three-dimensional extruded duct
 and pipe models for spatially varying magnetic fields, and periodic Q2D flow
-with Hartmann-layer damping. LMX builds the physics;
+with Hartmann-layer damping. LMhdX builds the physics;
 [SOLVAX](https://github.com/uwplasma/SOLVAX) supplies reusable numerical solvers.
 
 ```{image} _static/validation_ladder.webp
@@ -19,7 +19,7 @@ with Hartmann-layer damping. LMX builds the physics;
 :::{grid-item-card} Install and run
 :link: getting_started/install
 :link-type: doc
-Install LMX, select a JAX backend, and check the command line.
+Install LMhdX, select a JAX backend, and check the command line.
 :::
 
 :::{grid-item-card} First duct solve
@@ -111,4 +111,5 @@ adr/0003-precision-and-derivatives
 adr/0004-process
 adr/0005-review-2026-09-13
 adr/0006-review-2026-09-22
+adr/0007-rename-lmhdx
 ```

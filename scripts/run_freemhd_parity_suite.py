@@ -23,8 +23,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-from lmx.physics import hartmann_number
-from lmx.validation import (
+from lmhdx.physics import hartmann_number
+from lmhdx.validation import (
     build_benchmark_b_problem,
     load_benchmark_a_spec,
     load_benchmark_b_reference,
@@ -260,12 +260,12 @@ def materialize_freemhd_source_snapshot(
 
 
 def materialize_lmx_source_snapshot(output_dir: str | Path) -> dict[str, object]:
-    """Copy the clean tracked LMX package and parity driver used by the smoke."""
+    """Copy the clean tracked LMhdX package and parity driver used by the smoke."""
 
     repo, destination = Path(__file__).resolve().parents[1], Path(output_dir)
     if destination.exists():
-        raise FileExistsError(f"Refusing to overwrite existing LMX source snapshot {destination}")
-    scope = ("src/lmx", "pyproject.toml", "scripts/run_freemhd_parity_suite.py")
+        raise FileExistsError(f"Refusing to overwrite existing LMhdX source snapshot {destination}")
+    scope = ("src/lmhdx", "pyproject.toml", "scripts/run_freemhd_parity_suite.py")
     status = subprocess.run(
         ("git", "-C", str(repo), "status", "--porcelain", "--", *scope),
         check=True,
@@ -273,7 +273,7 @@ def materialize_lmx_source_snapshot(output_dir: str | Path) -> dict[str, object]
         text=True,
     ).stdout
     if status:
-        raise ValueError("LMX source scope has staged or unstaged changes")
+        raise ValueError("LMhdX source scope has staged or unstaged changes")
     files = subprocess.run(
         ("git", "-C", str(repo), "ls-files", "--", *scope),
         check=True,
@@ -307,8 +307,8 @@ def _tiny_b2_problem(
     solver_shape: tuple[int, int, int] = (8, 7, 7),
     executed_steps: int = 2,
 ) -> tuple[object, dict[str, object]]:
-    from lmx.mesh import _cross_section_mesh
-    from lmx.specs import ExtrudedInductionlessProblem, FringingProfile
+    from lmhdx.mesh import _cross_section_mesh
+    from lmhdx.specs import ExtrudedInductionlessProblem, FringingProfile
 
     if isinstance(executed_steps, bool) or not isinstance(executed_steps, int) or executed_steps < 2:
         raise ValueError("Matched B2 executed_steps must be an integer >= 2")
@@ -411,7 +411,7 @@ def materialize_matched_b2_lmx_input(
 
     destination = Path(output_file)
     if destination.exists():
-        raise FileExistsError(f"Refusing to overwrite existing LMX B2 input {destination}")
+        raise FileExistsError(f"Refusing to overwrite existing LMhdX B2 input {destination}")
     _, payload = _tiny_b2_problem(spec_root, solver_shape=solver_shape, executed_steps=executed_steps)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(
@@ -827,7 +827,7 @@ def _run_matched_b2_lmx_direct(
 
     import jax
 
-    from lmx.fringing import solve_extruded_inductionless
+    from lmhdx.fringing import solve_extruded_inductionless
 
     requested_steps = int(problem.case.time_stepper.max_steps)
     checkpoint_step = (requested_steps + 1) // 2
@@ -854,11 +854,11 @@ def _run_matched_b2_lmx_direct(
             if item.step == checkpoint_step and item.checkpoint is not None
         ]
         if len(progress) != requested_steps or len(checkpoints) != 1:
-            raise ValueError("LMX B2 direct path did not emit its midpoint checkpoint")
+            raise ValueError("LMhdX B2 direct path did not emit its midpoint checkpoint")
         checkpoint = checkpoints[0]
     jax.block_until_ready((direct.bundle.u, direct.bundle.p, direct.bundle.phi))
     if direct.bundle.u.dtype != np.float64:
-        raise ValueError("LMX B2 smoke requires float64 execution")
+        raise ValueError("LMhdX B2 smoke requires float64 execution")
     return checkpoint, direct.bundle
 
 
@@ -867,13 +867,13 @@ def _resume_matched_b2_lmx(problem, checkpoint, *, num_devices: int):
 
     import jax
 
-    from lmx.fringing import solve_extruded_inductionless
+    from lmhdx.fringing import solve_extruded_inductionless
 
     requested_steps = int(problem.case.time_stepper.max_steps)
     completed_steps = int(checkpoint.stopping_state[0])
     remaining_steps = requested_steps - completed_steps
     if not 0 < completed_steps < requested_steps:
-        raise ValueError("LMX B2 checkpoint does not split the requested trajectory")
+        raise ValueError("LMhdX B2 checkpoint does not split the requested trajectory")
     replay = replace(
         problem,
         case=replace(
@@ -888,7 +888,7 @@ def _resume_matched_b2_lmx(problem, checkpoint, *, num_devices: int):
     resumed = solve_extruded_inductionless(replay, initial_bundle=checkpoint, num_devices=num_devices).bundle
     jax.block_until_ready((resumed.u, resumed.p, resumed.phi))
     if resumed.stopping_state[0] != requested_steps or resumed.stopping_state[2] != "step_limit":
-        raise ValueError("LMX B2 resumed path did not complete the fixed-work trajectory")
+        raise ValueError("LMhdX B2 resumed path did not complete the fixed-work trajectory")
     return resumed
 
 
@@ -897,7 +897,7 @@ def _write_matched_b2_lmx_output(
 ):
     """Serialize already-executed matched-B2 bundles outside timing regions."""
 
-    from lmx.io import write_extruded_bundle_restart_npz
+    from lmhdx.io import write_extruded_bundle_restart_npz
 
     destination = Path(output_dir)
     destination.mkdir(parents=True)
@@ -912,7 +912,7 @@ def _write_matched_b2_lmx_output(
         destination / "run.json",
         {
             "schema_version": 1,
-            "code": "LMX",
+            "code": "LMhdX",
             "case_id": "B2-fringing-square",
             "input_sha256": artifact_sha256(input_path, "file"),
             "evaluator_sha256": artifact_sha256(evaluator, "file"),
@@ -930,7 +930,7 @@ def run_matched_b2_lmx_smoke(
     *,
     num_devices: int = 1,
 ) -> dict[str, object]:
-    """Run direct and checkpoint-resumed LMX paths and write replayable evidence."""
+    """Run direct and checkpoint-resumed LMhdX paths and write replayable evidence."""
 
     problem = load_matched_b2_lmx_input(input_path)
     started = time.perf_counter()
@@ -1076,7 +1076,7 @@ def run_matched_b2_smoke_bundle(
     nproc: int = 2,
     total_timeout_seconds: float = 600.0,
 ) -> dict[str, object]:
-    """Run LMX then FreeMHD inside one budget and validate the independent record."""
+    """Run LMhdX then FreeMHD inside one budget and validate the independent record."""
 
     destination = Path(output_dir)
     if destination.exists():
@@ -1095,25 +1095,25 @@ def run_matched_b2_smoke_bundle(
         "lmx_output": destination / "lmx_output",
         "freemhd_output": destination / "freemhd_output",
     }
-    lmx = run_matched_b2_lmx_smoke(paths["lmx_input"], paths["evaluator"], paths["lmx_output"])
+    lmhdx = run_matched_b2_lmx_smoke(paths["lmx_input"], paths["evaluator"], paths["lmx_output"])
     limits = load_benchmark_b_spec("B2-fringing-square")["harness_smoke_execution"]
     lmx_failed = (
-        lmx["steps"] != 2
-        or lmx["stop_reason"] != "step_limit"
-        or any(abs(value - 1.0 / 540000.0) > limits["dt_absolute_tolerance"] for value in lmx["dt"])
-        or max(lmx["courant_max"]) > limits["courant_max"]
+        lmhdx["steps"] != 2
+        or lmhdx["stop_reason"] != "step_limit"
+        or any(abs(value - 1.0 / 540000.0) > limits["dt_absolute_tolerance"] for value in lmhdx["dt"])
+        or max(lmhdx["courant_max"]) > limits["courant_max"]
         or any(
-            lmx[name] > limits[f"{name}_max"]
+            lmhdx[name] > limits[f"{name}_max"]
             for name in ("mass_balance", "current_balance", "interface_current_balance")
         )
-        or lmx["interface_current_activity"] < limits["interface_current_activity_min"]
-        or lmx["restart_max_abs"] > limits["restart_absolute_tolerance"]
+        or lmhdx["interface_current_activity"] < limits["interface_current_activity_min"]
+        or lmhdx["restart_max_abs"] > limits["restart_absolute_tolerance"]
     )
     if lmx_failed:
-        raise ValueError("LMX B2 smoke failed its frozen execution gate; FreeMHD was not started")
+        raise ValueError("LMhdX B2 smoke failed its frozen execution gate; FreeMHD was not started")
     remaining = total_timeout_seconds - (time.perf_counter() - started)
     if remaining <= 0.0:
-        raise TimeoutError("LMX B2 smoke exhausted the shared execution budget")
+        raise TimeoutError("LMhdX B2 smoke exhausted the shared execution budget")
     run_matched_b2_freemhd_smoke(
         paths["freemhd_input"],
         paths["evaluator"],
@@ -1130,13 +1130,13 @@ def run_matched_b2_smoke_bundle(
             "kind": kind,
             "sha256": artifact_sha256(path, kind),
         }
-    spec_path = Path(__file__).resolve().parents[1] / "src/lmx/data/benchmarks/specs/alex-b2-square.toml"
+    spec_path = Path(__file__).resolve().parents[1] / "src/lmhdx/data/benchmarks/specs/alex-b2-square.toml"
     record = {
         "schema_version": 3,
         "case_id": "B2-fringing-square",
         "acceptance_role": "harness-smoke",
         "contract": {
-            "lmx": observe_lmx_b2_contract(paths["lmx_input"], paths["evaluator"]),
+            "lmhdx": observe_lmx_b2_contract(paths["lmx_input"], paths["evaluator"]),
             "freemhd": observe_freemhd_b2_contract(
                 paths["freemhd_input"], paths["freemhd_source"], paths["evaluator"]
             ),
@@ -1286,23 +1286,23 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument(
         "--matched-b2-smoke",
         action="store_true",
-        help="run and independently validate the exact two-update LMX/FreeMHD smoke",
+        help="run and independently validate the exact two-update LMhdX/FreeMHD smoke",
     )
     parser.add_argument(
         "--freemhd-image",
-        default=os.environ.get("LMX_FREEMHD_IMAGE", "freemhd-install:latest"),
+        default=os.environ.get("LMHDX_FREEMHD_IMAGE", "freemhd-install:latest"),
     )
     parser.add_argument("--nproc", type=int, default=2)
     parser.add_argument("--smoke-timeout", type=float, default=600.0)
     parser.add_argument(
         "--freemhd-install-dir",
         type=Path,
-        default=Path(os.environ.get("LMX_FREEMHD_INSTALL_DIR", DEFAULT_FREEMHD_INSTALL_DIR)),
+        default=Path(os.environ.get("LMHDX_FREEMHD_INSTALL_DIR", DEFAULT_FREEMHD_INSTALL_DIR)),
     )
     parser.add_argument(
         "--freemhd-source-repo",
         type=Path,
-        default=Path(os.environ.get("LMX_FREEMHD_SOURCE_REPO", DEFAULT_FREEMHD_SOURCE_REPO)),
+        default=Path(os.environ.get("LMHDX_FREEMHD_SOURCE_REPO", DEFAULT_FREEMHD_SOURCE_REPO)),
     )
     args = parser.parse_args(argv)
 

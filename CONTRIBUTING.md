@@ -1,6 +1,6 @@
-# Contributing to LMX
+# Contributing to LMhdX
 
-Contributions are welcome when they preserve LMX's central rule: evidence comes
+Contributions are welcome when they preserve LMhdX's central rule: evidence comes
 before a validation, differentiability, or performance claim.
 
 ## Before changing code
@@ -16,8 +16,8 @@ before a validation, differentiability, or performance claim.
 ## Development setup
 
 ```bash
-git clone https://github.com/uwplasma/LMX.git
-cd LMX
+git clone https://github.com/uwplasma/LMhdX.git
+cd LMhdX
 uv venv
 uv pip install -e '.[dev,docs]'
 ```
@@ -62,13 +62,13 @@ remain in the portable gate.
 ## Support and security
 
 Use GitHub Discussions or an issue for installation questions, reproducible
-bugs, and proposed capabilities. Include the LMX commit, Python/JAX versions,
+bugs, and proposed capabilities. Include the LMhdX commit, Python/JAX versions,
 platform and device, the smallest reproducer, expected and observed behavior,
 and relevant residual or conservation diagnostics. Research-stage features are
 supported only within their documented evidence envelope.
 
 Report vulnerabilities through GitHub's private security-advisory interface for
-`uwplasma/LMX`; never publish exploit details, credentials, or private data in an
+`uwplasma/LMhdX`; never publish exploit details, credentials, or private data in an
 issue. Security fixes target the latest release and `main`. Treat user-provided
 TOML, NPZ, CSV, JSON, VTK, and external-solver data as untrusted input.
 

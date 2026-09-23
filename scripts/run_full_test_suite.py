@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run all or selected LMX tests in parallel within a declared budget.
+"""Run all or selected LMhdX tests in parallel within a declared budget.
 
 A tier selects evidence markers and a shard selects files; combining them runs
 one evidence tier over one file group, which keeps each pull-request job inside
@@ -156,10 +156,10 @@ def _tests_for_changes(paths: tuple[str, ...]) -> tuple[str, ...]:
     for path in paths:
         if path.startswith("tests/") and path.endswith(".py"):
             selected.append(path)
-        elif path.startswith("src/lmx/data/benchmarks/"):
+        elif path.startswith("src/lmhdx/data/benchmarks/"):
             selected.extend(("tests/test_benchmarks.py", "tests/test_freemhd.py"))
-        elif path.startswith("src/lmx/") and path.endswith(".py"):
-            module = path.removeprefix("src/lmx/").removesuffix(".py")
+        elif path.startswith("src/lmhdx/") and path.endswith(".py"):
+            module = path.removeprefix("src/lmhdx/").removesuffix(".py")
             if module == "fringing" or module.startswith("_fringing_"):
                 selected.extend(_FRINGING_TESTS)
             elif module in _CHANGE_TESTS:
@@ -262,7 +262,7 @@ def main(argv: list[str] | None = None) -> int:
         _tests_for_changes(_changed_files(args.changed_from)) if args.changed_from else args.tests
     )
     if args.changed_from and not selected_tests:
-        print(f"LMX change gate: no Python tests affected since {args.changed_from}")
+        print(f"LMhdX change gate: no Python tests affected since {args.changed_from}")
         return 0
 
     junit_path = os.path.abspath(args.junit_xml)
@@ -285,7 +285,7 @@ def main(argv: list[str] | None = None) -> int:
     if coverage:
         command.extend(
             [
-                "--cov=src/lmx",
+                "--cov=src/lmhdx",
                 "--cov-branch",
                 "--cov-report=term-missing:skip-covered",
                 f"--cov-report=xml:{args.coverage_xml}",
@@ -317,11 +317,11 @@ def main(argv: list[str] | None = None) -> int:
 
     started = time.monotonic()
     print(
-        f"LMX full test gate: workers={workers}, budget={args.budget_seconds:.0f}s, coverage={coverage}",
+        f"LMhdX full test gate: workers={workers}, budget={args.budget_seconds:.0f}s, coverage={coverage}",
         flush=True,
     )
     if args.changed_from:
-        print(f"LMX change gate selected: {', '.join(selected_tests)}", flush=True)
+        print(f"LMhdX change gate selected: {', '.join(selected_tests)}", flush=True)
     try:
         completed = subprocess.run(
             command,
@@ -332,16 +332,16 @@ def main(argv: list[str] | None = None) -> int:
     except subprocess.TimeoutExpired:
         elapsed = time.monotonic() - started
         print(
-            f"LMX full test gate exceeded its {args.budget_seconds:.0f}s budget after {elapsed:.1f}s",
+            f"LMhdX full test gate exceeded its {args.budget_seconds:.0f}s budget after {elapsed:.1f}s",
             file=sys.stderr,
         )
         return 124
 
     elapsed = time.monotonic() - started
-    print(f"LMX full test gate completed in {elapsed:.1f}s", flush=True)
+    print(f"LMhdX full test gate completed in {elapsed:.1f}s", flush=True)
     if elapsed > args.warning_seconds:
         print(
-            f"LMX full test gate exceeded its {args.warning_seconds:.0f}s warning budget",
+            f"LMhdX full test gate exceeded its {args.warning_seconds:.0f}s warning budget",
             file=sys.stderr,
         )
     return int(completed.returncode)

@@ -53,7 +53,7 @@ Core references used by the implemented models and validation contracts include:
   induced field with a divergence-free vector-potential formulation and
   validates free-surface response against LMX-U. This establishes full
   induction and free surfaces as an external high-fidelity boundary rather
-  than an LMX runtime target.
+  than an LMhdX runtime target.
 - T. Hua et al., “MHD capabilities in SAM and NekRS for fusion liquid metal
   blanket applications,” *Fusion Engineering and Design* 230, 2026,
   [doi:10.1016/j.fusengdes.2026.115888](https://doi.org/10.1016/j.fusengdes.2026.115888)
@@ -111,7 +111,7 @@ Core references used by the implemented models and validation contracts include:
   [gradient checkpointing](https://docs.jax.dev/en/latest/301/remat.html),
   [distributed arrays](https://docs.jax.dev/en/latest/201/sharding.html), and
   [autodiff with sharding](https://docs.jax.dev/en/latest/301/sharding-ad.html)
-  — current memory/parallel semantics used to design LMX acceptance tests.
+  — current memory/parallel semantics used to design LMhdX acceptance tests.
 
-Each numerical result should cite the LMX version/commit and the specific
+Each numerical result should cite the LMhdX version/commit and the specific
 benchmark source used for its physical claim.

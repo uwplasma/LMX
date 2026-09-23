@@ -1,6 +1,6 @@
 # Equations and assumptions
 
-LMX solves incompressible, inductionless liquid-metal MHD. The magnetic
+LMhdX solves incompressible, inductionless liquid-metal MHD. The magnetic
 Reynolds number is assumed small, so the imposed magnetic field $\mathbf B$ is
 not evolved. The full isothermal formulation below uses density $\rho$,
 kinematic viscosity $\nu$, conductivity $\sigma$, pressure $p$, and body drive

@@ -8,7 +8,7 @@ adjoints under the volume and face weights of :func:`cell_inner_product` and
 potential solve depends on: it is what makes the projection idempotent and keeps
 the Lorentz force from doing spurious work in the core of a high-Hartmann duct.
 
-Ghost cells carry the wall condition (see :mod:`lmx.bc`), so a wall face is
+Ghost cells carry the wall condition (see :mod:`lmhdx.bc`), so a wall face is
 differenced with the same expression as an interior face. The ghost cell mirrors
 the width of the wall cell, which places its centre one wall-cell width outside
 and makes that single expression reproduce both the prescribed-value and the
@@ -342,7 +342,7 @@ def _centred_axis_laplacian(field: Field, axis: int, condition: BoundaryConditio
     """Flux balance along an axis on which the field is cell centred.
 
     Written as a flux difference rather than a second difference, so the metric
-    of the axis enters through :meth:`lmx.grid.Grid.axis_measures` and the same
+    of the axis enters through :meth:`lmhdx.grid.Grid.axis_measures` and the same
     stencil is ``(1/r) d/dr (r d/dr)`` on a polar grid. The two forms are
     identical where the measures are one and the widths, which is Cartesian.
     """

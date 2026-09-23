@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inventory the LMX architecture and enforce the M2 slimming baseline."""
+"""Inventory the LMhdX architecture and enforce the M2 slimming baseline."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGE_ROOT = Path("src/lmx")
+PACKAGE_ROOT = Path("src/lmhdx")
 EXCLUDED_PARTS = {
     ".git",
     ".venv",
@@ -70,7 +70,7 @@ def _root_exports(root: Path) -> list[str]:
             if not isinstance(exports, list) or not all(isinstance(item, str) for item in exports):
                 break
             return exports
-    raise ValueError("lmx.__all__ must be a literal list for architecture auditing")
+    raise ValueError("lmhdx.__all__ must be a literal list for architecture auditing")
 
 
 def _repository_files(root: Path) -> list[Path] | None:
@@ -113,7 +113,7 @@ def _checkout_size(root: Path) -> int:
 def _current_state_violations(root: Path) -> list[str]:
     paths = [root / name for name in ("README.md", "CONTRIBUTING.md", "CITATION.cff")]
     for directory, patterns in (
-        ("src/lmx", ("*.py",)),
+        ("src/lmhdx", ("*.py",)),
         ("validation", ("*.py",)),
         ("docs", ("*.md", "*.py")),
         ("examples", ("*.py", "*.toml")),
@@ -122,7 +122,7 @@ def _current_state_violations(root: Path) -> list[str]:
         paths.extend(path for pattern in patterns for path in (root / directory).rglob(pattern))
     violations = []
     for path in paths:
-        if not path.is_file() or path == Path(__file__) or "src/lmx/data" in path.as_posix():
+        if not path.is_file() or path == Path(__file__) or "src/lmhdx/data" in path.as_posix():
             continue
         for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             if any(term in line.casefold() for term in CURRENT_STATE_TERMS):
@@ -271,7 +271,7 @@ def measure_import(root: Path = ROOT, repeats: int = 5) -> dict[str, Any]:
     command = [
         sys.executable,
         "-c",
-        "import sys, lmx; print(int('jax' in sys.modules))",
+        "import sys, lmhdx; print(int('jax' in sys.modules))",
     ]
     jax_loaded = False
     for _ in range(repeats):
@@ -283,7 +283,7 @@ def measure_import(root: Path = ROOT, repeats: int = 5) -> dict[str, Any]:
         jax_loaded |= completed.stdout.strip() == b"1"
         samples.append(elapsed)
     return {
-        "command": "python -c 'import lmx'",
+        "command": "python -c 'import lmhdx'",
         "repeats": repeats,
         "median_seconds": statistics.median(samples),
         "min_seconds": min(samples),
@@ -298,13 +298,13 @@ def inspect_wheel(path: str | Path) -> dict[str, Any]:
     wheel = Path(path)
     with zipfile.ZipFile(wheel) as archive:
         members = [name for name in archive.namelist() if not name.endswith("/")]
-    forbidden = [name for name in members if not (name.startswith("lmx/") or ".dist-info/" in name)]
+    forbidden = [name for name in members if not (name.startswith("lmhdx/") or ".dist-info/" in name)]
     return {
         "path": wheel.name,
         "bytes": wheel.stat().st_size,
         "member_count": len(members),
         "forbidden_members": forbidden,
-        "typed_marker_present": "lmx/py.typed" in members,
+        "typed_marker_present": "lmhdx/py.typed" in members,
     }
 
 
@@ -323,7 +323,7 @@ def inspect_sdist(path: str | Path) -> dict[str, Any]:
         "pyproject.toml",
         "setup.cfg",
     }
-    allowed_roots = ("src/lmx/", "src/lmx.egg-info/")
+    allowed_roots = ("src/lmhdx/", "src/lmhdx.egg-info/")
     forbidden = [
         name for name in relative if name not in allowed_files and not name.startswith(allowed_roots)
     ]
@@ -378,7 +378,7 @@ def architecture_budget_errors(
         if measurement["median_seconds"] > targets["root_import_median_seconds_max"]:
             errors.append("root import exceeds its median wall-time budget")
         if measurement["jax_loaded"]:
-            errors.append("import lmx must not eagerly import JAX")
+            errors.append("import lmhdx must not eagerly import JAX")
     if wheel is not None:
         wheel_record = inspect_wheel(wheel)
         if wheel_record["bytes"] > targets["wheel_bytes_max"]:
@@ -387,11 +387,11 @@ def architecture_budget_errors(
             )
         if wheel_record["forbidden_members"]:
             errors.append(
-                "wheel contains files outside lmx/ and dist-info/: "
+                "wheel contains files outside lmhdx/ and dist-info/: "
                 + ", ".join(wheel_record["forbidden_members"])
             )
         if not wheel_record["typed_marker_present"]:
-            errors.append("wheel must contain the lmx/py.typed PEP 561 marker")
+            errors.append("wheel must contain the lmhdx/py.typed PEP 561 marker")
     if sdist is not None:
         sdist_record = inspect_sdist(sdist)
         if sdist_record["bytes"] > targets["sdist_bytes_max"]:

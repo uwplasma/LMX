@@ -4,10 +4,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx.advect import advective_step_limit, momentum_advection
-from lmx.bc import DIRICHLET, PERIODIC, BoundaryCondition
-from lmx.core3d import ChannelProblem, step, velocity_offset, zero_velocity
-from lmx.grid import Field, Grid, uniform_faces
+from lmhdx.advect import advective_step_limit, momentum_advection
+from lmhdx.bc import DIRICHLET, PERIODIC, BoundaryCondition
+from lmhdx.core3d import ChannelProblem, step, velocity_offset, zero_velocity
+from lmhdx.grid import Field, Grid, uniform_faces
 
 pytestmark = pytest.mark.unit
 
@@ -176,7 +176,7 @@ def test_the_channel_rejects_an_unknown_advection_choice():
 @pytest.mark.parametrize("advection", ["central", "limited"])
 def test_a_step_with_transport_stays_divergence_free(advection):
     """Transport enters the predictor, so the projection still has to clean up after it."""
-    from lmx.ops import divergence
+    from lmhdx.ops import divergence
 
     problem = _channel(advection)
     velocity = zero_velocity(problem)

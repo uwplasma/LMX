@@ -5,8 +5,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx.bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition
-from lmx.em import (
+from lmhdx.bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition
+from lmhdx.em import (
     cell_average,
     charge_residual,
     face_conductivity,
@@ -17,7 +17,7 @@ from lmx.em import (
     thin_wall_flux,
     wall_insulated,
 )
-from lmx.grid import (
+from lmhdx.grid import (
     CENTER,
     FACE,
     Field,
@@ -27,8 +27,8 @@ from lmx.grid import (
     uniform_faces,
     wall_resolving_faces,
 )
-from lmx.ops import cell_inner_product, face_average, face_average_adjoint, face_inner_product
-from lmx.pipe import pipe_grid
+from lmhdx.ops import cell_inner_product, face_average, face_average_adjoint, face_inner_product
+from lmhdx.pipe import pipe_grid
 
 pytestmark = pytest.mark.unit
 
@@ -219,7 +219,7 @@ def test_the_face_average_and_its_adjoint_are_exact_transposes(grid, conditions)
 
 def test_the_face_average_is_the_distance_weighted_interpolation_on_uniform_cells():
     """The two differ only where neighbouring cells differ in width."""
-    from lmx.ops import face_interpolate
+    from lmhdx.ops import face_interpolate
 
     field = _cells(UNIFORM, lambda x, y, z: jnp.sin(x + 2.0 * y) * jnp.cos(3.0 * z))
     for axis in range(3):
@@ -287,8 +287,8 @@ def test_the_anl_fringe_is_divergence_free_on_the_grid():
     (0.070 of ``B0`` at ``|y| = 1``), the cells hold it to the midpoint error of averaging two faces,
     ``h^2 k^2 B0 cosh(k) / 8``: 1.2e-3 measured here against that bound of 4.9e-3.
     """
-    from lmx.core3d import fringe_field
-    from lmx.ops import divergence
+    from lmhdx.core3d import fringe_field
+    from lmhdx.ops import divergence
 
     grid = Grid(uniform_faces(48, -6.0, 6.0), tanh_faces(24, -1.0, 1.0, 2.0), uniform_faces(3, -1.0, 1.0))
     k, x, y = np.pi / 6.0, grid.centers[0][:, None], grid.centers[1][None, :]
@@ -338,9 +338,9 @@ def test_a_divergence_free_current_leaves_no_charge_residual():
 
 def test_insulated_conduction_current_conserves_charge_when_the_potential_solves_its_equation():
     """The potential that solves the discrete equation makes the face fluxes close."""
-    from lmx.bc import PERIODIC
-    from lmx.ops import laplacian
-    from lmx.poisson import fast_diagonal_poisson
+    from lmhdx.bc import PERIODIC
+    from lmhdx.ops import laplacian
+    from lmhdx.poisson import fast_diagonal_poisson
 
     grid = STRETCHED
     conditions = (BoundaryCondition(PERIODIC), WALL, WALL)

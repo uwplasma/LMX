@@ -1,13 +1,13 @@
-# LMX
+# LMhdX
 
 **Differentiable inductionless liquid-metal MHD in JAX.**
 
-[![CI](https://img.shields.io/github/actions/workflow/status/uwplasma/LMX/ci.yml?branch=main&label=ci)](https://github.com/uwplasma/LMX/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/uwplasma/LMhdX/ci.yml?branch=main&label=ci)](https://github.com/uwplasma/LMhdX/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/readthedocs/lmx/latest?label=docs)](https://lmx.readthedocs.io/)
 [![Python](https://img.shields.io/badge/python-3.10--3.13-3776ab.svg)](https://www.python.org/)
-[![License](https://img.shields.io/github/license/uwplasma/LMX)](LICENSE)
+[![License](https://img.shields.io/github/license/uwplasma/LMhdX)](LICENSE)
 
-LMX solves the flow of liquid metals in strong magnetic fields — the physics of
+LMhdX solves the flow of liquid metals in strong magnetic fields — the physics of
 fusion blanket channels. Ducts and pipes with insulating or thin conducting
 walls, three-dimensional channels entering a fringing field, and
 quasi-two-dimensional vortex dynamics, all differentiable end to end.
@@ -27,22 +27,22 @@ Reusable solvers and implicit derivatives come from
 ## Install
 
 ```console
-git clone https://github.com/uwplasma/LMX.git
-cd LMX
+git clone https://github.com/uwplasma/LMhdX.git
+cd LMhdX
 pip install ".[visualization]"
-lmx examples/hartmann_case.toml
+lmhdx examples/hartmann_case.toml
 ```
 
 JAX runs on the CPU by default; install the GPU wheel from the
-[JAX guide](https://docs.jax.dev/en/latest/installation.html) and LMX uses it.
+[JAX guide](https://docs.jax.dev/en/latest/installation.html) and LMhdX uses it.
 
 ## Solve a duct in three lines
 
 ```python
-import lmx
+import lmhdx
 
-problem = lmx.duct_problem(hartmann=100.0, cells=48, wall_conductance=0.027)
-solution = lmx.solve(problem)
+problem = lmhdx.duct_problem(hartmann=100.0, cells=48, wall_conductance=0.027)
+solution = lmhdx.solve(problem)
 ```
 
 `duct_problem` picks both transverse meshes from the layers the Hartmann number
@@ -62,7 +62,7 @@ python scripts/make_showcase_figures.py --only ladder
 
 - Hartmann profiles at Ha 20, 100 and 300 **collapse onto `1 − e^{−ξ}`** when
   plotted against the wall distance in layer widths; the points are a spectral
-  solve, the lines are LMX.
+  solve, the lines are LMhdX.
 - Flow rate within **0.4 – 2.3 %** on a fixed 48² mesh, across insulating walls
   and wall conductance 0.027 and 0.1.
 - Second order in the mesh, so the error at a fixed mesh growing with the field
@@ -94,7 +94,7 @@ python examples/hunt_example.py
 python scripts/make_showcase_figures.py --only pipe
 ```
 
-- A polar grid with the metric in `lmx.grid`, so the same flux-form operators
+- A polar grid with the metric in `lmhdx.grid`, so the same flux-form operators
   solve a circular pipe. The axis needs no condition: the face at `r = 0` has
   zero area.
 - The potential Poisson still factorizes exactly — a Fourier transform in the
@@ -114,12 +114,12 @@ python examples/variable_field_extruded_demo.py
 ```
 
 ```python
-import jax, jax.numpy as jnp, lmx
+import jax, jax.numpy as jnp, lmhdx
 
-problem = lmx.duct_problem(hartmann=20.0, cells=24)
+problem = lmhdx.duct_problem(hartmann=20.0, cells=24)
 
 def throughput(drive, field_scale):
-    solution = lmx.solve_steady_state(problem, forcing=(drive, 0.0, 0.0), field_scale=field_scale)
+    solution = lmhdx.solve_steady_state(problem, forcing=(drive, 0.0, 0.0), field_scale=field_scale)
     return jnp.mean(solution.velocity[0].data)
 
 print(jax.grad(throughput, argnums=(0, 1))(1.0, 1.0))
@@ -131,7 +131,7 @@ print(jax.grad(throughput, argnums=(0, 1))(1.0, 1.0))
   the field scale on the Ha ≤ 5 test ducts, where the test gate is 1e-6.
 - `solve_steady_state` and `solve_fully_developed_fields` differentiate the drive
   and the field scale. Wall conductance and geometry are differentiable on the
-  extruded fringing route of `lmx.fringing`, which the demo command above optimizes.
+  extruded fringing route of `lmhdx.fringing`, which the demo command above optimizes.
 - A solve that stops short raises, rather than returning a plausible field and a
   gradient taken away from a root.
 
@@ -191,7 +191,7 @@ PCIe. Correct, not yet faster — the numbers are in
 | [`validation/pipe.py`](validation/pipe.py) spectral solve | Pipe flow rates, insulating and conducting walls, Ha 0 → 100 | independent of the package; 0.04 – 0.43 % |
 | Analytic Hartmann, Shercliff, Hunt and Poiseuille | Profiles and flow rates in every limit that has a closed form | `python examples/hartmann_example.py` |
 | FreeMHD (OpenFOAM `epotFoam`), pinned [`freemhd_install`](https://github.com/rogeriojorge/freemhd_install) image, B2 case | Same observed contract, executed by both codes | passes: transverse pressure difference RMS 0.0045, max 0.0109, against frozen bounds 0.16 and 0.32 — an integration check on a harness mesh, **not** a production result |
-| ALEX B1 pipe and B2 square duct experiments | Fringing-field pressure drop | production acceptance **open**; specs and digitised references are frozen in [`src/lmx/data/benchmarks`](src/lmx/data/benchmarks) |
+| ALEX B1 pipe and B2 square duct experiments | Fringing-field pressure drop | production acceptance **open**; specs and digitised references are frozen in [`src/lmhdx/data/benchmarks`](src/lmhdx/data/benchmarks) |
 
 The [validation record](https://lmx.readthedocs.io/en/latest/validation/index.html)
 states each gate and what it does not cover.
@@ -200,7 +200,7 @@ states each gate and what it does not cover.
 
 | Command | Physics |
 |---|---|
-| `lmx examples/hartmann_case.toml` | Hartmann duct from a TOML file, terminal diagnostics |
+| `lmhdx examples/hartmann_case.toml` | Hartmann duct from a TOML file, terminal diagnostics |
 | `python examples/hartmann_example.py` | analytical error, conservation, mesh convergence |
 | `python examples/hunt_example.py` | conducting walls, prescribed throughput and hydraulic power |
 | `python examples/li_aln_wall_stack_example.py` | explicit wall material layers and interface currents |
@@ -220,7 +220,7 @@ parameters and evidence status are in [`examples/catalog.toml`](examples/catalog
   the steady mechanical power balance within a 1e-10 relative test gate (measured
   3.6e-14 insulating, 6.3e-14 at wall conductance 0.027); Q2D decay identities.
 - **Research stage:** three-dimensional convective transport (`advection="central"`
-  or `"limited"`, from `lmx.advect`) is tested for conservation, order and
+  or `"limited"`, from `lmhdx.advect`) is tested for conservation, order and
   boundedness but not validated against a reference flow, the
   ALEX B1/B2 fringing benchmarks have production acceptance open, and
   multi-device execution is not yet established. The

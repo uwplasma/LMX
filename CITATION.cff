@@ -1,13 +1,13 @@
 cff-version: 1.2.0
-message: "If you use LMX in published work, cite the software and the benchmark sources used by your case."
-title: "LMX: JAX-native inductionless liquid-metal magnetohydrodynamics"
+message: "If you use LMhdX in published work, cite the software and the benchmark sources used by your case."
+title: "LMhdX: JAX-native inductionless liquid-metal magnetohydrodynamics"
 type: software
 authors:
   - family-names: Jorge
     given-names: Rogerio
 version: 1.4.0
 date-released: 2026-09-15
-repository-code: "https://github.com/uwplasma/LMX"
+repository-code: "https://github.com/uwplasma/LMhdX"
 url: "https://lmx.readthedocs.io/"
 license: MIT
 keywords:
@@ -17,7 +17,7 @@ keywords:
   - differentiable simulation
   - fusion engineering
 abstract: >-
-  LMX solves incompressible, inductionless liquid-metal MHD in fully developed
+  LMhdX solves incompressible, inductionless liquid-metal MHD in fully developed
   duct cross-sections, periodic quasi-two-dimensional flow, and three-dimensional
   extruded ducts and pipes with spatially varying imposed magnetic fields. It
   provides JAX execution, analytical and manufactured verification, and

@@ -6,22 +6,22 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-import lmx.cases as cases_impl
-import lmx.solvers as solvers
-from lmx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case, solve_steady, solve_transient
-from lmx.io import load_restart_bundle, write_solution_npz
-from lmx.mesh import (
+import lmhdx.cases as cases_impl
+import lmhdx.solvers as solvers
+from lmhdx.cases import make_hartmann_case, make_hunt_case, make_shercliff_case, solve_steady, solve_transient
+from lmhdx.io import load_restart_bundle, write_solution_npz
+from lmhdx.mesh import (
     StructuredMesh,
     generate_layered_duct_mesh,
     generate_rect_duct_mesh,
     generate_rect_duct_mesh_from_faces,
 )
-from lmx.physics import (
+from lmhdx.physics import (
     build_material_fields,
     magnetic_field_components,
     magnetic_ramp_scale,
 )
-from lmx.specs import (
+from lmhdx.specs import (
     BoundaryCondition,
     ExtrudedInductionlessProblem,
     FringingProfile,
@@ -470,7 +470,7 @@ def test_common_solve_dispatches_configured_mode_and_fringing(monkeypatch: pytes
 
     profile = FringingProfile(x=jnp.ones(1), field_scale=jnp.ones(1), axis="z")
     problem = ExtrudedInductionlessProblem(case=case, profile=profile)
-    monkeypatch.setattr("lmx.fringing.solve_extruded_inductionless", lambda model: extruded_result)
+    monkeypatch.setattr("lmhdx.fringing.solve_extruded_inductionless", lambda model: extruded_result)
     assert cases_impl.solve(problem) is extruded_result
     with pytest.raises(TypeError, match="CaseSpec, ExtrudedInductionlessProblem, or Q2DProblem"):
         cases_impl.solve(SimpleNamespace())

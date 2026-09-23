@@ -60,9 +60,9 @@ class Grid:
     ``(x, y, z)``. :data:`POLAR` is ``(r, theta, z)``, which is a tensor product
     in the coordinates but not in the metric: an azimuthal face keeps its area
     while a radial one grows with ``r``, and the azimuthal distance between two
-    cell centres is ``r*dtheta``. Every stencil in :mod:`lmx.ops` reads the
+    cell centres is ``r*dtheta``. Every stencil in :mod:`lmhdx.ops` reads the
     metric through :meth:`face_areas`, :meth:`cell_volumes` and
-    :func:`lmx.ops.face_distances`, so putting it here is enough to make the
+    :func:`lmhdx.ops.face_distances`, so putting it here is enough to make the
     same operators solve a pipe.
 
     The axis is not a special case in flux form. The face at ``r = 0`` has zero

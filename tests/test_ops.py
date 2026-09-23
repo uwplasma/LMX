@@ -5,9 +5,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx.bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition, pad
-from lmx.grid import CENTER, FACE, POLAR, Field, Grid, geometric_faces, tanh_faces, uniform_faces
-from lmx.ops import (
+from lmhdx.bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition, pad
+from lmhdx.grid import CENTER, FACE, POLAR, Field, Grid, geometric_faces, tanh_faces, uniform_faces
+from lmhdx.ops import (
     cell_inner_product,
     divergence,
     face_distances,
@@ -344,7 +344,7 @@ def test_the_staggered_laplacian_carries_the_polar_metric():
 
 def test_the_fast_diagonalization_assembly_refuses_a_polar_grid():
     """The `1/r^2` azimuthal term does not separate; `fast_diagonal_polar_poisson` does it instead."""
-    from lmx.poisson import assemble_axis_laplacian
+    from lmhdx.poisson import assemble_axis_laplacian
 
     with pytest.raises(ValueError, match="fast diagonalization assumes"):
         assemble_axis_laplacian(_polar(4, 8), 0, BoundaryCondition(DIRICHLET))

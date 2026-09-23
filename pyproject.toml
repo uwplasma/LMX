@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "lmx"
+name = "lmhdx"
 version = "1.4.0"
 description = "JAX-native inductionless MHD toolkit for research, benchmarking, and differentiable simulation"
 readme = "README.md"
@@ -26,10 +26,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/uwplasma/LMX"
+Homepage = "https://github.com/uwplasma/LMhdX"
 Documentation = "https://lmx.readthedocs.io/"
-Issues = "https://github.com/uwplasma/LMX/issues"
-Source = "https://github.com/uwplasma/LMX"
+Issues = "https://github.com/uwplasma/LMhdX/issues"
+Source = "https://github.com/uwplasma/LMhdX"
 
 [project.optional-dependencies]
 dev = [
@@ -56,14 +56,14 @@ visualization = [
 ]
 
 [project.scripts]
-lmx = "lmx.cli:main"
+lmhdx = "lmhdx.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["lmx*"]
+include = ["lmhdx*"]
 
 [tool.setuptools.package-data]
-lmx = ["py.typed", "data/benchmarks/specs/*.toml", "data/benchmarks/references/*"]
+lmhdx = ["py.typed", "data/benchmarks/specs/*.toml", "data/benchmarks/references/*"]
 
 [tool.pytest.ini_options]
 addopts = "-ra -q --strict-markers"
@@ -85,7 +85,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["src/lmx"]
+source = ["src/lmhdx"]
 branch = true
 
 [tool.coverage.report]

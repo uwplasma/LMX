@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-from lmx.cases import make_hartmann_case
-from lmx.io import (
+from lmhdx.cases import make_hartmann_case
+from lmhdx.io import (
     _prepare_plot_output,
     _save_figure_pair,
     load_extruded_restart_bundle,
@@ -27,9 +27,9 @@ from lmx.io import (
     write_solution_outputs,
     write_vtu,
 )
-from lmx.mesh import generate_pipe_ogrid_mesh
-from lmx.solvers import _build_mesh
-from lmx.specs import Diagnostics, MHDState, Solution, zeros_state
+from lmhdx.mesh import generate_pipe_ogrid_mesh
+from lmhdx.solvers import _build_mesh
+from lmhdx.specs import Diagnostics, MHDState, Solution, zeros_state
 
 pytestmark = pytest.mark.unit
 
@@ -289,11 +289,11 @@ def test_write_solution_outputs_respects_output_flags(tmp_path: Path, monkeypatc
     solution = _sample_solution(case)
 
     monkeypatch.setattr(
-        "lmx.io.write_paraview",
+        "lmhdx.io.write_paraview",
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("unexpected paraview")),
     )
     monkeypatch.setattr(
-        "lmx.io.write_solution_npz",
+        "lmhdx.io.write_solution_npz",
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("unexpected npz")),
     )
 
@@ -754,7 +754,7 @@ def _stub_repeated_figure_pair_encoding(monkeypatch: pytest.MonkeyPatch) -> None
         plt.close(fig)
         return paths
 
-    monkeypatch.setattr("lmx.io._save_figure_pair", save)
+    monkeypatch.setattr("lmhdx.io._save_figure_pair", save)
 
 
 def test_figure_pair_owner_writes_real_png_and_pdf(tmp_path: Path):

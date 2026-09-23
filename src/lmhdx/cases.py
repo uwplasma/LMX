@@ -1380,11 +1380,11 @@ def solve(
 ) -> "SteadySolution | Solution | ExtrudedInductionlessSolution | Q2DResult":
     """Solve a duct, a fully developed case, a fringing problem, or a Q2D one.
 
-    A :class:`lmx.core3d.ChannelProblem` goes to the staggered core's steady
-    solve, :func:`lmx.steady.solve_steady_state`; the configured mode selects steady or transient
+    A :class:`lmhdx.core3d.ChannelProblem` goes to the staggered core's steady
+    solve, :func:`lmhdx.steady.solve_steady_state`; the configured mode selects steady or transient
     execution for ``CaseSpec``. Advanced restart, mesh, logging, progress, and
-    timing hooks remain on the specialized functions in :mod:`lmx.cases`,
-    :mod:`lmx.steady` and :mod:`lmx.fringing`.
+    timing hooks remain on the specialized functions in :mod:`lmhdx.cases`,
+    :mod:`lmhdx.steady` and :mod:`lmhdx.fringing`.
     """
 
     from .core3d import ChannelProblem

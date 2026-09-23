@@ -8,10 +8,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx.bc import NEUMANN, PERIODIC, BoundaryCondition
-from lmx.core3d import ChannelProblem, duct_problem, step, zero_velocity
-from lmx.grid import Grid, uniform_faces, wall_resolving_faces
-from lmx.steady import solve_steady_state, steady_residual
+from lmhdx.bc import NEUMANN, PERIODIC, BoundaryCondition
+from lmhdx.core3d import ChannelProblem, duct_problem, step, zero_velocity
+from lmhdx.grid import Grid, uniform_faces, wall_resolving_faces
+from lmhdx.steady import solve_steady_state, steady_residual
 from validation.shercliff import flow_rate
 
 pytestmark = pytest.mark.numerical
@@ -98,11 +98,11 @@ def test_the_steady_solve_reproduces_the_marched_state_far_faster(monkeypatch):
     ``jax.debug.callback`` fires once per execution, inside compiled loops too, so
     the counts are applications and not traces.
     """
-    import lmx.core3d
-    import lmx.steady
+    import lmhdx.core3d
+    import lmhdx.steady
 
     projections = [0]
-    project = lmx.core3d.project
+    project = lmhdx.core3d.project
 
     def bump():
         projections[0] += 1
@@ -111,8 +111,8 @@ def test_the_steady_solve_reproduces_the_marched_state_far_faster(monkeypatch):
         jax.debug.callback(bump)
         return project(*args, **kwargs)
 
-    monkeypatch.setattr(lmx.core3d, "project", counted_project)
-    monkeypatch.setattr(lmx.steady, "project", counted_project)
+    monkeypatch.setattr(lmhdx.core3d, "project", counted_project)
+    monkeypatch.setattr(lmhdx.steady, "project", counted_project)
 
     problem = _duct(12, 5.0, dt=0.02)
     factorization = problem.factorization()
@@ -255,7 +255,7 @@ def test_a_varying_field_certifies_at_the_default_tolerance(hartmann, conductanc
     side at Ha 20, 6.4e-7 at Ha 100, and no certificate at 1e-9 above Ha 20. Projecting the residual twice
     measured 122 / 794 / 2886 iterations here, with the certificate at 0.90 / 0.60 / 0.81 of its bound.
     """
-    from lmx.steady import _norm
+    from lmhdx.steady import _norm
 
     problem = _varying_duct(hartmann, conductance)
     solution = solve_steady_state(problem, pseudo_step=1.0e3)
@@ -273,7 +273,7 @@ def test_the_fringe_certifies_at_the_tolerance_rule(hartmann, tolerance):
     asymmetric by 6e-7. Each tolerance is at least 6.7 times its floor; the solves took 5581 / 12,056 / 19,299
     iterations, so the budget above Ha 300 keeps 1.9 times headroom.
     """
-    from lmx.core3d import fringe_field
+    from lmhdx.core3d import fringe_field
 
     duct = duct_problem(hartmann=hartmann, cells=24)
     grid = Grid(uniform_faces(16, -8.0, 8.0), duct.grid.y_faces, duct.grid.z_faces)
@@ -293,8 +293,8 @@ def test_a_varying_field_takes_the_damped_preconditioner_and_still_converges():
     the round-off of this layer mesh (8e-12 for a uniform field) and CG certifies the solve at the default
     tolerance, which took 1e-8 before #145.
     """
-    from lmx.poisson import FastDiagonalHelmholtz
-    from lmx.steady import _projection_solves
+    from lmhdx.poisson import FastDiagonalHelmholtz
+    from lmhdx.steady import _projection_solves
 
     problem = _varying_duct()
     solves = _projection_solves(problem, 1.0e3)
@@ -338,8 +338,8 @@ def test_the_adjoint_matches_finite_differences_in_a_varying_field(hartmann):
 
 def _random_velocity(problem: ChannelProblem, seed: int):
     """A random velocity with no constraint imposed: wall faces and periodic copies are free."""
-    from lmx.core3d import velocity_offset
-    from lmx.grid import Field
+    from lmhdx.core3d import velocity_offset
+    from lmhdx.grid import Field
 
     keys = jax.random.split(jax.random.PRNGKey(seed), 3)
     return tuple(
@@ -355,8 +355,8 @@ def _random_velocity(problem: ChannelProblem, seed: int):
 
 
 def _face_volume_inner(problem: ChannelProblem, left, right) -> float:
-    from lmx.core3d import velocity_condition
-    from lmx.ops import face_inner_product
+    from lmhdx.core3d import velocity_condition
+    from lmhdx.ops import face_inner_product
 
     return sum(
         float(face_inner_product(a, b, axis, velocity_condition(problem.conditions, axis)))
@@ -366,7 +366,7 @@ def _face_volume_inner(problem: ChannelProblem, left, right) -> float:
 
 def _stokes_operator_samples(problem: ChannelProblem):
     """Return <v, A u>, <u, A v> and <u, A u> for two random divergence-free velocities."""
-    from lmx.core3d import project
+    from lmhdx.core3d import project
 
     factorization = problem.factorization()
     rest = steady_residual(zero_velocity(problem), problem, factorization)
@@ -402,8 +402,8 @@ def test_the_conjugate_gradient_preconditioner_is_symmetric_positive_definite():
     inverse asymmetric by 2.7e-2 on a 24-cube Ha 20 duct, and CG took 320
     iterations instead of 119.
     """
-    from lmx.core3d import project
-    from lmx.steady import _orthogonal_projection, _preconditioner, _projection_solves
+    from lmhdx.core3d import project
+    from lmhdx.steady import _orthogonal_projection, _preconditioner, _projection_solves
 
     problem = _extruded(duct_problem(hartmann=100.0, cells=24), 4, 100.0, 24)
     factorization = problem.factorization()
@@ -426,7 +426,7 @@ def test_the_conjugate_gradient_preconditioner_is_symmetric_positive_definite():
 
 def _conjugate_gradient_iterations(problem: ChannelProblem, solves) -> int:
     """CG iterations of the insulating steady solve from rest, with the given projection-step solves."""
-    from lmx.steady import _orthogonal_projection, _preconditioner, _stokes_limit_root
+    from lmhdx.steady import _orthogonal_projection, _preconditioner, _stokes_limit_root
 
     factorization = problem.factorization()
     precond = _preconditioner(problem, factorization, solves(problem, 1.0e3), 1.0e3)
@@ -447,7 +447,7 @@ def test_field_lines_cut_the_iterations_where_the_layers_are_thin(hartmann, cell
     Round-off in the secondary components seeds part of the count, hence ~60 % headroom; the
     1.10b parity gate is 300 at Ha 1000.
     """
-    from lmx.steady import _isotropic_viscous, _projection_solves
+    from lmhdx.steady import _isotropic_viscous, _projection_solves
 
     problem = duct_problem(hartmann=hartmann, cells=cells)
     lines = _conjugate_gradient_iterations(problem, _projection_solves)
@@ -458,7 +458,7 @@ def test_field_lines_cut_the_iterations_where_the_layers_are_thin(hartmann, cell
 
 def test_field_lines_invert_the_fully_developed_operator_on_a_uniform_mesh():
     """On a uniform mesh the induction form is the discrete operator: 3 iterations at Ha 300, 218 damped."""
-    from lmx.steady import _projection_solves
+    from lmhdx.steady import _projection_solves
 
     assert _conjugate_gradient_iterations(_duct(24, 300.0), _projection_solves) <= 5
 
@@ -523,10 +523,10 @@ def test_the_stokes_operator_is_symmetric_on_a_layer_mesh(conductance):
 def test_the_stokes_operator_stays_symmetric_in_a_varying_field(conductance):
     """Plan step 1.9a: the ANL fringe and its solenoidal pair on a layer mesh, so conjugate gradients still apply.
 
-    Without the wall-face closure of :func:`lmx.core3d.electric_state` a thin wall's half-cell current
+    Without the wall-face closure of :func:`lmhdx.core3d.electric_state` a thin wall's half-cell current
     pushed on the fringe's ``B_x`` with no electromotive force to match: 1.0e-6 asymmetric at Ha 20.
     """
-    from lmx.core3d import fringe_field
+    from lmhdx.core3d import fringe_field
 
     duct = duct_problem(hartmann=100.0, cells=32, wall_conductance=conductance)
     grid = Grid(uniform_faces(8, -6.0, 6.0), duct.grid.y_faces, duct.grid.z_faces)
@@ -560,7 +560,7 @@ def test_a_rejected_root_cannot_produce_a_finite_objective_or_gradient(drive):
 
 
 def test_a_failed_tangent_solve_is_rejected_eagerly_and_under_jit():
-    from lmx.steady import _krylov, _tangent_solve
+    from lmhdx.steady import _krylov, _tangent_solve
 
     def solve(rhs):
         return _krylov(jnp.zeros_like, rhs)
@@ -663,7 +663,7 @@ def test_the_steady_state_closes_its_mechanical_power_balance():
     is the residual of the steady solve projected onto the velocity itself: an
     independent reading of the same claim, in energy rather than in momentum.
     """
-    from lmx.timeloop import energy_budget
+    from lmhdx.timeloop import energy_budget
 
     for conductance in (0.0, 0.027):
         problem = _duct(32, 20.0, ratio=1.35, conductance=conductance)

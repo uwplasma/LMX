@@ -42,11 +42,11 @@ jobs:
           elif ! git diff --quiet "$base" -- \
             scripts/run_freemhd_parity_suite.py validation/freemhd.py \
             .github/workflows/external-validation.yml .github/actions pyproject.toml \
-            src/lmx/_fringing_common.py src/lmx/_fringing_duct.py \
-            src/lmx/fringing.py src/lmx/mesh.py src/lmx/physics.py src/lmx/specs.py src/lmx/cases.py src/lmx/io.py \
-            src/lmx/data/benchmarks; then
+            src/lmhdx/_fringing_common.py src/lmhdx/_fringing_duct.py \
+            src/lmhdx/fringing.py src/lmhdx/mesh.py src/lmhdx/physics.py src/lmhdx/specs.py src/lmhdx/cases.py src/lmhdx/io.py \
+            src/lmhdx/data/benchmarks; then
             echo "b2=true" >> "$GITHUB_OUTPUT"
-          elif git diff -U0 "$base" -- src/lmx/validation.py | grep -Eq \
+          elif git diff -U0 "$base" -- src/lmhdx/validation.py | grep -Eq \
             'BENCHMARK_B|benchmark_b_|canonical_matched_b_contract|_repository_root|load_benchmark_[ab]_spec'; then
             echo "b2=true" >> "$GITHUB_OUTPUT"
           else
@@ -61,7 +61,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup-lmx
+      - uses: ./.github/actions/setup-lmhdx
 
       - name: Resolve pinned external sources
         run: |

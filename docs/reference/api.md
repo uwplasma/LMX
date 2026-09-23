@@ -1,7 +1,7 @@
 # Python API
 
 `enable_x64` explicitly enables JAX float64 arrays process-wide. Call it before
-constructing meshes or tracing functions; importing LMX does not change precision.
+constructing meshes or tracing functions; importing LMhdX does not change precision.
 `enable_x64`, a case `dtype`, `ChannelProblem` and `Q2DProblem` also set JAX's
 `jax_default_matmul_precision` to `'highest'` when it is unset. Float32 matrix
 products on Ampere GPUs then run in float32 rather than TensorFloat-32, which
@@ -17,11 +17,11 @@ case dtype; casting cannot recover precision lost during their construction.
 See JAX's [dtype and x64 contract](https://docs.jax.dev/en/latest/101/default_dtypes.html).
 
 ```python
-import lmx
+import lmhdx
 
-lmx.enable_x64()
-case = lmx.make_hartmann_case(ha=2, ny=32, nz=32, dtype="float32")
-u, phi, jy, jz, lorentz = lmx.solve_fully_developed_fields(case)
+lmhdx.enable_x64()
+case = lmhdx.make_hartmann_case(ha=2, ny=32, nz=32, dtype="float32")
+u, phi, jy, jz, lorentz = lmhdx.solve_fully_developed_fields(case)
 ```
 
 The package root is the small, stable convenience surface. Advanced workflows
@@ -36,7 +36,7 @@ live in the module that owns their concepts.
 | Meshes | `generate_rect_duct_mesh`, `generate_rect_duct_mesh_from_faces`, `generate_layered_duct_mesh`, `generate_layered_duct_mesh_from_fluid_faces`, `generate_multilayer_duct_mesh` |
 | Wall models | `WallLayer`, `wall_conductance_ratio`, `effective_pinhole_conductance_ratio`, `tangential_stack_conductance_ratio`, `normal_stack_leakage_ratio`, `equivalent_single_layer`, `nested_wall_layer_resolution_summary` |
 | Units | `dynamic_to_kinematic_viscosity`, `kinematic_to_dynamic_viscosity`, `hartmann_number`, `reynolds_number`, `interaction_parameter`, `magnetic_reynolds_number`, `magnetic_field_from_hartmann` |
-| Evidence | Power balance in `lmx.solvers` and the analytical, conservation, and packaged benchmark tools in `lmx.validation` |
+| Evidence | Power balance in `lmhdx.solvers` and the analytical, conservation, and packaged benchmark tools in `lmhdx.validation` |
 | Runtime | `enable_compilation_cache` |
 
 `solve(model)` accepts a `ChannelProblem`, `CaseSpec`,
@@ -54,7 +54,7 @@ restart, progress, logging, and timing hooks in their owning modules.
 ## Case schema
 
 ```{eval-rst}
-.. automodule:: lmx.specs
+.. automodule:: lmhdx.specs
    :members:
    :show-inheritance:
 ```
@@ -62,48 +62,48 @@ restart, progress, logging, and timing hooks in their owning modules.
 ## Three-dimensional fringing
 
 ```{eval-rst}
-.. automodule:: lmx.fringing
+.. automodule:: lmhdx.fringing
    :members:
 ```
 
 ## Quasi-two-dimensional flow
 
 ```{eval-rst}
-.. automodule:: lmx.q2d
+.. automodule:: lmhdx.q2d
    :members:
 ```
 
 ## Imposed fields
 
 ```{eval-rst}
-.. automodule:: lmx.mesh
+.. automodule:: lmhdx.mesh
    :members:
 ```
 
 ## Differentiation
 
 ```{eval-rst}
-.. automodule:: lmx.cases
+.. automodule:: lmhdx.cases
    :members:
 ```
 
 ## Output and restart
 
 ```{eval-rst}
-.. automodule:: lmx.io
+.. automodule:: lmhdx.io
    :members:
 ```
 
 ## Validation
 
 ```{eval-rst}
-.. automodule:: lmx.validation
+.. automodule:: lmhdx.validation
    :members:
 ```
 
 ## Units and walls
 
 ```{eval-rst}
-.. automodule:: lmx.physics
+.. automodule:: lmhdx.physics
    :members:
 ```
