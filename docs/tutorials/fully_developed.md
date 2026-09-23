@@ -96,6 +96,48 @@ This is a mesh-geometry query, not a solve, so it has no convergence or
 precision envelope to fail; it is the building block the new core's throughput
 and pumping-power metrics are measured against.
 
+## Throughput and pumping power on the staggered core
+
+`lmx.design.channel_flow_rate`, `channel_flow_response`,
+`channel_drive_for_flow_rate` and `channel_fixed_flow_hydraulic_power` are the
+`ChannelProblem` counterparts of `volumetric_flow_rate`, `linear_flow_response`,
+`drive_for_flow_rate` and `fixed_flow_hydraulic_power` above, reusing
+`channel_cross_section_weights`, `DuctResponse`, `pressure_drop` and
+`hydraulic_power`:
+
+```python
+import numpy as np
+
+from lmx.core3d import duct_problem
+from lmx.design import channel_drive_for_flow_rate, channel_flow_rate
+from lmx.steady import solve_steady_state
+
+problem = duct_problem(hartmann=20.0, cells=32)
+target = 0.02
+drive = channel_drive_for_flow_rate(problem, target)
+solution = solve_steady_state(problem, forcing=(float(drive), 0.0, 0.0))
+achieved = channel_flow_rate(problem, solution.velocity[0].data[0])
+assert np.isclose(float(achieved), target, rtol=1e-8)
+```
+
+`channel_flow_rate(problem, velocity)` takes one axial-velocity slice --
+every axial station carries the same value by periodicity -- and integrates
+it against `channel_cross_section_weights`:
+$Q = \sum_{j,k} \Delta y_j \Delta z_k\, u_{jk}$, the same total-flux convention
+as `volumetric_flow_rate`. `channel_flow_response` solves once at unit axial
+drive to measure $G = Q(f{=}1)$ and returns it as a `DuctResponse`;
+`channel_drive_for_flow_rate` and `channel_fixed_flow_hydraulic_power`
+eliminate the drive the same way the `CaseSpec` route above does,
+$f = Q_\mathrm{target} / G$, with hydraulic power $f L Q_\mathrm{target}$.
+
+Envelope: the Stokes limit only. $Q = Gf$ holds because the steady residual is
+affine in the drive when `problem.advection == "off"`; `channel_flow_response`
+raises `ValueError` for any other value, since the residual then carries
+$-\nabla\cdot(\mathbf u\mathbf u)$ and a single unit-drive solve stops
+determining the whole response. Like the functions above, these are isothermal
+segment quantities, excluding entry/exit losses, manifolds and thermal
+effects.
+
 ## Fit a measured velocity profile
 
 Use this bounded inverse problem to infer a positive pressure-gradient drive
