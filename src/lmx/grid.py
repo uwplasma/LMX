@@ -137,32 +137,46 @@ class Grid:
         except ValueError as error:
             raise ValueError(f"unknown axis {axis!r}") from error
 
+    def volume_factors(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Return one factor per axis whose product, left to right, is :meth:`cell_volumes`.
+
+        Stencils multiply them on the device, where XLA fuses the product into its
+        consumer, rather than capturing a full-size array at every call.
+        """
+        dx, dy, dz = self.widths
+        return (self._annular() if self.is_polar else dx)[:, None, None], dy[None, :, None], dz[None, None, :]
+
     def cell_volumes(self) -> np.ndarray:
         """Volume of every cell, shaped like the cell-centred field."""
-        dx, dy, dz = self.widths
-        if self.is_polar:
-            radial = 0.5 * (self.x_faces[1:] ** 2 - self.x_faces[:-1] ** 2)
-            return radial[:, None, None] * dy[None, :, None] * dz[None, None, :]
-        return dx[:, None, None] * dy[None, :, None] * dz[None, None, :]
+        first, second, third = self.volume_factors()
+        return first * second * third
+
+    def area_factors(self, axis: str | int) -> tuple[np.ndarray, ...]:
+        """Return broadcastable factors whose product, left to right, is :meth:`face_areas`.
+
+        A radial face is r*dtheta*dz, an azimuthal one dr*dz, an axial one the
+        annular sector; only the first two follow from the widths alone.
+        """
+        index = self.axis_index(axis)
+        factors = tuple(
+            width.reshape([-1 if axes == other else 1 for axes in range(3)])
+            for other, width in enumerate(self.widths)
+            if other != index
+        )
+        if not self.is_polar or index == 1:
+            return factors
+        radial = self.x_faces if index == 0 else self._annular() / self.widths[0]
+        return (*factors, radial[:, None, None])
 
     def face_areas(self, axis: str | int) -> np.ndarray:
         """Area of the faces normal to ``axis``, shaped like that face field."""
-        index = self.axis_index(axis)
-        area = np.ones(self.face_shape(index))
-        for other, width in enumerate(self.widths):
-            if other == index:
-                continue
-            area = area * width.reshape([-1 if axes == other else 1 for axes in range(3)])
-        if not self.is_polar:
-            return area
-        # A radial face is r*dtheta*dz, an azimuthal one dr*dz, an axial one the
-        # annular sector; only the first two follow from the widths alone.
-        if index == 0:
-            return area * self.x_faces[:, None, None]
-        if index == 2:
-            radial = 0.5 * (self.x_faces[1:] ** 2 - self.x_faces[:-1] ** 2)
-            return (radial / self.widths[0])[:, None, None] * area
+        area = np.ones(self.face_shape(axis))
+        for factor in self.area_factors(axis):
+            area = area * factor
         return area
+
+    def _annular(self) -> np.ndarray:
+        return 0.5 * (self.x_faces[1:] ** 2 - self.x_faces[:-1] ** 2)
 
     def axis_measures(self, axis: str | int) -> tuple[np.ndarray, np.ndarray]:
         """Return the face and cell measures of one axis, with the other two divided out.

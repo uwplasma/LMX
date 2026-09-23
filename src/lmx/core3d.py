@@ -648,6 +648,5 @@ def _imposed_field(problem: ChannelProblem) -> tuple[Field, Field, Field]:
 
 
 def _constant(grid: Grid, value: float) -> Field:
-    with jax.ensure_compile_time_eval():
-        data = jnp.full(grid.shape, value, dtype=jnp.result_type(float))
-    return Field(data, (CENTER,) * 3, grid)
+    """A broadcast scalar under tracing, which XLA fuses into its consumers, never a captured array."""
+    return Field(jnp.full(grid.shape, value, dtype=jnp.result_type(float)), (CENTER,) * 3, grid)

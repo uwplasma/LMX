@@ -113,6 +113,10 @@ def test_a_longer_trajectory_costs_no_extra_live_state():
     long = jax.make_jaxpr(lambda: advance(problem, 64, factorization=factorization).velocity[0].data)()
     # The scan body is compiled once; only its trip count differs.
     assert abs(len(str(long)) - len(str(short))) < 0.05 * len(str(short))
+    # Only scalar diagnostics are stacked per step; the fields ride in the carry. Stacking the
+    # pressure and potential held 3.1 GiB over 100 steps at 128^3 to return the last pair.
+    scan = next(equation for equation in long.eqns if equation.primitive.name == "scan")
+    assert all(var.aval.shape == (64,) for var in scan.outvars[scan.params["num_carry"] :])
 
 
 def test_diagnostics_match_a_direct_evaluation():
