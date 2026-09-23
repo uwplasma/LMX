@@ -166,6 +166,23 @@ assert jnp.asarray(1.).dtype == jnp.float64
     )
 
 
+@pytest.mark.parametrize("choice", ["0", "cache"])
+def test_first_case_enables_the_shared_disk_cache_by_default(tmp_path, choice):
+    code = """
+import os, jax, jaxlib, platform, lmx
+assert "--xla_gpu_enable_triton_gemm=false" in os.environ["XLA_FLAGS"]
+assert jax.config.jax_compilation_cache_dir is None
+lmx.make_hartmann_case(ha=2, ny=4, nz=4)
+unsafe = platform.system() == "Darwin" and tuple(map(int, jaxlib.__version__.split(".")[:2])) < (0, 10)
+enabled = os.environ["LMX_COMPILATION_CACHE"] != "0" and not unsafe
+assert (jax.config.jax_compilation_cache_dir == os.environ["LMX_COMPILATION_CACHE"]) == enabled
+assert jax.config.jax_compilation_cache_max_size == (2**31 if enabled else -1)
+"""
+    environment = {key: value for key, value in os.environ.items() if key != "XLA_FLAGS"}
+    environment["LMX_COMPILATION_CACHE"] = choice if choice == "0" else str(tmp_path / choice)
+    subprocess.run([sys.executable, "-c", code], check=True, timeout=90, env=environment)
+
+
 def _write_minimal_config(
     tmp_path: Path,
     name: str,

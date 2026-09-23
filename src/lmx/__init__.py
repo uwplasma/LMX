@@ -8,7 +8,19 @@ solver modules until a symbol is used.
 
 from __future__ import annotations
 
+import os
 from importlib import import_module
+
+# Cold runs first: cuBLAS instead of Triton GEMMs halves the GPU compile of a steady
+# solve (9.4 s to 4.2 s on an RTX A4000) at about 10 % warm cost. XLA reads the flag
+# when the GPU backend starts, so it is set on import; an explicit user flag wins.
+if (
+    "xla_gpu_enable_triton_gemm" not in os.environ.get("XLA_FLAGS", "")
+    and os.environ.get("LMX_XLA_DEFAULTS") != "0"
+):
+    os.environ["XLA_FLAGS"] = (
+        os.environ.get("XLA_FLAGS", "") + " --xla_gpu_enable_triton_gemm=false"
+    ).strip()
 
 __all__ = [
     "enable_x64",
@@ -78,7 +90,35 @@ def _pin_matmul_precision() -> str:
 
     if config.jax_default_matmul_precision is None:
         config.update("jax_default_matmul_precision", "highest")
+    _enable_default_cache(config)
     return config.jax_default_matmul_precision
+
+
+def _enable_default_cache(config) -> None:
+    """Keep compiled solves on disk unless the user chose otherwise, so a new process starts warm.
+
+    Programs are shared across field values, so a new Hartmann number on the same
+    mesh reuses them (compile 4.4 s to 0.45 s on an A4000) at a 35-60 % warm cost.
+    Only compiles over one second are kept, in at most 2 GiB. ``LMX_COMPILATION_CACHE=0``
+    disables it; a path in it sets the directory. It stays off on macOS with jaxlib
+    older than 0.10, which can crash reading back a large cached CPU program.
+    """
+    choice = os.environ.get("LMX_COMPILATION_CACHE", "")
+    if choice == "0" or config.jax_compilation_cache_dir or _cache_read_unsafe():
+        return
+    from .io import enable_compilation_cache
+
+    enable_compilation_cache(choice or None, min_compile_time_secs=1.0, share_across_values=True)
+    config.update("jax_compilation_cache_max_size", 2**31)
+
+
+def _cache_read_unsafe() -> bool:
+    import platform
+
+    import jaxlib
+
+    major, minor = (int(part) for part in jaxlib.__version__.split(".")[:2])
+    return platform.system() == "Darwin" and (major, minor) < (0, 10)
 
 
 _EXPORTS = {
