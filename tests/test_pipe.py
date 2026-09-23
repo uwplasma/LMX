@@ -4,9 +4,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx.grid import CENTER, FACE, Field, Grid, uniform_faces
-from lmx.ops import divergence
-from lmx.pipe import (
+from lmhdx.grid import CENTER, FACE, Field, Grid, uniform_faces
+from lmhdx.ops import divergence
+from lmhdx.pipe import (
     PipeProblem,
     _face_currents,
     _potential,
@@ -139,8 +139,8 @@ def test_the_conducting_pipe_converges_to_the_reference():
 
 def test_the_pipe_force_is_minus_the_adjoint_of_its_electromotive_force():
     """``<u, F(J)> = -<J, E(u)>`` for currents that vanish on the wall: the force does the work the currents dissipate."""
-    from lmx.ops import cell_inner_product, face_inner_product
-    from lmx.pipe import _WALL, _WRAP, _axial_force, _face_emf
+    from lmhdx.ops import cell_inner_product, face_inner_product
+    from lmhdx.pipe import _WALL, _WRAP, _axial_force, _face_emf
 
     problem = pipe_problem(hartmann=7.0, radial=10, azimuthal=12)
     grid = problem.grid
@@ -167,8 +167,8 @@ def test_the_current_into_a_conducting_pipe_wall_exerts_no_force():
     the adjoint and the ohmic identity both missed by 5.1e-4 here. The wall power is taken at the
     sheet potential, as in ``timeloop._wall_power``. An insulated wall is closed already: bit for bit.
     """
-    from lmx.ops import cell_inner_product, face_average_adjoint, face_inner_product
-    from lmx.pipe import _WALL, _WRAP, _angles, _axial_force, _face_emf
+    from lmhdx.ops import cell_inner_product, face_average_adjoint, face_inner_product
+    from lmhdx.pipe import _WALL, _WRAP, _angles, _axial_force, _face_emf
 
     values = np.random.default_rng(5).standard_normal((24, 32, 1))
     for conductance in (0.1, 0.0):

@@ -6,9 +6,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-project = "LMX"
-author = "LMX contributors"
-copyright = f"{datetime.now(timezone.utc).year}, LMX contributors"
+project = "LMhdX"
+author = "LMhdX contributors"
+copyright = f"{datetime.now(timezone.utc).year}, LMhdX contributors"
 release = "1.4.0"
 
 extensions = [
@@ -46,10 +46,10 @@ myst_enable_extensions = [
 ]
 
 html_theme = "furo"
-html_title = "LMX"
+html_title = "LMhdX"
 html_static_path = ["_static"]
 html_theme_options = {
-    "source_repository": "https://github.com/uwplasma/LMX/",
+    "source_repository": "https://github.com/uwplasma/LMhdX/",
     "source_branch": "main",
     "source_directory": "docs/",
     "navigation_with_keys": True,

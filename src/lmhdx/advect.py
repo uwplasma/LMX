@@ -143,7 +143,7 @@ def _wide(data, axis: int, condition: BoundaryCondition, grid, *, layers: int, d
     """Return ``data`` with ``layers`` ghost entries at each end of ``axis``.
 
     A velocity field on a periodic axis repeats its first face at the end, so the
-    wrap has to skip that duplicate; :func:`lmx.bc.pad` assumes the cell-centred
+    wrap has to skip that duplicate; :func:`lmhdx.bc.pad` assumes the cell-centred
     layout and cannot tell the two apart. Away from a periodic axis the second
     ghost is the mirror of the first, and only the limiter ratio ever reads it.
     """

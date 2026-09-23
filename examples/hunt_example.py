@@ -9,11 +9,11 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
-from lmx import make_hunt_case
-from lmx.cases import solve_steady
-from lmx.design import hydraulic_power, volumetric_flow_rate
-from lmx.io import write_case_overview_plots, write_solution_outputs
-from lmx.validation import validation_summary
+from lmhdx import make_hunt_case
+from lmhdx.cases import solve_steady
+from lmhdx.design import hydraulic_power, volumetric_flow_rate
+from lmhdx.io import write_case_overview_plots, write_solution_outputs
+from lmhdx.validation import validation_summary
 
 # Inputs: geometry, wall model, material properties, numerics, and outputs.
 OUTPUT_DIR = Path("artifacts/examples/hunt")

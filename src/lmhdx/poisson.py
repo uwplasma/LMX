@@ -1,6 +1,6 @@
 """Direct Poisson solves by fast diagonalization on a tensor-product grid.
 
-The finite-volume Laplacian of :mod:`lmx.ops` separates: on a tensor-product
+The finite-volume Laplacian of :mod:`lmhdx.ops` separates: on a tensor-product
 grid it is the Kronecker sum of three one-dimensional operators. Each of those is
 symmetric once the cell widths are folded in, so diagonalizing them on the host
 turns a Poisson solve into three tensor contractions and one elementwise divide.
@@ -8,7 +8,7 @@ The cost is a handful of matrix multiplies rather than an iteration whose count
 depends on the Hartmann number, the result is exact to round-off rather than to a
 tolerance, and the solve is a linear map, so it differentiates for free.
 
-The one-dimensional operators are read out of :mod:`lmx.ops` itself, by applying
+The one-dimensional operators are read out of :mod:`lmhdx.ops` itself, by applying
 the assembled Laplacian to unit vectors on a grid that is one cell wide across
 the other two axes. The factorization therefore cannot drift away from the
 stencil the rest of the code uses.
@@ -206,7 +206,7 @@ def _probe(
 
 
 def assemble_axis_laplacian(grid: Grid, axis: int, condition: BoundaryCondition) -> np.ndarray:
-    """Return the dense one-dimensional Laplacian :mod:`lmx.ops` applies along ``axis``.
+    """Return the dense one-dimensional Laplacian :mod:`lmhdx.ops` applies along ``axis``.
 
     The other two axes are collapsed to a single cell with a homogeneous
     Neumann condition, which contributes nothing, so the result is exactly the
@@ -327,7 +327,7 @@ class FastDiagonalPolarPoisson:
     def solve_with_wall(self, rhs: Field) -> tuple[Field, Field]:
         """Return the cell potential and, on the radial faces, the outer thin wall's potential.
 
-        As :func:`lmx.em.thin_wall_current` reads it: the outer entry is the sheet,
+        As :func:`lmhdx.em.thin_wall_current` reads it: the outer entry is the sheet,
         the inner entry repeats the adjacent cell so it carries no current.
         """
         if not self.wall_conductance or rhs.grid != self.grid or rhs.offset != (CENTER, CENTER, CENTER):
@@ -699,7 +699,7 @@ class FastDiagonalThinWallPoisson(FastDiagonalPoisson):
         """Return the cell potential, with zero volume mean, and each conducting axis's sheet potentials.
 
         Sheet potentials come back on the faces normal to their axis, as
-        :func:`lmx.em.thin_wall_current` reads them: wall entries set, interior zero.
+        :func:`lmhdx.em.thin_wall_current` reads them: wall entries set, interior zero.
         """
         if rhs.grid != self.grid or rhs.offset != (CENTER, CENTER, CENTER):
             raise ValueError("right-hand side must be cell centred on the factorized grid")
@@ -866,7 +866,7 @@ def free_slice(grid: Grid, axis: int, offset_value: float, condition: BoundaryCo
 def assemble_staggered_axis_operator(
     grid: Grid, axis: int, offset: tuple[float, float, float], condition: BoundaryCondition
 ) -> np.ndarray:
-    """Return the dense one-dimensional operator :mod:`lmx.ops` applies along ``axis``.
+    """Return the dense one-dimensional operator :mod:`lmhdx.ops` applies along ``axis``.
 
     As with :func:`assemble_axis_laplacian`, the other axes are collapsed to a
     single cell under a homogeneous Neumann condition so they contribute

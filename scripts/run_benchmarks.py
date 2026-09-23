@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Time LMX on whatever device it is given, and write the result as JSON.
+"""Time LMhdX on whatever device it is given, and write the result as JSON.
 
 Three numbers are reported for every case and they are not interchangeable.
 ``compile_seconds`` is the first call, which includes tracing and XLA
@@ -24,7 +24,7 @@ Every report also records what a timing needs before it can be quoted:
 
 Left unset, the matmul precision lets Ampere GPUs run float32 contractions in
 TensorFloat-32. On an RTX A4000 those were 3e-4 from float64, against 2.6-6.1e-7
-at true float32. LMX pins ``'highest'`` unless the precision is already set, and
+at true float32. LMhdX pins ``'highest'`` unless the precision is already set, and
 this script refuses to write a float32 GPU report at any level that allows
 TensorFloat-32 (ADR 0005, D15).
 """
@@ -149,16 +149,16 @@ def _core3d_case(jax, cells: int, steps: int, repeats: int, precision: str = "st
     """One compiled trajectory of the staggered core on a cubic duct.
 
     ``precision="mixed"`` runs the fast-diagonal solves in float32 with float64
-    correction (:mod:`lmx.poisson`); the environment block records the matmul precision it needs.
+    correction (:mod:`lmhdx.poisson`); the environment block records the matmul precision it needs.
     """
     import jax.numpy as jnp
     import numpy as np
 
-    from lmx.bc import NEUMANN, PERIODIC, BoundaryCondition
-    from lmx.core3d import ChannelProblem, zero_velocity
-    from lmx.grid import Grid, uniform_faces
-    from lmx.ops import divergence
-    from lmx.timeloop import advance
+    from lmhdx.bc import NEUMANN, PERIODIC, BoundaryCondition
+    from lmhdx.core3d import ChannelProblem, zero_velocity
+    from lmhdx.grid import Grid, uniform_faces
+    from lmhdx.ops import divergence
+    from lmhdx.timeloop import advance
 
     periodic, wall = BoundaryCondition(PERIODIC), BoundaryCondition(NEUMANN)
     grid = Grid(
@@ -213,7 +213,7 @@ def _q2d_case(jax, cells: int, steps: int, repeats: int) -> dict:
     import jax.numpy as jnp
     import numpy as np
 
-    import lmx
+    import lmhdx
 
     wavenumber = np.fft.fftfreq(cells, d=1.0 / cells)
     total = np.sqrt(wavenumber[:, None] ** 2 + wavenumber[None, :] ** 2)
@@ -222,7 +222,7 @@ def _q2d_case(jax, cells: int, steps: int, repeats: int) -> dict:
     vorticity = np.fft.ifftn(amplitude * phase).real
     vorticity *= 4.0 / np.sqrt(np.mean(vorticity**2))
     dtype = jnp.float64 if jax.config.jax_enable_x64 else jnp.float32
-    problem = lmx.Q2DProblem(
+    problem = lmhdx.Q2DProblem(
         jnp.asarray(vorticity, dtype=dtype),
         length=(2.0 * np.pi, 2.0 * np.pi),
         viscosity=2.0e-4,
@@ -233,7 +233,7 @@ def _q2d_case(jax, cells: int, steps: int, repeats: int) -> dict:
     )
 
     def run():
-        result = lmx.solve(problem)
+        result = lmhdx.solve(problem)
         return result.vorticity, result.status
 
     compile_seconds, warm, (result, status) = _timed(jax, run, repeats)
@@ -288,7 +288,7 @@ def _shard_case(jax, cells: int, steps: int, repeats: int) -> dict:
     from jax.sharding import Mesh, NamedSharding
     from jax.sharding import PartitionSpec as Spec
 
-    import lmx
+    import lmhdx
 
     devices = jax.devices()
     if len(devices) < 2:
@@ -302,10 +302,10 @@ def _shard_case(jax, cells: int, steps: int, repeats: int) -> dict:
     dtype = jnp.float64 if jax.config.jax_enable_x64 else jnp.float32
 
     def evolve(field):
-        # `lmx.solve` compiles internally and reports a status, so it cannot be
+        # `lmhdx.solve` compiles internally and reports a status, so it cannot be
         # wrapped in another `jit`; the placement of its input is what the
         # partitioner sees.
-        problem = lmx.Q2DProblem(
+        problem = lmhdx.Q2DProblem(
             field,
             length=(2.0 * np.pi, 2.0 * np.pi),
             viscosity=2.0e-4,
@@ -314,7 +314,7 @@ def _shard_case(jax, cells: int, steps: int, repeats: int) -> dict:
             steps=steps,
             history_stride=steps,
         )
-        result = lmx.solve(problem)
+        result = lmhdx.solve(problem)
         return result.vorticity, result.status
 
     single = jax.device_put(jnp.asarray(vorticity, dtype=dtype), devices[0])
@@ -380,7 +380,7 @@ def main(argv: list[str] | None = None) -> int:
 
     import jax
 
-    from lmx import _pin_matmul_precision
+    from lmhdx import _pin_matmul_precision
 
     jax.config.update("jax_enable_x64", arguments.x64 == "1")
     # Pin before reading the environment, so the report records the precision the cases run at.

@@ -1,9 +1,9 @@
 """The projection step: incompressibility, the damping treatment, and duct flow.
 
 The strongest check here is the last one. A periodic duct driven by a constant
-body force reaches the fully developed state, which LMX already solves by an
-entirely different route in :func:`lmx.solve_fully_developed_fields`: a
-two-dimensional cross-section solve on `lmx.mesh`, with its own operators and its
+body force reaches the fully developed state, which LMhdX already solves by an
+entirely different route in :func:`lmhdx.solve_fully_developed_fields`: a
+two-dimensional cross-section solve on `lmhdx.mesh`, with its own operators and its
 own linear algebra. Agreement between the two exercises the new staggered core,
 its electric coupling and its projection at once, against code that shares none
 of them.
@@ -16,9 +16,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx.bc import NEUMANN, PERIODIC, BoundaryCondition
-from lmx.cases import make_hartmann_case, solve_fully_developed_fields
-from lmx.core3d import (
+from lmhdx.bc import NEUMANN, PERIODIC, BoundaryCondition
+from lmhdx.cases import make_hartmann_case, solve_fully_developed_fields
+from lmhdx.core3d import (
     ChannelProblem,
     duct_problem,
     enforce_face_constraints,
@@ -28,9 +28,9 @@ from lmx.core3d import (
     velocity_offset,
     zero_velocity,
 )
-from lmx.grid import CENTER, Field, Grid, tanh_faces, uniform_faces, wall_resolving_faces
-from lmx.ops import divergence
-from lmx.timeloop import advance
+from lmhdx.grid import CENTER, Field, Grid, tanh_faces, uniform_faces, wall_resolving_faces
+from lmhdx.ops import divergence
+from lmhdx.timeloop import advance
 from validation.shercliff import flow_rate
 
 # Physics validation rather than unit checks: the channel cases integrate to a
@@ -286,7 +286,7 @@ def test_a_constant_field_given_as_arrays_is_the_uniform_field_bit_for_bit():
 
 
 def test_a_varying_field_is_validated_and_keeps_the_problem_static():
-    from lmx.core3d import ImposedField
+    from lmhdx.core3d import ImposedField
 
     grid = _duct(ny=4, nz=4)
     along = np.linspace(1.0, 2.0, grid.shape[0])[:, None, None] * np.ones(grid.shape)
@@ -381,7 +381,7 @@ def test_implicit_viscosity_keeps_second_order_convergence():
 
 # --- Reconciliation with the production solver and an independent reference ---
 #
-# `lmx.solve_fully_developed_fields` solves the same duct on a two-dimensional
+# `lmhdx.solve_fully_developed_fields` solves the same duct on a two-dimensional
 # cross-section mesh with its own operators. Its conventions had to be matched
 # before the two could be compared at all: `GeometrySpec.width` and `height` are
 # the *full* transverse extents, so a `width=height=2` case is the grid
@@ -482,19 +482,19 @@ def test_the_duct_helper_resolves_the_layers_it_names():
 
 
 def test_the_public_solve_reaches_the_new_core():
-    """`lmx.solve` dispatches a ChannelProblem to the certified steady solve of :mod:`lmx.steady`.
+    """`lmhdx.solve` dispatches a ChannelProblem to the certified steady solve of :mod:`lmhdx.steady`.
 
     The certificate is relative: the final residual is within ten times the
     tolerance of the residual at rest. An insulating Stokes duct is one CG solve,
     which stops at the tolerance rather than overshooting it as Newton does, so
     an absolute bound would test the route instead of the contract.
     """
-    import lmx
-    from lmx.core3d import zero_velocity
-    from lmx.steady import steady_residual
+    import lmhdx
+    from lmhdx.core3d import zero_velocity
+    from lmhdx.steady import steady_residual
 
-    problem = lmx.duct_problem(hartmann=5.0, cells=16)
-    solution = lmx.solve(problem)
+    problem = lmhdx.duct_problem(hartmann=5.0, cells=16)
+    solution = lmhdx.solve(problem)
     at_rest = steady_residual(zero_velocity(problem), problem)
     scale = max(float(np.sqrt(sum(np.sum(np.asarray(field.data) ** 2) for field in at_rest))), 1.0)
     assert float(np.mean(np.asarray(solution.velocity[0].data))) > 0.0
@@ -513,7 +513,7 @@ def _mean_free(problem: ChannelProblem, seed: int) -> Field:
 
 def _charge(problem: ChannelProblem, potential: Field, walls):
     """Charge balance at rest and sheet residuals; ``walls=None`` is the replaced first-order closure."""
-    from lmx.em import face_conductivity, face_current, thin_wall_current, thin_wall_flux, wall_insulated
+    from lmhdx.em import face_conductivity, face_current, thin_wall_current, thin_wall_flux, wall_insulated
 
     scalar = problem.scalar_conditions
     sigma = Field(jnp.full(problem.grid.shape, float(problem.conductivity)), (CENTER,) * 3, problem.grid)
@@ -563,8 +563,8 @@ def test_the_wall_potential_converges_at_second_order(stretch):
 
 def test_a_thin_wall_conserves_charge_and_keeps_the_solve_symmetric():
     """Per cell and per sheet element, with a solve map self-adjoint in the cell volumes."""
-    from lmx.core3d import _solve_potential
-    from lmx.ops import cell_inner_product
+    from lmhdx.core3d import _solve_potential
+    from lmhdx.ops import cell_inner_product
 
     problem = duct_problem(hartmann=20.0, cells=24, wall_conductance=0.05)
     factorization = problem.factorization()
@@ -591,7 +591,7 @@ def test_a_thin_wall_conserves_charge_and_keeps_the_solve_symmetric():
 
 def test_two_conducting_walls_meet_in_a_charge_conserving_corner():
     """What one sheet delivers to the corner the other receives, and the corner edge conducts nothing."""
-    from lmx.core3d import _solve_potential
+    from lmhdx.core3d import _solve_potential
 
     faces = (uniform_faces(5, 0.0, 1.0), tanh_faces(12, -1.0, 1.0, 1.3), tanh_faces(10, -1.0, 1.0, 1.3))
     problem = _problem(Grid(*faces), wall_conductance=(0.0, 0.05, 0.08), conductivity=2.0)
@@ -618,7 +618,7 @@ def test_the_thin_wall_solve_is_ten_times_faster_than_the_krylov_route():
 
     import solvax
 
-    from lmx.core3d import _solve_potential
+    from lmhdx.core3d import _solve_potential
 
     problem = duct_problem(hartmann=100.0, cells=48, wall_conductance=0.05)
     factorization, source = problem.factorization(), _mean_free(problem, 0)

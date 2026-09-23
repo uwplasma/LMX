@@ -9,9 +9,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-import lmx
-import lmx.cases as cases_impl
-from lmx.cases import (
+import lmhdx
+import lmhdx.cases as cases_impl
+from lmhdx.cases import (
     make_hartmann_case,
     make_hunt_case,
     make_shercliff_case,
@@ -19,21 +19,21 @@ from lmx.cases import (
     solve_steady,
     solve_transient,
 )
-from lmx.mesh import (
+from lmhdx.mesh import (
     generate_layered_duct_mesh,
     generate_multilayer_duct_mesh,
     generate_rect_duct_mesh,
     write_tabulated_field_npz,
 )
-from lmx.physics import (
+from lmhdx.physics import (
     WallLayer,
     _boundary_sides,
     build_material_fields,
     magnetic_field_components,
 )
-from lmx.q2d import Q2DProblem, make_q2d_case, solve_q2d
-from lmx.solvers import _build_mesh
-from lmx.specs import (
+from lmhdx.q2d import Q2DProblem, make_q2d_case, solve_q2d
+from lmhdx.solvers import _build_mesh
+from lmhdx.specs import (
     BoundaryCondition,
     CaseSpec,
     Diagnostics,
@@ -44,7 +44,7 @@ from lmx.specs import (
     Solution,
     TimeStepperConfig,
 )
-from lmx.validation import (
+from lmhdx.validation import (
     combined_profile_error,
     compare_normalized_profiles,
     compare_profiles_with_shared_scale,
@@ -564,9 +564,9 @@ def test_cold_hunt_steady_solve_certifies_the_discrete_affine_problem():
     import scipy.sparse
     import scipy.sparse.linalg
 
-    from lmx.design import volumetric_flow_rate
-    from lmx.mesh import apply_five_point_operator
-    from lmx.solvers import (
+    from lmhdx.design import volumetric_flow_rate
+    from lmhdx.mesh import apply_five_point_operator
+    from lmhdx.solvers import (
         _compute_current_and_lorentz,
         _face_current_components,
         _velocity_system_coefficients,
@@ -728,7 +728,7 @@ def test_q2d_mixed_precision_matches_analytic_fields_and_derivatives(control):
         return parameters
 
     def objective(value):
-        return jnp.mean(lmx.evolve_q2d(initial, **inputs(value), steps=4)[0] ** 2)
+        return jnp.mean(lmhdx.evolve_q2d(initial, **inputs(value), steps=4)[0] ** 2)
 
     def analytic(value):
         parameters = inputs(value)
@@ -740,7 +740,7 @@ def test_q2d_mixed_precision_matches_analytic_fields_and_derivatives(control):
         return initial * (decay + source * (-jnp.expm1(-rate * time)) / rate)
 
     value = jnp.asarray(1.1, dtype=jnp.float64)
-    fields = jax.jit(lambda x: lmx.evolve_q2d(initial, **inputs(x), steps=4))(value)
+    fields = jax.jit(lambda x: lmhdx.evolve_q2d(initial, **inputs(x), steps=4))(value)
     result = solve_q2d(Q2DProblem(initial, **inputs(value), steps=4, history_stride=2))
     assert result.problem.initial_vorticity.dtype == result.problem.forcing.dtype == jnp.float64
     assert all(field.dtype == jnp.float64 for field in fields)
@@ -762,7 +762,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
-from lmx.q2d import evolve_q2d, make_q2d_case, solve_q2d
+from lmhdx.q2d import evolve_q2d, make_q2d_case, solve_q2d
 assert len(jax.devices()) in (2, 4)
 placement = NamedSharding(Mesh(np.array(jax.devices()), ('d',)), P('d', None))
 for dtype in (np.float32, np.float64):
@@ -811,12 +811,12 @@ def test_q2d_real_dtype_floor_and_weak_scalar_defaults():
         expected = jnp.result_type(dtype, jnp.float32)
         case = Q2DProblem(initial, steps=1)
         assert case.initial_vorticity.dtype == expected
-        assert lmx.evolve_q2d(initial, steps=1)[0].dtype == expected
+        assert lmhdx.evolve_q2d(initial, steps=1)[0].dtype == expected
     initial = jnp.zeros((4, 4), dtype=jnp.complex64)
     with pytest.raises(ValueError, match="must be real"):
         Q2DProblem(initial)
     with pytest.raises(ValueError, match="must be real"):
-        lmx.evolve_q2d(initial)
+        lmhdx.evolve_q2d(initial)
 
 
 @pytest.mark.physics
@@ -932,7 +932,7 @@ def test_q2d_real_transforms_match_the_complex_transform_reference(
         jnp.asarray(rng.normal(size=shape)), forcing=forcing, history_stride=stride, **parameters
     )
     result = solve_q2d(problem)
-    evolved = lmx.evolve_q2d(problem.initial_vorticity, forcing=problem.forcing, **parameters)
+    evolved = lmhdx.evolve_q2d(problem.initial_vorticity, forcing=problem.forcing, **parameters)
     vorticity, ux, uy, frames, expected = _complex_transform_q2d(problem)
 
     assert result.vorticity.dtype == jnp.float64
@@ -1024,7 +1024,7 @@ def test_q2d_model_contract_refinement_and_failures():
         steps=4,
         history_stride=2,
     )
-    result = lmx.solve(case)
+    result = lmhdx.solve(case)
     wave_number_squared = (2.0 * np.pi * 2 / case.length[0]) ** 2 + (2.0 * np.pi * 3 / case.length[1]) ** 2
     expected = case.initial_vorticity * jnp.exp(
         -(case.viscosity * wave_number_squared + case.hartmann_friction) * case.dt * case.steps
@@ -1088,7 +1088,7 @@ def test_q2d_model_contract_refinement_and_failures():
     parameters = jnp.asarray([1.0, 0.02, 0.1, 0.0, 2.0 * np.pi, 0.01], dtype=jnp.float32)
 
     def objective(values, checkpoint_size=None):
-        vorticity, _, _ = lmx.evolve_q2d(
+        vorticity, _, _ = lmhdx.evolve_q2d(
             values[0] * mode,
             forcing=values[3] * mode,
             length=(values[4], 2.0 * jnp.pi),

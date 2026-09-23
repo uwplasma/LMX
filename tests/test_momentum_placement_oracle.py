@@ -10,7 +10,7 @@ produce and compares them on the properties a projection method depends on:
 * the discrete adjoint identity between gradient and divergence, because a
   projection is only idempotent when it holds;
 * symmetry under the cell volumes, because it decides whether the direct
-  factorization of :mod:`lmx.poisson` applies at all.
+  factorization of :mod:`lmhdx.poisson` applies at all.
 
 The collocated candidate is built here rather than in the package: it is the
 rejected design, and the plan asks that rejected prototypes leave evidence, not
@@ -21,9 +21,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx.bc import NEUMANN, BoundaryCondition
-from lmx.grid import CENTER, Field, Grid, uniform_faces
-from lmx.ops import cell_inner_product, divergence, face_gradient, face_inner_product
+from lmhdx.bc import NEUMANN, BoundaryCondition
+from lmhdx.grid import CENTER, Field, Grid, uniform_faces
+from lmhdx.ops import cell_inner_product, divergence, face_gradient, face_inner_product
 
 pytestmark = pytest.mark.unit
 
@@ -32,7 +32,7 @@ ORACLE = Grid(*(uniform_faces(8, 0.0, 1.0) for _ in range(3)))
 
 
 def _staggered_pressure_operator(grid: Grid) -> np.ndarray:
-    """Assemble divergence-of-gradient with the staggered operators of :mod:`lmx.ops`."""
+    """Assemble divergence-of-gradient with the staggered operators of :mod:`lmhdx.ops`."""
     size = int(np.prod(grid.shape))
     columns = []
     for index in range(size):
@@ -127,7 +127,7 @@ def test_staggered_gradient_and_divergence_are_adjoint_while_collocated_is_not()
 
 
 def test_staggered_operator_is_symmetric_under_the_cell_volumes():
-    """Symmetry is what lets :mod:`lmx.poisson` factorize the operator directly."""
+    """Symmetry is what lets :mod:`lmhdx.poisson` factorize the operator directly."""
     grid = ORACLE
     operator = _staggered_pressure_operator(grid)
     volumes = grid.cell_volumes().reshape(-1)

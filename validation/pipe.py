@@ -1,4 +1,4 @@
-"""A spectral reference for pipe flow in a transverse field, independent of LMX.
+"""A spectral reference for pipe flow in a transverse field, independent of LMhdX.
 
 The pipe has the same difficulty the duct had -- no closed form worth
 transcribing -- and one the duct did not: a coordinate singularity at the axis.
@@ -10,7 +10,7 @@ is then an interior point of the representation and needs no condition at all;
 this is Trefethen's construction for the Poisson equation on a disk.
 
 The system is the same one :mod:`validation.shercliff` solves, in the geometry
-:mod:`lmx.pipe` solves it in. With :math:`\\mathbf u = u(r,\\theta)\\hat z` and
+:mod:`lmhdx.pipe` solves it in. With :math:`\\mathbf u = u(r,\\theta)\\hat z` and
 :math:`\\mathbf B = B\\hat x`,
 
 .. math::

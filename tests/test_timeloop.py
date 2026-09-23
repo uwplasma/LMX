@@ -8,12 +8,12 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx import core3d, timeloop
-from lmx.bc import NEUMANN, PERIODIC, BoundaryCondition
-from lmx.core3d import ChannelProblem, step, zero_velocity
-from lmx.grid import Grid, uniform_faces
-from lmx.ops import divergence
-from lmx.timeloop import advance, energy_budget, kinetic_energy, trajectory_diagnostics
+from lmhdx import core3d, timeloop
+from lmhdx.bc import NEUMANN, PERIODIC, BoundaryCondition
+from lmhdx.core3d import ChannelProblem, step, zero_velocity
+from lmhdx.grid import Grid, uniform_faces
+from lmhdx.ops import divergence
+from lmhdx.timeloop import advance, energy_budget, kinetic_energy, trajectory_diagnostics
 
 pytestmark = pytest.mark.unit
 
@@ -174,9 +174,9 @@ def test_the_ohmic_identity_is_exact_on_a_layer_mesh(hartmann, cells):
     """
     import dataclasses
 
-    from lmx.core3d import duct_problem, face_currents, project, velocity_offset
-    from lmx.grid import Field
-    from lmx.ops import cell_inner_product
+    from lmhdx.core3d import duct_problem, face_currents, project, velocity_offset
+    from lmhdx.grid import Field
+    from lmhdx.ops import cell_inner_product
 
     problem = dataclasses.replace(duct_problem(hartmann=hartmann, cells=cells), dt=1.0e-2)
     marched = advance(problem, 10, viscous=problem.viscous_factorizations()).velocity
@@ -234,8 +234,8 @@ def test_the_ohmic_identity_holds_in_a_varying_field(conductance):
     """
     import dataclasses
 
-    from lmx.core3d import duct_problem, fringe_field, project, velocity_offset
-    from lmx.grid import Field
+    from lmhdx.core3d import duct_problem, fringe_field, project, velocity_offset
+    from lmhdx.grid import Field
 
     duct = duct_problem(hartmann=20.0, cells=24, wall_conductance=conductance)
     grid = Grid(uniform_faces(8, -6.0, 6.0), duct.grid.y_faces, duct.grid.z_faces)
@@ -271,7 +271,7 @@ def test_the_budget_is_the_rate_of_change_of_kinetic_energy():
 
 def test_a_mixed_precision_trajectory_follows_the_float64_one(true_float32_matmuls):
     """Float32 solves with float64 corrections, twenty implicit steps on a layer-resolving duct."""
-    from lmx.grid import wall_resolving_faces
+    from lmhdx.grid import wall_resolving_faces
 
     hartmann = 20.0
     transverse, spanwise = (

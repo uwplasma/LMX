@@ -26,7 +26,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx.q2d import evolve_q2d
+from lmhdx.q2d import evolve_q2d
 
 pytestmark = pytest.mark.numerical
 

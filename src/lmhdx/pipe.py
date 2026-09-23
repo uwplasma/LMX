@@ -17,7 +17,7 @@ coupled to the potential:
 
 with :math:`\\mathbf J = -\\nabla\\varphi + \\mathbf u\\times\\mathbf B`. Both
 unknowns are cell centred, which is why this needs none of the staggered vector
-machinery of :mod:`lmx.core3d`: there is no cross flow to project.
+machinery of :mod:`lmhdx.core3d`: there is no cross flow to project.
 
 The electromotive force is where the coordinates show. A uniform Cartesian field
 is not uniform in polar components, :math:`B_r = B\\cos\\theta` and
@@ -29,7 +29,7 @@ the axial force, which is the consistency the whole package is built on.
 The system is linear in the velocity, so it is one preconditioned Krylov solve,
 not a Newton iteration. The preconditioner is the damped operator
 :math:`(B^2 - \\nabla^2)^{-1}`, factorized exactly by
-:func:`lmx.poisson.fast_diagonal_polar_poisson`, which is what keeps the
+:func:`lmhdx.poisson.fast_diagonal_polar_poisson`, which is what keeps the
 iteration count from growing with the Hartmann number.
 """
 
@@ -133,9 +133,9 @@ def _face_emf(velocity: Field, problem: PipeProblem) -> tuple[Field, Field, Fiel
     ``B_theta = -B sin(theta)``, so an axial velocity drives ``B u sin(theta)``
     through a radial face and ``B u cos(theta)`` through an azimuthal one. The
     motional field is rotated at the cell centre, where the velocity lives, and
-    carried to the faces by :func:`lmx.ops.face_average`; :func:`_axial_force`
+    carried to the faces by :func:`lmhdx.ops.face_average`; :func:`_axial_force`
     takes the transpose path back, so the force does exactly minus the work the
-    currents dissipate, as in :mod:`lmx.em`.
+    currents dissipate, as in :mod:`lmhdx.em`.
     """
     grid = problem.grid
     sine, cosine = (jnp.asarray(value, dtype=velocity.dtype) for value in _angles(grid))
@@ -155,7 +155,7 @@ def _face_currents(
 
     ``wall`` is the potential of a thin conducting wall on the radial faces, as
     :func:`_potential` returns it; the current into the wall is Ohm's law across
-    the half cell against it (:func:`lmx.em.thin_wall_current`).
+    the half cell against it (:func:`lmhdx.em.thin_wall_current`).
     """
     conditions = problem.conditions
     emf = _face_emf(velocity, problem)
@@ -174,7 +174,7 @@ def _axial_force(currents: tuple[Field, Field, Field], problem: PipeProblem) -> 
     """Return ``(J x B)_z`` at cell centres: the transpose of :func:`_face_emf`, from the same currents.
 
     The half-cell current into a thin wall carries no electromotive force, so it exerts no force,
-    as in :func:`lmx.core3d.electric_state`: with it the Lorentz work missed the dissipation by
+    as in :func:`lmhdx.core3d.electric_state`: with it the Lorentz work missed the dissipation by
     1.2e-4 (c 0.1, Ha 20); the charge balance keeps it.
     """
     sine, cosine = (jnp.asarray(value, dtype=currents[0].dtype) for value in _angles(problem.grid))

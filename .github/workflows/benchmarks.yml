@@ -9,7 +9,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: ./.github/actions/setup-lmx
+      - uses: ./.github/actions/setup-lmhdx
 
       - name: Run benchmark suite
         env:
@@ -20,7 +20,7 @@ jobs:
           OPENBLAS_NUM_THREADS: "1"
           MKL_NUM_THREADS: "1"
           NUMEXPR_NUM_THREADS: "1"
-        run: python -m lmx benchmark --output artifacts/benchmarks/benchmark.json --repeats 6
+        run: python -m lmhdx benchmark --output artifacts/benchmarks/benchmark.json --repeats 6
 
       - name: Upload benchmark artifacts
         continue-on-error: true

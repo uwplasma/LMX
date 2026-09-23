@@ -1,6 +1,6 @@
 # Numerical methods
 
-LMX uses cell-centered structured finite-volume/finite-difference operators.
+LMhdX uses cell-centered structured finite-volume/finite-difference operators.
 The conservative face operators use distance-aware harmonic interpolation and
 local metric widths. Generic collocated momentum and its reconstructed field
 diagnostics have distinct operators; they do not inherit the face scheme's
@@ -110,7 +110,7 @@ between physical defect reduction and runtime. Mechanical acceleration is
 applied after those correctors; electric closure and Lorentz reconstruction
 then use the accepted conservative velocity. This follows the
 pressure-correction structure of SIMPLE and its consistent refinements while
-retaining LMX's MHD-specific residual and boundary contracts.
+retaining LMhdX's MHD-specific residual and boundary contracts.
 
 The B2 predictor also uses the positive local electromagnetic pseudo-mass
 $R_B=\sigma|B|^2I$:
@@ -136,7 +136,7 @@ implicit derivatives require them.
 
 At fixed field, materials and geometry the fully developed inductionless problem
 is linear in the drive, so the volumetric flow rate is $Q=Gf$ for a single
-response $G$ that one solve measures. `lmx.design` uses that directly: the drive
+response $G$ that one solve measures. `lmhdx.design` uses that directly: the drive
 delivering a requested throughput is $f=Q_{\rm target}/G$ exactly, and its
 derivative is $df/dQ=1/G$.
 
@@ -154,7 +154,7 @@ effects, so it is not a blanket pumping budget.
 
 ## Staggered grid and wall-resolving coordinates
 
-`lmx.grid` supplies the geometry the plan's conservative 3-D core is being built
+`lmhdx.grid` supplies the geometry the plan's conservative 3-D core is being built
 on. A `Grid` stores strictly increasing face coordinates per axis as host-side
 metadata: it is hashable and never traced, so stencil bookkeeping and any
 eigendecomposition happen once at trace time. A `Field` pairs a traced array with
@@ -172,8 +172,8 @@ requirement directly: given a layer thickness it places a requested number of
 cells inside the layer while bounding the growth ratio, and raises when the cell
 count cannot meet the request rather than returning an unresolved mesh.
 
-`lmx.bc` expresses a wall condition once, as the ghost value that reproduces it,
-and `lmx.ops` differences every face with the same expression. A cell-centred
+`lmhdx.bc` expresses a wall condition once, as the ghost value that reproduces it,
+and `lmhdx.ops` differences every face with the same expression. A cell-centred
 value sits half a cell from the wall, so a prescribed value $g$ needs
 $p_{\rm ghost}=2g-p_0$ and a prescribed normal derivative $q$ needs
 $p_{\rm ghost}=p_0\mp q\,\Delta x_0$.
@@ -199,11 +199,11 @@ two-point gradient is centred between cell centres rather than on the face, so
 its truncation error is first order in the spacing change; solution order there
 is a manufactured-solution question and is verified in the step that owns it.
 
-`lmx.poisson` inverts that Laplacian directly. On a tensor-product grid the
+`lmhdx.poisson` inverts that Laplacian directly. On a tensor-product grid the
 operator is the Kronecker sum of three one-dimensional operators, each symmetric
 once the cell widths are folded in, so diagonalizing them on the host reduces a
 solve to three tensor contractions and one elementwise divide. The one-dimensional
-operators are read out of `lmx.ops` by applying the assembled Laplacian to unit
+operators are read out of `lmhdx.ops` by applying the assembled Laplacian to unit
 vectors, so the factorization cannot drift away from the stencil the rest of the
 code uses.
 
@@ -218,7 +218,7 @@ carrying a value is refused instead of silently linearized. A guard rejects any
 axis operator that is not symmetric under the cell widths, which is the tripwire
 that a future three-point wall stencil would trip.
 
-`lmx.em` builds the electric coupling on those operators, following Ni et al.
+`lmhdx.em` builds the electric coupling on those operators, following Ni et al.
 Its rule is that one face-normal current
 
 $$
@@ -250,10 +250,10 @@ The electromotive force and the Lorentz force travel the same interpolation path
 in opposite directions. A velocity component is averaged from its faces to the
 cell centres and carried to the current faces; the force is averaged from the
 current faces to the cell centres, which is Ni's face form above, and carried to
-the velocity faces. Every cell-to-face step is `lmx.ops.face_average`, the
+the velocity faces. Every cell-to-face step is `lmhdx.ops.face_average`, the
 average of the piecewise-constant cell field over the control volume straddling
 the face, $(h_L c_L+h_R c_R)/(h_L+h_R)$, and every face-to-cell step is its
-transpose `lmx.ops.face_average_adjoint` under the cell volumes and the face
+transpose `lmhdx.ops.face_average_adjoint` under the cell volumes and the face
 weights $A_f d_f$, including the polar metric. The force map is then exactly
 minus the adjoint of the electromotive map, the discrete form of
 $\int\mathbf u\cdot(\mathbf J\times\mathbf B)=-\int\mathbf J\cdot(\mathbf u\times\mathbf B)$,
@@ -265,7 +265,7 @@ stretched mesh: with it the steady operator was asymmetric by 1e-2 on a Ha 100
 layer mesh and the ohmic identity was off by up to 3e-3. The two interpolations
 coincide on uniform cells. On the layer meshes of the validation ladder the face
 average moves each insulating duct flow rate towards the spectral reference, by
-at most 0.3 % of it. The pipe solver of `lmx.pipe` uses the same pair, with the
+at most 0.3 % of it. The pipe solver of `lmhdx.pipe` uses the same pair, with the
 polar rotation of the field taken at the cell centres.
 
 A thin conducting wall of conductance ratio $c=\sigma_w t_w/(\sigma a)$ is a
@@ -277,7 +277,7 @@ Laplacian in the metric of the wall. On the wall-normal axis the sheet is one
 more node, weighted by $c$ times the wall area where a cell is weighted by its
 volume, so the tangential operators act on it as on a cell and the potential
 operator stays a Kronecker sum. The solve is therefore the same three
-contractions as for an insulating wall (`lmx.poisson.fast_diagonal_thin_wall_poisson`
+contractions as for an insulating wall (`lmhdx.poisson.fast_diagonal_thin_wall_poisson`
 and the `wall_conductance` option of the polar factorization), with no inner
 Krylov iteration, and it is symmetric in the cell volumes. Taking the adjacent
 cell value as the wall potential, as before, was first order: a manufactured
@@ -288,18 +288,18 @@ joins the sheets in series, so one delivers what the other receives, and a
 rank-four Woodbury correction per mode of the third axis removes the conduction
 the Kronecker sum would otherwise give the corner edge. The half-cell current
 into a sheet carries no electromotive force, so it exerts no Lorentz force
-either: `lmx.core3d.electric_state` closes the wall faces before forming the
+either: `lmhdx.core3d.electric_state` closes the wall faces before forming the
 force. Its product with a field tangential to the wall would be work the Joule
 dissipation never sees; with conducting side walls in a uniform field that left
 the steady operator asymmetric by 1.1e-3 at Ha 20, and closing the faces moves
 the flow rate by at most 2.2e-4 of itself on 24 and 48 cells.
 
 The imposed field may vary in space. `ChannelProblem.magnetic_field` takes
-three numbers, or an `lmx.core3d.ImposedField` of cell-centred arrays (three
+three numbers, or an `lmhdx.core3d.ImposedField` of cell-centred arrays (three
 arrays become one); both paths carry each component to the current face with the
 same interpolation and multiply it there, so the adjoint pairing above holds for
 any field, and a constant field given as arrays reproduces the three numbers bit
-for bit. `lmx.core3d.fringe_field` builds the fringe of the ANL benchmark (square
+for bit. `lmhdx.core3d.fringe_field` builds the fringe of the ANL benchmark (square
 duct, $x_0=3$): with $s=x-x_c$ and $k=\pi/(2x_0)$, the midplane profile
 $B_y=\tfrac12 B_0[1-\sin(ks)]$ over $|s|\le x_0$, and, as Votyakov et al. (2009)
 ask of a fringe model, the companion that makes it divergence and curl free,
@@ -322,12 +322,12 @@ faces.
 These modules supply geometry, operators, the scalar solve and the electric
 coupling. The momentum discretization and the time loop follow in their own plan
 steps, and the existing fully developed and extruded solvers continue to use
-`lmx.mesh` until those land.
+`lmhdx.mesh` until those land.
 
 ## The projection step and its two stiffnesses
 
-`lmx.core3d` assembles one fractional step: the potential is solved, the face
-currents of `lmx.em` give the Lorentz force, momentum advances, and a pressure
+`lmhdx.core3d` assembles one fractional step: the potential is solved, the face
+currents of `lmhdx.em` give the Lorentz force, momentum advances, and a pressure
 Poisson solve returns the velocity to the discretely divergence-free space.
 
 The two stiffnesses are handled differently, on purpose. The velocity part of the
@@ -345,7 +345,7 @@ component, so a varying field takes the largest rate over the cells; in the
 diagonal model a cell of rate $r$ then updates by $1-\Delta t\,r/(1+\Delta t\,\lambda)$,
 inside $(0,1]$ wherever $r\le\lambda$, where a smaller shift such as the volume
 mean would overshoot past $-1$ once $\Delta t\,r>2(1+\Delta t\,\lambda)$. The
-steady preconditioner of `lmx.steady` takes the peak $|\mathbf B|^2$ for the same
+steady preconditioner of `lmhdx.steady` takes the peak $|\mathbf B|^2$ for the same
 reason. Viscosity is left explicit and its
 limit is reported by `ChannelProblem.diffusive_step_limit` rather than enforced,
 so a caller sweeping a parameter sees the constraint instead of a silently
@@ -379,7 +379,7 @@ over 8, 16 and 32 cells across the channel. Convective transport is omitted;
 that is the Stokes limit, appropriate at blanket interaction parameters and
 stated rather than implied.
 
-The steady residual of `lmx.steady` projects twice. One projection's pressure
+The steady residual of `lmhdx.steady` projects twice. One projection's pressure
 comes from the fast diagonal solve, exact only to round-off, and on a stretched
 mesh that round-off leaves about $10^{-13}$ of the removed gradient outside the
 divergence-free fields. The conjugate-gradient preconditioner ends in a
@@ -407,7 +407,7 @@ iterations) above Ha 300: the three solves take 5,581, 12,056 and 19,299.
 A Python loop around the projection step dispatches every operation from the
 host. On an accelerator that is the difference between a queue the device can run
 ahead on and a round trip per step, and it is why the audit that opened this plan
-found one GPU slower than a laptop CPU on a small duct. `lmx.timeloop` compiles
+found one GPU slower than a laptop CPU on a small duct. `lmhdx.timeloop` compiles
 the whole run with `jax.lax.scan` instead. Measured on this laptop's CPU, 200
 steps of a 4x16x16 duct take 3.58 s through the host loop and 0.44 s through the
 scan, an **8x speedup before any accelerator is involved**; the 32-cell case gives
@@ -421,9 +421,9 @@ kinetic-energy history without synchronising mid-trajectory. A test greps the
 step and loop sources for `float(`, `bool(`, `device_get` and `.item()`: one of
 those inside the loop would serialise the queue and undo the change.
 
-## LMX and SOLVAX
+## LMhdX and SOLVAX
 
-LMX owns:
+LMhdX owns:
 
 - geometry metrics and material coefficients;
 - boundary and interface equations;
@@ -439,7 +439,7 @@ SOLVAX owns:
 - solver state, termination metadata, implicit linear differentiation, and
   checkpointed exact reverse mode for long recurrences.
 
-LMX calls these algorithms with MHD-specific operator actions and then certifies
+LMhdX calls these algorithms with MHD-specific operator actions and then certifies
 the returned state in physical units. This keeps solver policy reusable without
 moving geometry or physics into SOLVAX.
 
@@ -450,7 +450,7 @@ dealiasing rule for the vorticity-advection product, and fourth-order
 integrating-factor Runge--Kutta time stepping. Viscous and Hartmann-friction
 terms are integrated exactly within each step. SOLVAX supplies the reusable
 periodic Poisson symbol and zero-mean spectral inversion for the streamfunction;
-LMX owns vorticity dynamics, velocity reconstruction, the energy identity, and
+LMhdX owns vorticity dynamics, velocity reconstruction, the energy identity, and
 physical acceptance.
 
 The largest stable integration segment is JIT compiled. A positive

@@ -27,7 +27,7 @@ jobs:
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
             echo "docs=true" >> "$GITHUB_OUTPUT"
           elif git diff --quiet "origin/${{ github.base_ref }}...HEAD" -- \
-            docs src/lmx README.md pyproject.toml .github/workflows/docs.yml .github/actions; then
+            docs src/lmhdx README.md pyproject.toml .github/workflows/docs.yml .github/actions; then
             echo "docs=false" >> "$GITHUB_OUTPUT"
           else
             echo "docs=true" >> "$GITHUB_OUTPUT"
@@ -40,7 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: ./.github/actions/setup-lmx
+      - uses: ./.github/actions/setup-lmhdx
         with:
           extras: docs,dev
 

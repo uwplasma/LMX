@@ -11,7 +11,7 @@ leaving a residual in velocity alone:
 with :math:`\\mathbb P` the discrete projection onto the divergence-free face
 fields and :math:`\\mathbf F` the Ni face-form Lorentz force of the potential
 that :math:`\\mathbf u` induces. A root of :math:`\\mathbf R` is a steady state
-of :func:`lmx.core3d.step`, and the projection keeps the iteration inside the
+of :func:`lmhdx.core3d.step`, and the projection keeps the iteration inside the
 subspace the time stepper never leaves.
 
 Without advection the residual is affine,
@@ -93,7 +93,7 @@ def steady_residual(
 ) -> tuple[Field, Field, Field]:
     """Return the projected steady momentum residual of a velocity field.
 
-    Zero exactly when ``velocity`` is a fixed point of :func:`lmx.core3d.step`.
+    Zero exactly when ``velocity`` is a fixed point of :func:`lmhdx.core3d.step`.
     ``forcing`` and ``field_scale`` are the continuous design inputs and may be
     traced; everything ``problem`` carries is static, because the factorizations
     read concrete arrays.
@@ -140,7 +140,7 @@ def _preconditioner(
     """One projection step: the conjugate-gradient and the Newton-GMRES preconditioner.
 
     ``viscous`` holds one solve per component, from :func:`_projection_solves`.
-    It ends in :func:`lmx.core3d.project`, whose copy of the first periodic face
+    It ends in :func:`lmhdx.core3d.project`, whose copy of the first periodic face
     completes a solve that returns that duplicate face as zero.
 
     ``viscous`` has to be factorized at ``pseudo_step`` and not at the problem's
@@ -339,7 +339,7 @@ def _orthogonal_projection(
 ) -> tuple[Field, Field, Field]:
     """Project onto the constrained divergence-free fields, orthogonally in the face volume.
 
-    :func:`lmx.core3d.project` copies the first periodic face onto its duplicate,
+    :func:`lmhdx.core3d.project` copies the first periodic face onto its duplicate,
     an oblique projection; both copies carry half the weight, so averaging them
     is the orthogonal one.
     """

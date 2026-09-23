@@ -1,6 +1,6 @@
 # FreeMHD comparison
 
-FreeMHD is an external validator, not an LMX runtime dependency. LMX retains a
+FreeMHD is an external validator, not an LMhdX runtime dependency. LMhdX retains a
 small boundary for four tasks:
 
 1. describe matched equations, geometry, properties, drive, and controls;
@@ -8,7 +8,7 @@ small boundary for four tasks:
 3. record immutable source, image, and artifact identities;
 4. compare the same normalized observables with explicit tolerances.
 
-The B2 square-duct smoke runs FreeMHD in Docker and then evaluates LMX from the
+The B2 square-duct smoke runs FreeMHD in Docker and then evaluates LMhdX from the
 matched input. It checks that the solver actually ran, that output timestamps
 advanced, and that the observed files belong to the recorded execution.
 

@@ -7,8 +7,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-import lmx
-from lmx.design import (
+import lmhdx
+from lmhdx.design import (
     DuctResponse,
     drive_for_flow_rate,
     fixed_flow_hydraulic_power,
@@ -59,18 +59,18 @@ def test_documented_profile_fit_recovers_drive_and_field():
 
 
 def _case(ha: float = 5.0, ny: int = 12, nz: int = 12):
-    return lmx.make_hartmann_case(ha=ha, ny=ny, nz=nz)
+    return lmhdx.make_hartmann_case(ha=ha, ny=ny, nz=nz)
 
 
 def _flow(case, drive, scale=1.0):
-    velocity, *_ = lmx.solve_fully_developed_fields(case, forcing=drive, magnetic_field_scale=scale)
+    velocity, *_ = lmhdx.solve_fully_developed_fields(case, forcing=drive, magnetic_field_scale=scale)
     return volumetric_flow_rate(case, velocity)
 
 
-@pytest.mark.parametrize("factory", [lmx.make_hartmann_case, lmx.make_hunt_case])
+@pytest.mark.parametrize("factory", [lmhdx.make_hartmann_case, lmhdx.make_hunt_case])
 def test_fluid_areas_sum_to_the_open_cross_section(factory):
-    from lmx.physics import build_material_fields
-    from lmx.solvers import _build_mesh
+    from lmhdx.physics import build_material_fields
+    from lmhdx.solvers import _build_mesh
 
     case = factory(ha=5, ny=12, nz=12)
     areas = np.asarray(fluid_cell_areas(case))
@@ -164,8 +164,8 @@ def test_flow_rate_rejects_a_mismatched_velocity():
 def test_a_conducting_wall_costs_more_power_than_an_insulating_one():
     """Hunt versus Shercliff at fixed throughput: wall currents add drag."""
     target = 0.05
-    insulating = lmx.make_shercliff_case(ha=5.0, ny=12, nz=12)
-    conducting = lmx.make_hunt_case(ha=5.0, ny=12, nz=12, wall_cells=2, insulator_cells=2)
+    insulating = lmhdx.make_shercliff_case(ha=5.0, ny=12, nz=12)
+    conducting = lmhdx.make_hunt_case(ha=5.0, ny=12, nz=12, wall_cells=2, insulator_cells=2)
     insulating_power = float(fixed_flow_hydraulic_power(insulating, target, LENGTH))
     conducting_power = float(fixed_flow_hydraulic_power(conducting, target, LENGTH))
     assert conducting_power > insulating_power

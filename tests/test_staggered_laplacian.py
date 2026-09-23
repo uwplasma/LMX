@@ -11,9 +11,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx.bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition
-from lmx.grid import CENTER, FACE, Field, Grid, geometric_faces, uniform_faces
-from lmx.ops import staggered_laplacian
+from lmhdx.bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition
+from lmhdx.grid import CENTER, FACE, Field, Grid, geometric_faces, uniform_faces
+from lmhdx.ops import staggered_laplacian
 
 pytestmark = pytest.mark.unit
 

@@ -1,4 +1,4 @@
-"""A spectral reference for insulating-duct MHD flow, independent of LMX.
+"""A spectral reference for insulating-duct MHD flow, independent of LMhdX.
 
 Fully developed flow along a square duct with a transverse field has no closed
 form that is comfortable to transcribe correctly, and a series copied out of a

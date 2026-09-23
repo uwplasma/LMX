@@ -7,13 +7,13 @@ from types import SimpleNamespace
 import pytest
 from solvax import anderson_weights
 
-import lmx.validation as benchmarks
-from lmx._fringing_common import ALEX_B2_ANDERSON_CONDITION_LIMIT
-from lmx._fringing_duct import _unpack_duct_mass_flux
-from lmx.fringing import solve_extruded_inductionless
-from lmx.io import load_extruded_restart_bundle, write_extruded_bundle_restart_npz
-from lmx.mesh import _cross_section_mesh
-from lmx.validation import (
+import lmhdx.validation as benchmarks
+from lmhdx._fringing_common import ALEX_B2_ANDERSON_CONDITION_LIMIT
+from lmhdx._fringing_duct import _unpack_duct_mass_flux
+from lmhdx.fringing import solve_extruded_inductionless
+from lmhdx.io import load_extruded_restart_bundle, write_extruded_bundle_restart_npz
+from lmhdx.mesh import _cross_section_mesh
+from lmhdx.validation import (
     benchmark_b_pressure_observable,
     benchmark_solver,
     build_benchmark_b_field_profile,
@@ -81,11 +81,11 @@ def test_device_benchmark_honors_q2d_solver_verdict(monkeypatch, status):
     import jax
     import jax.numpy as jnp
 
-    import lmx
+    import lmhdx
     from scripts.run_benchmarks import _q2d_case
 
     monkeypatch.setattr(
-        lmx,
+        lmhdx,
         "solve",
         lambda problem: SimpleNamespace(
             vorticity=jnp.zeros((8, 8)),
@@ -247,7 +247,7 @@ def test_benchmark_solver_returns_positive_timings(monkeypatch: pytest.MonkeyPat
         lambda ha, ny, nz: SimpleNamespace(name="hartmann_ha5"),
     )
     fields = SimpleNamespace(u=object(), phi=object())
-    monkeypatch.setattr("lmx.cases.solve_steady", lambda case: SimpleNamespace(fields=fields))
+    monkeypatch.setattr("lmhdx.cases.solve_steady", lambda case: SimpleNamespace(fields=fields))
     synchronized = []
     monkeypatch.setattr(benchmarks.jax, "block_until_ready", synchronized.append)
     monkeypatch.setattr(benchmarks.time, "perf_counter", lambda: next(times))

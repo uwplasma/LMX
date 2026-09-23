@@ -1,7 +1,7 @@
 """One projection step for inductionless duct flow on the staggered grid.
 
 The step is the classical fractional one, assembled from the pieces earlier plan
-steps settled: the potential is solved first, the face currents of :mod:`lmx.em`
+steps settled: the potential is solved first, the face currents of :mod:`lmhdx.em`
 supply the Lorentz force, the momentum is advanced, and a pressure Poisson solve
 projects the velocity back onto the discretely divergence-free space.
 
@@ -23,7 +23,7 @@ is built on, never from a separately differenced potential. In the core the
 balance is :math:`-\\nabla p + \\mathbf J\\times\\mathbf B = 0` to
 :math:`O(Ha^{-2})`, so any inconsistency between the two is amplified by
 :math:`Ha^2`. The insulating wall is part of that consistency: the motional term
-is dropped on wall faces by :func:`lmx.em.wall_insulated` before its divergence
+is dropped on wall faces by :func:`lmhdx.em.wall_insulated` before its divergence
 is taken, because the operator that receives it has no wall flux either. Leaving
 it in makes the potential absorb a boundary current the wall cannot carry, and a
 square duct at :math:`Ha=20` then runs at less than half its correct flow rate.
@@ -55,10 +55,10 @@ mesh is refined.
 *Convective transport.* ``advection`` selects it: ``"off"`` is the Stokes limit,
 appropriate at the large interaction parameters of a blanket channel and the
 default so that no run acquires a convective step limit by accident;
-``"central"`` is the conservative flux form of :mod:`lmx.advect`, second order on
+``"central"`` is the conservative flux form of :mod:`lmhdx.advect`, second order on
 a stretched mesh; ``"limited"`` adds the van Leer blend that keeps the thin side
 layers bounded. Transport is explicit, so switching it on bounds the step by
-:func:`lmx.advect.advective_step_limit`.
+:func:`lmhdx.advect.advective_step_limit`.
 """
 
 from __future__ import annotations
@@ -137,7 +137,7 @@ class ImposedField:
     ``components`` are ``(B_x, B_y, B_z)`` of ``grid.shape``; the optional ``faces``
     are the face-normal components whose discrete divergence :func:`fringe_field`
     controls. The arrays are copied read-only and compared by value, as
-    :class:`lmx.grid.Grid` is, so a problem carrying the field stays static. Both
+    :class:`lmhdx.grid.Grid` is, so a problem carrying the field stays static. Both
     the electromotive force and the Lorentz force multiply a component at the
     current face, so the force stays exactly minus the adjoint of the other.
     """
@@ -225,7 +225,7 @@ class ChannelProblem:
                 raise ValueError("the magnetic field must be finite")
         if isinstance(field, ImposedField) and field.grid != self.grid:
             raise ValueError("the imposed field is sampled on a different grid")
-        # True float32 contractions unless the user chose a precision; see lmx.enable_x64.
+        # True float32 contractions unless the user chose a precision; see lmhdx.enable_x64.
         _pin_matmul_precision()
 
     @property
@@ -291,7 +291,7 @@ class ChannelProblem:
         Build these once on the host and pass them to :func:`step` to take
         diffusion implicitly. The shift carries the magnetic damping, so one
         solve removes both stiff terms. :attr:`precision` selects the float32
-        solve with float64 correction of :mod:`lmx.poisson` for float64 states.
+        solve with float64 correction of :mod:`lmhdx.poisson` for float64 states.
         """
         conditions = tuple(velocity_condition(self.conditions, axis) for axis in range(3))
         return tuple(
@@ -324,7 +324,7 @@ class ChannelProblem:
         """Factorize the charge operator, with a sheet of potential unknowns on each conducting wall.
 
         :meth:`factorization` when no wall conducts; otherwise
-        :func:`lmx.poisson.fast_diagonal_thin_wall_poisson`, built once per grid,
+        :func:`lmhdx.poisson.fast_diagonal_thin_wall_poisson`, built once per grid,
         conditions, conductances and precision, and reused under tracing.
         """
         if not self.conducting_walls:
@@ -399,8 +399,8 @@ def face_lorentz_force(
 ) -> tuple[Field, Field, Field]:
     """Carry the cell-centred Lorentz force onto the velocity faces.
 
-    :func:`lmx.ops.face_average` is the transpose of the cell average that
-    :func:`lmx.em.face_electromotive_force` applies to the velocity, so the work
+    :func:`lmhdx.ops.face_average` is the transpose of the cell average that
+    :func:`lmhdx.em.face_electromotive_force` applies to the velocity, so the work
     this force does on any impermeable velocity is exactly minus the face
     current dotted with that velocity's electromotive force. The step, the
     steady residual and the energy budget all take the force from here.
@@ -616,7 +616,7 @@ def fringe_field(
     Both come from ``A = -B0 [s/2 + cos(ks) cosh(ky) / (2k)]`` (``cosh`` replaced
     by one when not solenoidal), with ``B_x = dA/dy``, ``B_y = -dA/dx``: each face
     holds the mean of its normal component, a difference of ``A``, so
-    :func:`lmx.ops.divergence` of the faces is round-off, and the cells average
+    :func:`lmhdx.ops.divergence` of the faces is round-off, and the cells average
     their two faces. ``y`` is measured from the magnet midplane.
     """
     if grid.is_polar:
