@@ -1,5 +1,6 @@
 """Fully developed duct design: linearity, exact drive elimination and gradients."""
 
+import dataclasses
 from pathlib import Path
 
 import jax
@@ -8,8 +9,15 @@ import numpy as np
 import pytest
 
 import lmx
+from lmx.bc import NEUMANN, PERIODIC, BoundaryCondition
+from lmx.core3d import ChannelProblem, duct_problem
 from lmx.design import (
     DuctResponse,
+    channel_cross_section_weights,
+    channel_drive_for_flow_rate,
+    channel_fixed_flow_hydraulic_power,
+    channel_flow_rate,
+    channel_flow_response,
     drive_for_flow_rate,
     fixed_flow_hydraulic_power,
     fluid_cell_areas,
@@ -18,6 +26,9 @@ from lmx.design import (
     pressure_drop,
     volumetric_flow_rate,
 )
+from lmx.grid import Grid, uniform_faces
+from lmx.steady import solve_steady_state
+from validation.shercliff import flow_rate
 
 pytestmark = pytest.mark.unit
 
@@ -84,6 +95,17 @@ def test_fluid_areas_sum_to_the_open_cross_section(factory):
     value, gradient = integrate(velocity)
     assert float(value) == pytest.approx(float(areas.sum()), rel=1e-12)
     np.testing.assert_array_equal(gradient, areas)
+
+
+def test_channel_cross_section_weights_sum_to_the_full_area():
+    """Every transverse cell is fluid, on a uniform mesh and on a wall-resolving one alike."""
+    for hartmann in (0.0, 20.0):
+        problem = duct_problem(hartmann=hartmann, cells=32)
+        weights = np.asarray(channel_cross_section_weights(problem))
+        assert weights.shape == problem.grid.shape[1:]
+        assert np.all(weights > 0.0)
+        extent = problem.grid.extent
+        assert float(weights.sum()) == pytest.approx(extent[1] * extent[2], rel=1e-12)
 
 
 def test_flow_rate_is_linear_in_the_drive():
@@ -169,3 +191,94 @@ def test_a_conducting_wall_costs_more_power_than_an_insulating_one():
     insulating_power = float(fixed_flow_hydraulic_power(insulating, target, LENGTH))
     conducting_power = float(fixed_flow_hydraulic_power(conducting, target, LENGTH))
     assert conducting_power > insulating_power
+
+
+def _uniform_duct(hartmann: float, cells: int) -> ChannelProblem:
+    """A square insulating duct matching ``lmx.make_hartmann_case``'s ``[-1, 1]^2`` grid."""
+    faces = uniform_faces(cells, -1.0, 1.0)
+    return ChannelProblem(
+        grid=Grid(uniform_faces(1, 0.0, 1.0), faces, faces),
+        conditions=(BoundaryCondition(PERIODIC), BoundaryCondition(NEUMANN), BoundaryCondition(NEUMANN)),
+        conductivity=1.0,
+        magnetic_field=(0.0, hartmann, 0.0),
+        forcing=(1.0, 0.0, 0.0),
+        dt=1.0,
+    )
+
+
+def test_channel_drive_round_trips_to_its_target_flow_rate():
+    problem = duct_problem(hartmann=5.0, cells=16)
+    target = 0.02
+    drive = channel_drive_for_flow_rate(problem, target)
+    solution = solve_steady_state(problem, forcing=(float(drive), 0.0, 0.0))
+    achieved = channel_flow_rate(problem, solution.velocity[0].data[0])
+    assert float(achieved) == pytest.approx(target, rel=1e-8)
+
+
+def test_channel_flow_response_rejects_advection():
+    problem = duct_problem(hartmann=0.0, cells=8, advection="central")
+    with pytest.raises(ValueError, match="requires advection='off'"):
+        channel_flow_response(problem)
+
+
+def test_channel_flow_rate_rejects_a_mismatched_velocity():
+    problem = duct_problem(hartmann=0.0, cells=8)
+    with pytest.raises(ValueError, match="does not match the mesh"):
+        channel_flow_rate(problem, jnp.zeros((3, 3)))
+
+
+@pytest.mark.parametrize(("hartmann", "cells", "bound"), [(20.0, 32, 0.02), (100.0, 48, 0.01)])
+def test_channel_flow_rate_matches_the_spectral_reference_on_a_wall_resolving_mesh(hartmann, cells, bound):
+    """Measured 0.887% at Ha 20/32 cells, 0.684% at Ha 100/48 cells."""
+    problem = duct_problem(hartmann=hartmann, cells=cells)
+    solution = solve_steady_state(problem, forcing=(1.0, 0.0, 0.0))
+    total = channel_flow_rate(problem, solution.velocity[0].data[0])
+    extent = problem.grid.extent
+    mean = float(total) / (extent[1] * extent[2])
+    exact = flow_rate(hartmann, 40)
+    assert abs(mean - exact) / exact < bound
+
+
+def test_channel_flow_rate_is_exactly_linear_in_the_drive():
+    """Measured Q(2f)/2Q(f) - 1 = 0.0, Q(0) = 0.0: exact on this CG solve."""
+    problem = duct_problem(hartmann=20.0, cells=32)
+
+    def flow_at(drive):
+        solution = solve_steady_state(problem, forcing=(drive, 0.0, 0.0))
+        return channel_flow_rate(problem, solution.velocity[0].data[0])
+
+    single, double, zero = (float(flow_at(drive)) for drive in (1.0, 2.0, 0.0))
+    assert double / (2.0 * single) - 1.0 == 0.0
+    assert zero == 0.0
+
+
+@pytest.mark.parametrize(("hartmann", "bound"), [(0.0, 2e-3), (5.0, 2e-2)])
+def test_channel_flow_response_reconciles_with_the_legacy_route_on_a_matched_uniform_mesh(hartmann, bound):
+    """Measured 0.104% at Ha 0, 1.498% at Ha 5.
+
+    NOT gated at Ha 20: a uniform mesh resolves neither route's a/Ha layer there
+    (see test_core3d.py's own Ha 20 test), so both are already >10% off spectral.
+    """
+    cells = 32
+    new = float(channel_flow_response(_uniform_duct(hartmann, cells)).flow_per_unit_drive)
+    case = lmx.make_hartmann_case(ha=hartmann, width=2.0, height=2.0, ny=cells, nz=cells)
+    uniform_geometry = dataclasses.replace(case.geometry, target_ha=None)
+    legacy = float(
+        linear_flow_response(dataclasses.replace(case, geometry=uniform_geometry)).flow_per_unit_drive
+    )
+    assert abs(new - legacy) / legacy < bound
+
+
+def test_channel_fixed_flow_power_matches_finite_differences_in_the_field_scale():
+    problem = duct_problem(hartmann=20.0, cells=32)
+    target = 0.01
+
+    def power(scale):
+        return channel_fixed_flow_hydraulic_power(problem, target, LENGTH, magnetic_field_scale=scale)
+
+    gradient = float(jax.grad(power)(1.0))
+    step = 1.0e-4
+    difference = (float(power(1.0 + step)) - float(power(1.0 - step))) / (2.0 * step)
+    assert gradient == pytest.approx(difference, rel=1e-5)
+    # Stronger field, more drag, more power.
+    assert gradient > 0.0
