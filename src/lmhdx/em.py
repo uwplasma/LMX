@@ -191,7 +191,9 @@ def thin_wall_current(potential: Field, wall_potential: Field, conductivity: Fie
     for face, cell, sign in ((0, 0, 1.0), (-1, -1, -1.0)):
         at = (slice(None),) * index + (face,)
         difference = wall_potential.data[at] - potential.data[(slice(None),) * index + (cell,)]
-        current = current.at[at].set(sign * conductivity.data[at] * difference / (0.5 * float(widths[cell])))
+        # The half width is read from a constant, not written as a literal (2b.1).
+        half = jnp.asarray(0.5 * widths[cell : cell + 1 if cell >= 0 else None][:1], dtype=potential.dtype)[0]
+        current = current.at[at].set(sign * conductivity.data[at] * difference / half)
     return Field(current, offset, grid)
 
 
