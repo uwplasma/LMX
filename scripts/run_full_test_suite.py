@@ -58,14 +58,17 @@ _TEST_SHARDS = {
         )
     ),
     "channel": ("tests/test_core3d.py", "tests/test_pipe.py"),
-    "plane": tuple(
-        f"tests/test_core3d.py::{name}"
-        for name in (
-            "test_implicit_and_explicit_viscosity_reach_the_same_steady_state",
-            "test_the_plane_channel_converges_at_second_order",
-            "test_plane_channel_matches_the_analytic_parabola",
-            "test_a_transverse_field_reduces_the_channel_throughput",
-        )
+    "plane": (
+        *(
+            f"tests/test_core3d.py::{name}"
+            for name in (
+                "test_implicit_and_explicit_viscosity_reach_the_same_steady_state",
+                "test_the_plane_channel_converges_at_second_order",
+                "test_plane_channel_matches_the_analytic_parabola",
+                "test_a_transverse_field_reduces_the_channel_throughput",
+            )
+        ),
+        "tests/test_coreflow.py",
     ),
     "steady": ("tests/test_steady.py",),
     "gradients": tuple(
@@ -93,7 +96,8 @@ _CHANGE_TEST_NAMES = {
     "cases": "config solver physics fringing benchmarks",
     "cli": "cli example_runner",
     "advect": "advect core3d",
-    "core3d": "core3d timeloop advect steady",
+    "core3d": "core3d timeloop advect steady coreflow",
+    "coreflow": "coreflow",
     "design": "design",
     "steady": "steady",
     "bc": "ops staggered_laplacian core3d timeloop advect steady pipe",
