@@ -280,7 +280,9 @@ def test_benchmark_solver_returns_positive_timings(monkeypatch: pytest.MonkeyPat
         lambda ha, ny, nz: SimpleNamespace(name="hartmann_ha5"),
     )
     fields = SimpleNamespace(u=object(), phi=object())
-    monkeypatch.setattr("lmhdx.cases.solve_steady", lambda case: SimpleNamespace(fields=fields))
+    monkeypatch.setattr(
+        "lmhdx.fully_developed.solve_fully_developed", lambda case: SimpleNamespace(fields=fields)
+    )
     synchronized = []
     monkeypatch.setattr(benchmarks.jax, "block_until_ready", synchronized.append)
     monkeypatch.setattr(benchmarks.time, "perf_counter", lambda: next(times))

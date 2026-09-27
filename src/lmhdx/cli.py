@@ -18,6 +18,7 @@ from .fringing import (
     build_square_duct_extruded_problem,
     solve_extruded_inductionless,
 )
+from .fully_developed import case_mesh, core_applies, solve_fully_developed
 from .io import (
     _portable_path,
     load_extruded_restart_bundle,
@@ -33,6 +34,7 @@ from .io import (
 )
 from .solvers import _build_mesh
 from .specs import (
+    CaseSpec,
     RestartLogInfo,
     RunConfig,
     StreamingSolverLogger,
@@ -128,17 +130,17 @@ def _solve_case_with_optional_logger(
             )
         except TypeError:
             return solve_transient(case)
-    try:
-        return solve_steady(
-            case,
-            logger=logger,
-            initial_state=initial_state,
-            initial_diagnostics=initial_diagnostics,
-            append_diagnostics=append_diagnostics,
-            restart_info=restart_info,
-        )
-    except TypeError:
-        return solve_steady(case)
+    if not isinstance(case, CaseSpec) or core_applies(case):
+        start_time = 0.0 if initial_state is None else float(initial_state.time)
+        return solve_fully_developed(case, logger=logger, start_time=start_time)
+    return solve_steady(
+        case,
+        logger=logger,
+        initial_state=initial_state,
+        initial_diagnostics=initial_diagnostics,
+        append_diagnostics=append_diagnostics,
+        restart_info=restart_info,
+    )
 
 
 def _runtime_summary(
@@ -336,7 +338,9 @@ def _run_config(config: RunConfig) -> dict[str, object]:
         restart_bundle = load_restart_bundle(config.restart.path)
         validate_restart_bundle(
             restart_bundle,
-            mesh=_build_mesh(case),
+            mesh=case_mesh(case)
+            if case.solver.mode != "transient" and core_applies(case)
+            else _build_mesh(case),
             geometry_kind=case.geometry.kind,
             case_name=case.name,
         )

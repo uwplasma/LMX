@@ -56,7 +56,6 @@ covers extras and GPUs.
 ```python
 import lmhdx
 
-lmhdx.enable_x64()  # the solvers are certified in float64
 problem = lmhdx.duct_problem(hartmann=100.0, cells=48, wall_conductance=0.027)
 solution = lmhdx.solve(problem)
 print(float(solution.velocity[0].data.max()))
@@ -67,8 +66,8 @@ implies — `a/Ha` against the walls normal to the field, `a/√Ha` against the
 others — so the answer is converged rather than merely computed. `solve` finds
 the steady state by preconditioned conjugate gradients, or by matrix-free
 Newton–Krylov when advection or a conducting wall makes the problem
-nonsymmetric; neither stores more than a restart cycle of vectors. Without
-`enable_x64()` the float32 solve raises rather than returning an unconverged field.
+nonsymmetric; neither stores more than a restart cycle of vectors. The duct is
+solved in float64, which `duct_problem` turns on.
 The same case runs from a TOML file with `lmhdx examples/hartmann_case.toml`.
 
 ## Documentation

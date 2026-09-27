@@ -1378,23 +1378,31 @@ def solve_steady(
 def solve(
     model: "ChannelProblem | CaseSpec | ExtrudedInductionlessProblem | Q2DProblem",
 ) -> "SteadySolution | Solution | ExtrudedInductionlessSolution | Q2DResult":
-    """Solve a duct, a fully developed case, a fringing problem, or a Q2D one.
+    """Solve a duct, a fully developed case, or a Q2D problem.
 
     A :class:`lmhdx.core3d.ChannelProblem` goes to the staggered core's steady
-    solve, :func:`lmhdx.steady.solve_steady_state`; the configured mode selects steady or transient
-    execution for ``CaseSpec``. Advanced restart, mesh, logging, progress, and
-    timing hooks remain on the specialized functions in :mod:`lmhdx.cases`,
-    :mod:`lmhdx.steady` and :mod:`lmhdx.fringing`.
+    solve, :func:`lmhdx.steady.solve_steady_state`, and so does a fully developed
+    ``CaseSpec``, through :func:`lmhdx.fully_developed.solve_fully_developed`,
+    which reports it on the case's cross-section; each is compiled once per
+    problem. A steady case the core does not represent (thick or mismatched
+    conducting walls, several fluids, a varying field) keeps the cell-centred
+    solve, :func:`solve_steady`. A transient ``CaseSpec`` runs its pseudo-time
+    loop, :func:`solve_transient`, and an extruded fringing problem
+    :func:`lmhdx.fringing.solve_extruded_inductionless`.
     """
 
     from .core3d import ChannelProblem
 
     if isinstance(model, ChannelProblem):
-        from .steady import solve_steady_state
+        from .steady import solve_compiled
 
-        return solve_steady_state(model)
+        return solve_compiled(model)
     if isinstance(model, CaseSpec):
-        return solve_transient(model) if model.solver.mode == "transient" else solve_steady(model)
+        if model.solver.mode == "transient":
+            return solve_transient(model)
+        from .fully_developed import core_applies, solve_fully_developed
+
+        return solve_fully_developed(model) if core_applies(model) else solve_steady(model)
     if isinstance(model, ExtrudedInductionlessProblem):
         from .fringing import solve_extruded_inductionless
 
@@ -1415,9 +1423,11 @@ def solve_fully_developed_fields(
     forcing: float | jax.Array | None = None,
     magnetic_field_scale: float | jax.Array = 1.0,
 ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array]:
-    """Return steady duct fields through the production discretization.
+    """Return steady duct fields from the cell-centred affine solve of this module.
 
-    ``forcing`` and ``magnetic_field_scale`` are continuous design inputs.
+    This is the validation lane that plan step 4.6 retires; the public
+    :func:`lmhdx.solve_fully_developed_fields` solves the same case on the
+    staggered core (:mod:`lmhdx.fully_developed`). ``forcing`` and ``magnetic_field_scale`` are continuous design inputs.
     The coupled affine state uses a SOLVAX implicit tangent/transpose solve,
     so reverse mode does not retain potential, momentum, or coupling
     iterations. Meshes, material regions, boundary kinds, and solver controls

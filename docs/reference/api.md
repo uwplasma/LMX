@@ -40,7 +40,14 @@ live in the module that owns their concepts.
 | Runtime | `enable_compilation_cache` |
 
 `solve(model)` accepts a `ChannelProblem`, `CaseSpec`,
-`ExtrudedInductionlessProblem`, or `Q2DProblem`.
+`ExtrudedInductionlessProblem`, or `Q2DProblem`. A steady fully developed
+`CaseSpec` runs on the staggered core through `lmhdx.fully_developed`, as does
+`solve_fully_developed_fields`; a case the core does not represent (thick or
+mismatched conducting walls, several fluids, a varying field, an odd cell count
+across a field) keeps the cell-centred solver of `lmhdx.cases`, the validation
+lane plan step 4.6 retires. A transient `CaseSpec` runs its pseudo-time loop,
+and an extruded fringing problem runs
+`lmhdx.fringing.solve_extruded_inductionless`.
 
 `duct_problem(hartmann=..., cells=..., wall_conductance=...)` builds a square
 insulating or Hunt duct with meshes that resolve the layers that exist -- `a/Ha`
@@ -87,7 +94,14 @@ restart, progress, logging, and timing hooks in their owning modules.
    :members:
 ```
 
-## Differentiation
+## Fully developed cases on the staggered core
+
+```{eval-rst}
+.. automodule:: lmhdx.fully_developed
+   :members:
+```
+
+## Case builders and the cell-centred validation lane
 
 ```{eval-rst}
 .. automodule:: lmhdx.cases
