@@ -62,20 +62,22 @@ class AcceptanceReport:
     passed: bool
 
 
+# A history the solver does not record (an interface the model has no wall for,
+# a potential solve the core does not run) is reported as None, never as zero.
 _SUMMARY_HISTORIES = (
-    ("potential_residual", "potential_residual_history", 0.0),
-    ("potential_iterations_used", "potential_iterations_history", 0.0),
-    ("mean_velocity", "mean_velocity_history", 0.0),
-    ("applied_forcing", "applied_forcing_history", 0.0),
-    ("linear_residual", "linear_residual_history", 0.0),
-    ("linear_iterations_used", "linear_iterations_history", 0.0),
-    ("volumetric_flow_rate", "volumetric_flow_rate_history", 0.0),
-    ("mean_current_magnitude", "mean_current_magnitude_history", 0.0),
-    ("lorentz_power", "lorentz_power_history", 0.0),
-    ("div_current_max", "div_current_max_history", 0.0),
-    ("charge_balance_residual", "charge_balance_residual_history", 0.0),
-    ("gauge_residual", "gauge_residual_history", 0.0),
-    ("interface_current_residual", "interface_current_residual_history", 0.0),
+    ("potential_residual", "potential_residual_history"),
+    ("potential_iterations_used", "potential_iterations_history"),
+    ("mean_velocity", "mean_velocity_history"),
+    ("applied_forcing", "applied_forcing_history"),
+    ("linear_residual", "linear_residual_history"),
+    ("linear_iterations_used", "linear_iterations_history"),
+    ("volumetric_flow_rate", "volumetric_flow_rate_history"),
+    ("mean_current_magnitude", "mean_current_magnitude_history"),
+    ("lorentz_power", "lorentz_power_history"),
+    ("div_current_max", "div_current_max_history"),
+    ("charge_balance_residual", "charge_balance_residual_history"),
+    ("gauge_residual", "gauge_residual_history"),
+    ("interface_current_residual", "interface_current_residual_history"),
 )
 
 
@@ -470,15 +472,17 @@ def duct_profile_metrics(solution: Solution) -> dict[str, float]:
     }
 
 
-def validation_summary(solution: Solution, case_name: str, ha: float | None = None) -> dict[str, float | str]:
-    payload: dict[str, float | str] = {
+def validation_summary(
+    solution: Solution, case_name: str, ha: float | None = None
+) -> dict[str, float | str | None]:
+    payload: dict[str, float | str | None] = {
         "case": case_name,
         "time": solution.state.time,
         "residual": solution.state.residual,
     }
-    for name, attribute, default in _SUMMARY_HISTORIES:
+    for name, attribute in _SUMMARY_HISTORIES:
         history = getattr(solution.diagnostics, attribute)
-        payload[name] = float(history[-1]) if history.size else default
+        payload[name] = float(history[-1]) if history.size else None
     payload.update(duct_profile_metrics(solution))
     if case_name.startswith("hartmann") and ha is not None:
         comparison = hartmann_validation(solution, ha)
@@ -1056,13 +1060,13 @@ def benchmark_b_pressure_observable(solution, case_id: str) -> jnp.ndarray:
 def benchmark_solver(
     repeats: int = 3, ha: float = 20.0, ny: int = 48, nz: int = 48
 ) -> dict[str, float | str]:
-    from .cases import solve_steady
+    from .fully_developed import solve_fully_developed
 
     case = make_hartmann_case(ha=ha, ny=ny, nz=nz)
     timings = []
     for _ in range(repeats):
         start = time.perf_counter()
-        solution = solve_steady(case)
+        solution = solve_fully_developed(case)
         jax.block_until_ready((solution.fields.u, solution.fields.phi))
         timings.append(time.perf_counter() - start)
     cold = timings[0]

@@ -25,19 +25,14 @@ CONDUCTIVITY = 1.0
 DENSITY = 1.0
 VISCOSITY = 1.0
 FORCING = 1.0
-TIME_STEP = 0.001
-FINAL_TIME = 1.0
-MAX_STEPS = 48
-POTENTIAL_ITERATIONS = 160
-COUPLING_ITERATIONS = 12
-STEADY_TOLERANCE = 1.0e-8
 WRITE_PARAVIEW = True
 WRITE_CSV = True
 WRITE_NPZ = True
 WRITE_PLOTS = False
 
 
-# Set up the case. ``replace`` exposes solver controls without private APIs.
+# Set up the case. ``solve`` runs it on the staggered core, one compiled
+# conjugate-gradient solve with the mesh clustered to the Hartmann layers.
 case = make_hartmann_case(
     ha=HARTMANN_NUMBER,
     width=WIDTH,
@@ -52,15 +47,6 @@ case = make_hartmann_case(
 case = replace(
     case,
     forcing=FORCING,
-    time_stepper=replace(
-        case.time_stepper,
-        dt=TIME_STEP,
-        t_final=FINAL_TIME,
-        max_steps=MAX_STEPS,
-        potential_iterations=POTENTIAL_ITERATIONS,
-        steady_tolerance=STEADY_TOLERANCE,
-    ),
-    solver=replace(case.solver, coupling_iterations=COUPLING_ITERATIONS),
     output=replace(
         case.output,
         write_paraview=WRITE_PARAVIEW,

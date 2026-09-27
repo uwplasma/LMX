@@ -17,11 +17,15 @@ def test_portable_duct_tutorials_and_toml_first_run(tmp_path: Path):
     hartmann = json.loads(next((tmp_path / "artifacts").rglob("hartmann_summary.json")).read_text())
     hunt = json.loads(next((tmp_path / "artifacts").rglob("hunt_summary.json")).read_text())
     assert hartmann["analytical_profile"]["l2_error"] < 0.05
-    assert hunt["validation"]["interface_current_residual"] < 1.0e-8
+    # The Hartmann walls are thin walls of the core, so there is no fluid/wall
+    # interface to report; charge conservation is checked on every cell instead.
+    assert hunt["validation"]["interface_current_residual"] is None
+    assert hunt["validation"]["div_current_max"] < 1.0e-8
     design = hunt["design"]
     assert design["verification"] == "cold certified steady solve"
     assert design["status"] == "converged"
-    assert design["steady_residual"] <= 1e-12
+    # ||R(u)|| / ||R(0)|| of the one CG solve, which is asked for 1e-9.
+    assert design["steady_residual"] <= 1e-9
     assert design["flow_rate"] == pytest.approx(design["target_flow_rate"], rel=1e-8)
     assert design["relative_flow_error"] < 1e-8
     assert design["drive_derivative_wrt_flow"] == pytest.approx(1 / design["flow_per_unit_drive"])
