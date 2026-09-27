@@ -78,7 +78,7 @@ class Q2DProblem:
             raise ValueError("energy_budget_tolerance must be finite and positive")
         object.__setattr__(self, "initial_vorticity", vorticity)
         object.__setattr__(self, "forcing", forcing)
-        # True float32 contractions unless the user chose a precision; see lmx.enable_x64.
+        # True float32 contractions unless the user chose a precision; see lmhdx.enable_x64.
         _pin_matmul_precision()
 
 

@@ -4,9 +4,9 @@ from pathlib import Path
 import jax.numpy as jnp
 import pytest
 
-from lmx.cases import make_hartmann_case
-from lmx.solvers import _build_mesh
-from lmx.specs import (
+from lmhdx.cases import make_hartmann_case
+from lmhdx.solvers import _build_mesh
+from lmhdx.specs import (
     Diagnostics,
     LoggingSpec,
     MHDState,
@@ -79,7 +79,7 @@ def test_streaming_solver_logger_prints_live_solver_sections(tmp_path: Path):
     )
 
     text = stream.getvalue()
-    assert "LMX solver" in text
+    assert "LMhdX solver" in text
     assert f"case={case.name}" in text
     assert "potential_residual=" in text
     assert "linear_residual=" in text

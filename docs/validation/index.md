@@ -1,6 +1,6 @@
 # Validation
 
-LMX separates numerical verification, physics validation, and external-code
+LMhdX separates numerical verification, physics validation, and external-code
 comparison. A test passes only its stated claim; finite output alone is never a
 validation result.
 
@@ -23,7 +23,7 @@ charge-balance and divergence residuals, boundary-current closure, stationwise
 flow variation, pressure variation, and response correlations. Mesh and solver
 independence remain separate required checks.
 
-The benchmark specifications and reference arrays shipped under `src/lmx/data/benchmarks`
+The benchmark specifications and reference arrays shipped under `src/lmhdx/data/benchmarks`
 are versioned package data. `benchmarks/provenance.json` records bibliographic
 sources and executable test/workflow links.
 
@@ -35,7 +35,7 @@ $24\times24$ cross-section. Its analytical errors are 0.02276 in $L_2$ and
 $4.24\times10^{-19}$ and final velocity update $9.48\times10^{-9}$. The
 documented profile-error limits are 0.05 and 0.10.
 
-The pinned two-update B2 Docker comparison executes LMX and FreeMHD from the
+The pinned two-update B2 Docker comparison executes LMhdX and FreeMHD from the
 same observed contract. It passes execution, artifact identity, contract,
 native-output observation, and comparison gates. The normalized transverse
 pressure difference has RMS error 0.004518 and maximum error 0.01092 against

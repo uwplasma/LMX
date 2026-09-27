@@ -15,7 +15,7 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 
-from lmx import Q2DProblem, solve
+from lmhdx import Q2DProblem, solve
 
 # Inputs: periodic mesh, physical coefficients, integration, and outputs.
 OUTPUT_DIR = Path("artifacts/examples/q2d_turbulence")
@@ -46,7 +46,7 @@ problem = Q2DProblem(
     history_stride=HISTORY_STRIDE,
 )
 
-# Run the same public solve entry point used by other LMX models.
+# Run the same public solve entry point used by other LMhdX models.
 result = solve(problem)
 frames = np.asarray(result.vorticity_history)
 limit = float(np.max(np.abs(frames)))

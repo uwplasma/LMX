@@ -43,7 +43,7 @@ jobs:
             exit 0
           fi
           changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
-          if grep -Eq '^(\.github/|src/lmx/|validation/|tests/|examples/|pyproject\.toml$|MANIFEST\.in$)' <<< "$changed"; then
+          if grep -Eq '^(\.github/|src/lmhdx/|validation/|tests/|examples/|pyproject\.toml$|MANIFEST\.in$)' <<< "$changed"; then
             echo "full=true" >> "$GITHUB_OUTPUT"
             echo "targeted=false" >> "$GITHUB_OUTPUT"
           elif grep -Eq '^scripts/' <<< "$changed"; then
@@ -62,13 +62,13 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup-lmx
+      - uses: ./.github/actions/setup-lmhdx
         with:
           python-version: "3.13"
       - name: Check Python quality
         run: |
-          python -m ruff check src/lmx validation tests examples scripts docs/conf.py
-          python -m ruff format --check src/lmx validation tests examples scripts docs/conf.py
+          python -m ruff check src/lmhdx validation tests examples scripts docs/conf.py
+          python -m ruff format --check src/lmhdx validation tests examples scripts docs/conf.py
       - name: Enforce architecture budgets
         run: python scripts/audit_architecture.py --check --measure-import
 
@@ -82,7 +82,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: ./.github/actions/setup-lmx
+      - uses: ./.github/actions/setup-lmhdx
         with:
           python-version: "3.10"
           solvax-version: "0.19.0"
@@ -120,7 +120,7 @@ jobs:
             cache: channel
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup-lmx
+      - uses: ./.github/actions/setup-lmhdx
         with:
           python-version: "3.10"
           solvax-version: "0.19.0"
@@ -151,7 +151,7 @@ jobs:
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup-lmx
+      - uses: ./.github/actions/setup-lmhdx
         with:
           python-version: "3.13"
           cache-suffix: coverage-report
@@ -267,7 +267,7 @@ jobs:
             budget: 300
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup-lmx
+      - uses: ./.github/actions/setup-lmhdx
         with:
           python-version: "3.10"
           solvax-version: "0.19.0"

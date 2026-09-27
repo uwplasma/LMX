@@ -1,4 +1,4 @@
-"""Optimize layered-duct field, wall, and geometry controls with exact LMX gradients.
+"""Optimize layered-duct field, wall, and geometry controls with exact LMhdX gradients.
 
 Run ``python examples/variable_field_extruded_demo.py``. The deliberately
 small mesh is a portable workflow demonstration, not production validation.
@@ -15,7 +15,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 
-from lmx.fringing import (
+from lmhdx.fringing import (
     build_layered_duct_extruded_problem,
     evolve_extruded_fields,
     extruded_engineering_objectives,

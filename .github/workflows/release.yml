@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup-lmx
+      - uses: ./.github/actions/setup-lmhdx
         with:
           extras: release
       - name: Build and inspect distributions
@@ -41,16 +41,16 @@ jobs:
             --wheel dist/*.whl --sdist dist/*.tar.gz
       - name: Smoke-test the wheel
         run: |
-          python -m venv /tmp/lmx-wheel-check
-          /tmp/lmx-wheel-check/bin/python -m pip install "$GITHUB_WORKSPACE"/dist/*.whl
+          python -m venv /tmp/lmhdx-wheel-check
+          /tmp/lmhdx-wheel-check/bin/python -m pip install "$GITHUB_WORKSPACE"/dist/*.whl
           cd /tmp
-          /tmp/lmx-wheel-check/bin/lmx --help >/dev/null
-          /tmp/lmx-wheel-check/bin/python - <<'PY'
+          /tmp/lmhdx-wheel-check/bin/lmhdx --help >/dev/null
+          /tmp/lmhdx-wheel-check/bin/python - <<'PY'
           import jax
           import jax.numpy as jnp
 
-          from lmx import make_hartmann_case, solve, solve_fully_developed_fields
-          from lmx.validation import (
+          from lmhdx import make_hartmann_case, solve, solve_fully_developed_fields
+          from lmhdx.validation import (
               load_benchmark_a_spec,
               load_benchmark_b_reference,
               load_benchmark_b_spec,
@@ -78,7 +78,7 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: dist
-          key: lmx-distributions-${{ github.run_id }}-${{ github.sha }}
+          key: lmhdx-distributions-${{ github.run_id }}-${{ github.sha }}
 
   publish-testpypi:
     if: github.event_name == 'workflow_dispatch' && inputs.publish_target == 'testpypi'
@@ -88,12 +88,12 @@ jobs:
       id-token: write
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/lmx
+      url: https://test.pypi.org/p/lmhdx
     steps:
       - uses: actions/cache/restore@v6
         with:
           path: dist
-          key: lmx-distributions-${{ github.run_id }}-${{ github.sha }}
+          key: lmhdx-distributions-${{ github.run_id }}-${{ github.sha }}
           fail-on-cache-miss: true
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
@@ -107,11 +107,11 @@ jobs:
       id-token: write
     environment:
       name: pypi
-      url: https://pypi.org/p/lmx
+      url: https://pypi.org/p/lmhdx
     steps:
       - uses: actions/cache/restore@v6
         with:
           path: dist
-          key: lmx-distributions-${{ github.run_id }}-${{ github.sha }}
+          key: lmhdx-distributions-${{ github.run_id }}-${{ github.sha }}
           fail-on-cache-miss: true
       - uses: pypa/gh-action-pypi-publish@release/v1

@@ -3,7 +3,7 @@ schema_version = 2
 [[example]]
 id = "hartmann-cli"
 path = "examples/hartmann_case.toml"
-command = "lmx examples/hartmann_case.toml"
+command = "lmhdx examples/hartmann_case.toml"
 status = "stable"
 runtime = "portable"
 outputs = ["solution", "diagnostics"]

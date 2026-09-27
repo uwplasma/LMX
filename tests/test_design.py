@@ -8,10 +8,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-import lmx
-from lmx.bc import NEUMANN, PERIODIC, BoundaryCondition
-from lmx.core3d import ChannelProblem, duct_problem
-from lmx.design import (
+import lmhdx
+from lmhdx.bc import NEUMANN, PERIODIC, BoundaryCondition
+from lmhdx.core3d import ChannelProblem, duct_problem
+from lmhdx.design import (
     DuctResponse,
     channel_cross_section_weights,
     channel_drive_for_flow_rate,
@@ -26,8 +26,8 @@ from lmx.design import (
     pressure_drop,
     volumetric_flow_rate,
 )
-from lmx.grid import Grid, uniform_faces
-from lmx.steady import solve_steady_state
+from lmhdx.grid import Grid, uniform_faces
+from lmhdx.steady import solve_steady_state
 from validation.shercliff import flow_rate
 
 pytestmark = pytest.mark.unit
@@ -70,18 +70,18 @@ def test_documented_profile_fit_recovers_drive_and_field():
 
 
 def _case(ha: float = 5.0, ny: int = 12, nz: int = 12):
-    return lmx.make_hartmann_case(ha=ha, ny=ny, nz=nz)
+    return lmhdx.make_hartmann_case(ha=ha, ny=ny, nz=nz)
 
 
 def _flow(case, drive, scale=1.0):
-    velocity, *_ = lmx.solve_fully_developed_fields(case, forcing=drive, magnetic_field_scale=scale)
+    velocity, *_ = lmhdx.solve_fully_developed_fields(case, forcing=drive, magnetic_field_scale=scale)
     return volumetric_flow_rate(case, velocity)
 
 
-@pytest.mark.parametrize("factory", [lmx.make_hartmann_case, lmx.make_hunt_case])
+@pytest.mark.parametrize("factory", [lmhdx.make_hartmann_case, lmhdx.make_hunt_case])
 def test_fluid_areas_sum_to_the_open_cross_section(factory):
-    from lmx.physics import build_material_fields
-    from lmx.solvers import _build_mesh
+    from lmhdx.physics import build_material_fields
+    from lmhdx.solvers import _build_mesh
 
     case = factory(ha=5, ny=12, nz=12)
     areas = np.asarray(fluid_cell_areas(case))
@@ -186,15 +186,15 @@ def test_flow_rate_rejects_a_mismatched_velocity():
 def test_a_conducting_wall_costs_more_power_than_an_insulating_one():
     """Hunt versus Shercliff at fixed throughput: wall currents add drag."""
     target = 0.05
-    insulating = lmx.make_shercliff_case(ha=5.0, ny=12, nz=12)
-    conducting = lmx.make_hunt_case(ha=5.0, ny=12, nz=12, wall_cells=2, insulator_cells=2)
+    insulating = lmhdx.make_shercliff_case(ha=5.0, ny=12, nz=12)
+    conducting = lmhdx.make_hunt_case(ha=5.0, ny=12, nz=12, wall_cells=2, insulator_cells=2)
     insulating_power = float(fixed_flow_hydraulic_power(insulating, target, LENGTH))
     conducting_power = float(fixed_flow_hydraulic_power(conducting, target, LENGTH))
     assert conducting_power > insulating_power
 
 
 def _uniform_duct(hartmann: float, cells: int) -> ChannelProblem:
-    """A square insulating duct matching ``lmx.make_hartmann_case``'s ``[-1, 1]^2`` grid."""
+    """A square insulating duct matching ``lmhdx.make_hartmann_case``'s ``[-1, 1]^2`` grid."""
     faces = uniform_faces(cells, -1.0, 1.0)
     return ChannelProblem(
         grid=Grid(uniform_faces(1, 0.0, 1.0), faces, faces),
@@ -261,7 +261,7 @@ def test_channel_flow_response_reconciles_with_the_legacy_route_on_a_matched_uni
     """
     cells = 32
     new = float(channel_flow_response(_uniform_duct(hartmann, cells)).flow_per_unit_drive)
-    case = lmx.make_hartmann_case(ha=hartmann, width=2.0, height=2.0, ny=cells, nz=cells)
+    case = lmhdx.make_hartmann_case(ha=hartmann, width=2.0, height=2.0, ny=cells, nz=cells)
     uniform_geometry = dataclasses.replace(case.geometry, target_ha=None)
     legacy = float(
         linear_flow_response(dataclasses.replace(case, geometry=uniform_geometry)).flow_per_unit_drive

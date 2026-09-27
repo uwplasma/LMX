@@ -4,7 +4,7 @@ Two-dimensional and extruded solves use separate typed restart bundles because
 their state and face-flux contracts differ.
 
 ```python
-from lmx.io import write_restart_npz, load_restart_bundle, validate_restart_bundle
+from lmhdx.io import write_restart_npz, load_restart_bundle, validate_restart_bundle
 
 write_restart_npz(result, case, "restart.npz")
 restart = load_restart_bundle("restart.npz")

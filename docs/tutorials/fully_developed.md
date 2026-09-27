@@ -4,14 +4,14 @@ Fully developed cases solve the axial velocity $u(y,z)$ and electric potential
 $\phi(y,z)$ on a structured cross-section. Start with the named builders:
 
 ```python
-import lmx
+import lmhdx
 
-hartmann = lmx.make_hartmann_case(ha=20, ny=32, nz=32)
-shercliff = lmx.make_shercliff_case(ha=20, ny=32, nz=32)
-hunt = lmx.make_hunt_case(ha=20, ny=32, nz=32, wall_cells=4)
+hartmann = lmhdx.make_hartmann_case(ha=20, ny=32, nz=32)
+shercliff = lmhdx.make_shercliff_case(ha=20, ny=32, nz=32)
+hunt = lmhdx.make_hunt_case(ha=20, ny=32, nz=32, wall_cells=4)
 
 for case in (hartmann, shercliff, hunt):
-    result = lmx.solve(case)
+    result = lmhdx.solve(case)
     print(case.name, result.converged, result.residual)
 ```
 
@@ -42,14 +42,14 @@ case = replace(
 After solving, check more than the update norm:
 
 ```python
-from lmx.validation import hartmann_validation, validation_summary
+from lmhdx.validation import hartmann_validation, validation_summary
 
 comparison = hartmann_validation(result, ha=20)
 metrics = validation_summary(result, case.name, ha=20)
 print(comparison.l2_error, metrics["charge_balance_relative"])
 ```
 
-`lmx.solvers.fully_developed_power_balance(case, result)` reports applied, viscous,
+`lmhdx.solvers.fully_developed_power_balance(case, result)` reports applied, viscous,
 Lorentz, and residual power using the same discrete operators as the solve.
 Increase wall and fluid resolution together for high Hartmann number cases;
 the mesh-quality helpers report cells across Hartmann and side layers.
@@ -70,11 +70,11 @@ thermal effects. It is not a complete blanket pumping budget.
 
 ## Cross-section weights on the staggered core
 
-`lmx.design.channel_cross_section_weights(problem)` is the `ChannelProblem`
+`lmhdx.design.channel_cross_section_weights(problem)` is the `ChannelProblem`
 counterpart of `fluid_cell_areas`: it returns the transverse `(y, z)`
 integration weight of every cell, $\Delta y_j \Delta z_k$, for a
-`lmx.core3d.ChannelProblem`. Axis 0 is the flow axis of every channel this
-package builds (`lmx.core3d.duct_problem` and every other constructor put the
+`lmhdx.core3d.ChannelProblem`. Axis 0 is the flow axis of every channel this
+package builds (`lmhdx.core3d.duct_problem` and every other constructor put the
 periodic axis there), so the weight of a cell does not depend on the axial
 spacing. A channel carries no fluid mask -- every transverse cell counts, so
 the weights sum to the full cross-section area:
@@ -82,8 +82,8 @@ the weights sum to the full cross-section area:
 ```python
 import numpy as np
 
-from lmx.core3d import duct_problem
-from lmx.design import channel_cross_section_weights
+from lmhdx.core3d import duct_problem
+from lmhdx.design import channel_cross_section_weights
 
 problem = duct_problem(hartmann=20.0, cells=32)
 weights = np.asarray(channel_cross_section_weights(problem))
@@ -98,7 +98,7 @@ and pumping-power metrics are measured against.
 
 ## Throughput and pumping power on the staggered core
 
-`lmx.design.channel_flow_rate`, `channel_flow_response`,
+`lmhdx.design.channel_flow_rate`, `channel_flow_response`,
 `channel_drive_for_flow_rate` and `channel_fixed_flow_hydraulic_power` are the
 `ChannelProblem` counterparts of `volumetric_flow_rate`, `linear_flow_response`,
 `drive_for_flow_rate` and `fixed_flow_hydraulic_power` above, reusing
@@ -108,9 +108,9 @@ and pumping-power metrics are measured against.
 ```python
 import numpy as np
 
-from lmx.core3d import duct_problem
-from lmx.design import channel_drive_for_flow_rate, channel_flow_rate
-from lmx.steady import solve_steady_state
+from lmhdx.core3d import duct_problem
+from lmhdx.design import channel_drive_for_flow_rate, channel_flow_rate
+from lmhdx.steady import solve_steady_state
 
 problem = duct_problem(hartmann=20.0, cells=32)
 target = 0.02
@@ -155,15 +155,15 @@ import jax.numpy as jnp
 import numpy as np
 from scipy.optimize import minimize
 
-import lmx
-from lmx.design import fluid_cell_areas
+import lmhdx
+from lmhdx.design import fluid_cell_areas
 
 jax.config.update("jax_enable_x64", True)
-case = lmx.make_shercliff_case(ha=5, ny=12, nz=12)
+case = lmhdx.make_shercliff_case(ha=5, ny=12, nz=12)
 areas = fluid_cell_areas(case)
 
 def velocity(parameters):
-    return lmx.solve_fully_developed_fields(
+    return lmhdx.solve_fully_developed_fields(
         case, forcing=parameters[0], magnetic_field_scale=parameters[1]
     )[0]
 
@@ -202,6 +202,6 @@ certificate. Validate inferred parameters with the reporting solver and a
 held-out finer mesh before using them in a design study.
 
 For a prescribed flow rate rather than a profile, avoid optimizing drive:
-`lmx.design.linear_flow_response(case).drive_for(target_flow_rate)` eliminates
+`lmhdx.design.linear_flow_response(case).drive_for(target_flow_rate)` eliminates
 it exactly using the linear response. Neither fit is a thermal blanket design;
 wall/geometry optimization and heat-transfer validation have separate gates.

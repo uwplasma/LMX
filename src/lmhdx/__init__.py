@@ -1,7 +1,7 @@
-"""Small, lazy convenience API for LMX.
+"""Small, lazy convenience API for LMhdX.
 
 Research and advanced APIs live in their named modules, for example
-``lmx.fringing`` and ``lmx.cases``. Keeping the package root deliberately
+``lmhdx.fringing`` and ``lmhdx.cases``. Keeping the package root deliberately
 small makes supported concepts discoverable and avoids importing JAX-heavy
 solver modules until a symbol is used.
 """
@@ -16,7 +16,7 @@ from importlib import import_module
 # when the GPU backend starts, so it is set on import; an explicit user flag wins.
 if (
     "xla_gpu_enable_triton_gemm" not in os.environ.get("XLA_FLAGS", "")
-    and os.environ.get("LMX_XLA_DEFAULTS") != "0"
+    and os.environ.get("LMHDX_XLA_DEFAULTS") != "0"
 ):
     os.environ["XLA_FLAGS"] = (
         os.environ.get("XLA_FLAGS", "") + " --xla_gpu_enable_triton_gemm=false"
@@ -99,11 +99,11 @@ def _enable_default_cache(config) -> None:
 
     Programs are shared across field values, so a new Hartmann number on the same
     mesh reuses them (compile 4.4 s to 0.45 s on an A4000) at a 35-60 % warm cost.
-    Only compiles over one second are kept, in at most 2 GiB. ``LMX_COMPILATION_CACHE=0``
+    Only compiles over one second are kept, in at most 2 GiB. ``LMHDX_COMPILATION_CACHE=0``
     disables it; a path in it sets the directory. It stays off on macOS with jaxlib
     older than 0.10, which can crash reading back a large cached CPU program.
     """
-    choice = os.environ.get("LMX_COMPILATION_CACHE", "")
+    choice = os.environ.get("LMHDX_COMPILATION_CACHE", "")
     if choice == "0" or config.jax_compilation_cache_dir or _cache_read_unsafe():
         return
     from .io import enable_compilation_cache
@@ -122,41 +122,41 @@ def _cache_read_unsafe() -> bool:
 
 
 _EXPORTS = {
-    "enable_compilation_cache": ("lmx.io", "enable_compilation_cache"),
-    "make_hartmann_case": ("lmx.cases", "make_hartmann_case"),
-    "make_shercliff_case": ("lmx.cases", "make_shercliff_case"),
-    "make_hunt_case": ("lmx.cases", "make_hunt_case"),
-    "make_q2d_case": ("lmx.q2d", "make_q2d_case"),
-    "evolve_q2d": ("lmx.q2d", "evolve_q2d"),
-    "solve_fully_developed_fields": ("lmx.cases", "solve_fully_developed_fields"),
-    "ChannelProblem": ("lmx.core3d", "ChannelProblem"),
-    "duct_problem": ("lmx.core3d", "duct_problem"),
-    "solve_steady_state": ("lmx.steady", "solve_steady_state"),
-    "advance": ("lmx.timeloop", "advance"),
-    "Q2DProblem": ("lmx.q2d", "Q2DProblem"),
-    "solve": ("lmx.cases", "solve"),
-    "generate_rect_duct_mesh": ("lmx.mesh", "generate_rect_duct_mesh"),
-    "generate_rect_duct_mesh_from_faces": ("lmx.mesh", "generate_rect_duct_mesh_from_faces"),
-    "generate_layered_duct_mesh": ("lmx.mesh", "generate_layered_duct_mesh"),
+    "enable_compilation_cache": ("lmhdx.io", "enable_compilation_cache"),
+    "make_hartmann_case": ("lmhdx.cases", "make_hartmann_case"),
+    "make_shercliff_case": ("lmhdx.cases", "make_shercliff_case"),
+    "make_hunt_case": ("lmhdx.cases", "make_hunt_case"),
+    "make_q2d_case": ("lmhdx.q2d", "make_q2d_case"),
+    "evolve_q2d": ("lmhdx.q2d", "evolve_q2d"),
+    "solve_fully_developed_fields": ("lmhdx.cases", "solve_fully_developed_fields"),
+    "ChannelProblem": ("lmhdx.core3d", "ChannelProblem"),
+    "duct_problem": ("lmhdx.core3d", "duct_problem"),
+    "solve_steady_state": ("lmhdx.steady", "solve_steady_state"),
+    "advance": ("lmhdx.timeloop", "advance"),
+    "Q2DProblem": ("lmhdx.q2d", "Q2DProblem"),
+    "solve": ("lmhdx.cases", "solve"),
+    "generate_rect_duct_mesh": ("lmhdx.mesh", "generate_rect_duct_mesh"),
+    "generate_rect_duct_mesh_from_faces": ("lmhdx.mesh", "generate_rect_duct_mesh_from_faces"),
+    "generate_layered_duct_mesh": ("lmhdx.mesh", "generate_layered_duct_mesh"),
     "generate_layered_duct_mesh_from_fluid_faces": (
-        "lmx.mesh",
+        "lmhdx.mesh",
         "generate_layered_duct_mesh_from_fluid_faces",
     ),
-    "generate_multilayer_duct_mesh": ("lmx.mesh", "generate_multilayer_duct_mesh"),
-    "WallLayer": ("lmx.physics", "WallLayer"),
-    "dynamic_to_kinematic_viscosity": ("lmx.physics", "dynamic_to_kinematic_viscosity"),
-    "kinematic_to_dynamic_viscosity": ("lmx.physics", "kinematic_to_dynamic_viscosity"),
-    "hartmann_number": ("lmx.physics", "hartmann_number"),
-    "reynolds_number": ("lmx.physics", "reynolds_number"),
-    "interaction_parameter": ("lmx.physics", "interaction_parameter"),
-    "magnetic_reynolds_number": ("lmx.physics", "magnetic_reynolds_number"),
-    "magnetic_field_from_hartmann": ("lmx.physics", "magnetic_field_from_hartmann"),
-    "wall_conductance_ratio": ("lmx.physics", "wall_conductance_ratio"),
-    "effective_pinhole_conductance_ratio": ("lmx.physics", "effective_pinhole_conductance_ratio"),
-    "tangential_stack_conductance_ratio": ("lmx.physics", "tangential_stack_conductance_ratio"),
-    "normal_stack_leakage_ratio": ("lmx.physics", "normal_stack_leakage_ratio"),
-    "equivalent_single_layer": ("lmx.physics", "equivalent_single_layer"),
-    "nested_wall_layer_resolution_summary": ("lmx.physics", "nested_wall_layer_resolution_summary"),
+    "generate_multilayer_duct_mesh": ("lmhdx.mesh", "generate_multilayer_duct_mesh"),
+    "WallLayer": ("lmhdx.physics", "WallLayer"),
+    "dynamic_to_kinematic_viscosity": ("lmhdx.physics", "dynamic_to_kinematic_viscosity"),
+    "kinematic_to_dynamic_viscosity": ("lmhdx.physics", "kinematic_to_dynamic_viscosity"),
+    "hartmann_number": ("lmhdx.physics", "hartmann_number"),
+    "reynolds_number": ("lmhdx.physics", "reynolds_number"),
+    "interaction_parameter": ("lmhdx.physics", "interaction_parameter"),
+    "magnetic_reynolds_number": ("lmhdx.physics", "magnetic_reynolds_number"),
+    "magnetic_field_from_hartmann": ("lmhdx.physics", "magnetic_field_from_hartmann"),
+    "wall_conductance_ratio": ("lmhdx.physics", "wall_conductance_ratio"),
+    "effective_pinhole_conductance_ratio": ("lmhdx.physics", "effective_pinhole_conductance_ratio"),
+    "tangential_stack_conductance_ratio": ("lmhdx.physics", "tangential_stack_conductance_ratio"),
+    "normal_stack_leakage_ratio": ("lmhdx.physics", "normal_stack_leakage_ratio"),
+    "equivalent_single_layer": ("lmhdx.physics", "equivalent_single_layer"),
+    "nested_wall_layer_resolution_summary": ("lmhdx.physics", "nested_wall_layer_resolution_summary"),
 }
 
 
@@ -166,7 +166,7 @@ def __getattr__(name: str):
     try:
         module_name, attr_name = _EXPORTS[name]
     except KeyError as exc:
-        raise AttributeError(f"module 'lmx' has no attribute {name!r}") from exc
+        raise AttributeError(f"module 'lmhdx' has no attribute {name!r}") from exc
     value = getattr(import_module(module_name), attr_name)
     globals()[name] = value
     return value

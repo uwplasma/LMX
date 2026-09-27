@@ -4,7 +4,7 @@ forcing = 1.0
 initial_velocity = 0.0
 reference_pressure_gradient = -1.0
 reference_phi_cell = [0, 0]
-notes = "Explicit Hartmann duct example for `lmx input.toml`."
+notes = "Explicit Hartmann duct example for `lmhdx input.toml`."
 
 [geometry]
 kind = "rect_duct"

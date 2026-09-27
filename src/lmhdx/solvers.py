@@ -694,7 +694,7 @@ def _solve_velocity_coefficients(
     tolerance: float,
     preconditioner: str,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    """Compose LMX coefficients and residual scaling with SOLVAX PCG."""
+    """Compose LMhdX coefficients and residual scaling with SOLVAX PCG."""
 
     def matvec(field: jnp.ndarray) -> jnp.ndarray:
         return apply_five_point_operator(*coefficients, field)

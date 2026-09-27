@@ -128,7 +128,7 @@
         "smolentsev-vv",
         "freemhd"
       ],
-      "spec_path": "lmx/data/benchmarks/specs/alex-b1-pipe.toml",
+      "spec_path": "lmhdx/data/benchmarks/specs/alex-b1-pipe.toml",
       "status": "specification-frozen",
       "tests": [
         "tests/test_benchmarks.py::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"
@@ -158,7 +158,7 @@
         "smolentsev-vv",
         "freemhd"
       ],
-      "spec_path": "lmx/data/benchmarks/specs/alex-b2-square.toml",
+      "spec_path": "lmhdx/data/benchmarks/specs/alex-b2-square.toml",
       "status": "specification-frozen",
       "tests": [
         "tests/test_benchmarks.py::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"
@@ -185,7 +185,7 @@
       "availability": "repository",
       "id": "samper-table-i",
       "kind": "reference_data",
-      "path": "lmx/data/benchmarks/references/samper-table-i.toml",
+      "path": "lmhdx/data/benchmarks/references/samper-table-i.toml",
       "sha256": "8140a5a19438baea503112be6247c4394fea0c4c7ce0f4bd75a81e74bc664105",
       "title": "High-Hartmann-number reference flow rates"
     },

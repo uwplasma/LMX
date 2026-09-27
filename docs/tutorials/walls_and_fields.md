@@ -6,12 +6,12 @@ uses the same case/result model as the named duct and fringing workflows.
 ## Wall layers
 
 Start with `WallLayer` to state thickness, resolution, and conductivity explicitly,
-then pass the layers to the layered mesh builders. LMX distinguishes fluid,
+then pass the layers to the layered mesh builders. LMhdX distinguishes fluid,
 conducting solid, and insulating regions; interface conductance uses the
 adjacent material values and face distances.
 
 ```python
-from lmx import WallLayer, generate_multilayer_duct_mesh
+from lmhdx import WallLayer, generate_multilayer_duct_mesh
 
 layers = (
     WallLayer(name="steel", thickness=2e-3, cells=3, conductivity=8e5),
@@ -50,9 +50,9 @@ measured/exported data. Include the conducting walls in the table's domain.
 from pathlib import Path
 from dataclasses import replace
 import numpy as np
-from lmx import make_hartmann_case
-from lmx.mesh import write_tabulated_field_npz, sample_tabulated_cross_section_field
-from lmx.specs import MagneticFieldSpec
+from lmhdx import make_hartmann_case
+from lmhdx.mesh import write_tabulated_field_npz, sample_tabulated_cross_section_field
+from lmhdx.specs import MagneticFieldSpec
 
 y = z = np.linspace(-1.2, 1.2, 17)
 yy, zz = np.meshgrid(y, z, indexing="ij")

@@ -5,10 +5,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx.bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition
-from lmx.grid import CENTER, Field, Grid, geometric_faces, tanh_faces, uniform_faces
-from lmx.ops import laplacian
-from lmx.poisson import assemble_axis_laplacian, fast_diagonal_poisson
+from lmhdx.bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition
+from lmhdx.grid import CENTER, Field, Grid, geometric_faces, tanh_faces, uniform_faces
+from lmhdx.ops import laplacian
+from lmhdx.poisson import assemble_axis_laplacian, fast_diagonal_poisson
 
 pytestmark = pytest.mark.unit
 
@@ -160,7 +160,7 @@ def test_factorization_validates_its_inputs():
 
 def test_factorization_refuses_an_operator_that_is_not_symmetric(monkeypatch):
     """A wall stencil that broke symmetry would invalidate the factorization."""
-    import lmx.poisson as poisson
+    import lmhdx.poisson as poisson
 
     def asymmetric(grid, axis, condition):
         operator = assemble_axis_laplacian(grid, axis, condition)
@@ -183,8 +183,8 @@ def test_factorization_refuses_an_operator_that_is_not_symmetric(monkeypatch):
 )
 def test_the_helmholtz_factorization_inverts_its_operator(offset, conditions, name):
     """A staggered implicit viscous solve, checked against the stencil it factorizes."""
-    from lmx.ops import staggered_laplacian
-    from lmx.poisson import fast_diagonal_helmholtz, free_slice
+    from lmhdx.ops import staggered_laplacian
+    from lmhdx.poisson import fast_diagonal_helmholtz, free_slice
 
     del name
     grid = Grid(uniform_faces(4, 0.0, 1.0), geometric_faces(8, -1.0, 1.0, 1.15), uniform_faces(4, -1.0, 1.0))
@@ -201,7 +201,7 @@ def test_the_helmholtz_factorization_inverts_its_operator(offset, conditions, na
 
 def test_the_helmholtz_solve_leaves_prescribed_entries_at_zero():
     """Wall faces are boundary data the caller owns, not unknowns to set."""
-    from lmx.poisson import fast_diagonal_helmholtz
+    from lmhdx.poisson import fast_diagonal_helmholtz
 
     grid = Grid(uniform_faces(4, 0.0, 1.0), uniform_faces(6, -1.0, 1.0), uniform_faces(4, -1.0, 1.0))
     offset, conditions = (CENTER, 0.0, CENTER), (WRAPPED, WALL, WRAPPED)
@@ -214,7 +214,7 @@ def test_the_helmholtz_solve_leaves_prescribed_entries_at_zero():
 
 
 def test_the_helmholtz_factorization_validates_its_inputs():
-    from lmx.poisson import fast_diagonal_helmholtz
+    from lmhdx.poisson import fast_diagonal_helmholtz
 
     grid = Grid(*(uniform_faces(4, 0.0, 1.0) for _ in range(3)))
     with pytest.raises(ValueError, match="one boundary condition per axis"):
@@ -228,7 +228,7 @@ def test_the_helmholtz_factorization_validates_its_inputs():
 
 def test_the_helmholtz_factorization_refuses_an_asymmetric_operator(monkeypatch):
     """The same tripwire as the scalar case, for the staggered assembly."""
-    import lmx.poisson as poisson
+    import lmhdx.poisson as poisson
 
     grid = Grid(*(uniform_faces(4, 0.0, 1.0) for _ in range(3)))
 
@@ -246,8 +246,8 @@ def test_the_helmholtz_factorization_refuses_an_asymmetric_operator(monkeypatch)
 
 def test_a_wall_resolving_mesh_still_factorizes():
     """Eight orders of magnitude in the operator is a graded mesh, not a broken stencil."""
-    from lmx.grid import wall_resolving_faces
-    from lmx.poisson import fast_diagonal_poisson
+    from lmhdx.grid import wall_resolving_faces
+    from lmhdx.poisson import fast_diagonal_poisson
 
     faces = wall_resolving_faces(48, -1.0, 1.0, layer_thickness=1.0 / 300.0, cells_in_layer=6, max_ratio=1.45)
     grid = Grid(uniform_faces(1, 0.0, 1.0), faces, faces)
@@ -260,7 +260,7 @@ def test_a_wall_resolving_mesh_still_factorizes():
 
 
 def _polar_grid(radial: int, azimuthal: int, axial: int = 1) -> Grid:
-    from lmx.grid import POLAR
+    from lmhdx.grid import POLAR
 
     return Grid(
         uniform_faces(radial, 0.0, 1.0),
@@ -273,8 +273,8 @@ def _polar_grid(radial: int, azimuthal: int, axial: int = 1) -> Grid:
 @pytest.mark.parametrize("radial_condition", [FIXED, WALL], ids=["dirichlet", "neumann"])
 def test_the_polar_factorization_inverts_its_own_operator(radial_condition):
     """One radial eigendecomposition per azimuthal mode, and the mode zero null space removed."""
-    from lmx.ops import laplacian
-    from lmx.poisson import fast_diagonal_polar_poisson
+    from lmhdx.ops import laplacian
+    from lmhdx.poisson import fast_diagonal_polar_poisson
 
     grid = _polar_grid(12, 16, 3)
     conditions = (radial_condition, WRAPPED, WRAPPED)
@@ -292,7 +292,7 @@ def test_the_polar_factorization_inverts_its_own_operator(radial_condition):
 
 def test_the_polar_solve_is_second_order_on_a_paraboloid():
     """`lap phi = -4` with `phi(1) = 0` is `1 - r^2`, wall closure and axis included."""
-    from lmx.poisson import fast_diagonal_polar_poisson
+    from lmhdx.poisson import fast_diagonal_polar_poisson
 
     errors = []
     for count in (16, 32, 64):
@@ -306,7 +306,7 @@ def test_the_polar_solve_is_second_order_on_a_paraboloid():
 
 
 def test_the_polar_factorization_states_what_it_needs():
-    from lmx.poisson import fast_diagonal_polar_poisson
+    from lmhdx.poisson import fast_diagonal_polar_poisson
 
     cartesian = Grid(uniform_faces(4, 0.0, 1.0), uniform_faces(4, 0.0, 1.0), uniform_faces(4, 0.0, 1.0))
     with pytest.raises(ValueError, match="use fast_diagonal_poisson"):
@@ -314,8 +314,8 @@ def test_the_polar_factorization_states_what_it_needs():
     grid = _polar_grid(4, 8)
     with pytest.raises(ValueError, match="azimuth of a polar grid is periodic"):
         fast_diagonal_polar_poisson(grid, (WALL, WALL, WRAPPED))
-    from lmx.grid import POLAR
-    from lmx.poisson import azimuthal_eigenvalues
+    from lmhdx.grid import POLAR
+    from lmhdx.poisson import azimuthal_eigenvalues
 
     stretched = Grid(
         uniform_faces(4, 0.0, 1.0),
@@ -332,7 +332,7 @@ def test_the_polar_factorization_states_what_it_needs():
 
 def _layer_grid(cells: int, layer: float, axial: int = 4) -> Grid:
     """A duct cross-section resolving a wall layer of ``layer``; 1e-3 at 64 cells is width ratio 2,831."""
-    from lmx.grid import wall_resolving_faces
+    from lmhdx.grid import wall_resolving_faces
 
     faces = wall_resolving_faces(cells, -1.0, 1.0, layer_thickness=layer, cells_in_layer=6, max_ratio=None)
     return Grid(uniform_faces(axial, 0.0, 1.0), faces, faces)
@@ -373,8 +373,8 @@ def test_mixed_precision_is_as_accurate_as_float64_where_float64_is_not_exact(tr
 @pytest.mark.parametrize("component", [0, 1, 2], ids=["u", "v", "w"])
 def test_mixed_precision_helmholtz_reaches_the_float64_solve(true_float32_matmuls, component):
     """The implicit viscous solve of each velocity component on the Ha 1000 layer mesh."""
-    from lmx.core3d import velocity_offset
-    from lmx.poisson import fast_diagonal_helmholtz
+    from lmhdx.core3d import velocity_offset
+    from lmhdx.poisson import fast_diagonal_helmholtz
 
     grid, conditions = _layer_grid(64, 1.0e-3), (WRAPPED, FIXED, FIXED)
     offset = velocity_offset(component)
@@ -392,8 +392,8 @@ def test_mixed_precision_helmholtz_reaches_the_float64_solve(true_float32_matmul
 @pytest.mark.parametrize("radial_condition", [WALL, FIXED], ids=["neumann", "dirichlet"])
 def test_mixed_precision_polar_poisson_reaches_the_float64_solve(true_float32_matmuls, radial_condition):
     """A pipe section resolving the Ha 1000 layer, singular under the insulating wall."""
-    from lmx.pipe import pipe_grid
-    from lmx.poisson import fast_diagonal_polar_poisson
+    from lmhdx.pipe import pipe_grid
+    from lmhdx.poisson import fast_diagonal_polar_poisson
 
     grid, conditions = pipe_grid(48, 32, 1000.0), (radial_condition, WRAPPED, WRAPPED)
     rhs = _random_cells(grid, seed=41)
@@ -421,8 +421,8 @@ def test_mixed_precision_differentiates_like_float64(true_float32_matmuls):
 
 def test_mixed_precision_leaves_float32_states_alone():
     """A float32 right-hand side takes the plain float32 solve, bit for bit."""
-    from lmx.pipe import pipe_grid
-    from lmx.poisson import fast_diagonal_helmholtz, fast_diagonal_polar_poisson
+    from lmhdx.pipe import pipe_grid
+    from lmhdx.poisson import fast_diagonal_helmholtz, fast_diagonal_polar_poisson
 
     grid, polar = _layer_grid(24, 0.05), pipe_grid(12, 8, 20.0)
     builders = [

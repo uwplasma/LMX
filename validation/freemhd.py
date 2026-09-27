@@ -11,7 +11,7 @@ from pathlib import Path, PurePosixPath
 
 import numpy as np
 
-from lmx.physics import (
+from lmhdx.physics import (
     dynamic_to_kinematic_viscosity,
     hartmann_number,
     interaction_parameter,
@@ -19,7 +19,7 @@ from lmx.physics import (
     wall_conductance_ratio,
 )
 
-_PACKAGE_DATA = Path(__file__).resolve().parents[1] / "src" / "lmx" / "data"
+_PACKAGE_DATA = Path(__file__).resolve().parents[1] / "src" / "lmhdx" / "data"
 BENCHMARK_A_SPEC_DIR = _PACKAGE_DATA / "benchmarks" / "specs"
 _MATCHED_B_ARTIFACT_NAMES = (
     "lmx_source",
@@ -209,7 +209,7 @@ def infer_inlet_drive_mode(case_dir: str | Path) -> str | None:
 
 
 def infer_liquid_material_properties(case_dir: str | Path) -> dict[str, float] | None:
-    """Read FreeMHD liquid properties and convert OpenFOAM ``mu`` to LMX ``nu``."""
+    """Read FreeMHD liquid properties and convert OpenFOAM ``mu`` to LMhdX ``nu``."""
 
     path = _first_existing(
         case_dir,
@@ -305,8 +305,8 @@ def infer_rectangular_geometry(
 def _decode_matched_b2_lmx_input(path: str | Path):
     from dataclasses import fields
 
-    from lmx.mesh import _cross_section_mesh
-    from lmx.specs import (
+    from lmhdx.mesh import _cross_section_mesh
+    from lmhdx.specs import (
         BoundaryCondition,
         CaseSpec,
         ExtrudedInductionlessProblem,
@@ -336,7 +336,7 @@ def _decode_matched_b2_lmx_input(path: str | Path):
         or (payload.get("schema_version"), payload.get("kind"), payload.get("case_id"))
         != (1, "lmx-matched-b2-input", "B2-fringing-square")
     ):
-        raise ValueError("Invalid matched B2 LMX input schema")
+        raise ValueError("Invalid matched B2 LMhdX input schema")
 
     def checked(cls, value, name):
         if not isinstance(value, dict) or set(value) != {item.name for item in fields(cls)}:
@@ -380,7 +380,7 @@ def _decode_matched_b2_lmx_input(path: str | Path):
         "alex_b2-fringing-square_scaling-calibration",
     }
     if case.name not in canonical_names or case.geometry.kind != "layered_duct":
-        raise ValueError("Matched B2 LMX input does not select the canonical solver path")
+        raise ValueError("Matched B2 LMhdX input does not select the canonical solver path")
     mesh = _cross_section_mesh(case)
     mesh_payload = payload["mesh"]
     if (
@@ -589,7 +589,7 @@ def _contract_scalar(value: float) -> float:
 
 
 def observe_lmx_b2_contract(path: str | Path, evaluator: str | Path | None = None) -> dict[str, object]:
-    """Derive the matched-B2 contract from a real LMX input, never its expected spec."""
+    """Derive the matched-B2 contract from a real LMhdX input, never its expected spec."""
 
     problem, mesh, payload = _decode_matched_b2_lmx_input(path)
     case, scaling, profile, controls = (
@@ -705,20 +705,20 @@ def observe_lmx_b2_contract(path: str | Path, evaluator: str | Path | None = Non
 def observe_lmx_b2_output(
     output_dir: str | Path, input_path: str | Path, evaluator: str | Path
 ) -> dict[str, object]:
-    """Replay compact LMX B2 restart evidence without trusting summary metrics."""
+    """Replay compact LMhdX B2 restart evidence without trusting summary metrics."""
 
     from types import SimpleNamespace
 
-    from lmx.io import (
+    from lmhdx.io import (
         load_extruded_restart_bundle,
         validate_extruded_restart_bundle,
     )
-    from lmx.validation import benchmark_b_pressure_observable
+    from lmhdx.validation import benchmark_b_pressure_observable
 
     root = Path(output_dir)
     required = {"run.json", "checkpoint.npz", "direct.npz", "resumed.npz"}
     if not root.is_dir() or {path.name for path in root.iterdir()} != required:
-        raise ValueError("LMX B2 output tree is incomplete")
+        raise ValueError("LMhdX B2 output tree is incomplete")
     metadata = json.loads((root / "run.json").read_text())
     keys = {
         "schema_version",
@@ -730,8 +730,8 @@ def observe_lmx_b2_output(
         "num_devices",
         "float_precision",
     }
-    if set(metadata) != keys or metadata.get("schema_version") != 1 or metadata.get("code") != "LMX":
-        raise ValueError("LMX B2 output metadata are invalid")
+    if set(metadata) != keys or metadata.get("schema_version") != 1 or metadata.get("code") != "LMhdX":
+        raise ValueError("LMhdX B2 output metadata are invalid")
     if (
         metadata.get("case_id") != "B2-fringing-square"
         or metadata.get("input_sha256") != artifact_sha256(input_path, "file")
@@ -740,7 +740,7 @@ def observe_lmx_b2_output(
         or int(metadata.get("num_devices", 0)) < 1
         or not math.isfinite(float(metadata.get("wall_seconds", math.nan)))
     ):
-        raise ValueError("LMX B2 output provenance differs")
+        raise ValueError("LMhdX B2 output provenance differs")
     problem = load_matched_b2_lmx_input(input_path)
     requested_steps = int(problem.case.time_stepper.max_steps)
     checkpoint_step = (requested_steps + 1) // 2
@@ -763,19 +763,19 @@ def observe_lmx_b2_output(
             "Aitken",
         )
     else:
-        raise ValueError("LMX B2 output acceleration is unsupported")
+        raise ValueError("LMhdX B2 output acceleration is unsupported")
     if any(
         restart.metadata.get("restart_schema") != schema or getattr(restart.bundle, acceleration_name) is None
         for restart in (checkpoint, direct, resumed)
     ):
-        raise ValueError(f"LMX B2 output {label} restart state is invalid")
+        raise ValueError(f"LMhdX B2 output {label} restart state is invalid")
     if (
         checkpoint.bundle.stopping_state[0] != checkpoint_step
         or direct.bundle.stopping_state != resumed.bundle.stopping_state
         or direct.bundle.stopping_state[0] != requested_steps
         or direct.bundle.stopping_state[2] != "step_limit"
     ):
-        raise ValueError("LMX B2 restart stopping state differs")
+        raise ValueError("LMhdX B2 restart stopping state differs")
     # Keep replay-driving state separate from recomputed fields and solver histories.
     state_names = """x y z field_scale u v w p phi
         axial_pressure_loss_gradient""".split()
@@ -800,7 +800,7 @@ def observe_lmx_b2_output(
         for name in names:
             left, right = (np.asarray(getattr(bundle.bundle, name)) for bundle in (direct, resumed))
             if left.shape != right.shape or not np.all(np.isfinite(left)) or not np.all(np.isfinite(right)):
-                raise ValueError(f"LMX B2 output array {name} is invalid")
+                raise ValueError(f"LMhdX B2 output array {name} is invalid")
             if left.size:
                 grouped_differences[group].append(float(np.max(np.abs(left - right))))
                 if group in {"state", "flux"}:
@@ -825,7 +825,7 @@ def observe_lmx_b2_output(
     ):
         left, right = (np.asarray(()) if value is None else np.asarray(value) for value in (left, right))
         if left.shape != right.shape or not np.all(np.isfinite(left)) or not np.all(np.isfinite(right)):
-            raise ValueError(f"LMX B2 output {label} state is invalid")
+            raise ValueError(f"LMhdX B2 output {label} state is invalid")
         if left.size:
             grouped_differences["state"].append(float(np.max(np.abs(left - right))))
             scale = max(np.linalg.norm(left), np.linalg.norm(right), 1.0e-30)
@@ -844,7 +844,7 @@ def observe_lmx_b2_output(
         or pressure.shape != (problem.case.geometry.nx,)
         or direct.bundle.stopping_state[0] != requested_steps
     ):
-        raise ValueError("LMX B2 output execution shape differs")
+        raise ValueError("LMhdX B2 output execution shape differs")
     return {
         "steps": requested_steps,
         "stop_reason": direct.bundle.stopping_state[2],
@@ -1361,11 +1361,11 @@ def observe_freemhd_b2_contract(
 
 
 def _validate_b2_smoke_execution(
-    lmx: dict[str, object], freemhd: dict[str, object], limits: dict[str, object]
+    lmhdx: dict[str, object], freemhd: dict[str, object], limits: dict[str, object]
 ) -> tuple[list[str], list[str], dict[str, float]]:
     execution_failed: list[str] = []
     expected_dt = 1.0 / 540000.0
-    for name, observed in (("lmx", lmx), ("freemhd", freemhd)):
+    for name, observed in (("lmhdx", lmhdx), ("freemhd", freemhd)):
 
         def fail(gate: str) -> None:
             execution_failed.append(f"execution.{name}.{gate}")
@@ -1400,7 +1400,7 @@ def _validate_b2_smoke_execution(
             activity = float(observed["interface_current_activity"])
             if not math.isfinite(activity) or activity < limits["interface_current_activity_min"]:
                 fail("interface_current_activity")
-            if name == "lmx":
+            if name == "lmhdx":
                 restart = float(observed["restart_max_abs"])
                 if not math.isfinite(restart) or restart > limits["restart_absolute_tolerance"]:
                     fail("restart")
@@ -1410,13 +1410,13 @@ def _validate_b2_smoke_execution(
     comparison_failed: list[str] = []
     metrics: dict[str, float] = {}
     try:
-        x_lmx, x_freemhd = (np.asarray(item["x_over_L"], dtype=float) for item in (lmx, freemhd))
-        p_lmx, p_freemhd = (np.asarray(item["pressure_observable"], dtype=float) for item in (lmx, freemhd))
+        x_lmx, x_freemhd = (np.asarray(item["x_over_L"], dtype=float) for item in (lmhdx, freemhd))
+        p_lmx, p_freemhd = (np.asarray(item["pressure_observable"], dtype=float) for item in (lmhdx, freemhd))
         if not np.array_equal(x_lmx, x_freemhd):
             comparison_failed.append("x")
         for key in ("courant_mean", "courant_max"):
             if not np.allclose(
-                np.asarray(lmx[key]),
+                np.asarray(lmhdx[key]),
                 np.asarray(freemhd[key]),
                 rtol=limits["cross_code_courant_relative_tolerance"],
                 atol=limits["cross_code_courant_absolute_tolerance"],
@@ -1449,7 +1449,7 @@ def validate_matched_b_record(
 ) -> dict[str, object]:
     """Validate matched Benchmark-B semantics and recompute comparison gates."""
 
-    from lmx.validation import (
+    from lmhdx.validation import (
         _MATCHED_CONTRACT_SECTIONS,
         BENCHMARK_B_SPEC_FILES,
         canonical_matched_b_contract,
@@ -1490,7 +1490,7 @@ def validate_matched_b_record(
         schema_failed.append("schema.exact_case_match")
 
     contract = record.get("contract")
-    lmx = contract.get("lmx") if isinstance(contract, dict) else None
+    lmhdx = contract.get("lmhdx") if isinstance(contract, dict) else None
     freemhd = contract.get("freemhd") if isinstance(contract, dict) else None
     contract_failed: list[str] = []
     try:
@@ -1499,7 +1499,7 @@ def validate_matched_b_record(
         expected_contract = None
         contract_failed.append("contract.acceptance_role.unavailable")
     for section in _MATCHED_CONTRACT_SECTIONS:
-        left = lmx.get(section) if isinstance(lmx, dict) else None
+        left = lmhdx.get(section) if isinstance(lmhdx, dict) else None
         right = freemhd.get(section) if isinstance(freemhd, dict) else None
         if not isinstance(left, dict) or not left or not isinstance(right, dict) or not right:
             contract_failed.append(f"contract.{section}.missing")
@@ -1671,7 +1671,7 @@ def validate_matched_b_record(
                 return [] if left == right else [prefix]
 
             observation_failed += [
-                f"{path}.lmx_observed" for path in differences(lmx, observed_lmx, "contract")
+                f"{path}.lmx_observed" for path in differences(lmhdx, observed_lmx, "contract")
             ]
             observation_failed += [
                 f"{path}.freemhd_observed" for path in differences(freemhd, observed_freemhd, "contract")
@@ -1682,7 +1682,7 @@ def validate_matched_b_record(
             ]
             if executed_smoke:
                 observed_outputs = {
-                    "lmx": observe_lmx_b2_output(
+                    "lmhdx": observe_lmx_b2_output(
                         resolved_artifacts["lmx_output"],
                         resolved_artifacts["lmx_input"],
                         resolved_artifacts["evaluator"],
@@ -1707,7 +1707,7 @@ def validate_matched_b_record(
     execution_failed: list[str] = []
     if executed_smoke:
         execution_failed, comparison_failed, metrics = _validate_b2_smoke_execution(
-            observed_outputs.get("lmx", {}),
+            observed_outputs.get("lmhdx", {}),
             observed_outputs.get("freemhd", {}),
             spec["harness_smoke_execution"],
         )

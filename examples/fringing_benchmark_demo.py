@@ -14,13 +14,13 @@ from pathlib import Path
 
 import numpy as np
 
-from lmx import solve
-from lmx.cases import make_shercliff_case
-from lmx.fringing import (
+from lmhdx import solve
+from lmhdx.cases import make_shercliff_case
+from lmhdx.fringing import (
     ExtrudedInductionlessProblem,
     smooth_fringing_profile,
 )
-from lmx.io import write_extruded_overview_plots
+from lmhdx.io import write_extruded_overview_plots
 
 # Inputs: geometry, materials, field envelope, numerics, and output location.
 OUTPUT_DIR = Path("artifacts/examples/fringing_benchmark")

@@ -584,7 +584,7 @@ _MATCHED_PRODUCTION_ROLES = {
 
 
 def _repository_root(root: str | Path | None = None) -> Path:
-    """Return an override root or the benchmark data shipped with LMX."""
+    """Return an override root or the benchmark data shipped with LMhdX."""
 
     return Path(root) if root is not None else Path(__file__).with_name("data")
 

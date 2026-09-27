@@ -1,4 +1,4 @@
-# LMX roadmap
+# LMhdX roadmap
 
 [plan.md](plan.md) is authoritative. Issues and PRs record daily evidence; dates
 below are planning targets, not validation or release promises.

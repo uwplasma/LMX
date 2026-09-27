@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx.grid import (
+from lmhdx.grid import (
     CENTER,
     FACE,
     POLAR,

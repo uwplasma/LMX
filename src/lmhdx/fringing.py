@@ -1187,7 +1187,7 @@ def _solve_duct_projection(
                 ),
             )
 
-        b2_map = jax.named_call(b2_map, name="lmx.b2.map")
+        b2_map = jax.named_call(b2_map, name="lmhdx.b2.map")
 
     for step in range(completed_steps, stop_step):
         step_courant = (

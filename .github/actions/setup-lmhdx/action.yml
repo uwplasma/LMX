@@ -1,4 +1,4 @@
-name: Set up LMX environment
+name: Set up LMhdX environment
 description: Install a supported Python and resolve declared compatible dependencies
 
 inputs:
@@ -48,7 +48,7 @@ runs:
         echo "JAX_PERSISTENT_CACHE_MIN_COMPILE_TIME_SECS=1" >> "$GITHUB_ENV"
         echo "JAX_PERSISTENT_CACHE_MIN_ENTRY_SIZE_BYTES=-1" >> "$GITHUB_ENV"
 
-    - name: Install LMX
+    - name: Install LMhdX
       shell: bash
       env:
         UV_PYTHON: ${{ inputs.python-version }}

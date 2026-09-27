@@ -7,12 +7,12 @@ For a uniform pressure-gradient drive over length ``L``, pressure drop is
 ``f L`` and hydraulic power is ``f L Q``. These are isothermal segment
 quantities, excluding entry/exit losses, manifolds and thermal effects.
 
-The ``channel_*`` functions are the :class:`~lmx.core3d.ChannelProblem`-native
+The ``channel_*`` functions are the :class:`~lmhdx.core3d.ChannelProblem`-native
 counterparts, sharing the same linear response, reusing :class:`DuctResponse`,
 :func:`pressure_drop` and :func:`hydraulic_power`, and the same segment-quantity
 disclaimer above. They apply in the Stokes limit only: ``Q = G f`` holds
 because the steady residual is affine in the drive when
-:attr:`~lmx.core3d.ChannelProblem.advection` is ``"off"``, so
+:attr:`~lmhdx.core3d.ChannelProblem.advection` is ``"off"``, so
 :func:`channel_flow_response` rejects any other value.
 """
 
@@ -57,7 +57,7 @@ def channel_cross_section_weights(problem: ChannelProblem) -> jnp.ndarray:
     """Return the cross-section integration weights of a :class:`ChannelProblem`.
 
     Axis 0 is the flow axis of every channel this package builds (see
-    :func:`lmx.core3d.duct_problem`), so a cell's weight is its transverse
+    :func:`lmhdx.core3d.duct_problem`), so a cell's weight is its transverse
     ``(y, z)`` area alone, independent of the axial spacing -- unlike
     :func:`fluid_cell_areas`, a channel carries no fluid mask, so every
     transverse cell counts.

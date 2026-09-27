@@ -1186,8 +1186,8 @@ def _b2_momentum_functions(
 
     return (
         initialize_flux,
-        jax.named_call(momentum_solve, name="lmx.b2.momentum"),
-        jax.named_call(momentum_defect, name="lmx.b2.momentum_defect"),
+        jax.named_call(momentum_solve, name="lmhdx.b2.momentum"),
+        jax.named_call(momentum_defect, name="lmhdx.b2.momentum_defect"),
         embed_velocity,
         courant_numbers,
         pack_flux,
@@ -1487,15 +1487,15 @@ def _b2_coupling_functions(
         return mix(mapped0, mapped1), mix(flux0, flux1), mix(inlet0, inlet1)
 
     return (
-        jax.named_call(mixed_boundary_projection, name="lmx.b2.projection"),
-        jax.named_call(electric_solve, name="lmx.b2.electric"),
-        jax.named_call(emf_operator, name="lmx.b2.emf"),
-        jax.named_call(reconstruct_electric, name="lmx.b2.reconstruction"),
+        jax.named_call(mixed_boundary_projection, name="lmhdx.b2.projection"),
+        jax.named_call(electric_solve, name="lmhdx.b2.electric"),
+        jax.named_call(emf_operator, name="lmhdx.b2.emf"),
+        jax.named_call(reconstruct_electric, name="lmhdx.b2.reconstruction"),
         lorentz_operator,
         scaled_state,
         sub,
         unscaled_state,
-        jax.named_call(mix_anderson, name="lmx.b2.anderson"),
+        jax.named_call(mix_anderson, name="lmhdx.b2.anderson"),
     )
 
 

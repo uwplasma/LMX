@@ -63,7 +63,7 @@ def enable_compilation_cache(
     than loops that reuse one compiled function; the default keeps them embedded.
     """
 
-    target = Path(cache_dir or (Path.home() / ".cache" / "lmx" / "jax_compilation"))
+    target = Path(cache_dir or (Path.home() / ".cache" / "lmhdx" / "jax_compilation"))
     target.mkdir(parents=True, exist_ok=True)
     jax.config.update("jax_compilation_cache_dir", str(target))
     jax.config.update("jax_persistent_cache_min_entry_size_bytes", min_entry_size_bytes)
@@ -220,7 +220,7 @@ def write_solution_npz(solution: Solution, case, path: str | Path) -> Path:
         "case": solution.case_name,
         "time": float(solution.state.time),
         "residual": float(solution.state.residual),
-        "description": "LMX solution dump",
+        "description": "LMhdX solution dump",
         "geometry_kind": case.geometry.kind,
         "notes": case.notes,
         "restart_capable": True,
@@ -259,7 +259,7 @@ def write_extruded_solution_npz(solution, case, path: str | Path) -> Path:
         "geometry_kind": case.geometry.kind,
         "solver_kind": case.solver.kind,
         "station_count": int(bundle.x.shape[0]),
-        "description": "LMX extruded inductionless solution dump",
+        "description": "LMhdX extruded inductionless solution dump",
         "extruded_formulation": case.solver.extruded_formulation,
     }
     np.savez_compressed(
@@ -892,7 +892,7 @@ def _plot_profile(
     coord_scale = coord_scale if coord_scale > 0.0 else 1.0
     value_scale = float(jnp.max(jnp.abs(values)))
     value_scale = value_scale if value_scale > 0.0 else 1.0
-    ax.plot(coordinate / coord_scale, values / value_scale, color="#0f766e", label="LMX")
+    ax.plot(coordinate / coord_scale, values / value_scale, color="#0f766e", label="LMhdX")
     if reference_coordinate is not None and reference_values is not None:
         ref_coord_scale = float(jnp.max(jnp.abs(reference_coordinate)))
         ref_coord_scale = ref_coord_scale if ref_coord_scale > 0.0 else 1.0

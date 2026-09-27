@@ -6,11 +6,11 @@ import jax
 import pytest
 
 # Tests measure compiles and must not share programs through the user's disk cache.
-os.environ.setdefault("LMX_COMPILATION_CACHE", "0")
+os.environ.setdefault("LMHDX_COMPILATION_CACHE", "0")
 
-import lmx  # noqa: E402
+import lmhdx  # noqa: E402
 
-lmx.enable_x64()
+lmhdx.enable_x64()
 
 
 @pytest.fixture

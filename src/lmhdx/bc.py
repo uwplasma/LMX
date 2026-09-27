@@ -1,6 +1,6 @@
 """Boundary conditions applied by padding ghost cells before differencing.
 
-Every stencil in :mod:`lmx.ops` reads a padded array, so a boundary condition is
+Every stencil in :mod:`lmhdx.ops` reads a padded array, so a boundary condition is
 expressed once, here, as the ghost value that reproduces the wall condition. The
 alternative -- special-casing edges inside each stencil -- is what makes wall
 treatment hard to audit at high Hartmann number, where the wall layers carry the

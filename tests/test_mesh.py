@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx.mesh import (
+from lmhdx.mesh import (
     _broadcast_spacing_y,
     _broadcast_spacing_z,
     _sample_station_magnetic_field,
@@ -35,7 +35,7 @@ from lmx.mesh import (
     sample_tabulated_field_volume,
     write_tabulated_field_npz,
 )
-from lmx.physics import WallLayer
+from lmhdx.physics import WallLayer
 
 pytestmark = pytest.mark.unit
 
