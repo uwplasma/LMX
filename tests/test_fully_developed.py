@@ -230,7 +230,7 @@ def test_a_case_the_core_does_not_represent_keeps_the_cell_centred_solve():
 
 
 def test_a_derivative_in_the_drive_differentiates_no_solve():
-    """The solve runs at unit drive and is scaled, so neither a gradient nor a tangent in the drive adds a loop."""
+    """At a fixed field the solve runs once, outside any trace; the drive only scales it."""
     case = lmhdx.make_hartmann_case(ha=2, ny=8, nz=8)
 
     def objective(drive):
@@ -239,9 +239,11 @@ def test_a_derivative_in_the_drive_differentiates_no_solve():
     def loops(function):
         return str(jax.make_jaxpr(function)(1.0)).count("while[")
 
-    forward = loops(objective)
-    assert forward > 0
-    assert loops(jax.grad(objective)) == forward
-    assert loops(lambda x: jax.jvp(objective, (x,), (1.0,))[1]) == forward
+    assert loops(objective) == loops(jax.grad(objective)) == 0
+    assert loops(lambda x: jax.jvp(objective, (x,), (1.0,))[1]) == 0
+    traced = str(
+        jax.make_jaxpr(lambda s: lmhdx.solve_fully_developed_fields(case, magnetic_field_scale=s)[0])(1.0)
+    )
+    assert traced.count("while[") > 0
     value, gradient = jax.value_and_grad(objective)(2.0)
     assert float(gradient) == pytest.approx(float(value) / 2.0, rel=1e-12)
