@@ -1,11 +1,13 @@
 # LMhdX
 
-**Differentiable inductionless liquid-metal MHD in JAX.**
-
+[![PyPI version](https://img.shields.io/pypi/v/lmhdx.svg)](https://pypi.org/project/lmhdx/)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue.svg)](pyproject.toml)
+[![License](https://img.shields.io/github/license/uwplasma/LMhdX)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/uwplasma/LMhdX/ci.yml?branch=main&label=ci)](https://github.com/uwplasma/LMhdX/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/readthedocs/lmx/latest?label=docs)](https://lmx.readthedocs.io/)
-[![Python](https://img.shields.io/badge/python-3.10--3.13-3776ab.svg)](https://www.python.org/)
-[![License](https://img.shields.io/github/license/uwplasma/LMhdX)](LICENSE)
+
+**Differentiable inductionless liquid-metal MHD in JAX.**
+Documentation: **<https://lmx.readthedocs.io/>** · Install: `pip install lmhdx`
 
 LMhdX solves the flow of liquid metals in strong magnetic fields — the physics of
 fusion blanket channels. Ducts and pipes with insulating or thin conducting
@@ -24,13 +26,19 @@ Reusable solvers and implicit derivatives come from
 
 *Decaying quasi-2D MHD turbulence with Hartmann-layer friction — 256², 3,000 steps, about 20 s on a laptop CPU with `python scripts/make_showcase_figures.py --only q2d`.*
 
-## Install
+Scope: fully developed duct and pipe flows are validated; three-dimensional
+convective transport, the ALEX fringing benchmarks and multi-device execution
+are research stage (see [What is validated, what is research](#what-is-validated-what-is-research)).
+
+## Installation
 
 ```console
 pip install lmhdx
 ```
 
 LMhdX was called LMX before version 1.5: `import lmx` is now `import lmhdx`.
+JAX runs on the CPU by default; install the GPU wheel from the
+[JAX guide](https://docs.jax.dev/en/latest/installation.html) and LMhdX uses it.
 From source:
 
 ```console
@@ -40,16 +48,18 @@ pip install ".[visualization]"
 lmhdx examples/hartmann_case.toml
 ```
 
-JAX runs on the CPU by default; install the GPU wheel from the
-[JAX guide](https://docs.jax.dev/en/latest/installation.html) and LMhdX uses it.
+The [installation guide](https://lmx.readthedocs.io/en/latest/getting_started/install.html)
+covers extras and GPUs.
 
-## Solve a duct in three lines
+## First run: a duct in three lines
 
 ```python
 import lmhdx
 
+lmhdx.enable_x64()  # the solvers are certified in float64
 problem = lmhdx.duct_problem(hartmann=100.0, cells=48, wall_conductance=0.027)
 solution = lmhdx.solve(problem)
+print(float(solution.velocity[0].data.max()))
 ```
 
 `duct_problem` picks both transverse meshes from the layers the Hartmann number
@@ -57,9 +67,23 @@ implies — `a/Ha` against the walls normal to the field, `a/√Ha` against the
 others — so the answer is converged rather than merely computed. `solve` finds
 the steady state by preconditioned conjugate gradients, or by matrix-free
 Newton–Krylov when advection or a conducting wall makes the problem
-nonsymmetric; neither stores more than a restart cycle of vectors.
+nonsymmetric; neither stores more than a restart cycle of vectors. Without
+`enable_x64()` the float32 solve raises rather than returning an unconverged field.
+The same case runs from a TOML file with `lmhdx examples/hartmann_case.toml`.
 
-## Duct flows against an independent reference
+## Documentation
+
+[Install](https://lmx.readthedocs.io/en/latest/getting_started/install.html) ·
+[First run](https://lmx.readthedocs.io/en/latest/getting_started/first_run.html) ·
+[Tutorials](https://lmx.readthedocs.io/en/latest/tutorials/fully_developed.html) ·
+[Equations](https://lmx.readthedocs.io/en/latest/physics/equations.html) ·
+[Validation](https://lmx.readthedocs.io/en/latest/validation/index.html) ·
+[API](https://lmx.readthedocs.io/en/latest/reference/api.html) ·
+[Roadmap](plan.md)
+
+## Fully developed ducts and pipes
+
+### Duct flows against an independent reference
 
 ![Hartmann layers, flow-rate error and mesh convergence](docs/_static/validation_ladder.webp)
 
@@ -79,7 +103,7 @@ python scripts/make_showcase_figures.py --only ladder
   shares no operator, mesh or solver with the package, and at zero field it
   returns the analytic Poiseuille maximum `0.29468541`.
 
-## Side layers at blanket-scale Hartmann numbers
+### Side layers at blanket-scale Hartmann numbers
 
 ![Hunt duct side-layer jets from Ha 20 to 1000](docs/_static/hunt_side_layers.webp)
 
@@ -93,7 +117,7 @@ python examples/hunt_example.py
 - The same steady solver reaches **Ha 1000** in the insulating duct, 0.5 % from
   the spectral reference on a wall-resolving 64² mesh.
 
-## Pipes
+### Pipes
 
 ![Pipe profiles, cross-section and flow rate against Hartmann number](docs/_static/pipe_flow.webp)
 
@@ -112,6 +136,20 @@ python scripts/make_showcase_figures.py --only pipe
   to 100 — a Fourier–Chebyshev solve on the diameter, which removes the axis
   singularity by construction rather than treating it.
 
+## Three-dimensional fringing fields
+
+```console
+python examples/fringing_benchmark_demo.py
+```
+
+- `lmhdx.fringing` extrudes a duct cross-section along the channel and applies a
+  smooth field envelope (`smooth_fringing_profile`), so the flow enters and leaves
+  the magnet; the demo writes plots and JSON to `artifacts/examples/`.
+- Research stage: the demo checks response and conservation trends; it is not an
+  ALEX/FreeMHD comparison or a mesh-converged validation result. The
+  [fringing tutorial](https://lmx.readthedocs.io/en/latest/tutorials/fringing.html)
+  walks through it.
+
 ## Design with gradients
 
 ![Field, wall and geometry design with gradient descent](docs/_static/blanket_design_optimization.webp)
@@ -123,6 +161,7 @@ python examples/variable_field_extruded_demo.py
 ```python
 import jax, jax.numpy as jnp, lmhdx
 
+lmhdx.enable_x64()
 problem = lmhdx.duct_problem(hartmann=20.0, cells=24)
 
 def throughput(drive, field_scale):
@@ -204,6 +243,21 @@ the strong-scaling efficiency of an unaided placement is 0.20 in float64 and
 PCIe. Correct, not yet faster — the numbers are in
 [`benchmarks/results`](benchmarks/results) and the next step is in the [plan](plan.md).
 
+## What is validated, what is research
+
+- **Validated:** Hartmann, Shercliff and Hunt ducts against an independent
+  spectral solve and against analytical profiles; the pipe against a second,
+  independent spectral solve over Ha 0 to 100; implicit adjoints against finite differences;
+  the steady mechanical power balance within a 1e-10 relative test gate (measured
+  3.6e-14 insulating, 6.3e-14 at wall conductance 0.027); Q2D decay identities.
+- **Research stage:** three-dimensional convective transport (`advection="central"`
+  or `"limited"`, from `lmhdx.advect`) is tested for conservation, order and
+  boundedness but not validated against a reference flow, the
+  ALEX B1/B2 fringing benchmarks have production acceptance open, and
+  multi-device execution is not yet established. The
+  [validation matrix](https://lmx.readthedocs.io/en/latest/validation/index.html)
+  and the [plan](plan.md) state each gate.
+
 ## Comparison with other codes
 
 | Comparison | What it establishes | Status |
@@ -232,30 +286,6 @@ states each gate and what it does not cover.
 Each example is one editable file that writes to `artifacts/examples/`;
 parameters and evidence status are in [`examples/catalog.toml`](examples/catalog.toml).
 `python scripts/make_showcase_figures.py` regenerates every figure above.
-
-## What is validated, what is research
-
-- **Validated:** Hartmann, Shercliff and Hunt ducts against an independent
-  spectral solve and against analytical profiles; the pipe against a second,
-  independent spectral solve over Ha 0 to 100; implicit adjoints against finite differences;
-  the steady mechanical power balance within a 1e-10 relative test gate (measured
-  3.6e-14 insulating, 6.3e-14 at wall conductance 0.027); Q2D decay identities.
-- **Research stage:** three-dimensional convective transport (`advection="central"`
-  or `"limited"`, from `lmhdx.advect`) is tested for conservation, order and
-  boundedness but not validated against a reference flow, the
-  ALEX B1/B2 fringing benchmarks have production acceptance open, and
-  multi-device execution is not yet established. The
-  [validation matrix](https://lmx.readthedocs.io/en/latest/validation/index.html)
-  and the [plan](plan.md) state each gate.
-
-## Documentation
-
-[Install](https://lmx.readthedocs.io/en/latest/getting_started/install.html) ·
-[Tutorials](https://lmx.readthedocs.io/en/latest/tutorials/fully_developed.html) ·
-[Equations](https://lmx.readthedocs.io/en/latest/physics/equations.html) ·
-[Validation](https://lmx.readthedocs.io/en/latest/validation/index.html) ·
-[API](https://lmx.readthedocs.io/en/latest/reference/api.html) ·
-[Roadmap](plan.md)
 
 ## Cite and contribute
 
