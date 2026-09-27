@@ -439,7 +439,9 @@ def _stokes_limit_root(
         inside = _orthogonal_projection(velocity, problem, factorization)
         return jax.tree.map(lambda u, a, q: u - a - q, velocity, operator(scale, inside), inside)
 
-    def cg(weights, scale, inside, start=None, traced=False):
+    # One staged CG: the tangent and transposed solves trace it once between them.
+    @jax.jit
+    def cg(weights, scale, inside, start):
         result = solvax.pcg(
             lambda y: jax.tree.map(jnp.negative, operator(scale, jax.tree.map(jnp.divide, y, weights))),
             inside,
@@ -449,7 +451,7 @@ def _stokes_limit_root(
             max_steps=max_iterations,
         )
         accepted = result.converged & jnp.isfinite(result.residual_norm)
-        kept = _certified(result.x, accepted, "steady CG solve", traced)
+        kept = _certified(result.x, accepted, "steady CG solve")
         return kept, (result.iterations, result.residual_norm, result.converged)
 
     def complete(weights, y, target, inside):
@@ -481,10 +483,7 @@ def _stokes_limit_root(
 
     rhs = steady_residual(start, problem, factorization, forcing=forcing, field_scale=field_scale)
     primal_inside = jax.lax.stop_gradient(_orthogonal_projection(rhs, problem, factorization))
-    # Outside the derivative rule the primal meets concrete values under eager differentiation,
-    # which must still reject with nonfinite values rather than raise.
-    traced = any(isinstance(leaf, jax.core.Tracer) for leaf in jax.tree.leaves((rhs, field_scale)))
-    primal_y, diagnostics = cg(weights, jax.lax.stop_gradient(field_scale), primal_inside, traced=traced)
+    primal_y, diagnostics = cg(weights, jax.lax.stop_gradient(field_scale), primal_inside, None)
     step = solved(rhs, field_scale, jax.lax.stop_gradient(primal_y), primal_inside, weights)
     return jax.tree.map(lambda u, y, w: u + y / w, start, step, weights), diagnostics
 
@@ -606,9 +605,9 @@ def _krylov(matvec, target, precond=None):
     return _certified(result.x, result.converged & jnp.isfinite(result.residual_norm), "steady linear solve")
 
 
-def _certified(value, accepted, stage, traced=False):
+def _certified(value, accepted, stage):
     """Reject eagerly; multiply by NaN under tracing so failed gradients fail too."""
-    traced = traced or any(isinstance(leaf, jax.core.Tracer) for leaf in jax.tree.leaves((value, accepted)))
+    traced = any(isinstance(leaf, jax.core.Tracer) for leaf in jax.tree.leaves((value, accepted)))
     if not traced and not bool(accepted):
         raise RuntimeError(f"the {stage} did not converge")
     return jax.tree.map(lambda leaf: leaf * jnp.where(accepted, 1.0, jnp.nan), value)
