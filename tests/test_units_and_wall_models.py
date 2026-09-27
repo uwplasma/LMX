@@ -18,7 +18,7 @@ from lmhdx import (
     tangential_stack_conductance_ratio,
     wall_conductance_ratio,
 )
-from lmhdx.physics import normal_leakage_ratio, wall_layer_from_conductance_ratio
+from lmhdx.physics import normal_leakage_ratio
 
 pytestmark = pytest.mark.unit
 
@@ -146,20 +146,6 @@ def test_nested_wall_layer_resolution_summary_marks_underresolved_layers():
 
     assert summary["resolution_pass"] is False
     assert summary["minimum_cells_per_layer"] == 2
-
-
-def test_wall_layer_from_conductance_ratio_recovers_requested_ratio():
-    layer = wall_layer_from_conductance_ratio(
-        name="hunt_wall",
-        conductance_ratio=0.05,
-        thickness=0.001,
-        fluid_conductivity=1.0,
-        length_scale=0.1,
-        cells=6,
-    )
-
-    assert layer.conductivity == pytest.approx(5.0)
-    assert layer.cells == 6
 
 
 @pytest.mark.parametrize(
@@ -309,33 +295,7 @@ def test_wall_stack_rejects_invalid_scales_and_handles_perfect_insulator():
     )
 
 
-def test_wall_resolution_and_conductance_constructor_validate_controls(monkeypatch):
+def test_wall_resolution_summary_validates_controls():
     layers = (WallLayer("wall", 1.0, 1.0),)
     with pytest.raises(ValueError, match="minimum_cells"):
         nested_wall_layer_resolution_summary(layers, minimum_cells_per_layer=0)
-    with pytest.raises(ValueError, match="thickness"):
-        wall_layer_from_conductance_ratio(
-            name="wall",
-            conductance_ratio=1.0,
-            thickness=0.0,
-            fluid_conductivity=1.0,
-            length_scale=1.0,
-        )
-    with pytest.raises(ValueError, match="conductance_ratio"):
-        wall_layer_from_conductance_ratio(
-            name="wall",
-            conductance_ratio=-1.0,
-            thickness=1.0,
-            fluid_conductivity=1.0,
-            length_scale=1.0,
-        )
-
-    monkeypatch.setattr("lmhdx.physics.wall_conductance_ratio", lambda **kwargs: -1.0)
-    with pytest.raises(RuntimeError, match="failed to construct"):
-        wall_layer_from_conductance_ratio(
-            name="wall",
-            conductance_ratio=1.0,
-            thickness=1.0,
-            fluid_conductivity=1.0,
-            length_scale=1.0,
-        )
