@@ -25,7 +25,6 @@ from lmhdx.io import (
     write_paraview,
     write_solution_npz,
     write_solution_outputs,
-    write_vtu,
 )
 from lmhdx.mesh import generate_pipe_ogrid_mesh
 from lmhdx.solvers import _build_mesh
@@ -128,21 +127,6 @@ def test_paraview_writer(tmp_path: Path):
     solution = _sample_solution(case)
     paths = write_paraview(solution, tmp_path)
     assert all(path.exists() for path in paths)
-
-
-def test_vtu_writer(tmp_path: Path):
-    mesh = generate_pipe_ogrid_mesh(radius=1.0, nx=1, nr=4, ntheta=8)
-    path = write_vtu(mesh, tmp_path)
-    assert path.exists()
-
-
-def test_vtu_writer_requires_point_coordinates(tmp_path: Path):
-    case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    mesh = _build_mesh(case)
-    mesh_without_points = mesh.__class__(**{**mesh.__dict__, "point_coordinates": None})
-
-    with pytest.raises(ValueError, match="Mapped mesh requires point_coordinates"):
-        write_vtu(mesh_without_points, tmp_path)
 
 
 def test_zeros_state_matches_mesh_shape():

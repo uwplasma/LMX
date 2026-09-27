@@ -156,34 +156,6 @@ def write_vtr(solution: Solution, out_dir: str | Path) -> Path:
     return target
 
 
-def write_vtu(mesh: StructuredMesh, out_dir: str | Path, name: str = "pipe_mesh") -> Path:
-    if mesh.point_coordinates is None:
-        raise ValueError("Mapped mesh requires point_coordinates")
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    target = out_dir / f"{name}.vtu"
-    points = mesh.point_coordinates.reshape((-1, 3))
-    content = (
-        '<?xml version="1.0"?>\n'
-        '<VTKFile type="UnstructuredGrid" version="0.1" byte_order="LittleEndian">\n'
-        "<UnstructuredGrid>\n"
-        f'<Piece NumberOfPoints="{points.shape[0]}" NumberOfCells="0">\n'
-        "<Points>\n"
-        f'<DataArray type="Float64" NumberOfComponents="3" format="ascii">{_array_text(points)}</DataArray>\n'
-        "</Points>\n"
-        "<Cells>\n"
-        '<DataArray type="Int64" Name="connectivity" format="ascii"></DataArray>\n'
-        '<DataArray type="Int64" Name="offsets" format="ascii"></DataArray>\n'
-        '<DataArray type="UInt8" Name="types" format="ascii"></DataArray>\n'
-        "</Cells>\n"
-        "</Piece>\n"
-        "</UnstructuredGrid>\n"
-        "</VTKFile>\n"
-    )
-    target.write_text(content)
-    return target
-
-
 def write_pvd(entries: list[tuple[float, str]], out_dir: str | Path, name: str = "series") -> Path:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

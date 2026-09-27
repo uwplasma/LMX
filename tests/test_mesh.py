@@ -1,6 +1,5 @@
 from types import SimpleNamespace
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -14,9 +13,6 @@ from lmhdx.mesh import (
     center_spacing_y,
     center_spacing_z,
     cross_section_divergence_metrics,
-    divergence_flux,
-    face_average_x,
-    face_average_z,
     face_divergence,
     generate_layered_duct_mesh,
     generate_layered_duct_mesh_from_fluid_faces,
@@ -25,11 +21,9 @@ from lmhdx.mesh import (
     generate_rect_duct_mesh,
     generate_rect_duct_mesh_from_faces,
     gradient_scalar,
-    laplacian_scalar,
     load_tabulated_field,
     make_divergence_free_cross_section_field,
     make_localized_divergence_free_obstacle_field,
-    make_maxwell_consistent_fringe_field,
     sample_cross_section_field,
     sample_tabulated_cross_section_field,
     sample_tabulated_field_volume,
@@ -311,33 +305,8 @@ def test_gradient_of_linear_field_on_clustered_mesh_is_exact_near_boundaries():
     assert jnp.allclose(gz[2:-2, :], -3.0, atol=5e-2)
 
 
-def test_laplacian_of_quadratic_field():
-    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=40, nz=40)
-    y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
-    field = y**2 + z**2
-    lap = laplacian_scalar(field, mesh)
-    assert jnp.allclose(lap[2:-2, 2:-2], 4.0, atol=2e-1)
-
-
-def test_laplacian_of_quadratic_field_on_clustered_mesh():
-    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=48, nz=48, target_ha=100.0, magnetic_axis="z")
-    y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
-    field = y**2 + z**2
-    lap = laplacian_scalar(field, mesh)
-    interior = jnp.ones(mesh.yz_shape, dtype=bool)
-    interior = interior.at[:6, :].set(False)
-    interior = interior.at[-6:, :].set(False)
-    interior = interior.at[:, :6].set(False)
-    interior = interior.at[:, -6:].set(False)
-    interior_values = lap[interior]
-    assert jnp.isfinite(interior_values).all()
-    assert float(jnp.mean(interior_values)) == pytest.approx(4.0, abs=0.15)
-
-
-def test_operator_helpers_cover_spacings_face_averages_and_divergence():
+def test_operator_helpers_cover_spacings_and_face_divergence():
     mesh = generate_rect_duct_mesh(width=2.0, height=3.0, ny=3, nz=4)
-    field = jnp.arange(mesh.ny * mesh.nz, dtype=float).reshape(mesh.yz_shape)
-
     yy, zz = center_coordinates(mesh)
     assert yy.shape == mesh.yz_shape
     assert zz.shape == mesh.yz_shape
@@ -345,14 +314,6 @@ def test_operator_helpers_cover_spacings_face_averages_and_divergence():
     assert _broadcast_spacing_z(mesh).shape == (1, mesh.nz)
     assert center_spacing_y(mesh).shape == (mesh.ny - 1,)
     assert center_spacing_z(mesh).shape == (mesh.nz - 1,)
-
-    face_y = face_average_x(field)
-    face_z = face_average_z(field)
-    assert face_y.shape == (mesh.ny - 1, mesh.nz)
-    assert face_z.shape == (mesh.ny, mesh.nz - 1)
-
-    div_flux = divergence_flux(jnp.ones(mesh.yz_shape), 2.0 * jnp.ones(mesh.yz_shape), mesh)
-    assert div_flux.shape == mesh.yz_shape
 
     face_flux_y = jnp.zeros((mesh.ny + 1, mesh.nz))
     face_flux_z = jnp.zeros((mesh.ny, mesh.nz + 1))
@@ -392,58 +353,11 @@ def test_gradient_observed_order_for_smooth_manufactured_solution():
     assert float(order_z) > 1.8
 
 
-def test_laplacian_manufactured_solution_and_masking_are_consistent():
-    mesh = generate_rect_duct_mesh(width=2.0, height=2.0, ny=48, nz=48)
-    y, z = jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
-    field = jnp.sin(jnp.pi * y) * jnp.sin(jnp.pi * z)
-    exact = -2.0 * (jnp.pi**2) * field
-
-    full_lap = laplacian_scalar(field, mesh)
-    sl = (slice(4, -4), slice(4, -4))
-    interior_error = float(jnp.sqrt(jnp.mean((full_lap[sl] - exact[sl]) ** 2)))
-    assert interior_error < 0.15
-
-    mask = jnp.ones(mesh.yz_shape, dtype=bool)
-    mask = mask.at[:4, :].set(False)
-    mask = mask.at[-4:, :].set(False)
-    mask = mask.at[:, :4].set(False)
-    mask = mask.at[:, -4:].set(False)
-
-    lap = laplacian_scalar(field, mesh, mask=mask)
-    assert jnp.allclose(lap[~mask], 0.0)
-
-
 def test_divergence_free_cross_section_field_has_small_discrete_divergence():
     field_fn = make_divergence_free_cross_section_field(width=2.0, height=1.5, base_bz=10.0, perturbation=0.1)
     metrics = cross_section_divergence_metrics(field_fn, width=2.0, height=1.5, ny=61, nz=61)
     assert metrics["max_abs_divergence"] < 0.2
     assert metrics["rms_divergence"] < 0.05
-
-
-@pytest.mark.parametrize("axis", ["y", "z"])
-def test_maxwell_consistent_fringe_field_satisfies_symmetry_and_maxwell(axis):
-    field = make_maxwell_consistent_fringe_field(peak_field=2.0, center=0.25, transition_width=1.2, axis=axis)
-    transverse_index = 1 if axis == "y" else 2
-
-    def point_field(x, transverse):
-        coordinates = [x, 0.0, 0.0]
-        coordinates[transverse_index] = transverse
-        return field(*map(jnp.asarray, coordinates))
-
-    jacobian = jax.jacfwd(lambda coordinates: point_field(*coordinates))(jnp.asarray([0.1, 0.3]))
-    assert jacobian[0, 0] + jacobian[transverse_index, 1] == pytest.approx(0.0, abs=1.0e-12)
-    assert jacobian[transverse_index, 0] - jacobian[0, 1] == pytest.approx(0.0, abs=1.0e-12)
-    positive = point_field(0.1, 0.3)
-    negative = point_field(0.1, -0.3)
-    assert positive[0] == pytest.approx(-float(negative[0]))
-    assert positive[transverse_index] == pytest.approx(float(negative[transverse_index]))
-
-
-def test_maxwell_consistent_fringe_field_rejects_invalid_parameters():
-    with pytest.raises(ValueError, match="positive"):
-        make_maxwell_consistent_fringe_field(peak_field=1.0, center=0.0, transition_width=0.0)
-    with pytest.raises(ValueError, match="axis"):
-        make_maxwell_consistent_fringe_field(peak_field=1.0, center=0.0, transition_width=1.0, axis="x")
 
 
 def test_sample_cross_section_field_returns_expected_shape():

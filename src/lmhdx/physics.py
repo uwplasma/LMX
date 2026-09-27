@@ -288,39 +288,6 @@ def nested_wall_layer_resolution_summary(
     }
 
 
-def wall_layer_from_conductance_ratio(
-    *,
-    name: str,
-    conductance_ratio: float,
-    thickness: float,
-    fluid_conductivity: float,
-    length_scale: float,
-    cells: int = 1,
-) -> WallLayer:
-    """Construct a wall layer from a target thin-wall conductance ratio."""
-
-    _require_positive("thickness", thickness)
-    if conductance_ratio < 0.0:
-        raise ValueError("conductance_ratio must be non-negative")
-    layer = WallLayer(
-        name=name,
-        conductivity=(
-            float(conductance_ratio) * float(fluid_conductivity) * float(length_scale) / float(thickness)
-        ),
-        thickness=thickness,
-        cells=cells,
-    )
-    recovered = wall_conductance_ratio(
-        wall_conductivity=layer.conductivity,
-        wall_thickness=layer.thickness,
-        fluid_conductivity=fluid_conductivity,
-        length_scale=length_scale,
-    )
-    if not math.isclose(recovered, conductance_ratio, rel_tol=1e-12, abs_tol=1e-15):
-        raise RuntimeError("failed to construct requested wall conductance ratio")
-    return layer
-
-
 @dataclass(frozen=True)
 class MaterialFields:
     conductivity: jnp.ndarray
