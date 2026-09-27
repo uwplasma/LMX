@@ -1,6 +1,6 @@
 # Differentiate physical solves
 
-LMX separates traced numerical fields from host-side validation, status, I/O,
+LMhdX separates traced numerical fields from host-side validation, status, I/O,
 and plotting. An accepted field core must carry continuous physical parameters
 through the production discretization; mesh counts, iteration limits, and
 output policies remain static controls. The accepted field cores are the
@@ -13,7 +13,7 @@ steady-flow interface is documented as end-to-end differentiable only when its
 production field equations use that contract and pass independent gradient,
 residual, runtime, and memory gates.
 
-For `lmx.steady.solve_steady_state`, a rejected primal residual or linearized
+For `lmhdx.steady.solve_steady_state`, a rejected primal residual or linearized
 solve raises eagerly. During autodiff tracing, failure instead produces
 nonfinite fields or derivatives without host callbacks: reject any nonfinite
 objective **or** gradient before accepting an optimizer step. Drive and field
@@ -27,13 +27,13 @@ the static problem requires a new trace. Compiled failures remain nonfinite.
 ```python
 import jax
 import jax.numpy as jnp
-import lmx
+import lmhdx
 
-case = lmx.make_shercliff_case(ha=20, ny=48, nz=48)
+case = lmhdx.make_shercliff_case(ha=20, ny=48, nz=48)
 
 
 def objective(forcing, field_scale):
-    velocity, potential, jy, jz, lorentz = lmx.solve_fully_developed_fields(
+    velocity, potential, jy, jz, lorentz = lmhdx.solve_fully_developed_fields(
         case,
         forcing=forcing,
         magnetic_field_scale=field_scale,
@@ -66,7 +66,7 @@ engineering objectives in the same traced program:
 ```python
 import jax
 import jax.numpy as jnp
-from lmx.fringing import (
+from lmhdx.fringing import (
     build_layered_duct_extruded_problem,
     evolve_extruded_fields,
     extruded_engineering_objectives,
@@ -108,7 +108,7 @@ with the ordinary production solve, independent finite differences, JVP/VJP
 duality, and lower compiled reverse temporary memory than a full tape.
 The material coefficients are ``(fluid, solid)`` multipliers, so a layered
 case exposes wall conductance without rebuilding its mesh or region topology.
-`jax.vmap` and bounded `jax.lax.map` compose directly, so LMX needs no ensemble
+`jax.vmap` and bounded `jax.lax.map` compose directly, so LMhdX needs no ensemble
 API. Choose the chunk size from measured accelerator memory; each row retains
 its own exact production derivative. For spatial parallelism, pass
 `num_devices` to `evolve_extruded_fields`; generic rectangular, layered, and
@@ -192,15 +192,15 @@ For a time-dependent field objective, call the field-only core:
 ```python
 import jax
 import jax.numpy as jnp
-import lmx
+import lmhdx
 
 jax.config.update("jax_enable_x64", True)
-case = lmx.make_q2d_case(shape=(32, 32), steps=80)
+case = lmhdx.make_q2d_case(shape=(32, 32), steps=80)
 
 
 def objective(parameters):
     viscosity, friction = parameters
-    vorticity, _, _ = lmx.evolve_q2d(
+    vorticity, _, _ = lmhdx.evolve_q2d(
         case.initial_vorticity,
         viscosity=viscosity,
         hartmann_friction=friction,

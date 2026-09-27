@@ -17,9 +17,9 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - Python 3.10
     import tomli as tomllib
 
-import lmx
-from lmx.cases import _wall_conductivity_from_conductance_ratio
-from lmx.specs import _parse_boundary_value, load_run_config
+import lmhdx
+from lmhdx.cases import _wall_conductivity_from_conductance_ratio
+from lmhdx.specs import _parse_boundary_value, load_run_config
 from scripts.audit_architecture import (
     _checkout_size,
     architecture_budget_errors,
@@ -119,26 +119,26 @@ def test_explicit_precision_in_fresh_process(x64):
 import warnings
 import jax
 import jax.numpy as jnp
-import lmx
+import lmhdx
 from dataclasses import replace
-from lmx import cases, mesh, physics, fringing, q2d
+from lmhdx import cases, mesh, physics, fringing, q2d
 initial = jax.config.x64_enabled
 assert initial == EXPECTED
 assert jax.config.jax_default_matmul_precision is None
-case32 = lmx.make_hartmann_case(ha=2, ny=8, nz=8, dtype="float32")
+case32 = lmhdx.make_hartmann_case(ha=2, ny=8, nz=8, dtype="float32")
 assert jax.config.x64_enabled == initial
 assert jax.config.jax_default_matmul_precision == "highest"
 values = []
 for dtype in ("float32", "float64"):
     with warnings.catch_warnings(record=True) as recorded:
         warnings.simplefilter("always")
-        case = lmx.make_hartmann_case(ha=2, ny=8, nz=8, dtype=dtype)
+        case = lmhdx.make_hartmann_case(ha=2, ny=8, nz=8, dtype=dtype)
     assert len(recorded) == int(dtype == "float64" and not initial)
     if recorded:
         assert recorded[0].category is DeprecationWarning
     grid, materials, _, _ = cases._prepare_fully_developed_case(case)
     assert grid.y_faces.dtype == materials.conductivity.dtype == case.dtype
-    objective = lambda x: jnp.mean(lmx.solve_fully_developed_fields(case, forcing=x)[0])
+    objective = lambda x: jnp.mean(lmhdx.solve_fully_developed_fields(case, forcing=x)[0])
     x = jnp.asarray(1., dtype=case.dtype)
     value, grad = jax.jit(jax.value_and_grad(objective))(x)
     tangent = jax.jit(lambda x: jax.jvp(objective, (x,), (jnp.ones_like(x),))[1])(x)
@@ -149,10 +149,10 @@ for dtype in ("float32", "float64"):
     assert bool(jnp.allclose(grad, tangent, rtol=2e-5, atol=1e-7))
     values.append(float(value))
     short = replace(case, time_stepper=replace(case.time_stepper, max_steps=2))
-    result = lmx.solve(short)
+    result = lmhdx.solve(short)
     assert result.state.u.dtype == result.state.phi.dtype == case.dtype
 assert abs(values[0] - values[1]) < 2e-6
-lmx.enable_x64()
+lmhdx.enable_x64()
 assert jnp.asarray(1.).dtype == jnp.float64
 """.replace("EXPECTED", str(x64 == "true"))
     subprocess.run(
@@ -169,13 +169,13 @@ assert jnp.asarray(1.).dtype == jnp.float64
 @pytest.mark.parametrize("choice", ["0", "cache"])
 def test_first_case_enables_the_shared_disk_cache_by_default(tmp_path, choice):
     code = """
-import os, jax, jaxlib, platform, lmx
+import os, jax, jaxlib, platform, lmhdx
 assert "--xla_gpu_enable_triton_gemm=false" in os.environ["XLA_FLAGS"]
 assert jax.config.jax_compilation_cache_dir is None
-lmx.make_hartmann_case(ha=2, ny=4, nz=4)
+lmhdx.make_hartmann_case(ha=2, ny=4, nz=4)
 unsafe = platform.system() == "Darwin" and tuple(map(int, jaxlib.__version__.split(".")[:2])) < (0, 10)
-enabled = os.environ["LMX_COMPILATION_CACHE"] != "0" and not unsafe
-assert (jax.config.jax_compilation_cache_dir == os.environ["LMX_COMPILATION_CACHE"]) == enabled
+enabled = os.environ["LMHDX_COMPILATION_CACHE"] != "0" and not unsafe
+assert (jax.config.jax_compilation_cache_dir == os.environ["LMHDX_COMPILATION_CACHE"]) == enabled
 assert jax.config.jax_compilation_cache_max_size == (2**31 if enabled else -1)
 """
     environment = {
@@ -183,7 +183,7 @@ assert jax.config.jax_compilation_cache_max_size == (2**31 if enabled else -1)
         for key, value in os.environ.items()
         if key != "XLA_FLAGS" and not key.startswith(("JAX_COMPILATION_CACHE", "JAX_PERSISTENT_CACHE"))
     }
-    environment["LMX_COMPILATION_CACHE"] = choice if choice == "0" else str(tmp_path / choice)
+    environment["LMHDX_COMPILATION_CACHE"] = choice if choice == "0" else str(tmp_path / choice)
     subprocess.run([sys.executable, "-c", code], check=True, timeout=90, env=environment)
 
 
@@ -306,10 +306,10 @@ def test_every_test_file_reaches_the_combined_coverage():
         (".github/workflows/ci.yml", "true", "false", "false", "false"),
         (".github/workflows/docs.yml", "true", "false", "true", "false"),
         (".github/workflows/external-validation.yml", "true", "false", "false", "true"),
-        (".github/actions/setup-lmx/action.yml", "true", "false", "true", "true"),
-        ("src/lmx/mesh.py", "true", "false", "true", "true"),
-        ("src/lmx/q2d.py", "true", "false", "true", "false"),
-        ("src/lmx/validation.py", "true", "false", "true", "true"),
+        (".github/actions/setup-lmhdx/action.yml", "true", "false", "true", "true"),
+        ("src/lmhdx/mesh.py", "true", "false", "true", "true"),
+        ("src/lmhdx/q2d.py", "true", "false", "true", "false"),
+        ("src/lmhdx/validation.py", "true", "false", "true", "true"),
         ("tests/test_mesh.py", "true", "false", "false", "false"),
         ("scripts/run_full_test_suite.py", "false", "true", "false", "false"),
         ("docs/index.md", "false", "false", "true", "false"),
@@ -324,7 +324,7 @@ def test_ci_scope_and_superseded_work_policy(tmp_path, changed, full, targeted, 
             [
                 "git",
                 "-c",
-                "user.name=LMX test",
+                "user.name=LMhdX test",
                 "-c",
                 "user.email=test@example.invalid",
                 "-c",
@@ -655,10 +655,10 @@ def test_precision_setup_pins_true_float32_contractions_and_keeps_a_user_choice(
     import jax.numpy as jnp
 
     setups = {
-        "enable_x64": lmx.enable_x64,
-        "case dtype": lambda: lmx.make_hartmann_case(ha=2, ny=8, nz=8, dtype="float32"),
-        "ChannelProblem": lambda: lmx.duct_problem(hartmann=20.0, cells=24),
-        "Q2DProblem": lambda: lmx.Q2DProblem(jnp.zeros((8, 8), dtype=jnp.float32)),
+        "enable_x64": lmhdx.enable_x64,
+        "case dtype": lambda: lmhdx.make_hartmann_case(ha=2, ny=8, nz=8, dtype="float32"),
+        "ChannelProblem": lambda: lmhdx.duct_problem(hartmann=20.0, cells=24),
+        "Q2DProblem": lambda: lmhdx.Q2DProblem(jnp.zeros((8, 8), dtype=jnp.float32)),
     }
     initial = jax.config.jax_default_matmul_precision
     try:
@@ -671,7 +671,7 @@ def test_precision_setup_pins_true_float32_contractions_and_keeps_a_user_choice(
             assert jax.config.jax_default_matmul_precision == "tensorfloat32", name
 
         jax.config.update("jax_default_matmul_precision", None)
-        lmx.enable_x64()
+        lmhdx.enable_x64()
         left, right = jax.random.uniform(jax.random.PRNGKey(0), (2, 32, 32, 32), dtype=jnp.float64)
 
         def contract(a, b):
@@ -728,13 +728,13 @@ def test_architecture_inventory_is_deterministic_without_timing() -> None:
 
 def test_change_gate_selects_affected_tests_and_fails_closed() -> None:
     assert _tests_for_changes(("docs/index.md", "plan.md")) == ()
-    assert _tests_for_changes(("src/lmx/_fringing_pipe.py",)) == (
+    assert _tests_for_changes(("src/lmhdx/_fringing_pipe.py",)) == (
         "tests/test_fringing.py",
         "tests/test_benchmarks.py",
         "tests/test_freemhd.py",
         "tests/test_example_runner.py",
     )
-    assert _tests_for_changes(("src/lmx/q2d.py", "examples/q2d_vortex.py")) == (
+    assert _tests_for_changes(("src/lmhdx/q2d.py", "examples/q2d_vortex.py")) == (
         "tests/test_physics.py",
         "tests/test_q2d_identities.py",
         "tests/test_example_runner.py",
@@ -746,18 +746,18 @@ def test_change_gate_selects_affected_tests_and_fails_closed() -> None:
 def test_stable_root_api_is_small_lazy_and_resolvable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    assert set(lmx.__all__) == EXPECTED_ROOT_API
-    assert EXPECTED_ROOT_API <= set(dir(lmx))
-    assert all(callable(getattr(lmx, name)) for name in lmx.__all__)
-    assert not [name for name in lmx.__all__ if not inspect.getdoc(getattr(lmx, name))]
+    assert set(lmhdx.__all__) == EXPECTED_ROOT_API
+    assert EXPECTED_ROOT_API <= set(dir(lmhdx))
+    assert all(callable(getattr(lmhdx, name)) for name in lmhdx.__all__)
+    assert not [name for name in lmhdx.__all__ if not inspect.getdoc(getattr(lmhdx, name))]
     api_reference = Path("docs/reference/api.md").read_text()
-    assert all(f"`{name}`" in api_reference for name in lmx.__all__)
+    assert all(f"`{name}`" in api_reference for name in lmhdx.__all__)
 
     import jax
 
     updates = []
-    monkeypatch.setattr("lmx.io.jax.config.update", lambda *args: updates.append(args))
-    cache = lmx.enable_compilation_cache(
+    monkeypatch.setattr("lmhdx.io.jax.config.update", lambda *args: updates.append(args))
+    cache = lmhdx.enable_compilation_cache(
         tmp_path / "jax-cache", min_compile_time_secs=2.0, min_entry_size_bytes=4096, share_across_values=True
     )
     assert cache.is_dir()
@@ -771,15 +771,15 @@ def test_stable_root_api_is_small_lazy_and_resolvable(
 
 
 def test_advanced_api_uses_owning_module() -> None:
-    assert not hasattr(lmx, "solve_extruded_inductionless")
-    from lmx.fringing import solve_extruded_inductionless
+    assert not hasattr(lmhdx, "solve_extruded_inductionless")
+    from lmhdx.fringing import solve_extruded_inductionless
 
     assert callable(solve_extruded_inductionless)
 
 
 def test_unknown_root_attribute_has_standard_error() -> None:
     with pytest.raises(AttributeError, match="not_an_api"):
-        lmx.not_an_api
+        lmhdx.not_an_api
 
 
 def test_architecture_inventory_ignores_generated_egg_info(
@@ -806,7 +806,7 @@ def test_root_import_is_lazy_and_within_budget() -> None:
 def test_numerical_modules_do_not_import_optional_visualization() -> None:
     code = """
 import sys
-import lmx.io
+import lmhdx.io
 assert not any(name == 'matplotlib' or name.startswith('matplotlib.') for name in sys.modules)
 assert not any(name == 'PIL' or name.startswith('PIL.') for name in sys.modules)
 """
@@ -816,18 +816,18 @@ assert not any(name == 'PIL' or name.startswith('PIL.') for name in sys.modules)
 def test_wheel_audit_rejects_nonpackage_payload(tmp_path: Path) -> None:
     wheel = tmp_path / "lmx-test.whl"
     with zipfile.ZipFile(wheel, "w") as archive:
-        archive.writestr("lmx/__init__.py", "")
-        archive.writestr("lmx/py.typed", "")
+        archive.writestr("lmhdx/__init__.py", "")
+        archive.writestr("lmhdx/py.typed", "")
         archive.writestr("lmx-1.dist-info/METADATA", "")
         archive.writestr("benchmarks/raw.bin", b"large output")
     assert inspect_wheel(wheel)["forbidden_members"] == ["benchmarks/raw.bin"]
-    assert "outside lmx/" in architecture_budget_errors(build_inventory(), wheel=wheel)[0]
+    assert "outside lmhdx/" in architecture_budget_errors(build_inventory(), wheel=wheel)[0]
 
 
 def test_root_api_is_pep561_marked_and_fully_annotated() -> None:
-    assert (Path("src/lmx") / "py.typed").is_file()
-    for name in lmx.__all__:
-        value = getattr(lmx, name)
+    assert (Path("src/lmhdx") / "py.typed").is_file()
+    for name in lmhdx.__all__:
+        value = getattr(lmhdx, name)
         if not (inspect.isfunction(value) or inspect.isclass(value)):
             continue
         signature = inspect.signature(value)
@@ -852,7 +852,7 @@ def test_sdist_audit_rejects_repository_tests(tmp_path: Path) -> None:
 
 def test_curated_examples_use_submodules_and_linear_scripts_are_editable() -> None:
     inventory = build_inventory()["inventory"]
-    stable = set(lmx.__all__)
+    stable = set(lmhdx.__all__)
     for item in inventory["curated_examples"]:
         path = Path(item["path"])
         if path.suffix != ".py":
@@ -860,7 +860,7 @@ def test_curated_examples_use_submodules_and_linear_scripts_are_editable() -> No
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(path))
         imports = (
-            node for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module == "lmx"
+            node for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module == "lmhdx"
         )
         root_imports = {alias.name for node in imports for alias in node.names}
         assert root_imports <= stable, f"{path} imports unsupported root APIs: {root_imports - stable}"

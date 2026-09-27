@@ -14,7 +14,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from lmx import (
+from lmhdx import (
     WallLayer,
     dynamic_to_kinematic_viscosity,
     effective_pinhole_conductance_ratio,
@@ -26,8 +26,8 @@ from lmx import (
     reynolds_number,
     tangential_stack_conductance_ratio,
 )
-from lmx.cases import solve_steady
-from lmx.specs import (
+from lmhdx.cases import solve_steady
+from lmhdx.specs import (
     BoundaryCondition,
     CaseSpec,
     GeometrySpec,
@@ -37,7 +37,7 @@ from lmx.specs import (
     SolverConfig,
     TimeStepperConfig,
 )
-from lmx.validation import validation_summary
+from lmhdx.validation import validation_summary
 
 # Inputs: edit material, geometry, wall, numerics, and output choices here.
 OUTPUT_DIR = Path("artifacts/examples/li_aln_wall_stack")

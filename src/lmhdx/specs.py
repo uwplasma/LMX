@@ -178,7 +178,7 @@ class CaseSpec:
             raise ValueError("case dtype must be 'float32' or 'float64'")
         if self.dtype == "float64" and not jax_config.x64_enabled:
             warnings.warn(
-                "Call lmx.enable_x64() before constructing float64 cases or meshes; "
+                "Call lmhdx.enable_x64() before constructing float64 cases or meshes; "
                 "case construction is activating float64 implicitly.",
                 DeprecationWarning,
                 stacklevel=2,
@@ -186,7 +186,7 @@ class CaseSpec:
             from . import enable_x64
 
             enable_x64()
-        # The case dtype is where LMX sets precision, float32 included; see lmx.enable_x64.
+        # The case dtype is where LMhdX sets precision, float32 included; see lmhdx.enable_x64.
         from . import _pin_matmul_precision
 
         _pin_matmul_precision()
@@ -790,7 +790,7 @@ class StreamingSolverLogger:
         self._max_steps = int(case.time_stepper.max_steps)
         self._target_final_time = float(case.time_stepper.t_final)
         if self.config.banner:
-            self._write("LMX solver")
+            self._write("LMhdX solver")
         solver = getattr(case, "solver", None)
         solver_kind = getattr(solver, "kind", "fully_developed_inductionless")
         self._write(

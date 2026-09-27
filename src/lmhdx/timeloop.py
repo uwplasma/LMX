@@ -1,6 +1,6 @@
 """Run the projection step as one compiled trajectory.
 
-A Python loop around :func:`lmx.core3d.step` dispatches every operation from the
+A Python loop around :func:`lmhdx.core3d.step` dispatches every operation from the
 host. On an accelerator that is the difference between a kernel queue the device
 can run ahead on and a round trip per step, and it is the reason the audit that
 opened this plan found one GPU slower than a laptop CPU on a small duct. The
@@ -184,7 +184,7 @@ def _wall_power(potential: Field, currents: tuple[Field, Field, Field], problem:
     """Return the excess Joule weight on conducting wall faces and the power the sheets dissipate.
 
     A current into a thin wall crosses only the half cell against it, so its
-    Joule term is weighted by ``h/2`` where :func:`lmx.ops.face_inner_product`
+    Joule term is weighted by ``h/2`` where :func:`lmhdx.ops.face_inner_product`
     weights the whole cell; the sheets take the outward current at their own
     potential, ``phi_w = phi_P - J h / (2 sigma)``. With both, the Lorentz work
     is exactly minus the dissipation. Outward is negative on the lower wall.

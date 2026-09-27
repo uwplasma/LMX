@@ -1,6 +1,6 @@
 # 0001 — One authoritative plan
 
-Status: accepted; governing record: [plan.md](https://github.com/uwplasma/LMX/blob/main/plan.md), decisions D1–D14.
+Status: accepted; governing record: [plan.md](https://github.com/uwplasma/LMhdX/blob/main/plan.md), decisions D1–D14.
 
 Context: numerical, validation and research work must share acceptance criteria.
 Decision: follow the plan's phases and exits; issues and PRs hold daily evidence.

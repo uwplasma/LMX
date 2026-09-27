@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from lmx import (
+from lmhdx import (
     WallLayer,
     dynamic_to_kinematic_viscosity,
     effective_pinhole_conductance_ratio,
@@ -18,7 +18,7 @@ from lmx import (
     tangential_stack_conductance_ratio,
     wall_conductance_ratio,
 )
-from lmx.physics import normal_leakage_ratio, wall_layer_from_conductance_ratio
+from lmhdx.physics import normal_leakage_ratio, wall_layer_from_conductance_ratio
 
 pytestmark = pytest.mark.unit
 
@@ -330,7 +330,7 @@ def test_wall_resolution_and_conductance_constructor_validate_controls(monkeypat
             length_scale=1.0,
         )
 
-    monkeypatch.setattr("lmx.physics.wall_conductance_ratio", lambda **kwargs: -1.0)
+    monkeypatch.setattr("lmhdx.physics.wall_conductance_ratio", lambda **kwargs: -1.0)
     with pytest.raises(RuntimeError, match="failed to construct"):
         wall_layer_from_conductance_ratio(
             name="wall",

@@ -30,8 +30,8 @@ Velocities live on their own faces, so a transverse component is averaged to the
 cell centre and then carried to the face where the electromotive force is
 needed. The Lorentz force travels the same path backwards: each face current is
 averaged to the cell centre, and the force is carried from there to the velocity
-faces. Both paths use :func:`lmx.ops.face_average` and its transpose
-:func:`lmx.ops.face_average_adjoint`, so the force map is exactly minus the
+faces. Both paths use :func:`lmhdx.ops.face_average` and its transpose
+:func:`lmhdx.ops.face_average_adjoint`, so the force map is exactly minus the
 adjoint of the electromotive map in the volume-weighted inner products. That is
 the discrete form of :math:`\\int \\mathbf u\\cdot(\\mathbf J\\times\\mathbf B)
 = -\\int \\mathbf J\\cdot(\\mathbf u\\times\\mathbf B)`: the Lorentz force does
@@ -123,8 +123,8 @@ def face_electromotive_force(
     ``velocity`` holds the three face-normal components in the marker-and-cell
     layout and ``magnetic_field`` the three cell-centred components. Both
     transverse velocity components are averaged to cell centres with
-    :func:`lmx.ops.face_average_adjoint` and carried to the target face with
-    :func:`lmx.ops.face_average`, the transpose of the path
+    :func:`lmhdx.ops.face_average_adjoint` and carried to the target face with
+    :func:`lmhdx.ops.face_average`, the transpose of the path
     :func:`lorentz_force` and the momentum update take back, so the
     electromotive force is evaluated where the current flux needs it.
     """
@@ -289,7 +289,7 @@ def lorentz_force(
     which never forms a cell-centred current vector and evaluates the magnetic
     field on the faces, so it stays correct where the field varies. The
     face-to-centre arm is half a cell, so the sum over the two faces of one axis
-    is :func:`lmx.ops.face_average_adjoint` of the current times the face field:
+    is :func:`lmhdx.ops.face_average_adjoint` of the current times the face field:
     the transpose of the interpolation :func:`face_electromotive_force` uses.
     """
     grid = currents[0].grid

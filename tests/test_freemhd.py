@@ -10,10 +10,10 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-import lmx.validation as benchmarks
-from lmx.io import write_extruded_bundle_restart_npz
-from lmx.specs import ExtrudedFieldBundle
-from lmx.validation import (
+import lmhdx.validation as benchmarks
+from lmhdx.io import write_extruded_bundle_restart_npz
+from lmhdx.specs import ExtrudedFieldBundle
+from lmhdx.validation import (
     BENCHMARK_B_SPEC_FILES,
     canonical_matched_b_contract,
     load_benchmark_a_spec,
@@ -75,7 +75,7 @@ def test_matched_b2_direct_can_exclude_optional_checkpoint_callback(monkeypatch)
         calls.append(options)
         return SimpleNamespace(bundle=bundle)
 
-    monkeypatch.setattr("lmx.fringing.solve_extruded_inductionless", solve)
+    monkeypatch.setattr("lmhdx.fringing.solve_extruded_inductionless", solve)
     problem = SimpleNamespace(case=SimpleNamespace(time_stepper=SimpleNamespace(max_steps=4)))
     checkpoint, _ = run_freemhd_parity_suite._run_matched_b2_lmx_direct(
         problem, num_devices=1, capture_checkpoint=False
@@ -87,7 +87,7 @@ def _matched_b_record(root: Path, case_id: str, *, role: str | None = None) -> d
     role = role or ("b1-production" if case_id.startswith("B1") else "b2-production")
     manifest = canonical_matched_b_contract(load_benchmark_b_spec(case_id), role)
     reference = load_benchmark_b_reference(case_id)
-    spec_path = Path("src/lmx/data/benchmarks/specs") / BENCHMARK_B_SPEC_FILES[case_id]
+    spec_path = Path("src/lmhdx/data/benchmarks/specs") / BENCHMARK_B_SPEC_FILES[case_id]
     artifacts = {}
     for name in (
         "lmx_source",
@@ -114,7 +114,7 @@ def _matched_b_record(root: Path, case_id: str, *, role: str | None = None) -> d
         "schema_version": 2,
         "case_id": case_id,
         "acceptance_role": role,
-        "contract": {"lmx": deepcopy(manifest), "freemhd": deepcopy(manifest)},
+        "contract": {"lmhdx": deepcopy(manifest), "freemhd": deepcopy(manifest)},
         "comparison": {
             "x_over_L": list(reference["x_over_L"]),
             "lmx_observable": list(reference["pressure_observable"]),
@@ -295,7 +295,7 @@ def _write_lmx_b2_output(
         json.dumps(
             {
                 "schema_version": 1,
-                "code": "LMX",
+                "code": "LMhdX",
                 "case_id": "B2-fringing-square",
                 "input_sha256": artifact_sha256(input_path, "file"),
                 "evaluator_sha256": artifact_sha256(evaluator, "file"),
@@ -370,7 +370,7 @@ def _matched_b2_smoke_record(
     run_freemhd_parity_suite.materialize_matched_b2_lmx_input(root / "lmx_input")
     run_freemhd_parity_suite.materialize_matched_b2_evaluator(root / "evaluator")
     (root / "lmx_source").mkdir()
-    (root / "lmx_source/evidence.txt").write_text("LMX source fixture\n")
+    (root / "lmx_source/evidence.txt").write_text("LMhdX source fixture\n")
     if executed:
         _write_lmx_b2_output(root / "lmx_output", root / "lmx_input", root / "evaluator")
         _write_freemhd_b2_output(root / "freemhd_output", root / "freemhd_input", root / "evaluator")
@@ -415,13 +415,13 @@ def _matched_b2_smoke_record(
         "schema_version": 3 if executed else 2,
         "case_id": "B2-fringing-square",
         "acceptance_role": "harness-smoke",
-        "contract": {"lmx": deepcopy(contract), "freemhd": deepcopy(contract)},
+        "contract": {"lmhdx": deepcopy(contract), "freemhd": deepcopy(contract)},
         "comparison": {"source": "independent-output-observers"}
         if executed
         else {"x_over_L": [], "lmx_observable": [], "freemhd_observable": []},
         "provenance": {
             "benchmark_spec_sha256": hashlib.sha256(
-                Path("src/lmx/data/benchmarks/specs/alex-b2-square.toml").read_bytes()
+                Path("src/lmhdx/data/benchmarks/specs/alex-b2-square.toml").read_bytes()
             ).hexdigest(),
             "artifacts": artifacts,
         },
@@ -498,7 +498,7 @@ def test_matched_b_schema2_rejects_contract_and_record_forgery(tmp_path: Path):
         (("schema_version",), 1, "schema"),
         (("case_id",), "wrong-case", "case_id"),
         (("acceptance_role",), "self-promoted", "acceptance_role"),
-        (("contract", "lmx", "wall"), {}, "contract.wall.missing"),
+        (("contract", "lmhdx", "wall"), {}, "contract.wall.missing"),
         (
             ("provenance", "benchmark_spec_sha256"),
             "b" * 64,
@@ -523,7 +523,7 @@ def test_matched_b_schema2_rejects_contract_and_record_forgery(tmp_path: Path):
         ("boundary_drive", "flow_constraint_scope", "stationwise"),
     ):
         self_consistent = deepcopy(record)
-        self_consistent["contract"]["lmx"][section][key] = wrong
+        self_consistent["contract"]["lmhdx"][section][key] = wrong
         self_consistent["contract"]["freemhd"][section][key] = wrong
         rejected = validate_matched_b_record(
             self_consistent,
@@ -936,7 +936,7 @@ def test_lmx_b2_output_observer_rejects_corrupt_evidence(tmp_path: Path, mutatio
     _write_lmx_b2_output(output, input_path, evaluator)
     path, old, new = {
         "root": (output / "unexpected", None, "unexpected\n"),
-        "metadata": (output / "run.json", '"code": "LMX"', '"code": "bad"'),
+        "metadata": (output / "run.json", '"code": "LMhdX"', '"code": "bad"'),
         "provenance": (
             output / "run.json",
             '"float_precision": "float64"',
@@ -944,7 +944,7 @@ def test_lmx_b2_output_observer_rejects_corrupt_evidence(tmp_path: Path, mutatio
         ),
     }[mutation]
     path.write_text(new if old is None else path.read_text().replace(old, new, 1))
-    with pytest.raises(ValueError, match="LMX B2"):
+    with pytest.raises(ValueError, match="LMhdX B2"):
         observe_lmx_b2_output(output, input_path, evaluator)
 
 
@@ -1082,21 +1082,21 @@ def test_freemhd_b2_output_observer_rejects_corrupt_evidence(tmp_path: Path, mut
 @pytest.mark.parametrize(
     ("target", "key", "value", "failed"),
     (
-        ("lmx", "steps", 1, "execution.lmx.stopping"),
-        ("lmx", "dt", [0.0], "execution.lmx.dt"),
-        ("lmx", "courant_max", [1.0], "execution.lmx.courant"),
-        ("lmx", "mass_balance", 1.0, "execution.lmx.mass_balance"),
+        ("lmhdx", "steps", 1, "execution.lmhdx.stopping"),
+        ("lmhdx", "dt", [0.0], "execution.lmhdx.dt"),
+        ("lmhdx", "courant_max", [1.0], "execution.lmhdx.courant"),
+        ("lmhdx", "mass_balance", 1.0, "execution.lmhdx.mass_balance"),
         (
-            "lmx",
+            "lmhdx",
             "interface_current_activity",
             0.0,
-            "execution.lmx.interface_current_activity",
+            "execution.lmhdx.interface_current_activity",
         ),
-        ("lmx", "restart_max_abs", 1.0, "execution.lmx.restart"),
-        ("lmx", "dt", None, "execution.lmx.schema"),
+        ("lmhdx", "restart_max_abs", 1.0, "execution.lmhdx.restart"),
+        ("lmhdx", "dt", None, "execution.lmhdx.schema"),
         ("freemhd", "x_over_L", [0.0, 2.0], "x"),
         ("freemhd", "courant_mean", [0.1, 0.1], "courant_mean"),
-        ("lmx", "pressure_observable", [0.0], "arrays"),
+        ("lmhdx", "pressure_observable", [0.0], "arrays"),
         ("freemhd", "pressure_observable", [1.0, 1.0], "pressure_rms"),
     ),
 )
@@ -1116,11 +1116,11 @@ def test_b2_smoke_execution_attributes_each_gate(target, key, value, failed):
         "x_over_L": [0.0, 1.0],
         "pressure_observable": [0.0, 0.0],
     }
-    lmx, freemhd = deepcopy(observed), deepcopy(observed)
-    selected = {"lmx": lmx, "freemhd": freemhd}[target]
+    lmhdx, freemhd = deepcopy(observed), deepcopy(observed)
+    selected = {"lmhdx": lmhdx, "freemhd": freemhd}[target]
     selected.pop(key) if value is None else selected.__setitem__(key, value)
     execution, comparison, _ = _validate_b2_smoke_execution(
-        lmx,
+        lmhdx,
         freemhd,
         load_benchmark_b_spec("B2-fringing-square")["harness_smoke_execution"],
     )
@@ -1455,10 +1455,10 @@ def test_matched_b2_bundle_runs_lmx_before_freemhd_and_builds_schema3(
         root.mkdir()
         (root / "evidence").write_text("source")
 
-    def lmx(_input, _evaluator, root):
-        order.append("lmx")
+    def lmhdx(_input, _evaluator, root):
+        order.append("lmhdx")
         root.mkdir()
-        (root / "evidence").write_text("lmx")
+        (root / "evidence").write_text("lmhdx")
         return {
             "steps": 2,
             "stop_reason": "step_limit",
@@ -1479,9 +1479,9 @@ def test_matched_b2_bundle_runs_lmx_before_freemhd_and_builds_schema3(
 
     monkeypatch.setattr(run_freemhd_parity_suite, "materialize_matched_b2_preflight", preflight)
     monkeypatch.setattr(run_freemhd_parity_suite, "materialize_lmx_source_snapshot", snapshot)
-    monkeypatch.setattr(run_freemhd_parity_suite, "run_matched_b2_lmx_smoke", lmx)
+    monkeypatch.setattr(run_freemhd_parity_suite, "run_matched_b2_lmx_smoke", lmhdx)
     monkeypatch.setattr(run_freemhd_parity_suite, "run_matched_b2_freemhd_smoke", freemhd)
-    monkeypatch.setattr(run_freemhd_parity_suite, "observe_lmx_b2_contract", lambda *_: {"code": "lmx"})
+    monkeypatch.setattr(run_freemhd_parity_suite, "observe_lmx_b2_contract", lambda *_: {"code": "lmhdx"})
     monkeypatch.setattr(
         run_freemhd_parity_suite,
         "observe_freemhd_b2_contract",
@@ -1500,7 +1500,7 @@ def test_matched_b2_bundle_runs_lmx_before_freemhd_and_builds_schema3(
         total_timeout_seconds=10.0,
     )
 
-    assert order == ["lmx", "freemhd"] and report["execution_pass"]
+    assert order == ["lmhdx", "freemhd"] and report["execution_pass"]
     assert captured["record"]["comparison"] == {"source": "independent-output-observers"}
     assert all(
         item["kind"] == "tree"
@@ -1559,7 +1559,7 @@ def test_benchmark_a_spec_loader_rejects_unsupported_case():
 def test_benchmark_a_spec_loader_rejects_inconsistent_inputs(
     tmp_path: Path, case_kind: str, old: str, new: str, message: str
 ):
-    source = Path("src/lmx/data/benchmarks/specs") / f"{case_kind}-ha20.toml"
+    source = Path("src/lmhdx/data/benchmarks/specs") / f"{case_kind}-ha20.toml"
     (tmp_path / source.name).write_text(source.read_text().replace(old, new, 1))
     with pytest.raises(ValueError, match=message):
         load_benchmark_a_spec(case_kind, tmp_path)
@@ -1575,7 +1575,7 @@ def test_samper_table_i_reference_is_complete_and_exact(tmp_path: Path):
     assert rows[("hunt", 500)]["hartmann_wall_conductance"] == pytest.approx(0.01)
     assert rows[("hunt", 15000)]["analytical_flow_rate"] == pytest.approx(2.425e-6)
 
-    source = Path("src/lmx/data/benchmarks/references/samper-table-i.toml")
+    source = Path("src/lmhdx/data/benchmarks/references/samper-table-i.toml")
     invalid = tmp_path / "invalid.toml"
     invalid.write_text(source.read_text().replace('case_kind = "hunt"', 'case_kind = "other"', 1))
     with pytest.raises(ValueError, match="Incomplete hunt Hartmann ladder"):

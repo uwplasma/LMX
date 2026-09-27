@@ -34,7 +34,7 @@ def test_portable_duct_tutorials_and_toml_first_run(tmp_path: Path):
     case_path.write_text(
         source.read_text().replace("../artifacts/examples/toml_hartmann", "artifacts/toml_hartmann")
     )
-    subprocess.run([sys.executable, "-m", "lmx", case_path], cwd=tmp_path, timeout=30, check=True)
+    subprocess.run([sys.executable, "-m", "lmhdx", case_path], cwd=tmp_path, timeout=30, check=True)
     summary = json.loads(next((tmp_path / "artifacts").rglob("hartmann_ha20_toml_summary.json")).read_text())
     assert summary["converged"] is True
     assert summary["status"] == "converged"

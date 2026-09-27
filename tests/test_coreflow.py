@@ -5,9 +5,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from lmx.core3d import fringe_field
-from lmx.coreflow import CoreFlow, fully_developed_gradient, midplane_field
-from lmx.grid import Grid, uniform_faces
+from lmhdx.core3d import fringe_field
+from lmhdx.coreflow import CoreFlow, fully_developed_gradient, midplane_field
+from lmhdx.grid import Grid, uniform_faces
 
 pytestmark = pytest.mark.unit
 
@@ -71,7 +71,7 @@ def test_the_anl_fringe_reproduces_tm228():
     """ANL/FPP/TM-228 section 4.1 (x0 = 3, c_t = c_s = 0.02, a = 1): row 7 of the validation ladder.
 
     The gate is the excess of the drop from x = -6 to 2 over the locally fully
-    developed drop, both computed by LMX on the same mesh, against TM-228's
+    developed drop, both computed by LMhdX on the same mesh, against TM-228's
     0.0932 - 0.0754 = 0.0178. The absolute drop (0.0954 here, 0.0951 on exactly
     [-6, 2]) is reported, not gated: TM-228's own fully developed gradient
     integrates to 0.0776 over [-6, 2], not the quoted 0.0754 (plan, D27a).
@@ -87,7 +87,7 @@ def test_the_anl_fringe_reproduces_tm228():
     assert float(jnp.ptp(result.axial_flux)) < 1e-10
     pressure = np.asarray(result.pressure).mean(axis=1)
     drop = np.interp(-6.0, x, pressure) - np.interp(2.0, x, pressure)
-    # LMX's own fully developed gradient on the same cross-section mesh, integrated over the same stations.
+    # LMhdX's own fully developed gradient on the same cross-section mesh, integrated over the same stations.
     uniform = CoreFlow(np.linspace(0.0, 2.0, 9), nz=20, ny=20).solve(np.ones(9), c_t=0.02, c_s=0.02)
     inside = (x > -6.0 - 1e-9) & (x < 2.0 + 1e-9)
     square = _anl(x[inside]) ** 2

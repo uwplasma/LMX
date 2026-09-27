@@ -26,15 +26,15 @@ sys.path.insert(0, str(ROOT / "src"))
 import jax
 import numpy as np
 
-import lmx
-from lmx.fringing import solve_extruded_inductionless
-from lmx.io import (
+import lmhdx
+from lmhdx.fringing import solve_extruded_inductionless
+from lmhdx.io import (
     load_extruded_restart_bundle,
     write_extruded_bundle_restart_npz,
     write_extruded_restart_npz,
 )
-from lmx.mesh import _cross_section_mesh
-from lmx.validation import (
+from lmhdx.mesh import _cross_section_mesh
+from lmhdx.validation import (
     benchmark_b_pressure_observable,
     build_benchmark_b_problem,
     load_benchmark_b_reference,
@@ -42,8 +42,8 @@ from lmx.validation import (
 )
 from validation.freemhd import validate_matched_b_record
 
-if ROOT not in Path(lmx.__file__).resolve().parents:
-    raise RuntimeError(f"Benchmark B runner imported LMX outside its source tree: {lmx.__file__}")
+if ROOT not in Path(lmhdx.__file__).resolve().parents:
+    raise RuntimeError(f"Benchmark B runner imported LMhdX outside its source tree: {lmhdx.__file__}")
 
 CASE_IDS = ("B1-fringing-pipe", "B2-fringing-square")
 MESH_LEVELS = ("coarse", "medium", "fine")
@@ -76,8 +76,8 @@ def _summarize_pressure_linear_history(
 def _source_fingerprint(root: Path = ROOT) -> str:
     digest = hashlib.sha256()
     paths = (
-        sorted((root / "src/lmx").glob("*.py"))
-        + sorted((root / "src/lmx/data/benchmarks/specs").glob("alex-b*.toml"))
+        sorted((root / "src/lmhdx").glob("*.py"))
+        + sorted((root / "src/lmhdx/data/benchmarks/specs").glob("alex-b*.toml"))
         + [root / "scripts" / "run_benchmark_b_independence.py"]
     )
     for path in paths:
@@ -1159,7 +1159,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--plot-reference-csv",
         type=Path,
-        default=ROOT / "src/lmx/data/benchmarks/references/alex-b2-square.csv",
+        default=ROOT / "src/lmhdx/data/benchmarks/references/alex-b2-square.csv",
         help=argparse.SUPPRESS,
     )
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)

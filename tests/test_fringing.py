@@ -11,10 +11,10 @@ import numpy as np
 import pytest
 from solvax import schur_complement_precond
 
-import lmx._fringing_common as common_impl
-import lmx._fringing_duct as duct_impl
-import lmx.fringing as fringing_impl
-from lmx._fringing_common import (
+import lmhdx._fringing_common as common_impl
+import lmhdx._fringing_duct as duct_impl
+import lmhdx.fringing as fringing_impl
+from lmhdx._fringing_common import (
     _apply_fixed_flow_pressure_constraint,
     _cross_duct_pressure_difference,
     _distance_weighted_harmonic_mean,
@@ -30,7 +30,7 @@ from lmx._fringing_common import (
     _spacing_vector,
     _thin_wall_interface_mean,
 )
-from lmx._fringing_duct import (
+from lmhdx._fringing_duct import (
     _conservative_current_diagnostics_3d,
     _conservative_current_fluxes_3d,
     _face_flux_pressure_projection_duct,
@@ -38,7 +38,7 @@ from lmx._fringing_duct import (
     _solvax_pressure_poisson_duct,
     _station_axial_current_from_fluxes,
 )
-from lmx._fringing_pipe import (
+from lmhdx._fringing_pipe import (
     _apply_pipe_diffusion_coefficients_3d,
     _pipe_conservative_current_diagnostics_3d,
     _pipe_conservative_emf_rhs_3d,
@@ -52,7 +52,7 @@ from lmx._fringing_pipe import (
     _solvax_pressure_poisson_pipe,
     _steady_stokes_projection_pipe,
 )
-from lmx.fringing import (
+from lmhdx.fringing import (
     build_extruded_problem_from_case,
     build_layered_duct_extruded_problem,
     build_magnetic_obstacle_rect_extruded_problem,
@@ -66,7 +66,7 @@ from lmx.fringing import (
     validate_variable_field_extruded_solution,
     validate_variable_field_pipe_solution,
 )
-from lmx.mesh import (
+from lmhdx.mesh import (
     _cross_section_mesh,
     _sample_volume_field,
     make_divergence_free_cross_section_field,
@@ -74,14 +74,14 @@ from lmx.mesh import (
     sample_cross_section_field,
     write_tabulated_field_npz,
 )
-from lmx.specs import (
+from lmhdx.specs import (
     ExtrudedFieldBundle,
     GeometrySpec,
     MagneticFieldSpec,
     NumericalFailure,
     RegionSpec,
 )
-from lmx.validation import build_benchmark_b_field_profile, build_benchmark_b_problem
+from lmhdx.validation import build_benchmark_b_field_profile, build_benchmark_b_problem
 
 pytestmark = pytest.mark.unit
 
@@ -2012,14 +2012,14 @@ def test_extruded_sharding_validates_placement_and_supported_paths(
     assert _shard_extruded_fields((field,), num_devices=None)[0] is field
 
     devices = [object(), object()]
-    monkeypatch.setattr("lmx._fringing_common.jax.devices", lambda: devices)
+    monkeypatch.setattr("lmhdx._fringing_common.jax.devices", lambda: devices)
     with pytest.raises(ValueError, match="divisible"):
         _shard_extruded_fields((jnp.zeros((3, 2, 2)),), num_devices=2)
 
-    monkeypatch.setattr("lmx._fringing_common.Mesh", lambda *args, **kwargs: "mesh")
-    monkeypatch.setattr("lmx._fringing_common.NamedSharding", lambda *args, **kwargs: "sharding")
+    monkeypatch.setattr("lmhdx._fringing_common.Mesh", lambda *args, **kwargs: "mesh")
+    monkeypatch.setattr("lmhdx._fringing_common.NamedSharding", lambda *args, **kwargs: "sharding")
     monkeypatch.setattr(
-        "lmx._fringing_common.jax.lax.with_sharding_constraint",
+        "lmhdx._fringing_common.jax.lax.with_sharding_constraint",
         lambda value, sharding: value + 1,
     )
     for count in (1, 2):
@@ -2035,7 +2035,7 @@ from dataclasses import replace
 import jax
 import jax.numpy as jnp
 import numpy as np
-from lmx.fringing import (
+from lmhdx.fringing import (
     build_layered_duct_extruded_problem,
     build_pipe_ogrid_extruded_problem,
     build_square_duct_extruded_problem,
@@ -2515,7 +2515,7 @@ def test_solve_extruded_inductionless_wraps_history_bundle_and_validation(
     problem = build_square_duct_extruded_problem(nx_stations=3, ny=6, nz=6)
     fake_bundle = _mock_extruded_bundle(geometry_kind="rect_duct", stations=3)
     monkeypatch.setattr(
-        "lmx.fringing._solve_extruded_projection",
+        "lmhdx.fringing._solve_extruded_projection",
         lambda problem, **kwargs: fake_bundle,
     )
 
@@ -2730,7 +2730,7 @@ def test_solve_extruded_inductionless_uses_projection_for_pipe_geometry(
     )
     pipe_problem = replace(problem, case=pipe_case)
     monkeypatch.setattr(
-        "lmx.fringing._solve_extruded_projection",
+        "lmhdx.fringing._solve_extruded_projection",
         lambda problem, **kwargs: _mock_extruded_bundle(geometry_kind="pipe_ogrid", stations=1),
     )
     solution = solve_extruded_inductionless(pipe_problem)

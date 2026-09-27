@@ -74,7 +74,7 @@ def fully_developed_gradient(c_t, c_s, aspect: float = 1.0):
 
 
 def midplane_field(field) -> tuple[np.ndarray, np.ndarray]:
-    """Return the cell-centre ``x`` and ``B_y`` nearest ``y = 0`` of an :class:`lmx.core3d.ImposedField`."""
+    """Return the cell-centre ``x`` and ``B_y`` nearest ``y = 0`` of an :class:`lmhdx.core3d.ImposedField`."""
     grid = field.grid
     x, y = (np.asarray(values) for values in grid.centers[:2])
     b_y = np.asarray(field.components[1])[:, int(np.argmin(np.abs(y))), :]
@@ -299,7 +299,7 @@ class CoreFlow:
         """Solve for ``p``, ``phi_t`` and ``phi_s`` together; differentiable in every traced argument.
 
         ``field`` is ``B_y`` at the stations of ``x`` (for example from
-        :func:`lmx.core3d.fringe_field` through :func:`midplane_field`, or any 1-D
+        :func:`lmhdx.core3d.fringe_field` through :func:`midplane_field`, or any 1-D
         array), multiplied by ``field_scale``. The inlet pressure is ``drive`` and
         the outlet zero; unless ``mean_velocity`` is None the solution is then
         rescaled once so that the mean axial velocity is ``mean_velocity``.

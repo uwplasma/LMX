@@ -1,6 +1,6 @@
 # Architecture
 
-LMX is organized by physical ownership:
+LMhdX is organized by physical ownership:
 
 ```text
 CaseSpec
@@ -17,21 +17,21 @@ modules. Imports remain one-way: specifications and data containers do not
 depend on solvers; plotting dependencies load only when an output function
 requests them.
 
-`lmx.fringing` is the public 3-D interface. Its private implementation is
+`lmhdx.fringing` is the public 3-D interface. Its private implementation is
 partitioned by mathematical ownership: the public module owns solve
 orchestration, while private modules hold shared mapped, rectangular, and
 cylindrical operators. The private modules are not separate user APIs, and
 architecture gates prevent the numerical kernels from becoming an
 undifferentiated mega-module.
 
-Package sources live under `src/lmx`, so an editable installation and a wheel
-resolve the same module tree. The wheel includes `lmx/py.typed`; every root API
+Package sources live under `src/lmhdx`, so an editable installation and a wheel
+resolve the same module tree. The wheel includes `lmhdx/py.typed`; every root API
 callable has an explicit signature, and distribution audits require the typing
 marker and reject files outside the package and metadata roots.
 
-Reusable algebra belongs in SOLVAX when it is independent of LMX geometry,
+Reusable algebra belongs in SOLVAX when it is independent of LMhdX geometry,
 units, boundaries, and terminology and has its own correctness, gradient,
-convergence, documentation, and performance tests. LMX retains coefficient
+convergence, documentation, and performance tests. LMhdX retains coefficient
 assembly, gauges that express physical constraints, coupling, and physical
 acceptance residuals.
 

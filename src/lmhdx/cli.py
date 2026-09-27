@@ -409,9 +409,9 @@ def main(argv: list[str] | None = None) -> int:
 
     formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        prog="lmx",
+        prog="lmhdx",
         description="Run and validate differentiable inductionless MHD cases.",
-        epilog="A TOML case may also be passed directly: lmx CASE.toml",
+        epilog="A TOML case may also be passed directly: lmhdx CASE.toml",
         formatter_class=formatter,
     )
     subparsers = parser.add_subparsers(dest="command", title="commands", required=True)

@@ -1,4 +1,4 @@
-"""Regenerate the README gallery assets from the public LMX API.
+"""Regenerate the README gallery assets from the public LMhdX API.
 
 Run ``python scripts/make_showcase_figures.py`` (CPU, about three minutes).
 Outputs go to ``docs/_static``: a 256^2 quasi-2D turbulence animation and
@@ -22,9 +22,9 @@ from PIL import Image
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-import lmx  # noqa: E402
-from lmx.cases import solve_steady  # noqa: E402
-from lmx.validation import extract_midplane_profile  # noqa: E402
+import lmhdx  # noqa: E402
+from lmhdx.cases import solve_steady  # noqa: E402
+from lmhdx.validation import extract_midplane_profile  # noqa: E402
 
 STATIC = Path(__file__).resolve().parents[1] / "docs" / "_static"
 
@@ -40,7 +40,7 @@ def q2d_turbulence(n: int = 256, steps: int = 3000, stride: int = 50, seed: int 
     phase = np.exp(2j * np.pi * np.asarray(jax.random.uniform(jax.random.PRNGKey(seed), (n, n))))
     vorticity = np.fft.ifftn(amplitude * phase).real
     vorticity *= 4.0 / np.sqrt(np.mean(vorticity**2))
-    problem = lmx.Q2DProblem(
+    problem = lmhdx.Q2DProblem(
         jnp.asarray(vorticity, dtype=jnp.float32),
         length=(length, length),
         viscosity=2.0e-4,
@@ -50,7 +50,7 @@ def q2d_turbulence(n: int = 256, steps: int = 3000, stride: int = 50, seed: int 
         history_stride=stride,
         energy_budget_tolerance=5.0e-2,
     )
-    result = lmx.solve(problem)
+    result = lmhdx.solve(problem)
     frames = np.asarray(result.vorticity_history)
     limit = float(np.percentile(np.abs(frames), 99.5))
     print(
@@ -112,7 +112,7 @@ def hunt_sweep(hartmann_numbers: tuple[float, ...] = (20.0, 100.0, 500.0, 1000.0
     """Hunt duct profiles versus Ha: side-layer jets and their Ha^-1/2 thickness."""
     profiles, maps, peaks = {}, {}, []
     for ha in hartmann_numbers:
-        solution = solve_steady(lmx.make_hunt_case(ha=ha, ny=cells, nz=cells))
+        solution = solve_steady(lmhdx.make_hunt_case(ha=ha, ny=cells, nz=cells))
         if not solution.converged:
             raise RuntimeError(f"Hunt Ha={ha:g} ended with {solution.status}")
         profile = extract_midplane_profile(solution, axis="z")
@@ -147,7 +147,7 @@ def hunt_sweep(hartmann_numbers: tuple[float, ...] = (20.0, 100.0, 500.0, 1000.0
     ax_map.set_aspect("equal")
     fig.colorbar(image, ax=ax_map, shrink=0.85)
     ha_values, distances = (np.array(v) for v in zip(*peaks, strict=True))
-    ax_scaling.loglog(ha_values, distances, "o", color="k", label="jet maximum, LMX")
+    ax_scaling.loglog(ha_values, distances, "o", color="k", label="jet maximum, LMhdX")
     guide = np.array([15.0, 1500.0])
     ax_scaling.loglog(
         guide,
@@ -170,7 +170,7 @@ def validation_ladder(
 ) -> None:
     """Rows 2-4 of the validation ladder, solved by the staggered core.
 
-    Every curve here is the steady solve of `lmx.steady` on a wall-resolving
+    Every curve here is the steady solve of `lmhdx.steady` on a wall-resolving
     mesh (conjugate gradients for insulating walls, Newton-Krylov for the
     conducting ones), and every reference is `validation.shercliff`, which
     shares no operator, mesh or solver with the package. The point of the middle
@@ -180,7 +180,7 @@ def validation_ladder(
     from validation.shercliff import duct_flow
 
     # The gates here are parts in a thousand; float32 cannot express them.
-    lmx.enable_x64()
+    lmhdx.enable_x64()
     profiles, errors, refinement = {}, {}, {}
     for hartmann in hartmann_numbers:
         for conductance in conductances:
@@ -220,7 +220,7 @@ def validation_ladder(
     wall = np.logspace(-1.5, 1.2, 60)
     axes[0].semilogx(wall, 1.0 - np.exp(-wall), "--", color="tab:red", lw=1.2, label=r"$1-e^{-\xi}$")
     axes[0].set_xlabel(r"$\xi = (1 + y/a)\,Ha$   (wall distance in layer widths)")
-    axes[0].set_ylabel("u / max u   (lines LMX, points spectral)")
+    axes[0].set_ylabel("u / max u   (lines LMhdX, points spectral)")
     axes[0].set_title("Hartmann layers collapse", fontsize=11)
     axes[0].set_xlim(3.0e-2, 20.0)
     axes[0].legend(frameon=False, loc="lower right")
@@ -243,7 +243,7 @@ def validation_ladder(
 
     counts = np.array(sorted(refinement))
     values = np.array([refinement[count] for count in counts])
-    axes[2].loglog(counts, values, "o-", color="k", label="LMX, Ha = 20")
+    axes[2].loglog(counts, values, "o-", color="k", label="LMhdX, Ha = 20")
     axes[2].loglog(
         counts, values[0] * (counts / counts[0]) ** -2.0, "--", color="tab:red", label="second order"
     )
@@ -255,13 +255,13 @@ def validation_ladder(
 
 
 def _duct_problem(cells: int, hartmann: float, conductance: float):
-    from lmx.core3d import duct_problem
+    from lmhdx.core3d import duct_problem
 
     return duct_problem(hartmann=hartmann, cells=cells, wall_conductance=conductance)
 
 
 def _steady_duct(problem) -> tuple[float, np.ndarray]:
-    from lmx.steady import solve_steady_state
+    from lmhdx.steady import solve_steady_state
 
     velocity = solve_steady_state(problem, pseudo_step=1.0e3, linear_restart=600).velocity[0].data
     volumes = np.asarray(problem.grid.cell_volumes())[0]
@@ -277,9 +277,9 @@ def _reference_rate(hartmann: float, conductance: float) -> float:
 
 def pipe_sweep(hartmann_numbers: tuple[float, ...] = (0.0, 20.0, 100.0, 400.0)) -> None:
     """A circular pipe across the Hartmann range: core, layers and flow rate."""
-    from lmx.pipe import flow_rate, pipe_problem, solve_pipe
+    from lmhdx.pipe import flow_rate, pipe_problem, solve_pipe
 
-    lmx.enable_x64()
+    lmhdx.enable_x64()
     profiles, rates, maps = {}, {}, None
     for hartmann in hartmann_numbers:
         problem = pipe_problem(hartmann=hartmann, radial=64, azimuthal=128)
@@ -330,7 +330,7 @@ def pipe_sweep(hartmann_numbers: tuple[float, ...] = (0.0, 20.0, 100.0, 400.0)) 
 
     values = np.array([rates[hartmann] for hartmann in hartmann_numbers])
     finite = np.array(hartmann_numbers) > 0.0
-    ax_rate.loglog(np.array(hartmann_numbers)[finite], values[finite], "o-", color="k", label="LMX")
+    ax_rate.loglog(np.array(hartmann_numbers)[finite], values[finite], "o-", color="k", label="LMhdX")
     guide = np.array([10.0, 600.0])
     reference = np.array(hartmann_numbers)[finite][1]
     ax_rate.loglog(
