@@ -81,9 +81,11 @@ $L_\infty=3.67\times10^{-6}$.
 
 That run's speed-up is not quoted. A float32 GPU timing counts only when its
 report records a true-float32 `jax_default_matmul_precision`, because JAX's
-default lets Ampere cards use TensorFloat-32 (ADR 0005, D15). The JAX 0.10.2
-reports in `benchmarks/results` record no precision; they put the $256^2$
-float32 ratio at 14.15x on a 20-step workload. Plan step 2.1 re-measures them.
+default lets Ampere cards use TensorFloat-32 (ADR 0005, D15). The GPU reports in
+`benchmarks/results` record `highest` (plan step 2.1): $256^2$ takes 0.863 ms per
+step in true float32 on one A4000. The CPU reports there are from the
+uncontrolled 2026-09-07 run and record no precision, so no Q2D CPU/GPU ratio is
+quoted.
 LMX sets the precision to `'highest'` when a `Q2DProblem` is built, unless you
 have already chosen one.
 
