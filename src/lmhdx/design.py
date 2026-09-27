@@ -7,7 +7,9 @@ For a uniform pressure-gradient drive over length ``L``, pressure drop is
 ``f L`` and hydraulic power is ``f L Q``. These are isothermal segment
 quantities, excluding entry/exit losses, manifolds and thermal effects.
 
-The ``channel_*`` functions are the :class:`~lmhdx.core3d.ChannelProblem`-native
+A ``CaseSpec`` is solved on the staggered core through
+:mod:`lmhdx.fully_developed`, so both families share one solver. The
+``channel_*`` functions are the :class:`~lmhdx.core3d.ChannelProblem`-native
 counterparts, sharing the same linear response, reusing :class:`DuctResponse`,
 :func:`pressure_drop` and :func:`hydraulic_power`, and the same segment-quantity
 disclaimer above. They apply in the Stokes limit only: ``Q = G f`` holds
@@ -23,8 +25,8 @@ from dataclasses import dataclass
 import jax
 import jax.numpy as jnp
 
-from .cases import solve_fully_developed_fields
 from .core3d import ChannelProblem
+from .fully_developed import channel_problem, core_applies, solve_fully_developed_fields
 from .solvers import _build_mesh
 from .specs import CaseSpec
 from .steady import solve_steady_state
@@ -46,7 +48,15 @@ __all__ = [
 
 
 def fluid_cell_areas(case: CaseSpec) -> jnp.ndarray:
-    """Return mesh-only integration weights, zero outside the fluid."""
+    """Return the cross-section weights of the fluid mesh a case is solved on.
+
+    That mesh is :func:`lmhdx.fully_developed.case_mesh`, the one the velocity of
+    :func:`lmhdx.solve_fully_developed_fields` and :func:`lmhdx.solve` lives on,
+    or, for a case the core does not represent, the cell-centred mesh with zero
+    weight outside the fluid.
+    """
+    if core_applies(case):
+        return channel_cross_section_weights(channel_problem(case)).astype(case.dtype)
     with jax.ensure_compile_time_eval():
         mesh = _build_mesh(case)
         areas = jnp.asarray(mesh.dy)[:, None] * jnp.asarray(mesh.dz)[None, :]

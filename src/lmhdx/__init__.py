@@ -128,7 +128,7 @@ _EXPORTS = {
     "make_hunt_case": ("lmhdx.cases", "make_hunt_case"),
     "make_q2d_case": ("lmhdx.q2d", "make_q2d_case"),
     "evolve_q2d": ("lmhdx.q2d", "evolve_q2d"),
-    "solve_fully_developed_fields": ("lmhdx.cases", "solve_fully_developed_fields"),
+    "solve_fully_developed_fields": ("lmhdx.fully_developed", "solve_fully_developed_fields"),
     "ChannelProblem": ("lmhdx.core3d", "ChannelProblem"),
     "duct_problem": ("lmhdx.core3d", "duct_problem"),
     "solve_steady_state": ("lmhdx.steady", "solve_steady_state"),
