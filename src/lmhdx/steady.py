@@ -77,9 +77,8 @@ _MAX_STEPS = 40
 # backends, and the banded solve otherwise: measured faster there, and no slower to compile (2b.11).
 _LINE_INVERSE_BYTES = 64 * 2**20
 _LINE_INVERSE_BACKENDS = ("gpu", "cuda", "rocm")
-# A right-hand side within this fraction of the CG tolerance of the primal one's direction reuses
-# the primal solution (2b.2); the scaled solution's residual then stays within 1.001 x the tolerance.
-_PARALLEL = 1.0e-3
+# Start derivative solves from the primal solution scaled onto their right-hand side (2b.2).
+_REUSE_PRIMAL = True
 
 
 @dataclass(frozen=True)
@@ -419,34 +418,32 @@ def _stokes_limit_root(
     ``K y = -A Q W^-1 y + (I - Q) W^-1 y`` with ``Q`` the orthogonal projection
     onto ``V``. Its inverse projects once per solve, not per iteration.
 
-    The operator being symmetric, a right-hand side parallel to the primal one
-    is answered by the primal solution scaled (2b.2): the adjoint of any
-    objective whose weight is the drive, such as the flow rate under a uniform
-    drive, and the tangent in the drive, which then cost no second CG solve.
-    The test is on the projected right-hand sides, to a mismatch of
-    ``_PARALLEL * tolerance`` of their norm, so the scaled solution's residual
-    stays within ``1.001`` times the CG tolerance; any other right-hand side runs
-    CG as before. The primal solve sits outside the derivative rule, a
-    :func:`jax.custom_jvp`, so an undifferentiated solve compiles one CG loop and
-    a gradient two, as without the reuse. The rule closes over constants only:
+    The operator being symmetric, the derivative solves start from the primal
+    solution scaled onto their projected right-hand side (2b.2). A right-hand
+    side parallel to the primal one -- the adjoint of any objective whose weight
+    is the drive, such as the flow rate under a uniform drive, and the tangent
+    in the drive -- is then solved on entry and CG takes no step; any other
+    starts from its component along the primal. One code path, the same CG and
+    tolerance. The primal solve sits outside the derivative rule, a
+    :func:`jax.custom_jvp`, so an undifferentiated solve compiles one CG loop.
+    The rule takes the face weights as arguments rather than closing over them:
     a traced closure would leak when an enclosing ``jit`` is differentiated.
     """
-    with jax.ensure_compile_time_eval():
-        weights = _face_weights(problem)
-        inverse = jax.tree.map(jnp.reciprocal, weights)
+    weights = _face_weights(problem)
 
     def operator(scale, velocity):
         return steady_residual(velocity, problem, factorization, forcing=(0.0, 0.0, 0.0), field_scale=scale)
 
-    def matvec(scale, state):
-        velocity = jax.tree.map(jnp.multiply, state, inverse)
+    def matvec(weights, scale, state):
+        velocity = jax.tree.map(jnp.divide, state, weights)
         inside = _orthogonal_projection(velocity, problem, factorization)
         return jax.tree.map(lambda u, a, q: u - a - q, velocity, operator(scale, inside), inside)
 
-    def cg(scale, inside, traced=False):
+    def cg(weights, scale, inside, start=None, traced=False):
         result = solvax.pcg(
-            lambda y: jax.tree.map(jnp.negative, operator(scale, jax.tree.map(jnp.multiply, y, inverse))),
+            lambda y: jax.tree.map(jnp.negative, operator(scale, jax.tree.map(jnp.divide, y, weights))),
             inside,
+            x0=start,
             precond=lambda r: jax.tree.map(jnp.multiply, precond(r), weights),
             rtol=tolerance,
             max_steps=max_iterations,
@@ -455,46 +452,40 @@ def _stokes_limit_root(
         kept = _certified(result.x, accepted, "steady CG solve", traced)
         return kept, (result.iterations, result.residual_norm, result.converged)
 
-    def complete(y, target, inside):
+    def complete(weights, y, target, inside):
         return jax.tree.map(lambda v, t, q, w: v + w * (t - q), y, target, inside, weights)
 
     @jax.custom_jvp
-    def solved(target, scale, primal_y, primal_inside):
-        return complete(primal_y, target, primal_inside)
+    def solved(target, scale, primal_y, primal_inside, weights):
+        return complete(weights, primal_y, target, primal_inside)
 
     @solved.defjvp
     def solved_jvp(primals, tangents):
-        target, scale, primal_y, primal_inside = primals
+        target, scale, primal_y, primal_inside, weights = primals
         target_dot, scale_dot = tangents[:2]
         solution = solved(*primals)
         norm2 = _dot(primal_inside, primal_inside)
 
         def solve(_, value):
             inside = _orthogonal_projection(value, problem, factorization)
-            ratio = _dot(inside, primal_inside) / jnp.maximum(norm2, jnp.finfo(norm2.dtype).tiny)
-            mismatch = _norm(jax.tree.map(lambda q, p: q - ratio * p, inside, primal_inside))
-            parallel = (norm2 > 0.0) & (mismatch <= _PARALLEL * tolerance * _norm(inside))
-            y = jax.lax.cond(
-                parallel,
-                lambda _: jax.tree.map(lambda v: ratio * v, primal_y),
-                lambda q: cg(scale, q)[0],
-                inside,
-            )
-            return complete(y, value, inside)
+            start = None
+            if _REUSE_PRIMAL:
+                ratio = _dot(inside, primal_inside) / jnp.maximum(norm2, jnp.finfo(norm2.dtype).tiny)
+                start = jax.tree.map(lambda v: ratio * v, primal_y)
+            return complete(weights, cg(weights, scale, inside, start)[0], value, inside)
 
-        change = jax.jvp(lambda s: matvec(s, solution), (scale,), (scale_dot,))[1]
+        change = jax.jvp(lambda s: matvec(weights, s, solution), (scale,), (scale_dot,))[1]
         rhs = jax.tree.map(jnp.subtract, target_dot, change)
-        return solution, jax.lax.custom_linear_solve(
-            functools.partial(matvec, scale), rhs, solve, symmetric=True
-        )
+        operator_at = functools.partial(matvec, weights, scale)
+        return solution, jax.lax.custom_linear_solve(operator_at, rhs, solve, symmetric=True)
 
     rhs = steady_residual(start, problem, factorization, forcing=forcing, field_scale=field_scale)
     primal_inside = jax.lax.stop_gradient(_orthogonal_projection(rhs, problem, factorization))
     # Outside the derivative rule the primal meets concrete values under eager differentiation,
     # which must still reject with nonfinite values rather than raise.
     traced = any(isinstance(leaf, jax.core.Tracer) for leaf in jax.tree.leaves((rhs, field_scale)))
-    primal_y, diagnostics = cg(jax.lax.stop_gradient(field_scale), primal_inside, traced)
-    step = solved(rhs, field_scale, jax.lax.stop_gradient(primal_y), primal_inside)
+    primal_y, diagnostics = cg(weights, jax.lax.stop_gradient(field_scale), primal_inside, traced=traced)
+    step = solved(rhs, field_scale, jax.lax.stop_gradient(primal_y), primal_inside, weights)
     return jax.tree.map(lambda u, y, w: u + y / w, start, step, weights), diagnostics
 
 
