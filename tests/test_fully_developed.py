@@ -227,3 +227,21 @@ def test_a_case_the_core_does_not_represent_keeps_the_cell_centred_solve():
     reference = cell_centred_fields(case)[0]
     assert bool(jnp.array_equal(velocity, reference))
     assert fluid_cell_areas(case).shape == velocity.shape
+
+
+def test_a_derivative_in_the_drive_differentiates_no_solve():
+    """The solve runs at unit drive and is scaled, so neither a gradient nor a tangent in the drive adds a loop."""
+    case = lmhdx.make_hartmann_case(ha=2, ny=8, nz=8)
+
+    def objective(drive):
+        return jnp.mean(lmhdx.solve_fully_developed_fields(case, forcing=drive)[0])
+
+    def loops(function):
+        return str(jax.make_jaxpr(function)(1.0)).count("while[")
+
+    forward = loops(objective)
+    assert forward > 0
+    assert loops(jax.grad(objective)) == forward
+    assert loops(lambda x: jax.jvp(objective, (x,), (1.0,))[1]) == forward
+    value, gradient = jax.value_and_grad(objective)(2.0)
+    assert float(gradient) == pytest.approx(float(value) / 2.0, rel=1e-12)

@@ -153,7 +153,8 @@ def solve_fully_developed_fields(
     problem = channel_problem(case)
     target = _target_flow_rate(case) if forcing is None else None
     drive = target if target is not None else (case.forcing if forcing is None else forcing)
-    fields, _, _ = _compiled(problem, target is not None, case.dtype)(drive, magnetic_field_scale)
+    fields, _, _ = _compiled(problem, target is not None)(*_inputs(drive, magnetic_field_scale))
+    fields = tuple(value.astype(case.dtype) for value in fields)
     if not any(isinstance(value, jax.core.Tracer) for value in (drive, magnetic_field_scale)):
         require_finite("fully developed solve", velocity=fields[0])
     return fields
@@ -181,9 +182,9 @@ def solve_fully_developed(case: CaseSpec, *, logger=None, start_time: float = 0.
             reference_mean_velocity=mean,
             restart=None,
         )
-    run = _compiled(problem, target is not None, case.dtype)
-    fields, drive, evidence = run(case.forcing if target is None else target, 1.0)
-    u, phi, jy, jz, lorentz = fields
+    run = _compiled(problem, target is not None)
+    fields, drive, evidence = run(*_inputs(case.forcing if target is None else target, 1.0))
+    u, phi, jy, jz, lorentz = (value.astype(case.dtype) for value in fields)
     require_finite("fully developed solve", velocity=u, potential=phi, residual=evidence["residual"])
     areas = jnp.asarray(mesh.dy, dtype=u.dtype)[:, None] * jnp.asarray(mesh.dz, dtype=u.dtype)[None, :]
     flow_rate = jnp.sum(areas * u)
@@ -214,32 +215,42 @@ def solve_fully_developed(case: CaseSpec, *, logger=None, start_time: float = 0.
     return solution
 
 
+def _inputs(drive, field_scale):
+    """The program's arguments in the precision it computes in, so every case dtype shares one program."""
+    dtype = jnp.result_type(float)
+    return jnp.asarray(drive, dtype=dtype), jnp.asarray(field_scale, dtype=dtype)
+
+
 @functools.lru_cache(maxsize=16)
-def _compiled(problem: ChannelProblem, fixed_flow: bool, dtype: str):
+def _compiled(problem: ChannelProblem, fixed_flow: bool):
     """Compile one steady solve per problem, with the drive and the field scale as arguments.
 
     One program replaces the dispatch of every operation from the host, which
     is most of an eager solve's time, cold or warm. ``drive`` is the force
-    density, or the flow rate when ``fixed_flow`` is set; that flow rate is met
-    by scaling the unit-drive solution. The fields and the report share the
+    density, or the flow rate when ``fixed_flow`` is set. Either way the solve
+    runs at unit drive and its solution is scaled, which the problem's linearity
+    in the drive makes exact: a derivative in the drive then differentiates a
+    product rather than the conjugate-gradient solve, so a gradient or a tangent
+    in the drive compiles no second solve. The fields and the report share the
     program, so :func:`lmhdx.solve` and :func:`solve_fully_developed_fields` agree
-    bit for bit and compile once between them.
+    bit for bit and compile once between them, for every case dtype: the fields
+    come back in the precision of the solve and the callers cast them.
     """
 
     def run(drive, field_scale):
-        forcing = 1.0 if fixed_flow else drive
         velocity = solve_steady_state(
             problem,
-            forcing=(forcing, 0.0, 0.0),
+            forcing=(1.0, 0.0, 0.0),
             field_scale=field_scale,
             tolerance=_TOLERANCE[jnp.result_type(float).name],
         ).velocity
+        forcing = drive
         if fixed_flow:
             _, dy, dz = problem.grid.widths
             weights = jnp.asarray(dy)[:, None] * jnp.asarray(dz)[None, :]
             forcing = drive / jnp.sum(weights * velocity[0].data[0])
-            velocity = tuple(component.replace_data(forcing * component.data) for component in velocity)
-        fields, currents = _fields(problem, velocity, field_scale, dtype)
+        velocity = tuple(component.replace_data(forcing * component.data) for component in velocity)
+        fields, currents = _fields(problem, velocity, field_scale)
         drives = {"forcing": (forcing, 0.0, 0.0), "field_scale": field_scale}
         scale = _norm(steady_residual(zero_velocity(problem), problem, **drives))
         evidence = {
@@ -251,7 +262,7 @@ def _compiled(problem: ChannelProblem, fixed_flow: bool, dtype: str):
     return jax.jit(run)
 
 
-def _fields(problem: ChannelProblem, velocity, field_scale, dtype):
+def _fields(problem: ChannelProblem, velocity, field_scale):
     potential, currents, field = face_currents(velocity, problem, field_scale=field_scale)
     scalar = problem.scalar_conditions
     closed = tuple(wall_insulated(current, axis, scalar[axis]) for axis, current in enumerate(currents))
@@ -260,7 +271,7 @@ def _fields(problem: ChannelProblem, velocity, field_scale, dtype):
     jy = 0.5 * (current_y[:-1] + current_y[1:])
     jz = 0.5 * (current_z[:, :-1] + current_z[:, 1:])
     fields = (velocity[0].data[0], potential.data[0], jy, jz, force[0].data[0])
-    return tuple(value.astype(dtype) for value in fields), currents
+    return fields, currents
 
 
 def _faces(count: int, half: float, layer: float, cells_in_layer: int) -> np.ndarray:
