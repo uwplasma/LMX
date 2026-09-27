@@ -177,6 +177,9 @@ unsafe = platform.system() == "Darwin" and tuple(map(int, jaxlib.__version__.spl
 enabled = os.environ["LMHDX_COMPILATION_CACHE"] != "0" and not unsafe
 assert (jax.config.jax_compilation_cache_dir == os.environ["LMHDX_COMPILATION_CACHE"]) == enabled
 assert jax.config.jax_compilation_cache_max_size == (2**31 if enabled else -1)
+# JAX reads and writes a size-bounded cache only through filelock; without it every entry fails.
+import importlib.util
+assert importlib.util.find_spec("filelock") is not None
 """
     environment = {
         key: value
