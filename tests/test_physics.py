@@ -201,7 +201,7 @@ def test_validation_api_reports_profiles_metrics_and_artifacts(tmp_path: Path):
     unsupported = replace(case, magnetic_field=replace(case.magnetic_field, value=(1.0, 0.0, 0.0)))
 
     assert metrics["potential_residual"] == pytest.approx(1.0e-7)
-    assert metrics["linear_residual"] == pytest.approx(0.0)
+    assert metrics["linear_residual"] is None  # not recorded by this solve
     assert scalar["coordinate"].shape == scalar["value"].shape
     assert shared.l2_error == pytest.approx(0.0)
     assert combined_profile_error() == pytest.approx(0.0)
@@ -564,7 +564,6 @@ def test_cold_hunt_steady_solve_certifies_the_discrete_affine_problem():
     import scipy.sparse
     import scipy.sparse.linalg
 
-    from lmhdx.design import volumetric_flow_rate
     from lmhdx.mesh import apply_five_point_operator
     from lmhdx.solvers import (
         _compute_current_and_lorentz,
@@ -599,8 +598,16 @@ def test_cold_hunt_steady_solve_certifies_the_discrete_affine_problem():
         ),
         solver=replace(case.solver, coupling_tolerance=1e-12),
     )
-    unit_velocity, unit_potential, *_ = solve_fully_developed_fields(case, forcing=1.0)
-    drive = 0.05 / float(volumetric_flow_rate(case, unit_velocity))
+    # The cell-centred solver on its own layered mesh; lmhdx.solve now takes the core.
+    unit_velocity, unit_potential, *_ = cases_impl.solve_fully_developed_fields(case, forcing=1.0)
+    solution = solve_steady(replace(case, forcing=1.0))
+    areas = np.asarray(solution.mesh.dy)[:, None] * np.asarray(solution.mesh.dz)[None, :]
+    fluid_areas = np.where(np.asarray(solution.mesh.fluid_mask), areas, 0.0)
+
+    def volumetric_flow_rate(_, velocity):
+        return float(np.sum(fluid_areas * np.asarray(velocity)))
+
+    drive = 0.05 / volumetric_flow_rate(case, unit_velocity)
     solution = solve_steady(replace(case, forcing=drive))
     velocity, potential = solution.state.u, solution.state.phi
 
