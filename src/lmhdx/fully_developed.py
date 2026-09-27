@@ -153,7 +153,7 @@ def solve_fully_developed_fields(
     problem = channel_problem(case)
     target = _target_flow_rate(case) if forcing is None else None
     drive = target if target is not None else (case.forcing if forcing is None else forcing)
-    fields, _, _ = _compiled(problem, target is not None)(*_inputs(drive, magnetic_field_scale))
+    fields, _, _ = _driven(problem, target is not None, drive, magnetic_field_scale)
     fields = tuple(value.astype(case.dtype) for value in fields)
     if not any(isinstance(value, jax.core.Tracer) for value in (drive, magnetic_field_scale)):
         require_finite("fully developed solve", velocity=fields[0])
@@ -182,8 +182,9 @@ def solve_fully_developed(case: CaseSpec, *, logger=None, start_time: float = 0.
             reference_mean_velocity=mean,
             restart=None,
         )
-    run = _compiled(problem, target is not None)
-    fields, drive, evidence = run(*_inputs(case.forcing if target is None else target, 1.0))
+    fields, drive, evidence = _driven(
+        problem, target is not None, case.forcing if target is None else target, 1.0
+    )
     u, phi, jy, jz, lorentz = (value.astype(case.dtype) for value in fields)
     require_finite("fully developed solve", velocity=u, potential=phi, residual=evidence["residual"])
     areas = jnp.asarray(mesh.dy, dtype=u.dtype)[:, None] * jnp.asarray(mesh.dz, dtype=u.dtype)[None, :]
@@ -215,49 +216,66 @@ def solve_fully_developed(case: CaseSpec, *, logger=None, start_time: float = 0.
     return solution
 
 
-def _inputs(drive, field_scale):
-    """The program's arguments in the precision it computes in, so every case dtype shares one program."""
+def _driven(problem: ChannelProblem, fixed_flow: bool, drive, field_scale):
+    """Scale the unit-drive program's fields by the drive, outside the program.
+
+    ``drive`` is the force density, or the flow rate when ``fixed_flow`` is set.
+    The problem is linear in the drive, so the scaling is exact; done outside the
+    compiled solve, a derivative in the drive differentiates a product and never
+    enters the solve's program, which is then neither linearized nor transposed.
+    The relative residual does not depend on the drive, and the current
+    divergence scales with it. A field scale that is not traced makes the solve
+    a constant of any enclosing trace: it runs then, through the one compiled
+    program, so a jitted objective, gradient or tangent in the drive compiles
+    only the scaling around it.
+    """
     dtype = jnp.result_type(float)
-    return jnp.asarray(drive, dtype=dtype), jnp.asarray(field_scale, dtype=dtype)
+    if isinstance(field_scale, jax.core.Tracer):
+        fields, flow_rate, evidence = _compiled(problem)(jnp.asarray(field_scale, dtype=dtype))
+    else:
+        fields, flow_rate, evidence = _executable(problem, dtype.name)(np.asarray(field_scale, dtype=dtype))
+    forcing = jnp.asarray(drive, dtype=dtype)
+    if fixed_flow:
+        forcing = forcing / flow_rate
+    evidence = {**evidence, "div_current_max": jnp.abs(forcing) * evidence["div_current_max"]}
+    return tuple(forcing * value for value in fields), forcing, evidence
 
 
 @functools.lru_cache(maxsize=16)
-def _compiled(problem: ChannelProblem, fixed_flow: bool):
-    """Compile one steady solve per problem, with the drive and the field scale as arguments.
+def _executable(problem: ChannelProblem, dtype: str):
+    """The compiled unit-drive program itself, which runs on concrete inputs even inside a trace."""
+    return _compiled(problem).lower(jax.ShapeDtypeStruct((), dtype)).compile()
+
+
+@functools.lru_cache(maxsize=16)
+def _compiled(problem: ChannelProblem):
+    """Compile one steady solve per problem at unit drive, with the field scale as its argument.
 
     One program replaces the dispatch of every operation from the host, which
-    is most of an eager solve's time, cold or warm. ``drive`` is the force
-    density, or the flow rate when ``fixed_flow`` is set. Either way the solve
-    runs at unit drive and its solution is scaled, which the problem's linearity
-    in the drive makes exact: a derivative in the drive then differentiates a
-    product rather than the conjugate-gradient solve, so a gradient or a tangent
-    in the drive compiles no second solve. The fields and the report share the
-    program, so :func:`lmhdx.solve` and :func:`solve_fully_developed_fields` agree
-    bit for bit and compile once between them, for every case dtype: the fields
-    come back in the precision of the solve and the callers cast them.
+    is most of an eager solve's time, cold or warm; :func:`_driven` scales it.
+    The fields and the report share the program, so :func:`lmhdx.solve` and
+    :func:`solve_fully_developed_fields` agree bit for bit and compile once
+    between them, for every case dtype: the fields come back in the precision of
+    the solve and the callers cast them.
     """
 
-    def run(drive, field_scale):
+    def run(field_scale):
         velocity = solve_steady_state(
             problem,
             forcing=(1.0, 0.0, 0.0),
             field_scale=field_scale,
             tolerance=_TOLERANCE[jnp.result_type(float).name],
         ).velocity
-        forcing = drive
-        if fixed_flow:
-            _, dy, dz = problem.grid.widths
-            weights = jnp.asarray(dy)[:, None] * jnp.asarray(dz)[None, :]
-            forcing = drive / jnp.sum(weights * velocity[0].data[0])
-        velocity = tuple(component.replace_data(forcing * component.data) for component in velocity)
+        _, dy, dz = problem.grid.widths
+        weights = jnp.asarray(dy)[:, None] * jnp.asarray(dz)[None, :]
         fields, currents = _fields(problem, velocity, field_scale)
-        drives = {"forcing": (forcing, 0.0, 0.0), "field_scale": field_scale}
+        drives = {"forcing": (1.0, 0.0, 0.0), "field_scale": field_scale}
         scale = _norm(steady_residual(zero_velocity(problem), problem, **drives))
         evidence = {
             "residual": _norm(steady_residual(velocity, problem, **drives)) / jnp.maximum(scale, 1e-300),
             "div_current_max": jnp.max(jnp.abs(divergence(currents).data)),
         }
-        return fields, forcing, evidence
+        return fields, jnp.sum(weights * velocity[0].data[0]), evidence
 
     return jax.jit(run)
 
