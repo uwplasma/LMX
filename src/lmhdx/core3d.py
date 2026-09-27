@@ -456,9 +456,16 @@ def duct_problem(
     the walls normal to the field and ``a/sqrt(Ha)`` against the others -- with
     the gentlest stretching that spans the duct, which is the difference between
     a converged flow rate and a fine mesh in the wrong place.
+
+    The duct is solved in float64: JAX's float64 mode is turned on if it is
+    off, since the steady solve at these tolerances does not converge in
+    float32. A float32 channel is built with :class:`ChannelProblem` directly.
     """
     if hartmann < 0.0:
         raise ValueError("hartmann must not be negative")
+    from . import enable_x64
+
+    enable_x64()
     if hartmann:
         transverse = wall_resolving_faces(
             cells, -1.0, 1.0, layer_thickness=1.0 / hartmann, cells_in_layer=cells_in_layer, max_ratio=None

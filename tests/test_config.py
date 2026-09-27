@@ -907,3 +907,14 @@ def test_curated_examples_declare_user_facing_contracts(tmp_path: Path) -> None:
     assert (summary_path.parent / summary["poster"]).is_file()
     if summary["movie"] is not None:
         assert (summary_path.parent / summary["movie"]).is_file()
+
+
+def test_the_readme_duct_solves_in_a_fresh_process_without_enabling_x64():
+    code = """
+import jax, lmhdx
+assert not jax.config.x64_enabled
+solution = lmhdx.solve(lmhdx.duct_problem(hartmann=20.0, cells=32, wall_conductance=0.027))
+assert jax.config.x64_enabled and solution.velocity[0].data.dtype == "float64"
+"""
+    environment = {key: value for key, value in os.environ.items() if key != "JAX_ENABLE_X64"}
+    subprocess.run([sys.executable, "-c", code], check=True, timeout=300, env=environment)
