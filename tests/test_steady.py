@@ -247,10 +247,16 @@ def test_the_reused_primal_is_the_general_adjoint(monkeypatch, conductance):
 
 
 @pytest.mark.parametrize(
-    ("hartmann", "cells"), [(100.0, 24), pytest.param(300.0, 48, marks=pytest.mark.slow)]
+    ("hartmann", "cells"),
+    [(100.0, 24), pytest.param(300.0, 48, marks=pytest.mark.slow), (1000.0, 48)],
 )
 def test_the_adjoint_matches_finite_differences_where_the_layers_are_thin(hartmann, cells):
-    """Stretched layer meshes need the preconditioned transpose; without it Ha 300 gave NaN."""
+    """Stretched layer meshes need the preconditioned transpose; without it Ha 300 gave NaN.
+
+    Ha 1000 is G11 and validation row 26 (plan step 1.7e): measured on 24, 48 and 64 cells
+    at 2e-9 to 1.5e-7 of central differences with steps 1e-4 and 1e-5. Both the gradient
+    and the differences are compiled; eager tracing of the solve was twice their cost.
+    """
     problem = duct_problem(hartmann=hartmann, cells=cells)
 
     def throughput(drive, scale):
@@ -259,15 +265,16 @@ def test_the_adjoint_matches_finite_differences_where_the_layers_are_thin(hartma
         )
         return jnp.mean(solution.velocity[0].data)
 
-    value, gradient = jax.value_and_grad(throughput, argnums=(0, 1))(1.0, 1.0)
+    value, gradient = jax.jit(jax.value_and_grad(throughput, argnums=(0, 1)))(1.0, 1.0)
     assert np.isfinite(value) and np.isfinite(gradient).all()
+    compiled = jax.jit(throughput)
     size = 1.0e-4
     for index in range(2):
         raised = [1.0, 1.0]
         lowered = [1.0, 1.0]
         raised[index] += size
         lowered[index] -= size
-        difference = (throughput(*raised) - throughput(*lowered)) / (2.0 * size)
+        difference = (compiled(*raised) - compiled(*lowered)) / (2.0 * size)
         assert float(gradient[index]) == pytest.approx(float(difference), rel=1e-6)
     # A stronger field brakes the flow.
     assert float(gradient[1]) < 0.0
