@@ -461,10 +461,20 @@ def _stokes_limit_root(
         return jax.tree.map(lambda u, a, q: u - a - q, velocity, operator(scale, inside), inside)
 
     def staged_cg(weights, scale, inside, start):
+        rest = jax.tree.map(jnp.zeros_like, inside) if start is None else start
+        rest_leaves = jax.tree.leaves(rest)
+
+        def matvec(y):
+            # CG's first product is with a zero start, and the operator is linear: skip it rather
+            # than put a whole operator application into the program. Anything else is applied.
+            if start is None and all(a is b for a, b in zip(jax.tree.leaves(y), rest_leaves, strict=True)):
+                return jax.tree.map(jnp.zeros_like, y)
+            return jax.tree.map(jnp.negative, operator(scale, jax.tree.map(jnp.divide, y, weights)))
+
         result = solvax.pcg(
-            lambda y: jax.tree.map(jnp.negative, operator(scale, jax.tree.map(jnp.divide, y, weights))),
+            matvec,
             inside,
-            x0=start,
+            x0=rest,
             precond=lambda r: jax.tree.map(jnp.multiply, precond(r), weights),
             rtol=tolerance,
             max_steps=max_iterations,

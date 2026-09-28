@@ -773,3 +773,20 @@ def test_the_residual_at_rest_is_the_projected_drive_exactly(conductance):
     )
     for got, expected in zip(_rest_residual(problem, factorization, (2.5, 0.0, 0.0)), full, strict=True):
         np.testing.assert_array_equal(got.data, expected.data)
+
+
+def test_a_solve_from_rest_traces_the_operator_twice(monkeypatch):
+    """Once in the CG iteration and once to certify the root: not at rest, nor on CG's zero start."""
+    import lmhdx.steady as steady
+
+    calls = []
+    original = steady.steady_residual
+
+    def counted(*arguments, **keywords):
+        calls.append(1)
+        return original(*arguments, **keywords)
+
+    monkeypatch.setattr(steady, "steady_residual", counted)
+    problem = _duct(24, 20.0)
+    jax.make_jaxpr(lambda: solve_steady_state(problem).velocity)()
+    assert len(calls) == 2
