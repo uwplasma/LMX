@@ -94,7 +94,7 @@ def face_gradient(field: Field, axis: int | str, condition: BoundaryCondition) -
     difference = _take(padded, index, slice(1, None)) - _take(padded, index, slice(None, -1))
     distances = face_distances(grid, index, condition)
     offset = tuple(FACE if position == index else CENTER for position in range(3))
-    return Field(difference / _metric(distances, index, field.dtype), offset, grid)
+    return Field(difference * _metric(1.0 / distances, index, field.dtype), offset, grid)
 
 
 def axis_divergence(face: Field, axis: int | str) -> Field:
@@ -104,7 +104,8 @@ def axis_divergence(face: Field, axis: int | str) -> Field:
     _require_face(face, index)
     flux = _product(grid.area_factors(index), face.dtype) * face.data
     contribution = _take(flux, index, slice(1, None)) - _take(flux, index, slice(None, -1))
-    return Field(contribution / _product(grid.volume_factors(), face.dtype), (CENTER, CENTER, CENTER), grid)
+    inverse = tuple(1.0 / factor for factor in grid.volume_factors())
+    return Field(contribution * _product(inverse, face.dtype), (CENTER, CENTER, CENTER), grid)
 
 
 def divergence(faces: tuple[Field, Field, Field]) -> Field:
@@ -167,11 +168,12 @@ def face_average(field: Field, axis: int | str, condition: BoundaryCondition) ->
     _require_cell_centred(field)
     padded = pad(field.data, index, condition, grid=grid)
     ghosted = _ghosted_widths(np.asarray(grid.widths[index]), condition)
-    weight = _broadcast(ghosted[:-1] / (ghosted[:-1] + ghosted[1:]), index, field.dtype)
+    share = ghosted[:-1] / (ghosted[:-1] + ghosted[1:])
     lower = _take(padded, index, slice(None, -1))
     upper = _take(padded, index, slice(1, None))
     offset = tuple(FACE if position == index else CENTER for position in range(3))
-    return Field(weight * lower + (1.0 - weight) * upper, offset, grid)
+    weights = (_broadcast(share, index, field.dtype), _broadcast(1.0 - share, index, field.dtype))
+    return Field(weights[0] * lower + weights[1] * upper, offset, grid)
 
 
 def face_average_adjoint(face: Field, axis: int | str, condition: BoundaryCondition) -> Field:
@@ -306,8 +308,23 @@ def _as_array(values: np.ndarray, dtype) -> jnp.ndarray:
     return jnp.asarray(values, dtype=dtype)
 
 
+def foldable(shape: tuple[int, ...]) -> bool:
+    """Whether a metric product of this shape is formed on the host: a line or a plane, never a volume.
+
+    A stored plane costs what one slab of the field does; a volume would bring back the
+    cell-sized captured constants that dominated a 64^3 compile, so those stay broadcast
+    factors multiplied on the device. A cross-section (one axial cell) is always a plane.
+    """
+    return sum(extent > 1 for extent in shape) <= 2
+
+
 def _product(factors: tuple[np.ndarray, ...], dtype) -> jnp.ndarray:
-    """Multiply broadcastable metric factors left to right on the device, where XLA fuses them."""
+    """Multiply broadcastable metric factors left to right: on the host when small, else on the device."""
+    if foldable(np.broadcast_shapes(*(np.shape(factor) for factor in factors))):
+        total = np.asarray(factors[0])
+        for factor in factors[1:]:
+            total = total * factor
+        return _as_array(total, dtype)
     total = _as_array(factors[0], dtype)
     for factor in factors[1:]:
         total = total * _as_array(factor, dtype)
@@ -360,13 +377,13 @@ def _centred_axis_laplacian(field: Field, axis: int, condition: BoundaryConditio
     grid = field.grid
     padded = pad(field.data, axis, condition, grid=grid)
     distances = face_distances(grid, axis, condition)
-    gradient = (_take(padded, axis, slice(1, None)) - _take(padded, axis, slice(None, -1))) / _metric(
-        distances, axis, field.dtype
-    )
     face_measure, cell_measure = grid.axis_measures(axis)
-    flux = gradient * _metric(face_measure, axis, field.dtype)
+    # One stored factor per face, measure over distance, and one reciprocal per cell.
+    flux = (_take(padded, axis, slice(1, None)) - _take(padded, axis, slice(None, -1))) * _metric(
+        (face_measure if distances.ndim == 1 else _shaped(face_measure, axis)) / distances, axis, field.dtype
+    )
     difference = _take(flux, axis, slice(1, None)) - _take(flux, axis, slice(None, -1))
-    return difference / _metric(cell_measure, axis, field.dtype)
+    return difference * _metric(1.0 / cell_measure, axis, field.dtype)
 
 
 def _face_axis_laplacian(field: Field, axis: int, condition: BoundaryCondition) -> jnp.ndarray:
@@ -377,17 +394,17 @@ def _face_axis_laplacian(field: Field, axis: int, condition: BoundaryCondition) 
     if condition.is_periodic:
         # The first and last faces coincide; drop the duplicate before wrapping.
         interior = _take(data, axis, slice(None, -1))
-        gradient = (_roll(interior, axis, -1) - interior) / _broadcast(widths, axis, field.dtype)
+        gradient = (_roll(interior, axis, -1) - interior) * _broadcast(1.0 / widths, axis, field.dtype)
         distances = 0.5 * (widths + np.roll(widths, 1))
         difference = gradient - _roll(gradient, axis, 1)
-        result = difference / _broadcast(distances, axis, field.dtype)
+        result = difference * _broadcast(1.0 / distances, axis, field.dtype)
         return jnp.concatenate((result, _take(result, axis, slice(None, 1))), axis=axis)
-    gradient = (_take(data, axis, slice(1, None)) - _take(data, axis, slice(None, -1))) / _broadcast(
-        widths, axis, field.dtype
+    gradient = (_take(data, axis, slice(1, None)) - _take(data, axis, slice(None, -1))) * _broadcast(
+        1.0 / widths, axis, field.dtype
     )
     distances = 0.5 * (widths[:-1] + widths[1:])
-    inner = (_take(gradient, axis, slice(1, None)) - _take(gradient, axis, slice(None, -1))) / _broadcast(
-        distances, axis, field.dtype
+    inner = (_take(gradient, axis, slice(1, None)) - _take(gradient, axis, slice(None, -1))) * _broadcast(
+        1.0 / distances, axis, field.dtype
     )
     zeros = jnp.zeros_like(_take(data, axis, slice(None, 1)))
     return jnp.concatenate((zeros, inner, zeros), axis=axis)

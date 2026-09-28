@@ -46,7 +46,7 @@ import solvax
 
 from .bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition
 from .grid import CENTER, FACE, POLAR, Field, Grid, uniform_faces
-from .ops import laplacian, staggered_laplacian
+from .ops import foldable, laplacian, staggered_laplacian
 
 __all__ = [
     "FastDiagonalPolarPoisson",
@@ -66,6 +66,7 @@ __all__ = [
 ]
 
 _SINGULAR_TOLERANCE = 1.0e-9
+_AXIS_SHAPES = ((-1, 1, 1), (1, -1, 1), (1, 1, -1))
 _PRECISIONS = ("state", "mixed")
 
 
@@ -112,6 +113,12 @@ def _refined(factorization, direct, matvec, data: jnp.ndarray, volumes: np.ndarr
     return solution if volumes is None else _volume_mean_removed(solution, volumes)
 
 
+def _reciprocal(values: np.ndarray) -> np.ndarray:
+    """``1 / values`` on the host, zero where a singular mode's value is (its entry is overwritten)."""
+    values = np.asarray(values)
+    return np.divide(1.0, values, out=np.zeros_like(values), where=values != 0.0).astype(values.dtype)
+
+
 def _volume_mean_removed(values: jnp.ndarray, volumes: np.ndarray) -> jnp.ndarray:
     weights = jnp.asarray(volumes, dtype=values.dtype)
     return values - jnp.sum(weights * values) / jnp.sum(weights)
@@ -132,6 +139,12 @@ def _single_bases(vectors, scales, denominator: np.ndarray) -> dict:
 
 
 def _scaled(data: jnp.ndarray, scales, low: dict | None, *, inverse: bool) -> jnp.ndarray:
+    if low is None and foldable(data.shape):
+        # One stored factor: the product of the three axis scales, formed on the host.
+        factors = [
+            (1.0 / scale if inverse else scale).reshape(shape) for scale, shape in zip(scales, _AXIS_SHAPES)
+        ]
+        return data * jnp.asarray(factors[0] * factors[1] * factors[2], dtype=data.dtype)
     for axis, scale in enumerate(scales):
         if low is None:
             factor = 1.0 / scale if inverse else scale
@@ -501,21 +514,21 @@ class FastDiagonalPoisson:
     def _direct(self, data: jnp.ndarray, single: bool = False) -> jnp.ndarray:
         dtype = data.dtype
         low = self._low if single else None
-        volumes = jnp.asarray(self._measure(), dtype=dtype)
+        # Stored factors, not quotients: normalized volumes and reciprocal eigenvalue sums.
         if self.singular:
-            mean = jnp.sum(volumes * data) / jnp.sum(volumes)
-            data = data - mean
+            measure = self._measure()
+            weights = jnp.asarray(measure / np.sum(measure), dtype=dtype)
+            data = data - jnp.sum(weights * data)
         scaled = _scaled(data, self.scales, low, inverse=False)
         transformed = _contracted(scaled, self.vectors, low, transpose=True)
-        denominator = self._eigenvalue_sum(dtype) if low is None else jnp.asarray(low["denominator"])
-        solution = transformed / denominator
+        denominator = self._eigenvalue_total() if low is None else np.asarray(low["denominator"])
+        solution = transformed * jnp.asarray(_reciprocal(denominator), dtype=transformed.dtype)
         if self.singular:
             solution = solution.at[0, 0, 0].set(0.0)
         restored = _contracted(solution, self.vectors, low, transpose=False)
         result = _scaled(restored, self.scales, low, inverse=True)
         if self.singular:
-            mean = jnp.sum(volumes * result) / jnp.sum(volumes)
-            result = result - mean
+            result = result - jnp.sum(weights * result)
         return result
 
     def residual_norm(self, solution: Field, rhs: Field) -> jnp.ndarray:
@@ -944,14 +957,12 @@ class FastDiagonalHelmholtz:
         return self.shift - self.coefficient * total
 
     def _direct(self, interior: jnp.ndarray, single: bool = False) -> jnp.ndarray:
-        dtype = interior.dtype
         low = self._low if single else None
         scaled = _scaled(interior, self.scales, low, inverse=False)
         transformed = _contracted(scaled, self.vectors, low, transpose=True)
-        denominator = (
-            jnp.asarray(self._denominator(), dtype=dtype) if low is None else jnp.asarray(low["denominator"])
-        )
-        restored = _contracted(transformed / denominator, self.vectors, low, transpose=False)
+        denominator = self._denominator() if low is None else np.asarray(low["denominator"])
+        inverse = jnp.asarray(_reciprocal(denominator), dtype=transformed.dtype)
+        restored = _contracted(transformed * inverse, self.vectors, low, transpose=False)
         return _scaled(restored, self.scales, low, inverse=True)
 
 

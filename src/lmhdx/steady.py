@@ -312,7 +312,7 @@ class _FieldLine:
             flat = jax.vmap(solvax.lu_solve_banded)(self.factors, interleaved)[:, ::2]
         data = jnp.moveaxis(flat.reshape(lines.shape), -1, self.axis)
         for at in self.across:
-            data = _modal(data, velocity.vectors[at], at) / _along(velocity.scales[at], at, data)
+            data = _modal(data, velocity.vectors[at], at) * _along(1.0 / velocity.scales[at], at, data)
         return rhs.replace_data(jnp.zeros_like(rhs.data).at[velocity.slices].set(data))
 
 
