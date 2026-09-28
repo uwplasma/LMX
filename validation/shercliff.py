@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import numpy as np
 
-__all__ = ["chebyshev_weights", "duct_flow", "flow_rate", "quadrant_flow_rate"]
+__all__ = ["chebyshev_weights", "duct_flow", "flow_rate", "hartmann_wall_current", "quadrant_flow_rate"]
 
 
 def _differentiation_matrix(points: int) -> tuple[np.ndarray, np.ndarray]:
@@ -132,6 +132,22 @@ def flow_rate(hartmann: float, points: int = 40, *, forcing: float = 1.0, **wall
     _, velocity, _ = duct_flow(hartmann, points, forcing=forcing, **walls)
     weights = chebyshev_weights(points)
     return float(weights @ velocity @ weights) / 4.0
+
+
+def hartmann_wall_current(hartmann: float, points: int = 64, *, hartmann_wall: float) -> float:
+    """Return the current a Hartmann wall carries across its midplane.
+
+    The fluid drives current into the wall at ``y = 1`` on one side of ``z = 0``
+    and takes it back on the other; the sheet carries the difference along
+    itself, and the corners, which meet insulating side walls, carry none. The
+    current crossing the midplane is therefore half the integral of the normal
+    current density ``|J_y| = |d phi / dy|`` (the velocity vanishes at the wall)
+    over the wall, which reads the exchange rather than one point of the sheet.
+    """
+    derivative, _ = _differentiation_matrix(points)
+    _, _, potential = duct_flow(hartmann, points, hartmann_wall=hartmann_wall)
+    normal = (derivative @ potential)[0]
+    return 0.5 * float(chebyshev_weights(points) @ np.abs(normal))
 
 
 def quadrant_flow_rate(
