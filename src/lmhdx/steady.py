@@ -55,6 +55,7 @@ from .core3d import (
     ImposedField,
     electric_state,
     enforce_face_constraints,
+    face_currents,
     face_lorentz_force,
     project,
     velocity_condition,
@@ -91,6 +92,9 @@ class SteadySolution:
     potential: Field
     residual_norm: jnp.ndarray
     steps: int
+    initial_residual_norm: jnp.ndarray | None = None
+    currents: tuple[Field, Field, Field] | None = None
+    magnetic_field: tuple[Field, Field, Field] | None = None
 
 
 def steady_residual(
@@ -407,6 +411,7 @@ def _stokes_limit_root(
     field_scale,
     tolerance: float,
     max_iterations: int,
+    rhs=None,
 ):
     """Solve the affine Stokes-limit problem with one preconditioned CG solve.
 
@@ -498,7 +503,8 @@ def _stokes_limit_root(
         operator_at = functools.partial(matvec, weights, scale)
         return solution, jax.lax.custom_linear_solve(operator_at, rhs, solve, symmetric=True)
 
-    rhs = steady_residual(start, problem, factorization, forcing=forcing, field_scale=field_scale)
+    if rhs is None:
+        rhs = steady_residual(start, problem, factorization, forcing=forcing, field_scale=field_scale)
     primal_inside = jax.lax.stop_gradient(_orthogonal_projection(rhs, problem, factorization))
     primal_y, diagnostics = cg(weights, jax.lax.stop_gradient(field_scale), primal_inside, None)
     step = solved(rhs, field_scale, jax.lax.stop_gradient(primal_y), primal_inside, weights)
@@ -546,7 +552,8 @@ def solve_steady_state(
     def residual(state):
         return steady_residual(state, problem, factorization, forcing=forcing, field_scale=field_scale)
 
-    scale = _norm(residual(start))
+    initial = residual(start)
+    scale = _norm(initial)
 
     precond = _preconditioner(problem, factorization, viscous, step)
 
@@ -560,6 +567,8 @@ def solve_steady_state(
             field_scale=field_scale,
             tolerance=tolerance,
             max_iterations=linear_restart * linear_max_restarts if max_steps > 0 else 0,
+            # From rest the projected start is the start, so its residual is already known.
+            rhs=initial if velocity is None else None,
         )
         return _finish(root, residual, scale, tolerance, problem, factorization, field_scale, max_steps)
 
@@ -669,8 +678,9 @@ def _finish(
     )
     root = _certified(root, accepted, "steady solve")
     corrected, pressure = project(root, problem, factorization)
-    potential, _ = electric_state(corrected, problem, factorization, field_scale)
-    return SteadySolution(corrected, pressure, potential, final, max_steps)
+    # The currents and the scaled field come with the potential, so callers need no second potential solve.
+    potential, currents, field = face_currents(corrected, problem, factorization, field_scale)
+    return SteadySolution(corrected, pressure, potential, final, max_steps, scale, currents, field)
 
 
 def _krylov(matvec, target, precond=None):

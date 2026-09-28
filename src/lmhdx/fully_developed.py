@@ -41,13 +41,13 @@ import jax.numpy as jnp
 import numpy as np
 
 from .bc import NEUMANN, PERIODIC, BoundaryCondition
-from .core3d import ChannelProblem, face_currents, zero_velocity
+from .core3d import ChannelProblem
 from .em import lorentz_force, wall_insulated
 from .grid import Grid, uniform_faces, wall_resolving_faces
 from .mesh import StructuredMesh, generate_rect_duct_mesh_from_faces
 from .ops import divergence
 from .specs import CaseSpec, Diagnostics, MHDState, Solution, require_finite
-from .steady import shared_or_embedded, solve_steady_state, steady_residual
+from .steady import shared_or_embedded, solve_steady_state
 
 __all__ = [
     "case_mesh",
@@ -260,19 +260,20 @@ def _compiled(problem: ChannelProblem):
     """
 
     def run(field_scale):
-        velocity = solve_steady_state(
+        solution = solve_steady_state(
             problem,
             forcing=(1.0, 0.0, 0.0),
             field_scale=field_scale,
             tolerance=_TOLERANCE[jnp.result_type(float).name],
-        ).velocity
+        )
+        velocity = solution.velocity
         _, dy, dz = problem.grid.widths
         weights = jnp.asarray(dy)[:, None] * jnp.asarray(dz)[None, :]
-        fields, currents = _fields(problem, velocity, field_scale)
-        drives = {"forcing": (1.0, 0.0, 0.0), "field_scale": field_scale}
-        scale = _norm(steady_residual(zero_velocity(problem), problem, **drives))
+        fields, currents = _fields(problem, solution)
+        # The solve's own residuals, at rest and at the root: evaluating them again doubled the program.
+        scale = solution.initial_residual_norm
         evidence = {
-            "residual": _norm(steady_residual(velocity, problem, **drives)) / jnp.maximum(scale, 1e-300),
+            "residual": solution.residual_norm / jnp.maximum(scale, 1e-300),
             "div_current_max": jnp.max(jnp.abs(divergence(currents).data)),
         }
         return fields, jnp.sum(weights * velocity[0].data[0]), evidence
@@ -280,8 +281,9 @@ def _compiled(problem: ChannelProblem):
     return jax.jit(run)
 
 
-def _fields(problem: ChannelProblem, velocity, field_scale):
-    potential, currents, field = face_currents(velocity, problem, field_scale=field_scale)
+def _fields(problem: ChannelProblem, solution):
+    velocity, potential = solution.velocity, solution.potential
+    currents, field = solution.currents, solution.magnetic_field
     scalar = problem.scalar_conditions
     closed = tuple(wall_insulated(current, axis, scalar[axis]) for axis, current in enumerate(currents))
     force = lorentz_force(closed, field, scalar)
@@ -397,7 +399,3 @@ def _target_flow_rate(case: CaseSpec) -> float | None:
         if boundary.kind == "inlet_flow_rate" and isinstance(boundary.value, (int, float)):
             return float(boundary.value)
     return None
-
-
-def _norm(velocity) -> jax.Array:
-    return jnp.sqrt(sum(jnp.sum(component.data**2) for component in velocity))
