@@ -655,5 +655,11 @@ def _imposed_field(problem: ChannelProblem) -> tuple[Field, Field, Field]:
 
 
 def _constant(grid: Grid, value: float) -> Field:
-    """A broadcast scalar under tracing, which XLA fuses into its consumers, never a captured array."""
-    return Field(jnp.full(grid.shape, value, dtype=jnp.result_type(float)), (CENTER,) * 3, grid)
+    """A broadcast scalar under tracing, which XLA fuses into its consumers, never a captured array.
+
+    The scalar is read from a one-element constant rather than written as a literal, so
+    programs that differ only in the value share one executable (2b.1).
+    """
+    dtype = jnp.result_type(float)
+    scalar = jnp.asarray(np.full(1, value, dtype=dtype))[0]
+    return Field(jnp.broadcast_to(scalar, grid.shape), (CENTER,) * 3, grid)

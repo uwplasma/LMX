@@ -40,7 +40,10 @@ without host callbacks. Optimizers must reject nonfinite values and gradients.
 
 from __future__ import annotations
 
+import collections
+import contextlib
 import functools
+import hashlib
 from dataclasses import dataclass
 
 import jax
@@ -599,7 +602,128 @@ def _program(problem: ChannelProblem):
         solution = solve_steady_state(problem, max_steps=_MAX_STEPS)
         return solution.velocity, solution.pressure, solution.potential, solution.residual_norm
 
-    return jax.jit(run)
+    return shared_or_embedded(problem, run)
+
+
+_SHAPES_SEEN: set = set()
+_EMBED_AFTER_CALLS = 400
+
+
+def shape_key(problem: ChannelProblem) -> tuple:
+    """What fixes the structure of a problem's program: shapes, conditions and flags, not values."""
+    field = problem.magnetic_field
+    pattern = type(field).__name__ if isinstance(field, ImposedField) else tuple(bool(b) for b in field)
+    return (
+        problem.grid.shape,
+        problem.grid.is_polar,
+        problem.conditions,
+        problem.advection,
+        problem.precision,
+        pattern,
+        tuple(bool(c) for c in problem.wall_conductance),
+        bool(problem.conductivity),
+    )
+
+
+def shared_or_embedded(problem: ChannelProblem, function, *arguments):
+    """Compile the first problem of a shape with its constants embedded, later ones shared (2b.1).
+
+    Embedded constants compile faster and run up to half again faster warm on a
+    CPU, because XLA folds them; a shared program (:func:`shape_program`) saves
+    the compile of every further problem of the shape, 2-4 s on a 48-cell duct.
+    A single solve takes the first. In a sweep of fields or conductances on one
+    mesh the second problem compiles the shared program and the later ones reuse it. A shared
+    program runs a warm solve up to 40 % slower on a CPU (XLA cannot fold the
+    arithmetic on arrays it receives as arguments: on the steady residual, 144
+    fusions and 54 divides against 96 and none), so a problem solved more than
+    ``_EMBED_AFTER_CALLS`` times compiles its own embedded program, bounding
+    that loss by about the compile it saved.
+    """
+    key = (shape_key(problem), tuple((a.shape, str(a.dtype)) for a in arguments))
+
+    def embedded():
+        compiled = jax.jit(function).lower(*arguments).compile()
+        return lambda *values: compiled(*values)
+
+    if key not in _SHAPES_SEEN:
+        _SHAPES_SEEN.add(key)
+        return embedded()
+    shared, calls, program = shape_program(function, *arguments), [0], [None]
+
+    def run(*values):
+        # A problem solved many times earns its own embedded program: its compile (4-5 s on a
+        # 48-cell duct) costs what the shared one loses in about 400-600 warm solves (8-10 ms each).
+        calls[0] += 1
+        if program[0] is None and calls[0] > _EMBED_AFTER_CALLS:
+            program[0] = embedded()
+        return (program[0] or shared)(*values)
+
+    return run
+
+
+def _constants_as_constvars():
+    """Keep array constants as jaxpr constants while tracing, which :func:`shape_program` packs.
+
+    JAX's simplified constants (on with the default compilation cache, where the installed JAX
+    has them) put them inline as literals instead, and lowering then embeds numpy arrays.
+    """
+    from jax._src import config
+
+    state = getattr(config, "use_simplified_jaxpr_constants", None)
+    return contextlib.nullcontext() if state is None else state(False)
+
+
+_EXECUTABLES: collections.OrderedDict = collections.OrderedDict()
+_MAX_EXECUTABLES = 16
+
+
+def shape_program(function, *arguments):
+    """Compile ``function`` of ``arguments`` (shapes and dtypes) once per program shape (2b.1).
+
+    Tracing leaves every array the solve closes over -- the grid's metric, the
+    field, the factorizations -- as a constant of the program. Embedded, a new
+    Hartmann number, field or conductance on the same mesh is a new program and
+    compiles again, 4-5 s on a 48-cell duct. Here the constants are packed into
+    one device buffer per dtype, which the program takes as an argument, and the
+    executable is looked up by a hash of the lowered program, so two problems
+    whose programs differ only in those arrays share it, in the process and, as
+    the lowered program is the same, in the persistent compilation cache. A
+    scalar that the trace keeps as a literal still selects its own program, so
+    the sharing is exact by construction. Returns a function of ``arguments``.
+    """
+    with _constants_as_constvars():
+        closed, shapes = jax.make_jaxpr(function, return_shape=True)(*arguments)
+    tree = jax.tree.structure(shapes)
+    groups: dict[str, list[np.ndarray]] = {}
+    sizes: dict[str, int] = {}
+    layout = []
+    for constant in closed.consts:
+        value = np.asarray(constant)
+        name = value.dtype.str
+        layout.append((name, sizes.get(name, 0), value.shape))
+        groups.setdefault(name, []).append(value.ravel())
+        sizes[name] = sizes.get(name, 0) + value.size
+    names = sorted(groups)
+    with jax.ensure_compile_time_eval():
+        packed = tuple(jnp.asarray(np.concatenate(groups[name])) for name in names)
+    jaxpr = closed.jaxpr
+
+    def run(buffers, *values):
+        by_name = dict(zip(names, buffers, strict=True))
+        constants = [
+            by_name[name][start : start + int(np.prod(shape, dtype=int))].reshape(shape)
+            for name, start, shape in layout
+        ]
+        return jax.core.eval_jaxpr(jaxpr, constants, *values)
+
+    with _constants_as_constvars():
+        lowered = jax.jit(run).lower(packed, *arguments)
+    key = hashlib.sha256(lowered.as_text().encode()).hexdigest()
+    executable = _EXECUTABLES.pop(key, None) or lowered.compile()
+    _EXECUTABLES[key] = executable
+    while len(_EXECUTABLES) > _MAX_EXECUTABLES:
+        _EXECUTABLES.popitem(last=False)
+    return lambda *values: jax.tree.unflatten(tree, executable(packed, *values))
 
 
 def _finish(

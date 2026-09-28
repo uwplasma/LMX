@@ -47,7 +47,7 @@ from .grid import Grid, uniform_faces, wall_resolving_faces
 from .mesh import StructuredMesh, generate_rect_duct_mesh_from_faces
 from .ops import divergence
 from .specs import CaseSpec, Diagnostics, MHDState, Solution, require_finite
-from .steady import solve_steady_state, steady_residual
+from .steady import shared_or_embedded, solve_steady_state, steady_residual
 
 __all__ = [
     "case_mesh",
@@ -244,7 +244,7 @@ def _driven(problem: ChannelProblem, fixed_flow: bool, drive, field_scale):
 @functools.lru_cache(maxsize=16)
 def _executable(problem: ChannelProblem, dtype: str):
     """The compiled unit-drive program itself, which runs on concrete inputs even inside a trace."""
-    return _compiled(problem).lower(jax.ShapeDtypeStruct((), dtype)).compile()
+    return shared_or_embedded(problem, _compiled(problem).__wrapped__, jax.ShapeDtypeStruct((), dtype))
 
 
 @functools.lru_cache(maxsize=16)
