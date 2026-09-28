@@ -606,6 +606,7 @@ def _program(problem: ChannelProblem):
 
 
 _SHAPES_SEEN: set = set()
+_EMBED_AFTER_CALLS = 400
 
 
 def shape_key(problem: ChannelProblem) -> tuple:
@@ -631,14 +632,33 @@ def shared_or_embedded(problem: ChannelProblem, function, *arguments):
     CPU, because XLA folds them; a shared program (:func:`shape_program`) saves
     the compile of every further problem of the shape, 2-4 s on a 48-cell duct.
     A single solve takes the first. In a sweep of fields or conductances on one
-    mesh the second problem compiles the shared program and the later ones reuse it.
+    mesh the second problem compiles the shared program and the later ones reuse it. A shared
+    program runs a warm solve up to 40 % slower on a CPU (XLA cannot fold the
+    arithmetic on arrays it receives as arguments: on the steady residual, 144
+    fusions and 54 divides against 96 and none), so a problem solved more than
+    ``_EMBED_AFTER_CALLS`` times compiles its own embedded program, bounding
+    that loss by about the compile it saved.
     """
     key = (shape_key(problem), tuple((a.shape, str(a.dtype)) for a in arguments))
-    if key not in _SHAPES_SEEN:
-        _SHAPES_SEEN.add(key)
+
+    def embedded():
         compiled = jax.jit(function).lower(*arguments).compile()
         return lambda *values: compiled(*values)
-    return shape_program(function, *arguments)
+
+    if key not in _SHAPES_SEEN:
+        _SHAPES_SEEN.add(key)
+        return embedded()
+    shared, calls, program = shape_program(function, *arguments), [0], [None]
+
+    def run(*values):
+        # A problem solved many times earns its own embedded program: its compile (4-5 s on a
+        # 48-cell duct) costs what the shared one loses in about 400-600 warm solves (8-10 ms each).
+        calls[0] += 1
+        if program[0] is None and calls[0] > _EMBED_AFTER_CALLS:
+            program[0] = embedded()
+        return (program[0] or shared)(*values)
+
+    return run
 
 
 def _constants_as_constvars():

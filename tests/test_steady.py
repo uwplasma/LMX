@@ -748,3 +748,10 @@ def test_a_new_field_on_the_same_mesh_reuses_the_compiled_solve(monkeypatch):
             np.testing.assert_allclose(got.data, expected.data, rtol=1e-12, atol=1e-14)
     # The first problem of the shape embeds its constants; the second and third share one program.
     assert len(steady._EXECUTABLES) == 1
+    monkeypatch.setattr(steady, "_EMBED_AFTER_CALLS", 1)
+    steady._program.cache_clear()
+    repeated = dataclasses.replace(base, magnetic_field=(0.0, 50.0, 0.0))
+    first = steady.solve_compiled(repeated).velocity
+    again = steady.solve_compiled(repeated).velocity  # past the threshold: its own embedded program
+    for got, expected in zip(again, first, strict=True):
+        np.testing.assert_allclose(got.data, expected.data, rtol=1e-12, atol=1e-14)
