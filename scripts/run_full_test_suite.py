@@ -75,6 +75,7 @@ _TEST_SHARDS = {
         f"tests/test_steady.py::{name}"
         for name in (
             "test_the_adjoint_matches_finite_differences",
+            "test_the_reused_primal_is_the_general_adjoint",
             "test_the_adjoint_matches_finite_differences_where_the_layers_are_thin",
             "test_the_adjoint_matches_finite_differences_in_a_varying_field",
             "test_a_rejected_root_cannot_produce_a_finite_objective_or_gradient",

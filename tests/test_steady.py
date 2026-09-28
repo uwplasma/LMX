@@ -219,6 +219,33 @@ def test_the_adjoint_matches_finite_differences(cells, hartmann, conductance):
     assert float(gradient[0]) == pytest.approx(float(value), rel=1e-12)
 
 
+@pytest.mark.parametrize("conductance", [0.0, 0.027])
+def test_the_reused_primal_is_the_general_adjoint(monkeypatch, conductance):
+    """2b.2: a drive-weighted objective reuses the primal CG solve; the gradients are the general adjoint's."""
+    import lmhdx.steady as steady
+
+    problem = _duct(24, 100.0, conductance=conductance)
+    areas = np.diff(problem.grid.y_faces)[:, None] * np.diff(problem.grid.z_faces)[None, :]
+
+    def objectives(drive, scale):
+        velocity = solve_steady_state(problem, forcing=(drive, 0.0, 0.0), field_scale=scale).velocity[0]
+        flow = jnp.sum(areas * velocity.data[0])
+        return flow, jnp.sum(velocity.data[0] ** 3)
+
+    def gradients():
+        flow = jax.jit(jax.value_and_grad(lambda d, s: objectives(d, s)[0], argnums=(0, 1)))(1.0, 1.0)
+        cubic = jax.jit(jax.grad(lambda d, s: objectives(d, s)[1], argnums=(0, 1)))(1.0, 1.0)
+        return np.array([flow[0], *flow[1], *cubic])
+
+    reused = gradients()
+    # Differentiating an enclosing jit re-enters the derivative rule outside the first trace.
+    nested = jax.jit(jax.grad(jax.jit(lambda s: objectives(1.0, s)[0])))(1.0)
+    np.testing.assert_allclose(nested, reused[2], rtol=1e-12, atol=0.0)
+    monkeypatch.setattr(steady, "_REUSE_PRIMAL", False)
+    general = gradients()
+    np.testing.assert_allclose(reused, general, rtol=1e-9, atol=0.0)
+
+
 @pytest.mark.parametrize(
     ("hartmann", "cells"), [(100.0, 24), pytest.param(300.0, 48, marks=pytest.mark.slow)]
 )

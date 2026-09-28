@@ -77,6 +77,8 @@ _MAX_STEPS = 40
 # backends, and the banded solve otherwise: measured faster there, and no slower to compile (2b.11).
 _LINE_INVERSE_BYTES = 64 * 2**20
 _LINE_INVERSE_BACKENDS = ("gpu", "cuda", "rocm")
+# Start derivative solves from the primal solution scaled onto their right-hand side (2b.2).
+_REUSE_PRIMAL = True
 
 
 @dataclass(frozen=True)
@@ -415,35 +417,90 @@ def _stokes_limit_root(
     symmetric on every vector because a cotangent is arbitrary:
     ``K y = -A Q W^-1 y + (I - Q) W^-1 y`` with ``Q`` the orthogonal projection
     onto ``V``. Its inverse projects once per solve, not per iteration.
+
+    The operator being symmetric, the derivative solves start from the primal
+    solution scaled onto their projected right-hand side (2b.2). A right-hand
+    side parallel to the primal one -- the adjoint of any objective whose weight
+    is the drive, such as the flow rate under a uniform drive, and the tangent
+    in the drive -- is then solved on entry and CG takes no step; any other
+    starts from its component along the primal. One code path, the same CG and
+    tolerance. The primal solve sits outside the derivative rule, a
+    :func:`jax.custom_jvp`, so an undifferentiated solve compiles one CG loop.
+    The rule takes the face weights as arguments rather than closing over them:
+    a traced closure would leak when an enclosing ``jit`` is differentiated.
     """
     weights = _face_weights(problem)
-    inverse = jax.tree.map(jnp.reciprocal, weights)
 
-    def operator(velocity):
-        return steady_residual(
-            velocity, problem, factorization, forcing=(0.0, 0.0, 0.0), field_scale=field_scale
-        )
+    def operator(scale, velocity):
+        return steady_residual(velocity, problem, factorization, forcing=(0.0, 0.0, 0.0), field_scale=scale)
 
-    def matvec(state):
-        velocity = jax.tree.map(jnp.multiply, state, inverse)
+    def matvec(weights, scale, state):
+        velocity = jax.tree.map(jnp.divide, state, weights)
         inside = _orthogonal_projection(velocity, problem, factorization)
-        return jax.tree.map(lambda u, a, q: u - a - q, velocity, operator(inside), inside)
+        return jax.tree.map(lambda u, a, q: u - a - q, velocity, operator(scale, inside), inside)
 
-    def solve(_, target):
-        inside = _orthogonal_projection(target, problem, factorization)
+    def staged_cg(weights, scale, inside, start):
         result = solvax.pcg(
-            lambda y: jax.tree.map(jnp.negative, operator(jax.tree.map(jnp.multiply, y, inverse))),
+            lambda y: jax.tree.map(jnp.negative, operator(scale, jax.tree.map(jnp.divide, y, weights))),
             inside,
+            x0=start,
             precond=lambda r: jax.tree.map(jnp.multiply, precond(r), weights),
             rtol=tolerance,
             max_steps=max_iterations,
         )
-        kept = _certified(result.x, result.converged & jnp.isfinite(result.residual_norm), "steady CG solve")
-        solution = jax.tree.map(lambda y, t, q, w: y + w * (t - q), kept, target, inside, weights)
-        return solution, (result.iterations, result.residual_norm, result.converged)
+        accepted = result.converged & jnp.isfinite(result.residual_norm)
+        kept = _certified(result.x, accepted, "steady CG solve")
+        return kept, (result.iterations, result.residual_norm, result.converged)
+
+    traced_cg = {}
+
+    def cg(*arguments):
+        """CG traced once per argument signature: the tangent and transposed solves share one trace.
+
+        The trace is replayed with :func:`jax.core.eval_jaxpr` rather than staged as a
+        ``jit``, so its constants stay constants of the enclosing program, which
+        compiling once per program shape (2b.1) passes as arguments.
+        """
+        leaves, tree = jax.tree.flatten(arguments)
+        key = (tree, tuple((jnp.shape(leaf), jnp.result_type(leaf)) for leaf in leaves))
+        if key not in traced_cg:
+            traced_cg[key] = jax.make_jaxpr(staged_cg, return_shape=True)(*arguments)
+        closed, shapes = traced_cg[key]
+        return jax.tree.unflatten(
+            jax.tree.structure(shapes), jax.core.eval_jaxpr(closed.jaxpr, closed.consts, *leaves)
+        )
+
+    def complete(weights, y, target, inside):
+        return jax.tree.map(lambda v, t, q, w: v + w * (t - q), y, target, inside, weights)
+
+    @jax.custom_jvp
+    def solved(target, scale, primal_y, primal_inside, weights):
+        return complete(weights, primal_y, target, primal_inside)
+
+    @solved.defjvp
+    def solved_jvp(primals, tangents):
+        target, scale, primal_y, primal_inside, weights = primals
+        target_dot, scale_dot = tangents[:2]
+        solution = solved(*primals)
+        norm2 = _dot(primal_inside, primal_inside)
+
+        def solve(_, value):
+            inside = _orthogonal_projection(value, problem, factorization)
+            start = None
+            if _REUSE_PRIMAL:
+                ratio = _dot(inside, primal_inside) / jnp.maximum(norm2, jnp.finfo(norm2.dtype).tiny)
+                start = jax.tree.map(lambda v: ratio * v, primal_y)
+            return complete(weights, cg(weights, scale, inside, start)[0], value, inside)
+
+        change = jax.jvp(lambda s: matvec(weights, s, solution), (scale,), (scale_dot,))[1]
+        rhs = jax.tree.map(jnp.subtract, target_dot, change)
+        operator_at = functools.partial(matvec, weights, scale)
+        return solution, jax.lax.custom_linear_solve(operator_at, rhs, solve, symmetric=True)
 
     rhs = steady_residual(start, problem, factorization, forcing=forcing, field_scale=field_scale)
-    step, diagnostics = jax.lax.custom_linear_solve(matvec, rhs, solve, symmetric=True, has_aux=True)
+    primal_inside = jax.lax.stop_gradient(_orthogonal_projection(rhs, problem, factorization))
+    primal_y, diagnostics = cg(weights, jax.lax.stop_gradient(field_scale), primal_inside, None)
+    step = solved(rhs, field_scale, jax.lax.stop_gradient(primal_y), primal_inside, weights)
     return jax.tree.map(lambda u, y, w: u + y / w, start, step, weights), diagnostics
 
 
@@ -598,6 +655,10 @@ def _tangent_solve(operator, target, precond=None):
         return _krylov(vecmat, rhs, lambda direction: transposed(direction)[0])
 
     return jax.lax.custom_linear_solve(operator, target, solve, transpose_solve)
+
+
+def _dot(first: tuple[Field, Field, Field], second: tuple[Field, Field, Field]):
+    return sum(jnp.sum(a.data * b.data) for a, b in zip(first, second, strict=True))
 
 
 def _norm(velocity: tuple[Field, Field, Field]):
