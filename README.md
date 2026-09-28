@@ -4,10 +4,10 @@
 [![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue.svg)](pyproject.toml)
 [![License](https://img.shields.io/github/license/uwplasma/LMhdX)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/uwplasma/LMhdX/ci.yml?branch=main&label=ci)](https://github.com/uwplasma/LMhdX/actions/workflows/ci.yml)
-[![Docs](https://img.shields.io/readthedocs/lmx/latest?label=docs)](https://lmx.readthedocs.io/)
+[![Docs](https://img.shields.io/readthedocs/lmhdx/latest?label=docs)](https://lmhdx.readthedocs.io/)
 
 **Differentiable inductionless liquid-metal MHD in JAX.**
-Documentation: **<https://lmx.readthedocs.io/>** · Install: `pip install lmhdx`
+Documentation: **<https://lmhdx.readthedocs.io/>** · Install: `pip install lmhdx`
 
 LMhdX solves the flow of liquid metals in strong magnetic fields — the physics of
 fusion blanket channels. Ducts and pipes with insulating or thin conducting
@@ -48,7 +48,7 @@ pip install ".[visualization]"
 lmhdx examples/hartmann_case.toml
 ```
 
-The [installation guide](https://lmx.readthedocs.io/en/latest/getting_started/install.html)
+The [installation guide](https://lmhdx.readthedocs.io/en/latest/getting_started/install.html)
 covers extras and GPUs.
 
 ## First run: a duct in three lines
@@ -72,12 +72,12 @@ The same case runs from a TOML file with `lmhdx examples/hartmann_case.toml`.
 
 ## Documentation
 
-[Install](https://lmx.readthedocs.io/en/latest/getting_started/install.html) ·
-[First run](https://lmx.readthedocs.io/en/latest/getting_started/first_run.html) ·
-[Tutorials](https://lmx.readthedocs.io/en/latest/tutorials/fully_developed.html) ·
-[Equations](https://lmx.readthedocs.io/en/latest/physics/equations.html) ·
-[Validation](https://lmx.readthedocs.io/en/latest/validation/index.html) ·
-[API](https://lmx.readthedocs.io/en/latest/reference/api.html) ·
+[Install](https://lmhdx.readthedocs.io/en/latest/getting_started/install.html) ·
+[First run](https://lmhdx.readthedocs.io/en/latest/getting_started/first_run.html) ·
+[Tutorials](https://lmhdx.readthedocs.io/en/latest/tutorials/fully_developed.html) ·
+[Equations](https://lmhdx.readthedocs.io/en/latest/physics/equations.html) ·
+[Validation](https://lmhdx.readthedocs.io/en/latest/validation/index.html) ·
+[API](https://lmhdx.readthedocs.io/en/latest/reference/api.html) ·
 [Roadmap](plan.md)
 
 ## Fully developed ducts and pipes
@@ -146,7 +146,7 @@ python examples/fringing_benchmark_demo.py
   the magnet; the demo writes plots and JSON to `artifacts/examples/`.
 - Research stage: the demo checks response and conservation trends; it is not an
   ALEX/FreeMHD comparison or a mesh-converged validation result. The
-  [fringing tutorial](https://lmx.readthedocs.io/en/latest/tutorials/fringing.html)
+  [fringing tutorial](https://lmhdx.readthedocs.io/en/latest/tutorials/fringing.html)
   walks through it.
 
 ## Design with gradients
@@ -254,7 +254,7 @@ PCIe. Correct, not yet faster — the numbers are in
   boundedness but not validated against a reference flow, the
   ALEX B1/B2 fringing benchmarks have production acceptance open, and
   multi-device execution is not yet established. The
-  [validation matrix](https://lmx.readthedocs.io/en/latest/validation/index.html)
+  [validation matrix](https://lmhdx.readthedocs.io/en/latest/validation/index.html)
   and the [plan](plan.md) state each gate.
 
 ## Comparison with other codes
@@ -267,7 +267,7 @@ PCIe. Correct, not yet faster — the numbers are in
 | FreeMHD (OpenFOAM `epotFoam`), pinned [`freemhd_install`](https://github.com/rogeriojorge/freemhd_install) image, B2 case | Same observed contract, executed by both codes | passes: transverse pressure difference RMS 0.0045, max 0.0109, against frozen bounds 0.16 and 0.32 — an integration check on a harness mesh, **not** a production result |
 | ALEX B1 pipe and B2 square duct experiments | Fringing-field pressure drop | production acceptance **open**; specs and digitised references are frozen in [`src/lmhdx/data/benchmarks`](src/lmhdx/data/benchmarks) |
 
-The [validation record](https://lmx.readthedocs.io/en/latest/validation/index.html)
+The [validation record](https://lmhdx.readthedocs.io/en/latest/validation/index.html)
 states each gate and what it does not cover.
 
 ## Examples
