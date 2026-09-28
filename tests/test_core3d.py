@@ -624,11 +624,16 @@ def test_two_conducting_walls_meet_in_a_charge_conserving_corner():
     np.testing.assert_allclose(inner - inner.mean(), potential.data - potential.data.mean(), atol=1e-12)
     assert float(jnp.max(jnp.abs(factorization._apply(augmented)[:, 1:-1, 1:-1] - source.data / 2.0))) < 1e-10
     heights, widths = problem.grid.widths[1:]
+    potential = float(jnp.max(jnp.abs(augmented)))
     for row, column in ((0, 0), (0, -1), (-1, 0), (-1, -1)):
         corner = augmented[:, row, column]
         along_y = 0.05 * (augmented[:, row, 1 if column == 0 else -2] - corner) / (0.5 * widths[column])
         along_z = 0.08 * (augmented[:, 1 if row == 0 else -2, column] - corner) / (0.5 * heights[row])
-        assert float(jnp.max(jnp.abs(along_y + along_z))) < 1e-12 * float(jnp.max(jnp.abs(along_y)))
+        # Each flux is a difference of sheet potentials about 2,000 times larger than it, so
+        # round-off scales with the potential over the half widths, not with the flux: measured
+        # 1e-16 to 6e-16 of that scale (and 3e-14 to 1.2e-12 of the flux, varying with the platform).
+        scale = potential * (0.05 / (0.5 * widths[column]) + 0.08 / (0.5 * heights[row]))
+        assert float(jnp.max(jnp.abs(along_y + along_z))) < 1e-14 * scale
 
 
 def test_the_thin_wall_solve_is_ten_times_faster_than_the_krylov_route():
