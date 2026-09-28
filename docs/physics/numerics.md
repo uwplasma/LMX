@@ -596,6 +596,38 @@ warm solve takes 6.3 s at Ha 100 ($60\times32^2$), 21 s at Ha 400
 ($60\times96^2$). The iteration count, 774 to 4,846, is the cost; the coarse
 space of plan step 2b.4 is aimed at it.
 
+### The ANL fringe on the three-dimensional core (1.9d)
+
+`lmhdx.axial.fringe_duct` solved in the Stokes limit reproduces the geometry of
+the core-flow gate above at finite Hartmann number: $x_0=3$, $c=0.02$ on all
+four walls, $B_y$ alone, buffers of 15 and 10 half-widths. The excess is
+$\Delta p-\Delta p_{FD}$ over $[-6,2]$ in units of $\sigma U_0B_0^2a$, with
+$\Delta p_{FD}$ LMhdX's own two-dimensional fully developed gradient at the
+local field and the same Hartmann number, cross-section mesh and walls,
+integrated with 24 Gauss points over the ramp. Office host, one A4000:
+
+| Ha | mesh | $\Delta p$ | $\Delta p_{FD}$ | excess | CG iterations | warm |
+|---|---|---|---|---|---|---|
+| 100 | 60 × 32² | 0.2276 | 0.1651 | 0.06257 | 774 | 6.3 s |
+| 200 | 60 × 32² | 0.1815 | 0.1288 | 0.05272 | 1,748 | 10.1 s |
+| 400 | 60 × 48² | 0.1559 | 0.1109 | 0.04503 | 2,030 | 21 s |
+| 800 | 60 × 64² | 0.1398 | 0.1008 | 0.03893 | 2,993 | 91 s |
+| 1600 | 60 × 96² | 0.1289 | 0.0947 | 0.03419 | 4,846 | 183 s |
+| 3200 | 70 × 128² | 0.1209 | 0.0905 | 0.03042 | 8,321 | 820 s |
+
+Three meshes at Ha 400 ($41\times32^2$ at axial spacing 0.5, $70\times48^2$ at
+0.25, $118\times64^2$ at 0.125) give 0.04461, 0.04504 and 0.04514: the mesh
+moves the excess by 0.2 % at the last refinement, so the Hartmann number, not
+the mesh, sets the gap to the core-flow value. Successive excesses shrink by a
+constant factor 0.78–0.80 per doubling of Ha, a power $Ha^{-0.35}$, not the
+$Ha^{-1/2}$ of the plan's fit, which does not fit these points. A free power
+law extrapolates to 0.0158–0.0168 depending on which points it uses, 6–11 %
+below the core-flow model's 0.01783 (and TM-228's 0.0178). The 1 % gate of rows
+7 and 24 on the three-dimensional core is therefore **not met**: at Ha 3200 the
+excess is still 71 % above the core-flow value, and the extrapolation is not
+accurate to 1 %. The absolute drop falls from 0.228 to 0.121 over the same
+range, against TM-228's 0.0932.
+
 ## Derivative policy
 
 The derivative algorithm is part of each numerical method. Converged linear or
