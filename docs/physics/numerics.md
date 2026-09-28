@@ -531,6 +531,71 @@ The model neglects inertia, an error that scales as $N^{-1/3}$
 (Mistrangelo et al. 2021); at ALEX B2 ($N=540$) it is as large as the
 three-dimensional excess, which is why B2 keeps a 5--10 % tolerance.
 
+## Inlet and outlet: the non-periodic axial direction
+
+`lmhdx.axial` gives the staggered core an inflow-outflow axis (the first),
+with the boundary conditions of HIMAG, FreeMHD, GridapMHD and the 2025
+six-code benchmark (plan D26). The inlet velocity is LMhdX's own fully
+developed profile at the inlet field, solved on the same cross-section and
+scaled to the imposed flow rate; it is array-valued Dirichlet data on the inlet
+face (`lmhdx.bc.BoundaryCondition(kind, lower=profile, upper_kind=...)`). The
+outlet has zero axial gradient of every velocity component and $p=0$. Neither
+end carries normal current, $\partial\varphi/\partial n=(\mathbf u\times\mathbf B)\cdot\mathbf n$,
+and the potential's gauge is fixed by removing its mean. The flow rate is exact
+and the pressure drop is an output; there is no extra unknown.
+
+The inlet enters as a lift. The fully developed profile carried unchanged along
+the duct is discretely divergence free, so the solution is that lift plus a
+correction with no inlet flux. The correction lives in a linear space on which
+the Stokes-limit operator is symmetric in the face-volume inner product, once
+the two end faces own the half cell inside the duct, as the outlet face must:
+its velocity is an unknown with a zero-gradient viscous flux, and the pressure
+gradient through it is the Dirichlet one. The solve is then the preconditioned
+conjugate-gradient solve of a periodic duct and differentiates the same way.
+Upstream of any field change the lift is the discrete solution.
+
+Two numerical details make that hold at high Hartmann number. The pressure
+operator is non-singular now, and its lowest mode, the long axial wave, sits
+nine decades below the largest eigenvalue across a Hartmann layer (0.04
+against 7e7 at Ha 100); judged against that largest eigenvalue it passed for a
+null mode, so the singularity test is made per axis. The same ratio costs the
+fast-diagonal transforms that many digits, so the pressure solve and the
+potential solve of an open duct take one float64 defect correction, and the
+computed zero eigenvalue of every Neumann or periodic axis is set to zero.
+Without them the true residual stalled at 2e-7 and the charge balance at 1e-9.
+
+Measured on the ANL fringe ($x_0=3$, $c=0.02$ on all four walls, $B_y$ alone,
+buffers of 15 half-widths upstream and 10 downstream, 0.25 axial spacing over
+$[-6,3]$ for 70 axial cells and over the ramp $[-3,3]$ for 60), in the Stokes
+limit, on the office host:
+
+| Ha, cells | mesh | flow rate | mass | charge | uniform-region $\partial_xp$ | CG iterations |
+|---|---|---|---|---|---|---|
+| 100, 24 | 70 × 24 × 24 | 4.4e-16 | 1.0e-16 | 2.2e-13 | 3.5e-5 | 1,444 |
+| 100, 32 | 60 × 32 × 32 | 2.2e-16 | 1.9e-16 | 8.7e-14 | 4.3e-5 | 774 |
+| 400, 48 | 60 × 48 × 48 | 2.2e-16 | 1.9e-16 | 7.3e-14 | 5.6e-5 | 2,030 |
+| 1600, 96 | 60 × 96 × 96 | 2.2e-16 | 1.2e-16 | 7.5e-14 | 6.0e-5 | 4,846 |
+
+The flow rate is the largest error over every axial face relative to the
+imposed one; mass and charge are the largest net flux out of a cell relative to
+the largest gross (motional, for charge) flux through a cell; the gradient is
+the relative difference of the mean pressure gradient over $-12<x<-8$ from the
+fully developed one. Doubling both buffers (to 30 and 20) moves the drop over
+$[-6,2]$ by 3.5e-9 of itself and the axial current through the window's two end
+faces by 3e-7 (row 28 asks for 0.5 %). The adjoint of the drop in the field
+scale matches central differences to 7e-10 on the test mesh.
+
+Cold and warm solves (fresh processes, alternating, two rounds; build is the
+host assembly including the fully developed inlet solve): on the CPU floor stack
+(JAX 0.6.2, load 17–26) the test mesh ($23\times12\times12$, Ha 10) builds in
+14.1–14.9 s, solves first in 2.7–5.8 s and warm in 0.18–0.21 s; Ha 100 on
+$70\times24\times24$ builds in 15.1–15.5 s, solves first in 45.8–51.6 s and warm
+in 41.5–44.1 s (1,444 iterations, 29 ms each). On one A4000 (JAX 0.10.2) the
+warm solve takes 6.3 s at Ha 100 ($60\times32^2$), 21 s at Ha 400
+($60\times48^2$), 91 s at Ha 800 ($60\times64^2$) and 183 s at Ha 1600
+($60\times96^2$). The iteration count, 774 to 4,846, is the cost; the coarse
+space of plan step 2b.4 is aimed at it.
+
 ## Derivative policy
 
 The derivative algorithm is part of each numerical method. Converged linear or

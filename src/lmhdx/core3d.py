@@ -63,6 +63,7 @@ layers bounded. Transport is explicit, so switching it on bounds the step by
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 from dataclasses import dataclass
 
@@ -72,7 +73,7 @@ import numpy as np
 
 from . import _pin_matmul_precision
 from .advect import momentum_advection
-from .bc import DIRICHLET, PERIODIC, BoundaryCondition
+from .bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition
 from .em import (
     face_conductivity,
     face_current,
@@ -110,6 +111,8 @@ __all__ = [
 
 _NO_SLIP = BoundaryCondition(DIRICHLET)
 _INSULATING = BoundaryCondition("neumann")
+# The pressure of an inflow-outflow axis: no correction through the inlet, p = 0 at the outlet (D26).
+_OUTLET_PRESSURE = BoundaryCondition(NEUMANN, upper_kind=DIRICHLET)
 _ADVECTION = ("off", "central", "limited")
 
 
@@ -125,9 +128,15 @@ def velocity_condition(
 
     A periodic axis stays periodic. At a wall every component is homogeneous:
     the tangential ones by no slip, the normal one because it sits on the wall
-    and is prescribed there by :func:`enforce_face_constraints`.
+    and is prescribed there by :func:`enforce_face_constraints`. An
+    inflow-outflow axis keeps its kinds with the inlet data removed: the solve
+    carries the inlet as a lift (:mod:`lmhdx.axial`), so every component is zero
+    at the inlet and has zero axial gradient at the outlet.
     """
-    return conditions[axis] if conditions[axis].is_periodic else _NO_SLIP
+    condition = conditions[axis]
+    if condition.is_mixed:
+        return condition.homogeneous()
+    return condition if condition.is_periodic else _NO_SLIP
 
 
 @dataclass(frozen=True, eq=False)
@@ -181,6 +190,11 @@ class ChannelProblem:
     ``magnetic_field`` is three numbers for a uniform field, or a varying one: an
     :class:`ImposedField`, or three arrays of ``grid.shape`` at the cell centres
     (scalars broadcast), which become one.
+
+    One axis may be an inflow-outflow axis (plan D26): a condition of kind
+    ``dirichlet`` with ``upper_kind="neumann"``, whose ``lower`` is the inlet
+    profile of the velocity normal to it. :mod:`lmhdx.axial` builds and solves
+    such a duct, in the Stokes limit only.
     """
 
     grid: Grid
@@ -211,6 +225,7 @@ class ChannelProblem:
             raise ValueError("wall conductance must not be negative")
         if self.precision not in ("state", "mixed"):
             raise ValueError(f"precision must be 'state' or 'mixed', got {self.precision!r}")
+        self._check_open_axis()
         field = self.magnetic_field
         if not isinstance(field, ImposedField):
             if len(field) != 3:
@@ -228,6 +243,29 @@ class ChannelProblem:
         # True float32 contractions unless the user chose a precision; see lmhdx.enable_x64.
         _pin_matmul_precision()
 
+    def _check_open_axis(self) -> None:
+        mixed = [axis for axis, condition in enumerate(self.conditions) if condition.is_mixed]
+        if not mixed:
+            return
+        condition = self.conditions[mixed[0]]
+        if len(mixed) > 1 or condition.kinds != (DIRICHLET, NEUMANN) or np.any(condition.upper):
+            raise ValueError("one inflow-outflow axis at most: a Dirichlet inlet below, a free outlet above")
+        if self.advection != "off" or float(self.wall_conductance[mixed[0]]):
+            raise ValueError("an inflow-outflow axis is solved in the Stokes limit and has no wall")
+
+    @property
+    def open_axis(self) -> int | None:
+        """The inflow-outflow axis, or ``None``."""
+        return next((axis for axis, condition in enumerate(self.conditions) if condition.is_mixed), None)
+
+    @property
+    def pressure_conditions(self) -> tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition]:
+        """The pressure's conditions: :attr:`scalar_conditions`, except ``p = 0`` at an outlet."""
+        return tuple(
+            _OUTLET_PRESSURE if condition.is_mixed else scalar
+            for condition, scalar in zip(self.conditions, self.scalar_conditions, strict=True)
+        )
+
     @property
     def conducting_walls(self) -> bool:
         """Whether any wall carries current along itself."""
@@ -235,7 +273,11 @@ class ChannelProblem:
 
     @property
     def scalar_conditions(self) -> tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition]:
-        """Conditions for pressure and potential: periodic, else a homogeneous Neumann wall."""
+        """Conditions for the potential: periodic, else a homogeneous Neumann wall.
+
+        The ends of an inflow-outflow axis are insulating too: no normal current,
+        ``dphi/dn = (u x B).n`` (D26), with the potential's mean removed.
+        """
         return tuple(condition if condition.is_periodic else _INSULATING for condition in self.conditions)
 
     @property
@@ -318,7 +360,7 @@ class ChannelProblem:
         A thin conducting wall changes the potential's operator but not the
         pressure's; the potential then uses :meth:`potential_factorization`.
         """
-        return fast_diagonal_poisson(self.grid, self.scalar_conditions, precision=self.precision)
+        return fast_diagonal_poisson(self.grid, self.pressure_conditions, precision=self.precision)
 
     def potential_factorization(self) -> FastDiagonalPoisson:
         """Factorize the charge operator, with a sheet of potential unknowns on each conducting wall.
@@ -328,12 +370,15 @@ class ChannelProblem:
         conditions, conductances and precision, and reused under tracing.
         """
         if not self.conducting_walls:
-            return self.factorization()
+            if self.open_axis is None:
+                return self.factorization()
+            return _neumann_factorization(self.grid, self.scalar_conditions, self.precision)
         return _thin_wall_factorization(
             self.grid,
             self.scalar_conditions,
             tuple(float(value) for value in self.wall_conductance),
             self.precision,
+            int(self.open_axis is not None),
         )
 
 
@@ -432,6 +477,9 @@ def _solve_potential(
     scale = 1.0 / float(problem.conductivity) if float(problem.conductivity) else 0.0
     scaled = source.replace_data(scale * source.data)
     if not problem.conducting_walls:
+        if problem.open_axis is not None:
+            with jax.ensure_compile_time_eval():
+                factorization = problem.potential_factorization()
         return factorization.solve(scaled), (None, None, None)
     with jax.ensure_compile_time_eval():
         walls = problem.potential_factorization()
@@ -507,7 +555,7 @@ def zero_velocity(problem: ChannelProblem) -> tuple[Field, Field, Field]:
 def enforce_face_constraints(
     velocity: tuple[Field, Field, Field], problem: ChannelProblem
 ) -> tuple[Field, Field, Field]:
-    """Impose impermeability at walls and face agreement across a periodic axis.
+    """Impose impermeability at walls, face agreement across a periodic axis, and a zero inlet.
 
     Both are prerequisites for the discrete divergence to represent a flux
     balance; see the module docstring.
@@ -518,6 +566,8 @@ def enforce_face_constraints(
         selection = (slice(None),) * component
         if problem.conditions[component].is_periodic:
             data = data.at[selection + (-1,)].set(data[selection + (0,)])
+        elif problem.conditions[component].is_mixed:
+            data = data.at[selection + (0,)].set(0.0)
         else:
             data = data.at[selection + (0,)].set(0.0)
             data = data.at[selection + (-1,)].set(0.0)
@@ -536,7 +586,7 @@ def project(
     source = divergence(velocity)
     scale = problem.density / problem.dt
     pressure = factorization.solve(source.replace_data(scale * source.data))
-    scalar = problem.scalar_conditions
+    scalar = problem.pressure_conditions
     corrected = tuple(
         field.replace_data(
             field.data
@@ -588,18 +638,34 @@ def step(
 
 
 @functools.lru_cache(maxsize=16)
+def _neumann_factorization(
+    grid: Grid, conditions: tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition], precision: str
+) -> FastDiagonalPoisson:
+    """The potential's factorization where it differs from the pressure's: an inflow-outflow duct.
+
+    It keeps one float64 defect correction, as the pressure's does (:mod:`lmhdx.poisson`).
+    """
+    with jax.ensure_compile_time_eval():
+        return dataclasses.replace(
+            fast_diagonal_poisson(grid, conditions, precision=precision), corrections=1
+        )
+
+
+@functools.lru_cache(maxsize=16)
 def _thin_wall_factorization(
     grid: Grid,
     conditions: tuple[BoundaryCondition, BoundaryCondition, BoundaryCondition],
     conductance: tuple[float, float, float],
     precision: str,
+    corrections: int = 0,
 ) -> FastDiagonalThinWallPoisson:
     """Build the thin-wall factorization once; a periodic axis has no wall, so its conductance is ignored."""
     walls = tuple(
         0.0 if condition.is_periodic else value for condition, value in zip(conditions, conductance)
     )
     with jax.ensure_compile_time_eval():
-        return fast_diagonal_thin_wall_poisson(grid, conditions, walls, precision=precision)
+        factorization = fast_diagonal_thin_wall_poisson(grid, conditions, walls, precision=precision)
+    return dataclasses.replace(factorization, corrections=corrections)
 
 
 def fringe_field(

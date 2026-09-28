@@ -1,0 +1,337 @@
+"""Ducts with an inlet and an outlet: the non-periodic axial direction (plan 1.9b, D26).
+
+The axial axis is the first. Its conditions follow the published practice of
+HIMAG, FreeMHD, GridapMHD and the 2025 six-code benchmark, chosen so that every
+solve stays direct and every derivative implicit:
+
+* **Inlet.** The velocity is LMhdX's own fully developed profile at the inlet
+  field, solved on the same cross-section and scaled to the imposed flow rate.
+  It is array-valued Dirichlet data on the inlet face
+  (:class:`lmhdx.bc.BoundaryCondition`). The flow rate is exact and the pressure
+  drop is an output; there is no extra unknown.
+* **Outlet.** Zero axial gradient of every velocity component and ``p = 0``.
+  The pressure operator is then non-singular, and the axial axis stays
+  diagonalizable (Neumann at the inlet, Dirichlet at the outlet).
+* **No normal current at either end**, ``dphi/dn = (u x B).n``, with the
+  potential's gauge fixed by removing its mean.
+
+The inlet enters as a lift. The fully developed profile carried unchanged along
+the whole duct is discretely divergence free, so the solution is that lift plus
+a correction with a zero inlet face. The correction lives in a linear space on
+which the Stokes-limit operator is symmetric in the face-volume inner product,
+the two end faces owning half a cell each, so the solve is the same
+preconditioned conjugate-gradient solve as a periodic duct's
+(:func:`lmhdx.steady.solve_steady_state`) and differentiates the same way. Far
+upstream of a field change the lift is the discrete solution, which is why the
+uniform region carries its fully developed gradient.
+
+Only the Stokes limit (``advection="off"``) is solved.
+"""
+
+from __future__ import annotations
+
+from typing import NamedTuple
+
+import jax
+import jax.numpy as jnp
+import numpy as np
+
+from .bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition
+from .core3d import (
+    ChannelProblem,
+    ImposedField,
+    duct_problem,
+    face_currents,
+    fringe_field,
+    project,
+    zero_velocity,
+)
+from .em import face_electromotive_force
+from .grid import Field, Grid, uniform_faces
+from .steady import (
+    _norm,
+    _preconditioner,
+    _projection_solves,
+    _stokes_limit_root,
+    momentum_terms,
+    solve_steady_state,
+    steady_residual,
+    with_inflow,
+)
+
+__all__ = [
+    "OpenDuctSolution",
+    "axial_faces",
+    "charge_balance",
+    "fringe_duct",
+    "fully_developed_inlet",
+    "mass_balance",
+    "open_duct",
+    "pressure_drop",
+    "solve_open_duct",
+    "station_flow_rates",
+    "station_pressure",
+]
+
+_INSULATING = BoundaryCondition(NEUMANN)
+
+
+class OpenDuctSolution(NamedTuple):
+    """Fields of an inflow-outflow duct, a pytree; ``pressure`` is the physical one, zero at the outlet."""
+
+    velocity: tuple[Field, Field, Field]
+    pressure: Field
+    potential: Field
+    currents: tuple[Field, Field, Field]
+    magnetic_field: tuple[Field, Field, Field]
+    residual_norm: jnp.ndarray
+    initial_residual_norm: jnp.ndarray
+    iterations: jnp.ndarray
+
+
+def axial_faces(
+    lower: float, upper: float, core: tuple[float, float], spacing: float, growth: float = 1.1
+) -> np.ndarray:
+    """Faces of spacing ``spacing`` over ``core``, growing by ``growth`` per cell into the buffers.
+
+    Buffer cells stop growing at ``8 * spacing``; the last cell on each side
+    absorbs the remainder, so the ends land exactly on ``lower`` and ``upper``.
+    """
+    if not lower <= core[0] < core[1] <= upper or spacing <= 0.0 or growth < 1.0:
+        raise ValueError("axial faces need lower <= core < upper, a positive spacing and growth >= 1")
+    middle = uniform_faces(max(1, round((core[1] - core[0]) / spacing)), *core)
+    step = middle[1] - middle[0]
+
+    def buffer(length: float) -> np.ndarray:
+        widths, total = [], 0.0
+        while total < length - 1e-12:
+            width = min(step * growth ** (len(widths) + 1), 8.0 * step, length - total)
+            if length - total - width < 0.5 * width:
+                width = length - total
+            widths.append(width)
+            total += width
+        return np.cumsum(widths)
+
+    below, above = buffer(core[0] - lower), buffer(upper - core[1])
+    return np.concatenate((core[0] - below[::-1], middle, core[1] + above))
+
+
+def fully_developed_inlet(
+    problem: ChannelProblem, flow_rate: float, *, tolerance: float = 1.0e-9, **controls
+) -> tuple[np.ndarray, float]:
+    """Solve the fully developed flow of ``problem``'s first cross-section at its first cell's field.
+
+    The inlet field must be uniform over the cross-section, as it is upstream of a
+    magnet. Returns the axial velocity on that cross-section scaled to ``flow_rate``, and
+    the axial pressure gradient that drives it (negative for a positive flow).
+    The cross-section, conductances and field are the duct's own, so upstream of
+    any field change the three-dimensional solution reproduces it to round-off.
+    """
+    grid = problem.grid
+    section = Grid(uniform_faces(1, 0.0, 1.0), grid.y_faces, grid.z_faces)
+    field = problem.magnetic_field
+    if isinstance(field, ImposedField):
+        slabs = [component[0] for component in field.components]
+        if any(np.ptp(slab) > 1e-12 * max(1.0, float(np.max(np.abs(slab)))) for slab in slabs):
+            raise ValueError("the inlet field must be uniform over the inlet cross-section")
+        field = tuple(float(slab.flat[0]) for slab in slabs)
+    periodic = ChannelProblem(
+        grid=section,
+        conditions=(BoundaryCondition(PERIODIC), *problem.conditions[1:]),
+        density=problem.density,
+        viscosity=problem.viscosity,
+        conductivity=problem.conductivity,
+        magnetic_field=field,
+        forcing=(1.0, 0.0, 0.0),
+        dt=problem.dt,
+        wall_conductance=problem.wall_conductance,
+        precision=problem.precision,
+    )
+    solution = solve_steady_state(periodic, tolerance=tolerance, **controls)
+    axial = np.asarray(solution.velocity[0].data[0])
+    unit = float(np.sum(axial * section.face_areas(0)[0]))
+    return axial * (flow_rate / unit), -flow_rate / unit
+
+
+def open_duct(problem: ChannelProblem, flow_rate: float, **controls) -> ChannelProblem:
+    """Turn the first axis of ``problem`` into an inlet and an outlet at the imposed ``flow_rate``.
+
+    ``problem`` supplies the mesh, walls, field and properties; its first
+    condition and forcing are replaced. ``controls`` go to
+    :func:`fully_developed_inlet`.
+    """
+    profile, _ = fully_developed_inlet(problem, flow_rate, **controls)
+    return ChannelProblem(
+        grid=problem.grid,
+        conditions=(BoundaryCondition(DIRICHLET, lower=profile, upper_kind=NEUMANN), *problem.conditions[1:]),
+        density=problem.density,
+        viscosity=problem.viscosity,
+        conductivity=problem.conductivity,
+        magnetic_field=problem.magnetic_field,
+        forcing=(0.0, 0.0, 0.0),
+        dt=problem.dt,
+        wall_conductance=(0.0, *problem.wall_conductance[1:]),
+        precision=problem.precision,
+    )
+
+
+def fringe_duct(
+    *,
+    hartmann: float,
+    wall_conductance: float = 0.0,
+    half_length: float = 3.0,
+    upstream: float = 15.0,
+    downstream: float = 10.0,
+    spacing: float = 0.25,
+    cells: int = 24,
+    cells_in_layer: int = 6,
+    flow_rate: float = 4.0,
+    solenoidal: bool = False,
+    **controls,
+) -> ChannelProblem:
+    """The ANL fringe (TM-228) in a square duct with an inlet and an outlet.
+
+    The field falls as ``B_y = Ha (1 - sin(pi x / 2 x0)) / 2`` over
+    ``|x| <= half_length`` and is uniform outside; ``upstream`` and
+    ``downstream`` half-widths of buffer (D26: 15 and 10) separate the ramp from
+    the ends. ``solenoidal=False`` is TM-228's field, ``B_y`` alone, which is
+    divergence free. The conductance applies to all four walls, and the default
+    flow rate is a unit mean velocity.
+    """
+    base = duct_problem(
+        hartmann=hartmann, cells=cells, wall_conductance=wall_conductance, cells_in_layer=cells_in_layer
+    )
+    # Uniform from 2 x0 upstream of the centre, which holds TM-228's window [-6, 2], through the ramp.
+    faces = axial_faces(
+        -half_length - upstream, half_length + downstream, (-2.0 * half_length, half_length), spacing
+    )
+    grid = Grid(faces, base.grid.y_faces, base.grid.z_faces)
+    field = fringe_field(grid, half_length=half_length, strength=hartmann, solenoidal=solenoidal)
+    walled = ChannelProblem(
+        grid=grid,
+        conditions=(BoundaryCondition(PERIODIC), _INSULATING, _INSULATING),
+        conductivity=base.conductivity,
+        magnetic_field=field,
+        dt=base.dt,
+        wall_conductance=(0.0, float(wall_conductance), float(wall_conductance)),
+    )
+    return open_duct(walled, flow_rate, **controls)
+
+
+def solve_open_duct(
+    problem: ChannelProblem,
+    *,
+    field_scale: float | jnp.ndarray = 1.0,
+    tolerance: float = 1.0e-9,
+    max_iterations: int = 36_000,
+) -> OpenDuctSolution:
+    """Solve an inflow-outflow duct in the Stokes limit; differentiable in ``field_scale``.
+
+    One preconditioned conjugate-gradient solve for the correction to the lift,
+    certified on its residual (``tolerance`` relative to the lift's residual);
+    a rejected solve raises eagerly and gives nonfinite fields under tracing.
+    ``max_iterations`` follows the tolerance rule of #150 (600 restarts of 60).
+    """
+    axis = problem.open_axis
+    if axis != 0:
+        raise ValueError("solve_open_duct needs the first axis to be the inflow-outflow axis")
+    with jax.ensure_compile_time_eval():
+        factorization = problem.factorization()
+        viscous = _projection_solves(problem, float(problem.dt))
+    precond = _preconditioner(problem, factorization, viscous, float(problem.dt))
+    start = _lift(problem)
+    zero = (0.0, 0.0, 0.0)
+    rhs = steady_residual(start, problem, factorization, forcing=zero, field_scale=field_scale, inflow=1.0)
+    root, (iterations, _, _) = _stokes_limit_root(
+        problem,
+        start,
+        factorization,
+        precond,
+        forcing=zero,
+        field_scale=field_scale,
+        tolerance=tolerance,
+        max_iterations=max_iterations,
+        rhs=rhs,
+    )
+    correction, _ = project(jax.tree.map(jnp.subtract, root, start), problem, factorization)
+    velocity = with_inflow(jax.tree.map(jnp.add, start, correction), problem)
+    terms = momentum_terms(
+        velocity, problem, factorization, forcing=zero, field_scale=field_scale, inflow=1.0
+    )
+    # Two passes, as in the residual: the second is the defect correction of the first pressure solve.
+    once, first = project(terms, problem, factorization)
+    residual, second = project(once, problem, factorization)
+    pressure = first.replace_data(float(problem.dt) * (first.data + second.data))
+    potential, currents, field = face_currents(velocity, problem, factorization, field_scale)
+    return OpenDuctSolution(
+        velocity, pressure, potential, currents, field, _norm(residual), _norm(rhs), iterations
+    )
+
+
+def _lift(problem: ChannelProblem) -> tuple[Field, Field, Field]:
+    """The inlet profile on every axial face but the inlet: divergence free with the inlet added."""
+    velocity = zero_velocity(problem)
+    profile = jnp.asarray(problem.conditions[0].lower, dtype=velocity[0].dtype)
+    axial = velocity[0].replace_data(jnp.broadcast_to(profile, velocity[0].shape).at[0].set(0.0))
+    return (axial, *velocity[1:])
+
+
+def station_flow_rates(velocity: tuple[Field, Field, Field]) -> jnp.ndarray:
+    """The flow rate through every axial face."""
+    grid = velocity[0].grid
+    return jnp.sum(velocity[0].data * jnp.asarray(grid.face_areas(0)), axis=(1, 2))
+
+
+def station_pressure(pressure: Field) -> tuple[np.ndarray, jnp.ndarray]:
+    """The axial cell centres and the area-mean pressure over each cross-section."""
+    grid = pressure.grid
+    areas = jnp.asarray(grid.face_areas(0)[0])
+    return np.asarray(grid.centers[0]), jnp.sum(pressure.data * areas, axis=(1, 2)) / jnp.sum(areas)
+
+
+def pressure_drop(pressure: Field, start: float, end: float) -> jnp.ndarray:
+    """Mean pressure at ``start`` minus that at ``end``, interpolated linearly between centres."""
+    centres, means = station_pressure(pressure)
+    return jnp.interp(start, centres, means) - jnp.interp(end, centres, means)
+
+
+def mass_balance(velocity: tuple[Field, Field, Field]) -> jnp.ndarray:
+    """Largest net volume flux out of a cell, relative to the largest flux through a cell."""
+    return _balance(velocity)
+
+
+def charge_balance(solution: OpenDuctSolution, problem: ChannelProblem) -> jnp.ndarray:
+    """Largest net current out of a cell, relative to the largest motional current through a cell.
+
+    The motional current ``sigma (u x B).n`` is what the potential balances; the
+    net current is a small difference of it and the potential gradient, so it is
+    the scale the charge equation is solved to.
+    """
+    scalar = problem.scalar_conditions
+    motional = tuple(
+        face_electromotive_force(solution.velocity, solution.magnetic_field, axis, scalar)
+        for axis in range(3)
+    )
+    scaled = tuple(m.replace_data(float(problem.conductivity) * m.data) for m in motional)
+    return _balance(solution.currents, reference=scaled)
+
+
+def _balance(
+    faces: tuple[Field, Field, Field], reference: tuple[Field, Field, Field] | None = None
+) -> jnp.ndarray:
+    grid = faces[0].grid
+
+    def sums(fields):
+        net, gross = 0.0, 0.0
+        for axis, face in enumerate(fields):
+            flux = face.data * jnp.asarray(grid.face_areas(axis))
+            lower, upper = (
+                jax.lax.slice_in_dim(flux, start, start + grid.shape[axis], axis=axis) for start in (0, 1)
+            )
+            net, gross = net + upper - lower, gross + jnp.abs(upper) + jnp.abs(lower)
+        return net, gross
+
+    net, gross = sums(faces)
+    if reference is not None:
+        gross = sums(reference)[1]
+    return jnp.max(jnp.abs(net)) / jnp.max(gross)

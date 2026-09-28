@@ -57,7 +57,7 @@ _TEST_SHARDS = {
             "test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradient",
         )
     ),
-    "channel": ("tests/test_core3d.py", "tests/test_pipe.py"),
+    "channel": ("tests/test_core3d.py", "tests/test_pipe.py", "tests/test_axial.py"),
     "plane": (
         *(
             f"tests/test_core3d.py::{name}"
@@ -97,17 +97,18 @@ _CHANGE_TEST_NAMES = {
     "cases": "config solver physics fringing benchmarks fully_developed",
     "cli": "cli example_runner",
     "advect": "advect core3d",
-    "core3d": "core3d timeloop advect steady coreflow",
+    "axial": "axial",
+    "core3d": "core3d timeloop advect steady coreflow axial",
     "coreflow": "coreflow",
     "design": "design fully_developed",
     "fully_developed": "fully_developed design config cli solver example_runner",
-    "steady": "steady fully_developed",
-    "bc": "ops staggered_laplacian core3d timeloop advect steady pipe",
+    "steady": "steady fully_developed axial",
+    "bc": "ops staggered_laplacian core3d timeloop advect steady pipe axial",
     "grid": "grid ops staggered_laplacian core3d timeloop advect steady pipe",
     "timeloop": "timeloop",
-    "ops": "ops staggered_laplacian core3d timeloop advect steady pipe",
+    "ops": "ops staggered_laplacian core3d timeloop advect steady pipe axial",
     "em": "em",
-    "poisson": "poisson core3d timeloop steady pipe",
+    "poisson": "poisson core3d timeloop steady pipe axial",
     "pipe": "pipe",
     "io": "io cli fringing freemhd example_runner",
     "mesh": "mesh solver physics fringing benchmarks",
