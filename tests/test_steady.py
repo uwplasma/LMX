@@ -735,19 +735,23 @@ def test_the_steady_state_closes_its_mechanical_power_balance():
 
 def test_a_new_field_on_the_same_mesh_reuses_the_compiled_solve(monkeypatch):
     """2b.1: the arrays a solve closes over are arguments, so one executable serves every field."""
+    import lmhdx._programs as _programs
     import lmhdx.steady as steady
 
-    monkeypatch.setattr(steady, "_EXECUTABLES", type(steady._EXECUTABLES)())
+    monkeypatch.setattr(_programs, "_EXECUTABLES", type(_programs._EXECUTABLES)())
     monkeypatch.setattr(steady, "_SHAPES_SEEN", set())
     base = _duct(24, 20.0, conductance=0.027)
+    counts = []
     for hartmann in (20.0, 30.0, 40.0):
         problem = dataclasses.replace(base, magnetic_field=(0.0, hartmann, 0.0))
         shared = steady.solve_compiled(problem).velocity
         embedded = jax.jit(lambda problem=problem: solve_steady_state(problem).velocity)()
         for got, expected in zip(shared, embedded, strict=True):
             np.testing.assert_allclose(got.data, expected.data, rtol=1e-12, atol=1e-14)
-    # The first problem of the shape embeds its constants; the second and third share one program.
-    assert len(steady._EXECUTABLES) == 1
+        counts.append(len(_programs._EXECUTABLES))
+    # The first problem of the shape embeds its constants; the second compiles the shared program,
+    # which the third reuses.
+    assert counts[2] == counts[1] > counts[0]
     monkeypatch.setattr(steady, "_EMBED_AFTER_CALLS", 1)
     steady._program.cache_clear()
     repeated = dataclasses.replace(base, magnetic_field=(0.0, 50.0, 0.0))
@@ -755,3 +759,34 @@ def test_a_new_field_on_the_same_mesh_reuses_the_compiled_solve(monkeypatch):
     again = steady.solve_compiled(repeated).velocity  # past the threshold: its own embedded program
     for got, expected in zip(again, first, strict=True):
         np.testing.assert_allclose(got.data, expected.data, rtol=1e-12, atol=1e-14)
+
+
+@pytest.mark.parametrize("conductance", [0.0, 0.027])
+def test_the_residual_at_rest_is_the_projected_drive_exactly(conductance):
+    """The solve's starting residual skips the operator; it must be the full residual bit for bit."""
+    from lmhdx.steady import _rest_residual
+
+    problem = _duct(24, 20.0, conductance=conductance)
+    factorization = problem.factorization()
+    full = steady_residual(
+        zero_velocity(problem), problem, factorization, forcing=(2.5, 0.0, 0.0), field_scale=1.3
+    )
+    for got, expected in zip(_rest_residual(problem, factorization, (2.5, 0.0, 0.0)), full, strict=True):
+        np.testing.assert_array_equal(got.data, expected.data)
+
+
+def test_a_solve_from_rest_traces_the_operator_twice(monkeypatch):
+    """Once in the CG iteration and once to certify the root: not at rest, nor on CG's zero start."""
+    import lmhdx.steady as steady
+
+    calls = []
+    original = steady.steady_residual
+
+    def counted(*arguments, **keywords):
+        calls.append(1)
+        return original(*arguments, **keywords)
+
+    monkeypatch.setattr(steady, "steady_residual", counted)
+    problem = _duct(24, 20.0)
+    jax.make_jaxpr(lambda: solve_steady_state(problem).velocity)()
+    assert len(calls) == 2

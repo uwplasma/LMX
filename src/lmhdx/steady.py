@@ -40,10 +40,7 @@ without host callbacks. Optimizers must reject nonfinite values and gradients.
 
 from __future__ import annotations
 
-import collections
-import contextlib
 import functools
-import hashlib
 from dataclasses import dataclass
 
 import jax
@@ -51,12 +48,14 @@ import jax.numpy as jnp
 import numpy as np
 import solvax
 
+from ._programs import shape_program
 from .advect import momentum_advection
 from .core3d import (
     ChannelProblem,
     ImposedField,
     electric_state,
     enforce_face_constraints,
+    face_currents,
     face_lorentz_force,
     project,
     velocity_condition,
@@ -93,6 +92,9 @@ class SteadySolution:
     potential: Field
     residual_norm: jnp.ndarray
     steps: int
+    initial_residual_norm: jnp.ndarray | None = None
+    currents: tuple[Field, Field, Field] | None = None
+    magnetic_field: tuple[Field, Field, Field] | None = None
 
 
 def steady_residual(
@@ -140,6 +142,21 @@ def steady_residual(
             value = value - transport[component].data
         terms.append(field.replace_data(value))
     corrected, _ = project(project(tuple(terms), problem, factorization)[0], problem, factorization)
+    return corrected
+
+
+def _rest_residual(problem: ChannelProblem, factorization: FastDiagonalPoisson, forcing):
+    """:func:`steady_residual` of the fluid at rest: the projected drive, without the operator.
+
+    Every other term is an exact zero there (viscous stress, electromotive force, the potential it
+    drives, advection), so this is the same value as the full residual, at a fifth of the program.
+    """
+    drive = problem.forcing if forcing is None else forcing
+    terms = tuple(
+        field.replace_data(jnp.zeros_like(field.data) + drive[component] / problem.density)
+        for component, field in enumerate(zero_velocity(problem))
+    )
+    corrected, _ = project(project(terms, problem, factorization)[0], problem, factorization)
     return corrected
 
 
@@ -409,6 +426,7 @@ def _stokes_limit_root(
     field_scale,
     tolerance: float,
     max_iterations: int,
+    rhs=None,
 ):
     """Solve the affine Stokes-limit problem with one preconditioned CG solve.
 
@@ -443,10 +461,20 @@ def _stokes_limit_root(
         return jax.tree.map(lambda u, a, q: u - a - q, velocity, operator(scale, inside), inside)
 
     def staged_cg(weights, scale, inside, start):
+        rest = jax.tree.map(jnp.zeros_like, inside) if start is None else start
+        rest_leaves = jax.tree.leaves(rest)
+
+        def matvec(y):
+            # CG's first product is with a zero start, and the operator is linear: skip it rather
+            # than put a whole operator application into the program. Anything else is applied.
+            if start is None and all(a is b for a, b in zip(jax.tree.leaves(y), rest_leaves, strict=True)):
+                return jax.tree.map(jnp.zeros_like, y)
+            return jax.tree.map(jnp.negative, operator(scale, jax.tree.map(jnp.divide, y, weights)))
+
         result = solvax.pcg(
-            lambda y: jax.tree.map(jnp.negative, operator(scale, jax.tree.map(jnp.divide, y, weights))),
+            matvec,
             inside,
-            x0=start,
+            x0=rest,
             precond=lambda r: jax.tree.map(jnp.multiply, precond(r), weights),
             rtol=tolerance,
             max_steps=max_iterations,
@@ -500,7 +528,8 @@ def _stokes_limit_root(
         operator_at = functools.partial(matvec, weights, scale)
         return solution, jax.lax.custom_linear_solve(operator_at, rhs, solve, symmetric=True)
 
-    rhs = steady_residual(start, problem, factorization, forcing=forcing, field_scale=field_scale)
+    if rhs is None:
+        rhs = steady_residual(start, problem, factorization, forcing=forcing, field_scale=field_scale)
     primal_inside = jax.lax.stop_gradient(_orthogonal_projection(rhs, problem, factorization))
     primal_y, diagnostics = cg(weights, jax.lax.stop_gradient(field_scale), primal_inside, None)
     step = solved(rhs, field_scale, jax.lax.stop_gradient(primal_y), primal_inside, weights)
@@ -548,7 +577,9 @@ def solve_steady_state(
     def residual(state):
         return steady_residual(state, problem, factorization, forcing=forcing, field_scale=field_scale)
 
-    scale = _norm(residual(start))
+    # At rest the velocity terms vanish exactly, and so does the potential solve they feed.
+    initial = residual(start) if velocity is not None else _rest_residual(problem, factorization, forcing)
+    scale = _norm(initial)
 
     precond = _preconditioner(problem, factorization, viscous, step)
 
@@ -562,6 +593,8 @@ def solve_steady_state(
             field_scale=field_scale,
             tolerance=tolerance,
             max_iterations=linear_restart * linear_max_restarts if max_steps > 0 else 0,
+            # From rest the projected start is the start, so its residual is already known.
+            rhs=initial if velocity is None else None,
         )
         return _finish(root, residual, scale, tolerance, problem, factorization, field_scale, max_steps)
 
@@ -661,71 +694,6 @@ def shared_or_embedded(problem: ChannelProblem, function, *arguments):
     return run
 
 
-def _constants_as_constvars():
-    """Keep array constants as jaxpr constants while tracing, which :func:`shape_program` packs.
-
-    JAX's simplified constants (on with the default compilation cache, where the installed JAX
-    has them) put them inline as literals instead, and lowering then embeds numpy arrays.
-    """
-    from jax._src import config
-
-    state = getattr(config, "use_simplified_jaxpr_constants", None)
-    return contextlib.nullcontext() if state is None else state(False)
-
-
-_EXECUTABLES: collections.OrderedDict = collections.OrderedDict()
-_MAX_EXECUTABLES = 16
-
-
-def shape_program(function, *arguments):
-    """Compile ``function`` of ``arguments`` (shapes and dtypes) once per program shape (2b.1).
-
-    Tracing leaves every array the solve closes over -- the grid's metric, the
-    field, the factorizations -- as a constant of the program. Embedded, a new
-    Hartmann number, field or conductance on the same mesh is a new program and
-    compiles again, 4-5 s on a 48-cell duct. Here the constants are packed into
-    one device buffer per dtype, which the program takes as an argument, and the
-    executable is looked up by a hash of the lowered program, so two problems
-    whose programs differ only in those arrays share it, in the process and, as
-    the lowered program is the same, in the persistent compilation cache. A
-    scalar that the trace keeps as a literal still selects its own program, so
-    the sharing is exact by construction. Returns a function of ``arguments``.
-    """
-    with _constants_as_constvars():
-        closed, shapes = jax.make_jaxpr(function, return_shape=True)(*arguments)
-    tree = jax.tree.structure(shapes)
-    groups: dict[str, list[np.ndarray]] = {}
-    sizes: dict[str, int] = {}
-    layout = []
-    for constant in closed.consts:
-        value = np.asarray(constant)
-        name = value.dtype.str
-        layout.append((name, sizes.get(name, 0), value.shape))
-        groups.setdefault(name, []).append(value.ravel())
-        sizes[name] = sizes.get(name, 0) + value.size
-    names = sorted(groups)
-    with jax.ensure_compile_time_eval():
-        packed = tuple(jnp.asarray(np.concatenate(groups[name])) for name in names)
-    jaxpr = closed.jaxpr
-
-    def run(buffers, *values):
-        by_name = dict(zip(names, buffers, strict=True))
-        constants = [
-            by_name[name][start : start + int(np.prod(shape, dtype=int))].reshape(shape)
-            for name, start, shape in layout
-        ]
-        return jax.core.eval_jaxpr(jaxpr, constants, *values)
-
-    with _constants_as_constvars():
-        lowered = jax.jit(run).lower(packed, *arguments)
-    key = hashlib.sha256(lowered.as_text().encode()).hexdigest()
-    executable = _EXECUTABLES.pop(key, None) or lowered.compile()
-    _EXECUTABLES[key] = executable
-    while len(_EXECUTABLES) > _MAX_EXECUTABLES:
-        _EXECUTABLES.popitem(last=False)
-    return lambda *values: jax.tree.unflatten(tree, executable(packed, *values))
-
-
 def _finish(
     root, residual, scale, tolerance, problem, factorization, field_scale, max_steps
 ) -> SteadySolution:
@@ -736,8 +704,9 @@ def _finish(
     )
     root = _certified(root, accepted, "steady solve")
     corrected, pressure = project(root, problem, factorization)
-    potential, _ = electric_state(corrected, problem, factorization, field_scale)
-    return SteadySolution(corrected, pressure, potential, final, max_steps)
+    # The currents and the scaled field come with the potential, so callers need no second potential solve.
+    potential, currents, field = face_currents(corrected, problem, factorization, field_scale)
+    return SteadySolution(corrected, pressure, potential, final, max_steps, scale, currents, field)
 
 
 def _krylov(matvec, target, precond=None):
