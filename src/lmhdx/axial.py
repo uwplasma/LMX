@@ -203,7 +203,10 @@ def fringe_duct(
     )
     # Uniform from 2 x0 upstream of the centre, which holds TM-228's window [-6, 2], through the ramp.
     faces = axial_faces(
-        -half_length - upstream, half_length + downstream, (-2.0 * half_length, half_length), spacing
+        -half_length - upstream,
+        half_length + downstream,
+        (-half_length - min(half_length, upstream), half_length),
+        spacing,
     )
     grid = Grid(faces, base.grid.y_faces, base.grid.z_faces)
     field = fringe_field(grid, half_length=half_length, strength=hartmann, solenoidal=solenoidal)
