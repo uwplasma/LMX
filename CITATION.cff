@@ -5,10 +5,10 @@ type: software
 authors:
   - family-names: Jorge
     given-names: Rogerio
-version: 1.5.0
-date-released: 2026-09-27
+version: 1.6.0
+date-released: 2026-09-28
 repository-code: "https://github.com/uwplasma/LMhdX"
-url: "https://lmx.readthedocs.io/"
+url: "https://lmhdx.readthedocs.io/"
 license: MIT
 keywords:
   - magnetohydrodynamics
