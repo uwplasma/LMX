@@ -439,9 +439,7 @@ def _stokes_limit_root(
         inside = _orthogonal_projection(velocity, problem, factorization)
         return jax.tree.map(lambda u, a, q: u - a - q, velocity, operator(scale, inside), inside)
 
-    # One staged CG: the tangent and transposed solves trace it once between them.
-    @jax.jit
-    def cg(weights, scale, inside, start):
+    def staged_cg(weights, scale, inside, start):
         result = solvax.pcg(
             lambda y: jax.tree.map(jnp.negative, operator(scale, jax.tree.map(jnp.divide, y, weights))),
             inside,
@@ -453,6 +451,24 @@ def _stokes_limit_root(
         accepted = result.converged & jnp.isfinite(result.residual_norm)
         kept = _certified(result.x, accepted, "steady CG solve")
         return kept, (result.iterations, result.residual_norm, result.converged)
+
+    traced_cg = {}
+
+    def cg(*arguments):
+        """CG traced once per argument signature: the tangent and transposed solves share one trace.
+
+        The trace is replayed with :func:`jax.core.eval_jaxpr` rather than staged as a
+        ``jit``, so its constants stay constants of the enclosing program, which
+        compiling once per program shape (2b.1) passes as arguments.
+        """
+        leaves, tree = jax.tree.flatten(arguments)
+        key = (tree, tuple((jnp.shape(leaf), jnp.result_type(leaf)) for leaf in leaves))
+        if key not in traced_cg:
+            traced_cg[key] = jax.make_jaxpr(staged_cg, return_shape=True)(*arguments)
+        closed, shapes = traced_cg[key]
+        return jax.tree.unflatten(
+            jax.tree.structure(shapes), jax.core.eval_jaxpr(closed.jaxpr, closed.consts, *leaves)
+        )
 
     def complete(weights, y, target, inside):
         return jax.tree.map(lambda v, t, q, w: v + w * (t - q), y, target, inside, weights)
