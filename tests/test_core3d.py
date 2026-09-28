@@ -398,6 +398,82 @@ def test_implicit_viscosity_keeps_second_order_convergence():
     assert 1.7 < order < 2.3, (coarse, fine, order)
 
 
+def _manufactured_velocity(point):
+    """A divergence-free, no-slip 3-D field: the curl of ``(chi, 0, psi)`` plus an axial flow.
+
+    ``g = (1 - s^2)^2`` and its derivative vanish on the walls ``y, z = +-1``, so every
+    component does; ``x`` is periodic. Written once, pointwise, and differentiated by JAX,
+    so the source shares nothing with the discrete operators.
+    """
+    x, y, z = point
+    wave = 2.0 * jnp.pi
+
+    def g(s):
+        return (1.0 - s**2) ** 2
+
+    psi = jax.grad(lambda *p: g(p[1]) * g(p[2]) * jnp.sin(wave * p[0]), argnums=(0, 1, 2))(x, y, z)
+    chi = jax.grad(lambda *p: 0.5 * g(p[1]) * g(p[2]) * jnp.cos(wave * p[0]), argnums=(0, 1, 2))(x, y, z)
+    return jnp.stack([psi[1] + g(y) * g(z), chi[2] - psi[0], -chi[1]])
+
+
+def _manufactured_error(cells: int, advection: str, viscosity: float = 0.2) -> float:
+    """March the full step to its steady state under the manufactured source; return the max error."""
+
+    def source(point):
+        # Steady momentum with zero pressure: (u . grad) u - nu lap u.
+        velocity = _manufactured_velocity(point)
+        gradient = jax.jacfwd(_manufactured_velocity)(point)
+        laplacian = jnp.trace(jax.hessian(_manufactured_velocity)(point), axis1=1, axis2=2)
+        return gradient @ velocity - viscosity * laplacian
+
+    grid = Grid(
+        uniform_faces(cells, 0.0, 1.0), tanh_faces(cells, -1.0, 1.0, 1.5), tanh_faces(cells, -1.0, 1.0, 1.2)
+    )
+
+    def sample(function, component):
+        axes = [grid.faces[a] if a == component else grid.centers[a] for a in range(3)]
+        mesh = np.meshgrid(*axes, indexing="ij")
+        points = jnp.stack([jnp.asarray(c.ravel()) for c in mesh], axis=1)
+        return jax.vmap(function)(points)[:, component].reshape(mesh[0].shape)
+
+    # `step` adds the forcing pointwise, so a face array per component is a body force.
+    problem = _problem(
+        grid,
+        viscosity=viscosity,
+        conductivity=0.0,
+        forcing=tuple(sample(source, component) for component in range(3)),
+        dt=0.05,
+        advection=advection,
+    )
+    factorization, viscous = problem.factorization(), problem.viscous_factorizations()
+
+    @jax.jit
+    def march(velocity):
+        return jax.lax.fori_loop(0, 1500, lambda _, v: step(v, problem, factorization, viscous)[0], velocity)
+
+    velocity = march(zero_velocity(problem))
+    again = step(velocity, problem, factorization, viscous)[0]
+    assert max(float(jnp.max(jnp.abs(a.data - b.data))) for a, b in zip(again, velocity, strict=True)) < 1e-12
+    return max(
+        float(jnp.max(jnp.abs(field.data - sample(_manufactured_velocity, component))))
+        for component, field in enumerate(velocity)
+    )
+
+
+@pytest.mark.parametrize("advection", ["central", "limited"])
+def test_a_manufactured_flow_converges_at_second_order_with_convection_on(advection):
+    """Plan step 1.5b, validation row 8: the full step, convection on, a stretched 3-D mesh.
+
+    Both wall-normal axes are tanh-stretched and every velocity component varies in all
+    three directions; the Reynolds number is about 5, so convection is not a perturbation
+    (switched off, the error is 4.3 and does not fall). Measured: central 0.246 -> 0.0625
+    (order 1.98), limited 0.183 -> 0.0444 (order 2.04) from 12^3 to 24^3.
+    """
+    coarse, fine = _manufactured_error(12, advection), _manufactured_error(24, advection)
+    order = np.log2(coarse / fine)
+    assert 1.8 < order < 2.3, (coarse, fine, order)
+
+
 # --- Reconciliation with the production solver and an independent reference ---
 #
 # `lmhdx.solve_fully_developed_fields` solves the same duct on a two-dimensional
