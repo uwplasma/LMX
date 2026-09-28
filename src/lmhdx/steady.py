@@ -602,7 +602,43 @@ def _program(problem: ChannelProblem):
         solution = solve_steady_state(problem, max_steps=_MAX_STEPS)
         return solution.velocity, solution.pressure, solution.potential, solution.residual_norm
 
-    return shape_program(run)
+    return shared_or_embedded(problem, run)
+
+
+_SHAPES_SEEN: set = set()
+
+
+def shape_key(problem: ChannelProblem) -> tuple:
+    """What fixes the structure of a problem's program: shapes, conditions and flags, not values."""
+    field = problem.magnetic_field
+    pattern = type(field).__name__ if isinstance(field, ImposedField) else tuple(bool(b) for b in field)
+    return (
+        problem.grid.shape,
+        problem.grid.is_polar,
+        problem.conditions,
+        problem.advection,
+        problem.precision,
+        pattern,
+        tuple(bool(c) for c in problem.wall_conductance),
+        bool(problem.conductivity),
+    )
+
+
+def shared_or_embedded(problem: ChannelProblem, function, *arguments):
+    """Compile the first problem of a shape with its constants embedded, later ones shared (2b.1).
+
+    Embedded constants compile faster and run up to half again faster warm on a
+    CPU, because XLA folds them; a shared program (:func:`shape_program`) saves
+    the compile of every further problem of the shape, 2-4 s on a 48-cell duct.
+    A single solve takes the first. In a sweep of fields or conductances on one
+    mesh the second problem compiles the shared program and the later ones reuse it.
+    """
+    key = (shape_key(problem), tuple((a.shape, str(a.dtype)) for a in arguments))
+    if key not in _SHAPES_SEEN:
+        _SHAPES_SEEN.add(key)
+        compiled = jax.jit(function).lower(*arguments).compile()
+        return lambda *values: compiled(*values)
+    return shape_program(function, *arguments)
 
 
 def _constants_as_constvars():

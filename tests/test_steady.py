@@ -738,11 +738,13 @@ def test_a_new_field_on_the_same_mesh_reuses_the_compiled_solve(monkeypatch):
     import lmhdx.steady as steady
 
     monkeypatch.setattr(steady, "_EXECUTABLES", type(steady._EXECUTABLES)())
+    monkeypatch.setattr(steady, "_SHAPES_SEEN", set())
     base = _duct(24, 20.0, conductance=0.027)
-    for hartmann in (20.0, 30.0):
+    for hartmann in (20.0, 30.0, 40.0):
         problem = dataclasses.replace(base, magnetic_field=(0.0, hartmann, 0.0))
         shared = steady.solve_compiled(problem).velocity
         embedded = jax.jit(lambda problem=problem: solve_steady_state(problem).velocity)()
         for got, expected in zip(shared, embedded, strict=True):
             np.testing.assert_allclose(got.data, expected.data, rtol=1e-12, atol=1e-14)
+    # The first problem of the shape embeds its constants; the second and third share one program.
     assert len(steady._EXECUTABLES) == 1
