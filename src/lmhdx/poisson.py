@@ -114,6 +114,23 @@ def _refined(factorization, direct, matvec, data: jnp.ndarray, volumes: np.ndarr
     return solution if volumes is None else _volume_mean_removed(solution, volumes)
 
 
+def _corrected(factorization, direct, matvec, data, result, volumes: np.ndarray | None) -> jnp.ndarray:
+    """Apply ``factorization.corrections`` float64 defect corrections to a ``"state"`` solve.
+
+    The lowest mode of a long inflow-outflow axis sits nine decades below the largest
+    across a Hartmann layer, and the transforms lose that ratio in round-off: at Ha 100 the
+    pressure drop drifted at 1e-8 and the charge balance at 1e-9 without it.
+    """
+    if factorization.precision != "state":
+        return result
+    for _ in range(factorization.corrections):
+        defect = data - matvec(result)
+        result = result + direct(defect if volumes is None else _volume_mean_removed(defect, volumes))
+    return (
+        result if volumes is None or not factorization.corrections else _volume_mean_removed(result, volumes)
+    )
+
+
 def _reciprocal(values: np.ndarray) -> np.ndarray:
     """``1 / values`` on the host, zero where a singular mode's value is (its entry is overwritten)."""
     values = np.asarray(values)
@@ -491,6 +508,7 @@ class FastDiagonalPoisson:
     singular: bool
     precision: str = "state"
     refinements: int = 2
+    corrections: int = 0
     _low: dict | None = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
@@ -512,6 +530,7 @@ class FastDiagonalPoisson:
 
         volumes = self.grid.cell_volumes() if self.singular else None
         result = _refined(self, self._direct, operator, rhs.data, volumes)
+        result = _corrected(self, self._direct, operator, rhs.data, result, volumes)
         return Field(result, (CENTER, CENTER, CENTER), self.grid)
 
     def _direct(self, data: jnp.ndarray, single: bool = False) -> jnp.ndarray:
@@ -572,7 +591,7 @@ def fast_diagonal_poisson(
     if len(conditions) != 3:
         raise ValueError("a factorization needs one boundary condition per axis")
     for axis, condition in enumerate(conditions):
-        if (condition.lower, condition.upper) != (0.0, 0.0):
+        if not condition.is_homogeneous:
             raise ValueError(
                 f"axis {axis} carries inhomogeneous boundary data; factorize the homogeneous "
                 "operator and move the boundary contribution into the right-hand side"
@@ -589,6 +608,7 @@ def fast_diagonal_poisson(
         values.append(eigenvalues)
         scales.append(root)
     singular = _is_singular(values)
+    corrections = int(any(condition.is_mixed for condition in conditions))
     if singular:
         # Order the constant mode first so a single entry carries the nullspace.
         vectors, values = _promote_null_mode(vectors, values)
@@ -601,14 +621,21 @@ def fast_diagonal_poisson(
         singular,
         precision,
         refinements,
+        corrections,
     )
 
 
 def _is_singular(values: list[np.ndarray]) -> bool:
-    """Return whether the Kronecker sum has a zero eigenvalue."""
-    magnitude = max(float(np.max(np.abs(value))) for value in values)
-    smallest = sum(float(np.min(np.abs(value))) for value in values)
-    return smallest <= _SINGULAR_TOLERANCE * max(magnitude, 1.0)
+    """Return whether the Kronecker sum has a zero eigenvalue: every axis has one of its own.
+
+    Each axis is judged against its own spectrum. Against the largest eigenvalue of
+    all three, the lowest mode of a long inflow-outflow axis (0.04 against 7e7 across
+    a Hartmann layer at Ha 100) passed for a null mode, and the solve removed it.
+    """
+    return all(
+        float(np.min(np.abs(value))) <= _SINGULAR_TOLERANCE * max(float(np.max(np.abs(value))), 1.0)
+        for value in values
+    )
 
 
 def _promote_null_mode(
@@ -633,6 +660,11 @@ def _symmetric_eigen(operator: np.ndarray, weights: np.ndarray, message: str):
             f"{message} (relative asymmetry {asymmetry:.3e}); fast diagonalization does not apply"
         )
     eigenvalues, eigenvectors = np.linalg.eigh(0.5 * (symmetric + symmetric.T))
+    if np.max(np.abs(operator @ np.ones(len(weights)))) <= _SINGULAR_TOLERANCE * np.max(np.abs(operator)):
+        # Constants are in the null space, so that eigenvalue is zero. Computed, it carries round-off
+        # of the largest one (5e-10 across a Hartmann layer at Ha 100), which the lowest mode of a
+        # long inflow-outflow axis (0.04) cannot absorb: the pressure drop then drifts at 1e-8.
+        eigenvalues[np.argmin(np.abs(eigenvalues))] = 0.0
     return eigenvalues, eigenvectors, root
 
 
@@ -722,6 +754,7 @@ class FastDiagonalThinWallPoisson(FastDiagonalPoisson):
         conducting = [float(value) > 0.0 for value in self.conductance]
         data = jnp.pad(rhs.data, [(1, 1) if flag else (0, 0) for flag in conducting])
         solution = _refined(self, self._corrected, self._apply, data, self._measure())
+        solution = _corrected(self, self._corrected, self._apply, data, solution, self._measure())
         cells = tuple(slice(1, -1) if flag else slice(None) for flag in conducting)
         volumes = jnp.asarray(self.grid.cell_volumes(), dtype=solution.dtype)
         solution = solution - jnp.sum(volumes * solution[cells]) / jnp.sum(volumes)
@@ -802,9 +835,7 @@ def fast_diagonal_thin_wall_poisson(
         )
     operators, vectors, values, scales, weights = [], [], [], [], []
     for axis, condition in enumerate(conditions):
-        if (condition.lower, condition.upper) != (0.0, 0.0) or (
-            axis in conducting and condition.kind != NEUMANN
-        ):
+        if not condition.is_homogeneous or (axis in conducting and condition.kind != NEUMANN):
             raise ValueError(
                 f"axis {axis} needs a homogeneous condition, and insulating walls if it conducts"
             )
@@ -876,6 +907,11 @@ def free_slice(grid: Grid, axis: int, offset_value: float, condition: BoundaryCo
         return slice(None)
     if condition.is_periodic:
         return slice(0, grid.shape[axis])
+    if condition.is_mixed:
+        # Only a Dirichlet end is prescribed; the other face of an inflow-outflow axis is free.
+        return slice(
+            int(condition.kinds[0] == DIRICHLET), grid.shape[axis] + int(condition.kinds[1] != DIRICHLET)
+        )
     return slice(1, grid.shape[axis])
 
 
@@ -987,7 +1023,7 @@ def fast_diagonal_helmholtz(
     if len(conditions) != 3:
         raise ValueError("a factorization needs one boundary condition per axis")
     for axis, condition in enumerate(conditions):
-        if (condition.lower, condition.upper) != (0.0, 0.0):
+        if not condition.is_homogeneous:
             raise ValueError(
                 f"axis {axis} carries inhomogeneous boundary data; factorize the homogeneous "
                 "operator and move the boundary contribution into the right-hand side"
@@ -1037,4 +1073,5 @@ def _axis_weights(grid: Grid, axis: int, offset_value: float, condition: Boundar
     if condition.is_periodic:
         wrap = 0.5 * (widths[0] + widths[-1])
         return np.concatenate(([wrap], 0.5 * (widths[:-1] + widths[1:]), [wrap]))
-    return np.concatenate(([widths[0]], 0.5 * (widths[:-1] + widths[1:]), [widths[-1]]))
+    ends = (0.5 * widths[0], 0.5 * widths[-1]) if condition.is_mixed else (widths[0], widths[-1])
+    return np.concatenate(([ends[0]], 0.5 * (widths[:-1] + widths[1:]), [ends[1]]))

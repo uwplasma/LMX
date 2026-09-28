@@ -260,7 +260,8 @@ def face_inner_product(
     A periodic axis stores its wrap face twice, once at each end, so each copy
     takes half the weight. Counting both in full would double the measure of
     that control volume, which an adjoint identity would not notice -- both
-    sides carry the same error -- but an energy budget would, and did.
+    sides carry the same error -- but an energy budget would, and did. The two
+    end faces of an inflow-outflow axis carry values, and own half a cell each.
     """
     grid = left.grid
     index = grid.axis_index(axis)
@@ -269,7 +270,8 @@ def face_inner_product(
     if left.grid != right.grid:
         raise ValueError("fields must share one grid")
     distances = face_distances(grid, index, condition)
-    if condition.is_periodic:
+    if condition.is_periodic or condition.is_mixed:
+        # A wrap face is stored twice; an inflow-outflow face owns only the half cell inside.
         distances = distances.copy()
         wrap = (slice(None),) * index + ([0, -1],) if distances.ndim == 3 else ([0, -1],)
         distances[wrap] *= 0.5
@@ -407,7 +409,15 @@ def _face_axis_laplacian(field: Field, axis: int, condition: BoundaryCondition) 
         1.0 / distances, axis, field.dtype
     )
     zeros = jnp.zeros_like(_take(data, axis, slice(None, 1)))
-    return jnp.concatenate((zeros, inner, zeros), axis=axis)
+    ends = [zeros, zeros]
+    if condition.is_mixed:
+        # A Neumann end of an inflow-outflow axis is an unknown face with zero normal gradient:
+        # the flux beyond it vanishes over the half cell it owns, which keeps the operator symmetric.
+        for end, (kind, sign, at) in enumerate(zip(condition.kinds, (1.0, -1.0), (0, -1), strict=True)):
+            if kind == "neumann":
+                edge = _take(gradient, axis, slice(at, None) if at else slice(None, 1))
+                ends[end] = sign * edge * (2.0 / widths[at])
+    return jnp.concatenate((ends[0], inner, ends[1]), axis=axis)
 
 
 def _roll(data: jnp.ndarray, axis: int, shift: int) -> jnp.ndarray:

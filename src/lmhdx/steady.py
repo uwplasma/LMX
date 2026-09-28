@@ -104,6 +104,7 @@ def steady_residual(
     *,
     forcing: tuple[float, float, float] | None = None,
     field_scale: float | jnp.ndarray = 1.0,
+    inflow: float | jnp.ndarray | None = None,
 ) -> tuple[Field, Field, Field]:
     """Return the projected steady momentum residual of a velocity field.
 
@@ -117,9 +118,32 @@ def steady_residual(
     divergence-free fields, where the CG preconditioner cannot see it. The gradient part of a
     varying field's force is large, so that leak set the CG floor: 5e-10 of the right-hand
     side at Ha 20 and 6e-7 at Ha 100, against 1e-13 and 3e-12 with the correction (#145).
+
+    ``inflow`` scales the inlet profile of an inflow-outflow axis onto the inlet
+    face, which the constraints otherwise hold at zero; left ``None`` the residual
+    is linear in ``velocity``, which is what the Krylov solve needs.
     """
     factorization = problem.factorization() if factorization is None else factorization
+    terms = momentum_terms(
+        velocity, problem, factorization, forcing=forcing, field_scale=field_scale, inflow=inflow
+    )
+    corrected, _ = project(project(terms, problem, factorization)[0], problem, factorization)
+    return corrected
+
+
+def momentum_terms(
+    velocity: tuple[Field, Field, Field],
+    problem: ChannelProblem,
+    factorization: FastDiagonalPoisson,
+    *,
+    forcing: tuple[float, float, float] | None = None,
+    field_scale: float | jnp.ndarray = 1.0,
+    inflow: float | jnp.ndarray | None = None,
+) -> tuple[Field, Field, Field]:
+    """Return the steady momentum terms before projection: what the pressure gradient balances."""
     velocity = enforce_face_constraints(velocity, problem)
+    if inflow is not None:
+        velocity = with_inflow(velocity, problem, inflow)
     drive = problem.forcing if forcing is None else forcing
     _, force = electric_state(velocity, problem, factorization, field_scale)
     body = face_lorentz_force(force, problem)
@@ -141,8 +165,20 @@ def steady_residual(
         if transport is not None:
             value = value - transport[component].data
         terms.append(field.replace_data(value))
-    corrected, _ = project(project(tuple(terms), problem, factorization)[0], problem, factorization)
-    return corrected
+    return tuple(terms)
+
+
+def with_inflow(
+    velocity: tuple[Field, Field, Field], problem: ChannelProblem, scale: float | jnp.ndarray = 1.0
+) -> tuple[Field, Field, Field]:
+    """Set the inlet face of an inflow-outflow axis to ``scale`` times its prescribed profile."""
+    axis = problem.open_axis
+    if axis is None:
+        raise ValueError("the problem has no inflow-outflow axis")
+    field = velocity[axis]
+    profile = jnp.asarray(problem.conditions[axis].lower, dtype=field.dtype)
+    data = field.data.at[(slice(None),) * axis + (0,)].set(scale * profile)
+    return tuple(field.replace_data(data) if index == axis else v for index, v in enumerate(velocity))
 
 
 def _rest_residual(problem: ChannelProblem, factorization: FastDiagonalPoisson, forcing):
@@ -410,6 +446,8 @@ def _orthogonal_projection(
         if problem.conditions[component].is_periodic:
             mean = 0.5 * (data[selection + (0,)] + data[selection + (-1,)])
             data = data.at[selection + (0,)].set(mean).at[selection + (-1,)].set(mean)
+        elif problem.conditions[component].is_mixed:
+            data = data.at[selection + (0,)].set(0.0)
         else:
             data = data.at[selection + (0,)].set(0.0).at[selection + (-1,)].set(0.0)
         constrained.append(field.replace_data(data))
