@@ -145,6 +145,21 @@ def steady_residual(
     return corrected
 
 
+def _rest_residual(problem: ChannelProblem, factorization: FastDiagonalPoisson, forcing):
+    """:func:`steady_residual` of the fluid at rest: the projected drive, without the operator.
+
+    Every other term is an exact zero there (viscous stress, electromotive force, the potential it
+    drives, advection), so this is the same value as the full residual, at a fifth of the program.
+    """
+    drive = problem.forcing if forcing is None else forcing
+    terms = tuple(
+        field.replace_data(jnp.zeros_like(field.data) + drive[component] / problem.density)
+        for component, field in enumerate(zero_velocity(problem))
+    )
+    corrected, _ = project(project(terms, problem, factorization)[0], problem, factorization)
+    return corrected
+
+
 def _preconditioner(
     problem: ChannelProblem,
     factorization: FastDiagonalPoisson,
@@ -552,7 +567,8 @@ def solve_steady_state(
     def residual(state):
         return steady_residual(state, problem, factorization, forcing=forcing, field_scale=field_scale)
 
-    initial = residual(start)
+    # At rest the velocity terms vanish exactly, and so does the potential solve they feed.
+    initial = residual(start) if velocity is not None else _rest_residual(problem, factorization, forcing)
     scale = _norm(initial)
 
     precond = _preconditioner(problem, factorization, viscous, step)

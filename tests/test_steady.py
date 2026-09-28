@@ -759,3 +759,17 @@ def test_a_new_field_on_the_same_mesh_reuses_the_compiled_solve(monkeypatch):
     again = steady.solve_compiled(repeated).velocity  # past the threshold: its own embedded program
     for got, expected in zip(again, first, strict=True):
         np.testing.assert_allclose(got.data, expected.data, rtol=1e-12, atol=1e-14)
+
+
+@pytest.mark.parametrize("conductance", [0.0, 0.027])
+def test_the_residual_at_rest_is_the_projected_drive_exactly(conductance):
+    """The solve's starting residual skips the operator; it must be the full residual bit for bit."""
+    from lmhdx.steady import _rest_residual
+
+    problem = _duct(24, 20.0, conductance=conductance)
+    factorization = problem.factorization()
+    full = steady_residual(
+        zero_velocity(problem), problem, factorization, forcing=(2.5, 0.0, 0.0), field_scale=1.3
+    )
+    for got, expected in zip(_rest_residual(problem, factorization, (2.5, 0.0, 0.0)), full, strict=True):
+        np.testing.assert_array_equal(got.data, expected.data)
