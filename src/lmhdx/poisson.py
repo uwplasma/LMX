@@ -44,6 +44,7 @@ import jax.numpy as jnp
 import numpy as np
 import solvax
 
+from ._programs import shape_program
 from .bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition
 from .grid import CENTER, FACE, POLAR, Field, Grid, uniform_faces
 from .ops import foldable, laplacian, staggered_laplacian
@@ -214,7 +215,9 @@ def _probe(
     for column, position in enumerate(positions):
         units[(column,) + tuple(position)] = 1.0
     with jax.default_device(jax.devices("cpu")[0]):
-        applied = jax.jit(jax.vmap(lambda data: apply(Field(data, offset, line)).data))(units)
+        # One compiled probe per stencil shape: a new mesh of the same shape reuses it (2b.1).
+        batched = jax.vmap(lambda data: apply(Field(data, offset, line)).data)
+        applied = shape_program(batched, jax.ShapeDtypeStruct(units.shape, units.dtype))(units)
     return np.asarray(applied).reshape(len(positions), -1)[:, selection].T
 
 

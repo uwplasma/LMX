@@ -735,19 +735,23 @@ def test_the_steady_state_closes_its_mechanical_power_balance():
 
 def test_a_new_field_on_the_same_mesh_reuses_the_compiled_solve(monkeypatch):
     """2b.1: the arrays a solve closes over are arguments, so one executable serves every field."""
+    import lmhdx._programs as _programs
     import lmhdx.steady as steady
 
-    monkeypatch.setattr(steady, "_EXECUTABLES", type(steady._EXECUTABLES)())
+    monkeypatch.setattr(_programs, "_EXECUTABLES", type(_programs._EXECUTABLES)())
     monkeypatch.setattr(steady, "_SHAPES_SEEN", set())
     base = _duct(24, 20.0, conductance=0.027)
+    counts = []
     for hartmann in (20.0, 30.0, 40.0):
         problem = dataclasses.replace(base, magnetic_field=(0.0, hartmann, 0.0))
         shared = steady.solve_compiled(problem).velocity
         embedded = jax.jit(lambda problem=problem: solve_steady_state(problem).velocity)()
         for got, expected in zip(shared, embedded, strict=True):
             np.testing.assert_allclose(got.data, expected.data, rtol=1e-12, atol=1e-14)
-    # The first problem of the shape embeds its constants; the second and third share one program.
-    assert len(steady._EXECUTABLES) == 1
+        counts.append(len(_programs._EXECUTABLES))
+    # The first problem of the shape embeds its constants; the second compiles the shared program,
+    # which the third reuses.
+    assert counts[2] == counts[1] > counts[0]
     monkeypatch.setattr(steady, "_EMBED_AFTER_CALLS", 1)
     steady._program.cache_clear()
     repeated = dataclasses.replace(base, magnetic_field=(0.0, 50.0, 0.0))
