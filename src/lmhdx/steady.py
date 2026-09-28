@@ -41,6 +41,7 @@ without host callbacks. Optimizers must reject nonfinite values and gradients.
 from __future__ import annotations
 
 import collections
+import contextlib
 import functools
 import hashlib
 from dataclasses import dataclass
@@ -604,6 +605,18 @@ def _program(problem: ChannelProblem):
     return shape_program(run)
 
 
+def _constants_as_constvars():
+    """Keep array constants as jaxpr constants while tracing, which :func:`shape_program` packs.
+
+    JAX's simplified constants (on with the default compilation cache, where the installed JAX
+    has them) put them inline as literals instead, and lowering then embeds numpy arrays.
+    """
+    from jax._src import config
+
+    state = getattr(config, "use_simplified_jaxpr_constants", None)
+    return contextlib.nullcontext() if state is None else state(False)
+
+
 _EXECUTABLES: collections.OrderedDict = collections.OrderedDict()
 _MAX_EXECUTABLES = 16
 
@@ -622,15 +635,18 @@ def shape_program(function, *arguments):
     scalar that the trace keeps as a literal still selects its own program, so
     the sharing is exact by construction. Returns a function of ``arguments``.
     """
-    closed, shapes = jax.make_jaxpr(function, return_shape=True)(*arguments)
+    with _constants_as_constvars():
+        closed, shapes = jax.make_jaxpr(function, return_shape=True)(*arguments)
     tree = jax.tree.structure(shapes)
     groups: dict[str, list[np.ndarray]] = {}
+    sizes: dict[str, int] = {}
     layout = []
     for constant in closed.consts:
         value = np.asarray(constant)
-        members = groups.setdefault(value.dtype.str, [])
-        layout.append((value.dtype.str, sum(member.size for member in members), value.shape))
-        members.append(value.ravel())
+        name = value.dtype.str
+        layout.append((name, sizes.get(name, 0), value.shape))
+        groups.setdefault(name, []).append(value.ravel())
+        sizes[name] = sizes.get(name, 0) + value.size
     names = sorted(groups)
     with jax.ensure_compile_time_eval():
         packed = tuple(jnp.asarray(np.concatenate(groups[name])) for name in names)
@@ -644,7 +660,8 @@ def shape_program(function, *arguments):
         ]
         return jax.core.eval_jaxpr(jaxpr, constants, *values)
 
-    lowered = jax.jit(run).lower(packed, *arguments)
+    with _constants_as_constvars():
+        lowered = jax.jit(run).lower(packed, *arguments)
     key = hashlib.sha256(lowered.as_text().encode()).hexdigest()
     executable = _EXECUTABLES.pop(key, None) or lowered.compile()
     _EXECUTABLES[key] = executable
