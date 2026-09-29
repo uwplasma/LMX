@@ -22,7 +22,10 @@ walls and insulating side walls.
 `lmhdx.solve` runs a case on the staggered core (`lmhdx.fully_developed`): the
 cross-section becomes a `ChannelProblem` with one periodic axial cell, and the
 steady state is one preconditioned conjugate-gradient solve, compiled once per
-case and reused for any drive. `ny` and `nz` are fluid cells, clustered to the
+case and reused for any drive. A sweep of Hartmann numbers, fields or wall
+conductances on one mesh size compiles twice: from the third case on, the mesh,
+field and factorizations are built on the host and passed to the program the
+second case compiled, with no trace. `ny` and `nz` are fluid cells, clustered to the
 Hartmann layer `a/Ha` on the walls normal to the field and to the side layer
 `a/sqrt(Ha)` on the others, exactly as `lmhdx.duct_problem` does. Hunt's
 conducting walls are thin walls of conductance ratio `c = sigma_w t_w / (sigma a)`:

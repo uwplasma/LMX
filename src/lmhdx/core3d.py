@@ -72,6 +72,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from . import _pin_matmul_precision
+from ._programs import attribute, bound, host_array, host_scalar
 from .advect import momentum_advection
 from .bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition
 from .em import (
@@ -400,7 +401,7 @@ def face_currents(
         component.replace_data(field_scale * component.data) for component in _imposed_field(problem)
     )
     conductivities = [
-        face_conductivity(_constant(problem.grid, problem.conductivity), axis, scalar[axis])
+        face_conductivity(_constant(problem, _attribute_value, "conductivity"), axis, scalar[axis])
         for axis in range(3)
     ]
     emfs = [face_electromotive_force(velocity, field, axis, scalar) for axis in range(3)]
@@ -474,16 +475,24 @@ def _solve_potential(
     half-cell flux, and the operator stays a Kronecker sum, so either closure is
     three contractions: a fixed linear map that differentiates with no iteration.
     """
-    scale = 1.0 / float(problem.conductivity) if float(problem.conductivity) else 0.0
-    scaled = source.replace_data(scale * source.data)
+    scaled = source.replace_data(host_scalar(problem, _resistivity) * source.data)
     if not problem.conducting_walls:
         if problem.open_axis is not None:
-            with jax.ensure_compile_time_eval():
-                factorization = problem.potential_factorization()
+            factorization = bound(problem, _potential_factorization)
         return factorization.solve(scaled), (None, None, None)
-    with jax.ensure_compile_time_eval():
-        walls = problem.potential_factorization()
-    return walls.solve_with_walls(scaled)
+    return bound(problem, _potential_factorization).solve_with_walls(scaled)
+
+
+def _resistivity(problem: ChannelProblem) -> float:
+    return 1.0 / float(problem.conductivity) if float(problem.conductivity) else 0.0
+
+
+def _factorization(problem: ChannelProblem) -> FastDiagonalPoisson:
+    return problem.factorization()
+
+
+def _potential_factorization(problem: ChannelProblem) -> FastDiagonalPoisson:
+    return problem.potential_factorization()
 
 
 def duct_problem(
@@ -584,13 +593,12 @@ def project(
     factorization = problem.factorization() if factorization is None else factorization
     velocity = enforce_face_constraints(velocity, problem)
     source = divergence(velocity)
-    scale = problem.density / problem.dt
-    pressure = factorization.solve(source.replace_data(scale * source.data))
+    density, dt = attribute(problem, "density"), attribute(problem, "dt")
+    pressure = factorization.solve(source.replace_data((density / dt) * source.data))
     scalar = problem.pressure_conditions
     corrected = tuple(
         field.replace_data(
-            field.data
-            - (problem.dt / problem.density) * face_gradient(pressure, component, scalar[component]).data
+            field.data - (dt / density) * face_gradient(pressure, component, scalar[component]).data
         )
         for component, field in enumerate(velocity)
     )
@@ -714,18 +722,36 @@ def _imposed_field(problem: ChannelProblem) -> tuple[Field, Field, Field]:
     """Return the imposed field at the cell centres: three constants, or the arrays of a varying one."""
     field = problem.magnetic_field
     if not isinstance(field, ImposedField):
-        return tuple(_constant(problem.grid, value) for value in field)
-    with jax.ensure_compile_time_eval():
-        data = tuple(jnp.asarray(component, dtype=jnp.result_type(float)) for component in field.components)
-    return tuple(Field(values, (CENTER,) * 3, problem.grid) for values in data)
+        return tuple(_constant(problem, _field_component, component) for component in range(3))
+    dtype = jnp.result_type(float)
+    return tuple(
+        Field(host_array(problem, _imposed_component, component, dtype=dtype), (CENTER,) * 3, problem.grid)
+        for component in range(3)
+    )
 
 
-def _constant(grid: Grid, value: float) -> Field:
+def _field_component(problem: ChannelProblem, component: int) -> float:
+    return problem.magnetic_field[component]
+
+
+def _imposed_component(problem: ChannelProblem, component: int) -> np.ndarray:
+    return problem.magnetic_field.components[component]
+
+
+def _attribute_value(problem: ChannelProblem, name: str) -> float:
+    return getattr(problem, name)
+
+
+def _one_element(problem: ChannelProblem, build, static: tuple) -> np.ndarray:
+    return np.full(1, build(problem, *static), dtype=jnp.result_type(float))
+
+
+def _constant(problem: ChannelProblem, build, *static) -> Field:
     """A broadcast scalar under tracing, which XLA fuses into its consumers, never a captured array.
 
-    The scalar is read from a one-element constant rather than written as a literal, so
-    programs that differ only in the value share one executable (2b.1).
+    The scalar, ``build(problem, *static)``, is read from a one-element constant rather than
+    written as a literal, so programs that differ only in the value share one executable (2b.1).
     """
     dtype = jnp.result_type(float)
-    scalar = jnp.asarray(np.full(1, value, dtype=dtype))[0]
-    return Field(jnp.broadcast_to(scalar, grid.shape), (CENTER,) * 3, grid)
+    scalar = host_array(problem, _one_element, build, static, dtype=dtype)[0]
+    return Field(jnp.broadcast_to(scalar, problem.grid.shape), (CENTER,) * 3, problem.grid)

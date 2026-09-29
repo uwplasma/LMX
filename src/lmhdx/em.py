@@ -47,6 +47,7 @@ from __future__ import annotations
 import jax.numpy as jnp
 import numpy as np
 
+from ._programs import host_array
 from .bc import NEUMANN, BoundaryCondition, pad
 from .grid import CENTER, FACE, Field, Grid
 from .ops import (
@@ -102,14 +103,21 @@ def face_conductivity(sigma: Field, axis: int | str, condition: BoundaryConditio
     padded = pad(sigma.data, index, condition, grid=grid)
     lower = padded[(slice(None),) * index + (slice(None, -1),)]
     upper = padded[(slice(None),) * index + (slice(1, None),)]
-    widths = np.asarray(grid.widths[index])
-    ghosted = np.concatenate(([widths[0]], widths, [widths[-1]]))
-    lower_half = _broadcast(0.5 * ghosted[:-1], index, sigma.dtype)
-    upper_half = _broadcast(0.5 * ghosted[1:], index, sigma.dtype)
+    lower_half, upper_half = (
+        host_array(grid, _half_widths, index, side, dtype=sigma.dtype) for side in (0, 1)
+    )
     total = lower_half + upper_half
     resistance = lower_half / lower + upper_half / upper
     offset = tuple(FACE if position == index else CENTER for position in range(3))
     return Field(total / resistance, offset, grid)
+
+
+def _half_widths(grid: Grid, axis: int, side: int) -> np.ndarray:
+    """Half the width of the cell below (``side`` 0) or above each face, the wall cell mirrored."""
+    widths = np.asarray(grid.widths[axis])
+    ghosted = np.concatenate(([widths[0]], widths, [widths[-1]]))
+    half = 0.5 * (ghosted[1:] if side else ghosted[:-1])
+    return half.reshape([-1 if position == axis else 1 for position in range(3)])
 
 
 def face_electromotive_force(
@@ -186,15 +194,20 @@ def thin_wall_current(potential: Field, wall_potential: Field, conductivity: Fie
         raise ValueError(f"the wall potential must live on the faces normal to axis {index}")
     if conductivity.offset != offset or conductivity.shape != grid.face_shape(index):
         raise ValueError("conductivity must live on the wall faces")
-    widths, current = np.asarray(grid.widths[index]), jnp.zeros(grid.face_shape(index), dtype=potential.dtype)
+    current = jnp.zeros(grid.face_shape(index), dtype=potential.dtype)
     # The stored value points along the axis: outward on the upper wall, inward on the lower.
     for face, cell, sign in ((0, 0, 1.0), (-1, -1, -1.0)):
         at = (slice(None),) * index + (face,)
         difference = wall_potential.data[at] - potential.data[(slice(None),) * index + (cell,)]
         # The half width is read from a constant, not written as a literal (2b.1).
-        half = jnp.asarray(0.5 * widths[cell : cell + 1 if cell >= 0 else None][:1], dtype=potential.dtype)[0]
+        half = host_array(grid, _wall_half_width, index, cell, dtype=potential.dtype)[0]
         current = current.at[at].set(sign * conductivity.data[at] * difference / half)
     return Field(current, offset, grid)
+
+
+def _wall_half_width(grid: Grid, axis: int, cell: int) -> np.ndarray:
+    widths = np.asarray(grid.widths[axis])
+    return 0.5 * widths[cell : cell + 1 if cell >= 0 else None][:1]
 
 
 def thin_wall_flux(

@@ -44,7 +44,7 @@ import jax.numpy as jnp
 import numpy as np
 import solvax
 
-from ._programs import shape_program
+from ._programs import attribute, grid_program, host_array
 from .bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition
 from .grid import CENTER, FACE, POLAR, Field, Grid, uniform_faces
 from .ops import foldable, laplacian, staggered_laplacian
@@ -83,14 +83,15 @@ def _single(array: np.ndarray) -> np.ndarray:
     return np.ascontiguousarray(array, dtype=np.float32)
 
 
-def _refined(factorization, direct, matvec, data: jnp.ndarray, volumes: np.ndarray | None) -> jnp.ndarray:
+def _refined(factorization, direct, matvec, data: jnp.ndarray, volumes: tuple | None) -> jnp.ndarray:
     """Return ``direct(data)`` in the precision the factorization asks for.
 
     A float64 right-hand side under ``precision="mixed"`` is solved in float32
     and corrected against ``matvec`` in float64; anything else is solved
     directly in its own precision. ``volumes`` marks a singular operator: the
     incompatible mean is removed from the right-hand side, from every residual
-    and from the result in float64, where the float32 solve would lose it.
+    and from the result in float64, where the float32 solve would lose it:
+    ``(owner, build)``, the host builder of the volumes (:func:`lmhdx._programs.host_array`).
     """
     if factorization.precision != "mixed" or data.dtype != jnp.float64:
         return direct(data)
@@ -114,7 +115,7 @@ def _refined(factorization, direct, matvec, data: jnp.ndarray, volumes: np.ndarr
     return solution if volumes is None else _volume_mean_removed(solution, volumes)
 
 
-def _corrected(factorization, direct, matvec, data, result, volumes: np.ndarray | None) -> jnp.ndarray:
+def _corrected(factorization, direct, matvec, data, result, volumes: tuple | None) -> jnp.ndarray:
     """Apply ``factorization.corrections`` float64 defect corrections to a ``"state"`` solve.
 
     The lowest mode of a long inflow-outflow axis sits nine decades below the largest
@@ -137,9 +138,52 @@ def _reciprocal(values: np.ndarray) -> np.ndarray:
     return np.divide(1.0, values, out=np.zeros_like(values), where=values != 0.0).astype(values.dtype)
 
 
-def _volume_mean_removed(values: jnp.ndarray, volumes: np.ndarray) -> jnp.ndarray:
-    weights = jnp.asarray(volumes, dtype=values.dtype)
+def _volume_mean_removed(values: jnp.ndarray, volumes: tuple) -> jnp.ndarray:
+    weights = host_array(*volumes, dtype=values.dtype)
     return values - jnp.sum(weights * values) / jnp.sum(weights)
+
+
+def _cell_volumes(grid: Grid) -> np.ndarray:
+    return grid.cell_volumes()
+
+
+def _own_measure(factorization) -> np.ndarray:
+    return factorization._measure()
+
+
+def _normalized_measure(factorization) -> np.ndarray:
+    measure = factorization._measure()
+    return measure / np.sum(measure)
+
+
+def _low_entry(factorization, name: str, axis: int | None = None) -> np.ndarray:
+    entry = factorization._low[name]
+    return entry if axis is None else entry[axis]
+
+
+def _inverse_denominator(factorization, single: bool) -> np.ndarray:
+    """The stored reciprocal of the eigenvalue denominator of a fast-diagonal solve."""
+    denominator = np.asarray(factorization._low["denominator"]) if single else factorization._denominator()
+    return _reciprocal(denominator)
+
+
+def _scale_product(factorization, inverse: bool) -> np.ndarray:
+    factors = [
+        (1.0 / scale if inverse else scale).reshape(shape)
+        for scale, shape in zip(factorization.scales, _AXIS_SHAPES)
+    ]
+    return factors[0] * factors[1] * factors[2]
+
+
+def _axis_scale(factorization, axis: int, inverse: bool) -> np.ndarray:
+    scale = factorization.scales[axis]
+    factor = 1.0 / scale if inverse else scale
+    return factor.reshape([-1 if position == axis else 1 for position in range(3)])
+
+
+def _basis(factorization, axis: int, transpose: bool) -> np.ndarray:
+    vector = factorization.vectors[axis]
+    return vector.T if transpose else vector
 
 
 def _single_bases(vectors, scales, denominator: np.ndarray) -> dict:
@@ -156,29 +200,24 @@ def _single_bases(vectors, scales, denominator: np.ndarray) -> dict:
     }
 
 
-def _scaled(data: jnp.ndarray, scales, low: dict | None, *, inverse: bool) -> jnp.ndarray:
-    if low is None and foldable(data.shape):
+def _scaled(factorization, data: jnp.ndarray, single: bool, *, inverse: bool) -> jnp.ndarray:
+    if not single and foldable(data.shape):
         # One stored factor: the product of the three axis scales, formed on the host.
-        factors = [
-            (1.0 / scale if inverse else scale).reshape(shape) for scale, shape in zip(scales, _AXIS_SHAPES)
-        ]
-        return data * jnp.asarray(factors[0] * factors[1] * factors[2], dtype=data.dtype)
-    for axis, scale in enumerate(scales):
-        if low is None:
-            factor = 1.0 / scale if inverse else scale
-            shape = [-1 if position == axis else 1 for position in range(3)]
-            data = data * jnp.asarray(factor.reshape(shape), dtype=data.dtype)
+        return data * host_array(factorization, _scale_product, inverse, dtype=data.dtype)
+    for axis in range(3):
+        if not single:
+            data = data * host_array(factorization, _axis_scale, axis, inverse, dtype=data.dtype)
         else:
-            data = data * jnp.asarray(low["inverse" if inverse else "scales"][axis])
+            data = data * host_array(factorization, _low_entry, "inverse" if inverse else "scales", axis)
     return data
 
 
-def _contracted(data: jnp.ndarray, vectors, low: dict | None, *, transpose: bool) -> jnp.ndarray:
-    for axis, vector in enumerate(vectors):
-        if low is None:
-            matrix = jnp.asarray(vector.T if transpose else vector, dtype=data.dtype)
+def _contracted(factorization, data: jnp.ndarray, single: bool, *, transpose: bool) -> jnp.ndarray:
+    for axis in range(3):
+        if not single:
+            matrix = host_array(factorization, _basis, axis, transpose, dtype=data.dtype)
         else:
-            matrix = jnp.asarray(low["transposed" if transpose else "vectors"][axis])
+            matrix = host_array(factorization, _low_entry, "transposed" if transpose else "vectors", axis)
         data = jnp.moveaxis(jnp.tensordot(matrix, data, axes=([1], [axis])), 0, axis)
     return data
 
@@ -219,22 +258,26 @@ def _require_separable(grid: Grid) -> None:
 
 
 def _probe(
-    apply, line: Grid, offset: tuple[float, float, float], positions, selection=slice(None)
+    apply, key: tuple, line: Grid, offset: tuple[float, float, float], positions, selection=slice(None)
 ) -> np.ndarray:
     """Return the matrix of a linear stencil, one column per unit vector at ``positions``.
 
     All unit vectors go through the stencil in one batched, compiled call on the
     host CPU. Probing them one by one as eager operations dispatched hundreds of
     small kernels, which was most of the cold start (4 s on a CPU, 20 s on a GPU
-    host, for a 48-cell duct).
+    host, for a 48-cell duct). ``key`` names the stencil ``apply`` applies.
     """
     units = np.zeros((len(positions),) + line.offset_shape(offset))
     for column, position in enumerate(positions):
         units[(column,) + tuple(position)] = 1.0
+
+    def build(grid: Grid):
+        return jax.vmap(lambda data: apply(Field(data, offset, grid)).data)
+
+    program = (key, line.shape, line.geometry, offset, tuple(map(tuple, positions)), jax.devices("cpu")[0])
     with jax.default_device(jax.devices("cpu")[0]):
-        # One compiled probe per stencil shape: a new mesh of the same shape reuses it (2b.1).
-        batched = jax.vmap(lambda data: apply(Field(data, offset, line)).data)
-        applied = shape_program(batched, jax.ShapeDtypeStruct(units.shape, units.dtype))(units)
+        # One program per stencil shape, the line's metric its arguments: a new mesh is not traced (2b.1).
+        applied = grid_program(program, build, line, jax.ShapeDtypeStruct(units.shape, units.dtype))(units)
     return np.asarray(applied).reshape(len(positions), -1)[:, selection].T
 
 
@@ -257,7 +300,9 @@ def _axis_laplacian(line: Grid, axis: int, condition: BoundaryCondition) -> np.n
         condition if position == axis else BoundaryCondition("neumann") for position in range(3)
     )
     positions = [(0,) * axis + (index,) + (0,) * (2 - axis) for index in range(line.shape[axis])]
-    return _probe(lambda field: laplacian(field, conditions), line, (CENTER,) * 3, positions)
+    return _probe(
+        lambda field: laplacian(field, conditions), ("laplacian", conditions), line, (CENTER,) * 3, positions
+    )
 
 
 def assemble_radial_laplacian(grid: Grid, condition: BoundaryCondition) -> np.ndarray:
@@ -283,7 +328,9 @@ def assemble_radial_laplacian(grid: Grid, condition: BoundaryCondition) -> np.nd
 def _radial_laplacian(line: Grid, condition: BoundaryCondition) -> np.ndarray:
     conditions = (condition, BoundaryCondition(PERIODIC), BoundaryCondition(NEUMANN))
     positions = [(index, 0, 0) for index in range(line.shape[0])]
-    return _probe(lambda field: laplacian(field, conditions), line, (CENTER,) * 3, positions)
+    return _probe(
+        lambda field: laplacian(field, conditions), ("laplacian", conditions), line, (CENTER,) * 3, positions
+    )
 
 
 def azimuthal_eigenvalues(grid: Grid) -> np.ndarray:
@@ -354,7 +401,7 @@ class FastDiagonalPolarPoisson:
 
         if self.wall_conductance:
             return self.solve_with_wall(rhs)[0]
-        volumes = self.grid.cell_volumes() if self.singular else None
+        volumes = (self.grid, _cell_volumes) if self.singular else None
         return rhs.replace_data(_refined(self, self._direct, operator, rhs.data, volumes))
 
     def solve_with_wall(self, rhs: Field) -> tuple[Field, Field]:
@@ -528,27 +575,24 @@ class FastDiagonalPoisson:
         def operator(values):
             return laplacian(rhs.replace_data(values), self.conditions).data
 
-        volumes = self.grid.cell_volumes() if self.singular else None
+        volumes = (self.grid, _cell_volumes) if self.singular else None
         result = _refined(self, self._direct, operator, rhs.data, volumes)
         result = _corrected(self, self._direct, operator, rhs.data, result, volumes)
         return Field(result, (CENTER, CENTER, CENTER), self.grid)
 
     def _direct(self, data: jnp.ndarray, single: bool = False) -> jnp.ndarray:
         dtype = data.dtype
-        low = self._low if single else None
         # Stored factors, not quotients: normalized volumes and reciprocal eigenvalue sums.
         if self.singular:
-            measure = self._measure()
-            weights = jnp.asarray(measure / np.sum(measure), dtype=dtype)
+            weights = host_array(self, _normalized_measure, dtype=dtype)
             data = data - jnp.sum(weights * data)
-        scaled = _scaled(data, self.scales, low, inverse=False)
-        transformed = _contracted(scaled, self.vectors, low, transpose=True)
-        denominator = self._eigenvalue_total() if low is None else np.asarray(low["denominator"])
-        solution = transformed * jnp.asarray(_reciprocal(denominator), dtype=transformed.dtype)
+        scaled = _scaled(self, data, single, inverse=False)
+        transformed = _contracted(self, scaled, single, transpose=True)
+        solution = transformed * host_array(self, _inverse_denominator, single, dtype=transformed.dtype)
         if self.singular:
             solution = solution.at[0, 0, 0].set(0.0)
-        restored = _contracted(solution, self.vectors, low, transpose=False)
-        result = _scaled(restored, self.scales, low, inverse=True)
+        restored = _contracted(self, solution, single, transpose=False)
+        result = _scaled(self, restored, single, inverse=True)
         if self.singular:
             result = result - jnp.sum(weights * result)
         return result
@@ -558,8 +602,7 @@ class FastDiagonalPoisson:
         applied = laplacian(solution, self.conditions)
         difference = applied.data - rhs.data
         if self.singular:
-            volumes = jnp.asarray(self.grid.cell_volumes(), dtype=rhs.dtype)
-            difference = difference - jnp.sum(volumes * difference) / jnp.sum(volumes)
+            difference = _volume_mean_removed(difference, (self.grid, _cell_volumes))
         return jnp.max(jnp.abs(difference))
 
     def _eigenvalue_total(self) -> np.ndarray:
@@ -570,6 +613,9 @@ class FastDiagonalPoisson:
 
     def _eigenvalue_sum(self, dtype) -> jnp.ndarray:
         return jnp.asarray(self._eigenvalue_total(), dtype=dtype)
+
+    def _denominator(self) -> np.ndarray:
+        return self._eigenvalue_total()
 
     def _measure(self) -> np.ndarray:
         """Return the weights of the unknowns the contractions act on: the cell volumes."""
@@ -753,10 +799,10 @@ class FastDiagonalThinWallPoisson(FastDiagonalPoisson):
             raise ValueError("right-hand side must be cell centred on the factorized grid")
         conducting = [float(value) > 0.0 for value in self.conductance]
         data = jnp.pad(rhs.data, [(1, 1) if flag else (0, 0) for flag in conducting])
-        solution = _refined(self, self._corrected, self._apply, data, self._measure())
-        solution = _corrected(self, self._corrected, self._apply, data, solution, self._measure())
+        solution = _refined(self, self._corrected, self._apply, data, (self, _own_measure))
+        solution = _corrected(self, self._corrected, self._apply, data, solution, (self, _own_measure))
         cells = tuple(slice(1, -1) if flag else slice(None) for flag in conducting)
-        volumes = jnp.asarray(self.grid.cell_volumes(), dtype=solution.dtype)
+        volumes = host_array(self.grid, _cell_volumes, dtype=solution.dtype)
         solution = solution - jnp.sum(volumes * solution[cells]) / jnp.sum(volumes)
         walls = []
         for axis, flag in enumerate(conducting):
@@ -772,16 +818,17 @@ class FastDiagonalThinWallPoisson(FastDiagonalPoisson):
 
     def _apply(self, values: jnp.ndarray) -> jnp.ndarray:
         """The assembled operator, for the float64 residual of a mixed-precision solve."""
+        matrices = [
+            host_array(self, _thin_wall_entry, "operators", axis, dtype=values.dtype) for axis in range(3)
+        ]
         total = sum(
-            jnp.moveaxis(
-                jnp.tensordot(jnp.asarray(matrix, dtype=values.dtype), values, axes=([1], [axis])), 0, axis
-            )
-            for axis, matrix in enumerate(self.operators)
+            jnp.moveaxis(jnp.tensordot(matrix, values, axes=([1], [axis])), 0, axis)
+            for axis, matrix in enumerate(matrices)
         )
         if self.corner_gain is None:
             return total
         edge = self._edge()
-        along = jnp.asarray(self.operators[edge], dtype=values.dtype) @ _corners(values, edge)
+        along = matrices[edge] @ _corners(values, edge)
         return total - _corners(values, edge, along)
 
     def _corrected(self, data: jnp.ndarray, single: bool = False) -> jnp.ndarray:
@@ -789,14 +836,19 @@ class FastDiagonalThinWallPoisson(FastDiagonalPoisson):
         if self.corner_gain is None:
             return solution
         edge, dtype = self._edge(), solution.dtype
-        root = jnp.asarray(self.scales[edge], dtype=dtype)[:, None]
-        vectors = jnp.asarray(self.vectors[edge], dtype=dtype)
-        gain = jnp.asarray(self.corner_gain, dtype=dtype)
+        root = host_array(self, _thin_wall_entry, "scales", edge, dtype=dtype)[:, None]
+        vectors = host_array(self, _thin_wall_entry, "vectors", edge, dtype=dtype)
+        gain = host_array(self, _thin_wall_entry, "corner_gain", None, dtype=dtype)
         modes = jnp.einsum("mpq,mq->mp", gain, vectors.T @ (root * _corners(solution, edge)))
         return solution - self._direct(_corners(solution, edge, (vectors @ modes) / root), single)
 
     def _edge(self) -> int:
         return next(axis for axis, value in enumerate(self.conductance) if not float(value) > 0.0)
+
+
+def _thin_wall_entry(factorization, name: str, axis: int | None) -> np.ndarray:
+    entry = getattr(factorization, name)
+    return entry if axis is None else entry[axis]
 
 
 _CORNER_ROWS, _CORNER_COLUMNS = np.array([0, 0, -1, -1]), np.array([0, -1, 0, -1])
@@ -942,7 +994,12 @@ def _staggered_axis_operator(
     free = range(*selection.indices(line.offset_shape(line_offset)[axis]))
     positions = [tuple(index if position == axis else 0 for position in range(3)) for index in free]
     return _probe(
-        lambda field: staggered_laplacian(field, conditions), line, line_offset, positions, selection
+        lambda field: staggered_laplacian(field, conditions),
+        ("staggered", conditions),
+        line,
+        line_offset,
+        positions,
+        selection,
     )
 
 
@@ -986,7 +1043,8 @@ class FastDiagonalHelmholtz:
         def operator(values):
             embedded = rhs.replace_data(jnp.zeros(rhs.shape, dtype=values.dtype).at[self.slices].set(values))
             laplacian_ = staggered_laplacian(embedded, self.conditions).data
-            return (self.shift * embedded.data - self.coefficient * laplacian_)[self.slices]
+            shift, coefficient = attribute(self, "shift"), attribute(self, "coefficient")
+            return (shift * embedded.data - coefficient * laplacian_)[self.slices]
 
         solution = _refined(self, self._direct, operator, rhs.data[self.slices], None)
         return rhs.replace_data(jnp.zeros_like(rhs.data).at[self.slices].set(solution))
@@ -996,13 +1054,11 @@ class FastDiagonalHelmholtz:
         return self.shift - self.coefficient * total
 
     def _direct(self, interior: jnp.ndarray, single: bool = False) -> jnp.ndarray:
-        low = self._low if single else None
-        scaled = _scaled(interior, self.scales, low, inverse=False)
-        transformed = _contracted(scaled, self.vectors, low, transpose=True)
-        denominator = self._denominator() if low is None else np.asarray(low["denominator"])
-        inverse = jnp.asarray(_reciprocal(denominator), dtype=transformed.dtype)
-        restored = _contracted(transformed * inverse, self.vectors, low, transpose=False)
-        return _scaled(restored, self.scales, low, inverse=True)
+        scaled = _scaled(self, interior, single, inverse=False)
+        transformed = _contracted(self, scaled, single, transpose=True)
+        inverse = host_array(self, _inverse_denominator, single, dtype=transformed.dtype)
+        restored = _contracted(self, transformed * inverse, single, transpose=False)
+        return _scaled(self, restored, single, inverse=True)
 
 
 def fast_diagonal_helmholtz(

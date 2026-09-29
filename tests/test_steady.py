@@ -520,7 +520,7 @@ def test_field_line_inverses_match_the_banded_solve(monkeypatch):
     dense = steady._FieldLine(problem, 0, 1, 1.0e3)
     monkeypatch.setattr(steady, "_LINE_INVERSE_BYTES", -1)
     banded = steady._FieldLine(problem, 0, 1, 1.0e3)
-    assert dense.factors is None and banded.factors is not None
+    assert dense.dense and not banded.dense
     rhs = zero_velocity(problem)[0]
     rhs = rhs.replace_data(jnp.asarray(np.random.default_rng(0).standard_normal(rhs.data.shape)))
     for route in (lambda solve: solve(rhs), lambda solve: jax.vjp(solve, rhs)[1](rhs)[0]):
@@ -761,20 +761,18 @@ def test_a_new_field_on_the_same_mesh_reuses_the_compiled_solve(monkeypatch):
     import lmhdx._programs as _programs
     import lmhdx.steady as steady
 
-    monkeypatch.setattr(_programs, "_EXECUTABLES", type(_programs._EXECUTABLES)())
-    monkeypatch.setattr(steady, "_SHAPES_SEEN", set())
+    monkeypatch.setattr(steady, "_SHAPES", {})
     base = _duct(24, 20.0, conductance=0.027)
-    counts = []
     for hartmann in (20.0, 30.0, 40.0):
         problem = dataclasses.replace(base, magnetic_field=(0.0, hartmann, 0.0))
         shared = steady.solve_compiled(problem).velocity
-        embedded = jax.jit(lambda problem=problem: solve_steady_state(problem).velocity)()
+        embedded = jax.jit(steady._solve_program(problem))()[0]
         for got, expected in zip(shared, embedded, strict=True):
             np.testing.assert_allclose(got.data, expected.data, rtol=1e-12, atol=1e-14)
-        counts.append(len(_programs._EXECUTABLES))
     # The first problem of the shape embeds its constants; the second compiles the shared program,
     # which the third reuses.
-    assert counts[2] == counts[1] > counts[0]
+    (entry,) = steady._SHAPES.values()
+    assert isinstance(entry, _programs.ShapeProgram)
     monkeypatch.setattr(steady, "_EMBED_AFTER_CALLS", 1)
     steady._program.cache_clear()
     repeated = dataclasses.replace(base, magnetic_field=(0.0, 50.0, 0.0))
@@ -782,6 +780,108 @@ def test_a_new_field_on_the_same_mesh_reuses_the_compiled_solve(monkeypatch):
     again = steady.solve_compiled(repeated).velocity  # past the threshold: its own embedded program
     for got, expected in zip(again, first, strict=True):
         np.testing.assert_allclose(got.data, expected.data, rtol=1e-12, atol=1e-14)
+
+
+@pytest.mark.parametrize("conductance", [0.0, 0.027])
+def test_a_new_mesh_of_a_known_shape_is_solved_without_a_trace(monkeypatch, conductance):
+    """2b.1 stage 5: from the third problem of a shape on, the solve is never traced.
+
+    Each Hartmann number clusters its own mesh, so the grid metric, the field and every
+    factorization differ; they are built on the host and passed to the shape's program.
+    """
+    import lmhdx.steady as steady
+
+    monkeypatch.setattr(steady, "_SHAPES", {})
+    steady._program.cache_clear()
+    traces = []
+    original = steady.solve_steady_state
+
+    def counted(*arguments, **keywords):
+        traces.append(1)
+        return original(*arguments, **keywords)
+
+    monkeypatch.setattr(steady, "solve_steady_state", counted)
+    counts = []
+    for hartmann in (20.0, 30.0, 45.0):
+        problem = duct_problem(hartmann=hartmann, cells=16, cells_in_layer=2, wall_conductance=conductance)
+        before = len(traces)
+        shared = steady.solve_compiled(problem).velocity
+        counts.append(len(traces) - before)
+        embedded = jax.jit(steady._solve_program(problem))()[0]
+        for got, expected in zip(shared, embedded, strict=True):
+            np.testing.assert_allclose(got.data, expected.data, rtol=1e-12, atol=1e-14)
+            assert got.grid is problem.grid
+    assert counts == [1, 1, 0]
+
+
+def _extruded_duct(hartmann: float) -> ChannelProblem:
+    duct = duct_problem(hartmann=hartmann, cells=10, cells_in_layer=1)
+    return dataclasses.replace(
+        duct, grid=Grid(uniform_faces(4, 0.0, 4.0), duct.grid.y_faces, duct.grid.z_faces)
+    )
+
+
+def _varying(hartmann: float) -> ChannelProblem:
+    duct = duct_problem(hartmann=hartmann, cells=10, cells_in_layer=1)
+    grid = Grid(uniform_faces(4, 0.0, 8.0), duct.grid.y_faces, duct.grid.z_faces)
+    field = hartmann * (1.0 + 0.2 * np.cos(np.pi * grid.centers[0] / 4.0))
+    return dataclasses.replace(
+        duct, grid=grid, magnetic_field=(0.0, field[:, None, None] * np.ones(grid.shape), 0.0)
+    )
+
+
+_FAMILIES = {
+    "duct": lambda hartmann: duct_problem(hartmann=hartmann, cells=12, cells_in_layer=2),
+    "hunt": lambda hartmann: duct_problem(
+        hartmann=hartmann, cells=12, cells_in_layer=2, wall_conductance=0.027
+    ),
+    "three-dimensional": _extruded_duct,
+    "varying field": _varying,
+    "mixed precision": lambda hartmann: dataclasses.replace(
+        duct_problem(hartmann=hartmann, cells=12, cells_in_layer=2), precision="mixed"
+    ),
+}
+
+
+@pytest.mark.parametrize("route", ["steady", "fully developed"])
+@pytest.mark.parametrize("family", sorted(_FAMILIES))
+def test_the_shared_program_holds_no_value_of_the_problem(family, route):
+    """2b.1 stage 5: two problems of a shape lower to the same program, which solves each to round-off.
+
+    A number or an array of one problem left in the trace would change the lowered text
+    and give every later problem that problem's value; the fingerprint is that text.
+    ``route`` is the program of :func:`lmhdx.steady.solve_compiled` or the unit-drive
+    program of :func:`lmhdx.solve`, whose argument is the field scale.
+    """
+    import lmhdx._programs as _programs
+    import lmhdx.fully_developed as fully_developed
+    import lmhdx.steady as steady
+
+    if route == "steady":
+        build, arguments, values = steady._solve_program, (), ()
+    else:
+        dtype = jnp.result_type(float)
+        build, arguments = fully_developed._unit_drive, (jax.ShapeDtypeStruct((), dtype),)
+        values = (np.asarray(1.3, dtype=dtype),)
+    first, *problems = (_FAMILIES[family](hartmann) for hartmann in (20.0, 30.0, 45.0))
+    with _programs.discovering(first) as trace:
+        jax.jit(build(first)).lower(*arguments)
+    assert trace.complete
+    keys = list(trace.keys)
+    programs = [_programs.ShapeProgram(build, problem, arguments, keys) for problem in problems]
+    assert programs[0].fingerprint == programs[1].fingerprint
+    for problem in problems:
+        shared = jax.tree.leaves(programs[0].bind(problem)(*values))
+        embedded = jax.tree.leaves(jax.jit(build(problem))(*values))
+        # Fields against the largest one (the transverse velocities are round-off); the varying
+        # field stops CG at 1e-9, which amplifies round-off to about 1e-11. Of the numbers, the
+        # residual norms are where CG stopped, round-off themselves, and the flow rate is compared.
+        scale = max(float(np.max(np.abs(leaf))) for leaf in embedded)
+        for got, expected in zip(shared, embedded, strict=True):
+            if np.ndim(expected):
+                np.testing.assert_allclose(got, expected, rtol=0.0, atol=1e-10 * scale)
+            elif abs(float(expected)) > 1e-6 * scale:
+                np.testing.assert_allclose(got, expected, rtol=1e-10)
 
 
 @pytest.mark.parametrize("conductance", [0.0, 0.027])

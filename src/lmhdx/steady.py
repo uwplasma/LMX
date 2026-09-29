@@ -48,11 +48,13 @@ import jax.numpy as jnp
 import numpy as np
 import solvax
 
-from ._programs import shape_program
+from . import _programs
+from ._programs import attribute, bound, host_array, host_scalar, shape_program
 from .advect import momentum_advection
 from .core3d import (
     ChannelProblem,
     ImposedField,
+    _factorization,
     electric_state,
     enforce_face_constraints,
     face_currents,
@@ -144,7 +146,7 @@ def momentum_terms(
     velocity = enforce_face_constraints(velocity, problem)
     if inflow is not None:
         velocity = with_inflow(velocity, problem, inflow)
-    drive = problem.forcing if forcing is None else forcing
+    drive = _drive(problem, forcing)
     _, force = electric_state(velocity, problem, factorization, field_scale)
     body = face_lorentz_force(force, problem)
     conditions = tuple(velocity_condition(problem.conditions, axis) for axis in range(3))
@@ -153,14 +155,15 @@ def momentum_terms(
         if problem.advection == "off"
         else momentum_advection(velocity, conditions, limited=problem.advection == "limited")
     )
+    viscosity, density = attribute(problem, "viscosity"), attribute(problem, "density")
     terms = []
     for component, field in enumerate(velocity):
         # The damping rate is a preconditioning device, not a term: the conservative
         # face force already carries the whole Lorentz contribution, so subtracting
         # it here as well would count the same physics twice.
         value = (
-            problem.viscosity * staggered_laplacian(field, conditions).data
-            + (body[component].data + drive[component]) / problem.density
+            viscosity * staggered_laplacian(field, conditions).data
+            + (body[component].data + drive[component]) / density
         )
         if transport is not None:
             value = value - transport[component].data
@@ -176,9 +179,24 @@ def with_inflow(
     if axis is None:
         raise ValueError("the problem has no inflow-outflow axis")
     field = velocity[axis]
-    profile = jnp.asarray(problem.conditions[axis].lower, dtype=field.dtype)
+    profile = host_array(problem, _inlet_profile, axis, dtype=field.dtype)
     data = field.data.at[(slice(None),) * axis + (0,)].set(scale * profile)
     return tuple(field.replace_data(data) if index == axis else v for index, v in enumerate(velocity))
+
+
+def _inlet_profile(problem: ChannelProblem, axis: int) -> np.ndarray:
+    return problem.conditions[axis].lower
+
+
+def _forcing(problem: ChannelProblem, component: int) -> float:
+    return problem.forcing[component]
+
+
+def _drive(problem: ChannelProblem, forcing) -> tuple:
+    """The drive: ``forcing`` as given (fixed by the program), else the problem's, read as its data."""
+    if forcing is not None:
+        return forcing
+    return tuple(host_scalar(problem, _forcing, component) for component in range(3))
 
 
 def _rest_residual(problem: ChannelProblem, factorization: FastDiagonalPoisson, forcing):
@@ -187,9 +205,9 @@ def _rest_residual(problem: ChannelProblem, factorization: FastDiagonalPoisson, 
     Every other term is an exact zero there (viscous stress, electromotive force, the potential it
     drives, advection), so this is the same value as the full residual, at a fifth of the program.
     """
-    drive = problem.forcing if forcing is None else forcing
+    drive, density = _drive(problem, forcing), attribute(problem, "density")
     terms = tuple(
-        field.replace_data(jnp.zeros_like(field.data) + drive[component] / problem.density)
+        field.replace_data(jnp.zeros_like(field.data) + drive[component] / density)
         for component, field in enumerate(zero_velocity(problem))
     )
     corrected, _ = project(project(terms, problem, factorization)[0], problem, factorization)
@@ -348,37 +366,58 @@ class _FieldLine:
         bands = np.where(inside, blocks[:, np.clip(rows, 0, size - 1), np.arange(size)], 0.0)
         lu = _factor_lines(np.einsum("km,krj->mrj", np.stack(coefficients), bands))
         dense = lu.shape[0] * widths.size**2 * 8 <= _LINE_INVERSE_BYTES
-        if dense and jax.default_backend() in _LINE_INVERSE_BACKENDS:
-            self.inverses, self.factors = jnp.asarray(_velocity_inverses(lu)), None
-        else:
-            lower, upper, scale = jnp.asarray(lu[:, 3:]), jnp.asarray(lu[:, :3]), jnp.ones(lu.shape[::2])
-            self.factors = solvax.BandedLUFactors(lower, upper, scale, jnp.zeros(lu.shape[0], jnp.int32))
+        # Host arrays, read in solve through lmhdx._programs.host_array.
+        self.dense = dense and jax.default_backend() in _LINE_INVERSE_BACKENDS
+        self.inverses = _velocity_inverses(lu) if self.dense else None
+        self.lu = None if self.dense else lu
 
     def solve(self, rhs: Field) -> Field:
         velocity = self.velocity
         data = rhs.data[velocity.slices]
         for at in self.across:
-            data = _modal(data * _along(velocity.scales[at], at, data), velocity.vectors[at].T, at)
+            scale = host_array(self, _line_scale, at, False, dtype=data.dtype)
+            data = _modal(data * scale, host_array(self, _line_basis, at, True, dtype=data.dtype), at)
         lines = jnp.moveaxis(data, self.axis, -1)
         flat = lines.reshape(-1, lines.shape[-1])
-        if self.factors is None:
-            flat = jnp.einsum("lij,lj->li", self.inverses, flat, precision=jax.lax.Precision.HIGHEST)
+        if self.dense:
+            inverses = host_array(self, _line_array, "inverses")
+            flat = jnp.einsum("lij,lj->li", inverses, flat, precision=jax.lax.Precision.HIGHEST)
         else:
+            count = self.lu.shape[0]
+            factors = solvax.BandedLUFactors(
+                host_array(self, _line_array, "lower"),
+                host_array(self, _line_array, "upper"),
+                jnp.ones(self.lu.shape[::2]),
+                jnp.zeros(count, jnp.int32),
+            )
             interleaved = jnp.zeros((flat.shape[0], 2 * flat.shape[1] - 1), flat.dtype).at[:, ::2].set(flat)
-            flat = jax.vmap(solvax.lu_solve_banded)(self.factors, interleaved)[:, ::2]
+            flat = jax.vmap(solvax.lu_solve_banded)(factors, interleaved)[:, ::2]
         data = jnp.moveaxis(flat.reshape(lines.shape), -1, self.axis)
         for at in self.across:
-            data = _modal(data, velocity.vectors[at], at) * _along(1.0 / velocity.scales[at], at, data)
+            restored = _modal(data, host_array(self, _line_basis, at, False, dtype=data.dtype), at)
+            data = restored * host_array(self, _line_scale, at, True, dtype=data.dtype)
         return rhs.replace_data(jnp.zeros_like(rhs.data).at[velocity.slices].set(data))
 
 
-def _along(values: np.ndarray, axis: int, like: jnp.ndarray) -> jnp.ndarray:
-    shape = [-1 if position == axis else 1 for position in range(3)]
-    return jnp.asarray(values.reshape(shape), dtype=like.dtype)
+def _line_array(line: _FieldLine, name: str) -> np.ndarray:
+    if name == "inverses":
+        return line.inverses
+    return line.lu[:, 3:] if name == "lower" else line.lu[:, :3]
 
 
-def _modal(data: jnp.ndarray, matrix: np.ndarray, axis: int) -> jnp.ndarray:
-    matrix = jnp.asarray(matrix, dtype=data.dtype)
+def _line_scale(line: _FieldLine, axis: int, inverse: bool) -> np.ndarray:
+    scale = line.velocity.scales[axis]
+    return (1.0 / scale if inverse else scale).reshape(
+        [-1 if position == axis else 1 for position in range(3)]
+    )
+
+
+def _line_basis(line: _FieldLine, axis: int, transpose: bool) -> np.ndarray:
+    vectors = line.velocity.vectors[axis]
+    return vectors.T if transpose else vectors
+
+
+def _modal(data: jnp.ndarray, matrix: jnp.ndarray, axis: int) -> jnp.ndarray:
     return jnp.moveaxis(jnp.tensordot(matrix, data, axes=([1], [axis])), 0, axis)
 
 
@@ -419,6 +458,14 @@ def _projection_solves(problem: ChannelProblem, pseudo_step: float) -> tuple:
             if component != axis and problem.conditions[component].is_periodic:
                 solves[component] = _FieldLine(problem, component, axis, pseudo_step)
     return tuple(solves)
+
+
+def _pseudo_step(problem: ChannelProblem, pseudo_step: float | None) -> float:
+    return float(problem.dt if pseudo_step is None else pseudo_step)
+
+
+def _projection_solves_at(problem: ChannelProblem, pseudo_step: float | None) -> tuple:
+    return _projection_solves(problem, _pseudo_step(problem, pseudo_step))
 
 
 def _face_weights(problem: ChannelProblem) -> tuple[Field, Field, Field]:
@@ -607,9 +654,8 @@ def solve_steady_state(
     ):
         if not np.isfinite(value) or value <= 0.0:
             raise ValueError(f"{name} must be positive and finite")
-    with jax.ensure_compile_time_eval():
-        factorization = problem.factorization()
-        viscous = _projection_solves(problem, step)
+    factorization = bound(problem, _factorization)
+    viscous = bound(problem, _projection_solves_at, pseudo_step)
     start = zero_velocity(problem) if velocity is None else enforce_face_constraints(velocity, problem)
 
     def residual(state):
@@ -619,7 +665,9 @@ def solve_steady_state(
     initial = residual(start) if velocity is not None else _rest_residual(problem, factorization, forcing)
     scale = _norm(initial)
 
-    precond = _preconditioner(problem, factorization, viscous, step)
+    precond = _preconditioner(
+        problem, factorization, viscous, host_scalar(problem, _pseudo_step, pseudo_step)
+    )
 
     if problem.advection == "off":
         root, _ = _stokes_limit_root(
@@ -669,21 +717,29 @@ def solve_compiled(problem: ChannelProblem) -> SteadySolution:
 
 @functools.lru_cache(maxsize=16)
 def _program(problem: ChannelProblem):
+    return shared_or_embedded(problem, _solve_program)
+
+
+def _solve_program(problem: ChannelProblem):
     def run():
         solution = solve_steady_state(problem, max_steps=_MAX_STEPS)
         return solution.velocity, solution.pressure, solution.potential, solution.residual_norm
 
-    return shared_or_embedded(problem, run)
+    return run
 
 
-_SHAPES_SEEN: set = set()
+# Per program shape: the keys of its problem arrays, then its shared program; None keeps #175's route.
+_SHAPES: dict = {}
 _EMBED_AFTER_CALLS = 400
 
 
 def shape_key(problem: ChannelProblem) -> tuple:
     """What fixes the structure of a problem's program: shapes, conditions and flags, not values."""
     field = problem.magnetic_field
-    pattern = type(field).__name__ if isinstance(field, ImposedField) else tuple(bool(b) for b in field)
+    if isinstance(field, ImposedField):
+        pattern = (type(field).__name__, field.faces is None)
+    else:
+        pattern = tuple(bool(b) for b in field)
     return (
         problem.grid.shape,
         problem.grid.is_polar,
@@ -693,33 +749,50 @@ def shape_key(problem: ChannelProblem) -> tuple:
         pattern,
         tuple(bool(c) for c in problem.wall_conductance),
         bool(problem.conductivity),
+        jax.default_backend(),
     )
 
 
-def shared_or_embedded(problem: ChannelProblem, function, *arguments):
+def _shareable(problem: ChannelProblem) -> bool:
+    """The problems whose programs read every array through :mod:`lmhdx._programs` (2b.1 stage 5)."""
+    return problem.advection == "off" and not problem.grid.is_polar and problem.open_axis is None
+
+
+def shared_or_embedded(problem: ChannelProblem, build, *arguments):
     """Compile the first problem of a shape with its constants embedded, later ones shared (2b.1).
 
-    Embedded constants compile faster and run up to half again faster warm on a
-    CPU, because XLA folds them; a shared program (:func:`shape_program`) saves
-    the compile of every further problem of the shape, 2-4 s on a 48-cell duct.
-    A single solve takes the first. In a sweep of fields or conductances on one
-    mesh the second problem compiles the shared program and the later ones reuse it. A shared
-    program runs a warm solve up to 40 % slower on a CPU (XLA cannot fold the
-    arithmetic on arrays it receives as arguments: on the steady residual, 144
-    fusions and 54 divides against 96 and none), so a problem solved more than
-    ``_EMBED_AFTER_CALLS`` times compiles its own embedded program, bounding
-    that loss by about the compile it saved.
+    ``build(problem)`` returns the function to compile, of ``arguments``
+    (shapes and dtypes). Embedded constants compile faster and run up to a
+    third faster warm on a CPU, because XLA folds them, so a single solve takes
+    the first. Its trace notes the key of every host array the solve reads; the
+    second problem of the shape traces the program once more with those arrays
+    as arguments (:class:`lmhdx._programs.ShapeProgram`), and every later one
+    builds its arrays on the host and runs that executable, with no trace.
+    Programs that do not read every array that way trace each problem and share
+    its lowered program (:func:`shape_program`). A shared program runs a warm
+    solve slower on a CPU (XLA cannot fold arrays it receives as arguments), so a
+    problem solved more than ``_EMBED_AFTER_CALLS`` times compiles its own
+    embedded program, bounding that loss by about the compile it saved.
     """
-    key = (shape_key(problem), tuple((a.shape, str(a.dtype)) for a in arguments))
+    key = (build, shape_key(problem), tuple((a.shape, str(a.dtype)) for a in arguments))
+    function = build(problem)
 
     def embedded():
         compiled = jax.jit(function).lower(*arguments).compile()
         return lambda *values: compiled(*values)
 
-    if key not in _SHAPES_SEEN:
-        _SHAPES_SEEN.add(key)
-        return embedded()
-    shared, calls, program = shape_program(function, *arguments), [0], [None]
+    if key not in _SHAPES:
+        _SHAPES[key] = None
+        if not _shareable(problem):
+            return embedded()
+        with _programs.discovering(problem) as trace:
+            lowered = jax.jit(function).lower(*arguments)
+        _SHAPES[key] = list(trace.keys) if trace.complete else None
+        compiled = lowered.compile()
+        return lambda *values: compiled(*values)
+    shared, calls, program = _shared(key, problem, build, arguments), [0], [None]
+    if shared is None:
+        shared = shape_program(function, *arguments)
 
     def run(*values):
         # A problem solved many times earns its own embedded program: its compile (4-5 s on a
@@ -730,6 +803,21 @@ def shared_or_embedded(problem: ChannelProblem, function, *arguments):
         return (program[0] or shared)(*values)
 
     return run
+
+
+def _shared(key, problem: ChannelProblem, build, arguments):
+    """The shape's program bound to ``problem``, compiling it on the second problem; None if it cannot be."""
+    entry = _SHAPES[key]
+    if entry is None:
+        return None
+    try:
+        if not isinstance(entry, _programs.ShapeProgram):
+            entry = _SHAPES[key] = _programs.ShapeProgram(build, problem, arguments, entry)
+        return entry.bind(problem)
+    except _programs.Unbound:
+        if not isinstance(entry, _programs.ShapeProgram):
+            _SHAPES[key] = None
+        return None
 
 
 def _finish(
