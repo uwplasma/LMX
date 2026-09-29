@@ -100,9 +100,7 @@
         "smolentsev-vv"
       ],
       "status": "verified-bounded",
-      "tests": [
-        "tests/test_freemhd.py::test_samper_table_i_reference_is_complete_and_exact"
-      ],
+      "tests": [],
       "tier": "A",
       "title": "High-Hartmann-number duct integral checks",
       "workflows": [
