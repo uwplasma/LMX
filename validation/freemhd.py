@@ -506,18 +506,18 @@ def solve_core_flow(nx: int = 400, nz: int = 32, ny: int = 32) -> dict[str, obje
         "wall_seconds": wall_seconds,
         "finite": bool(np.all(np.isfinite(pressure)) and np.all(np.isfinite(flux))),
         "floored_nodes": int(result.floored_nodes),
-        "weak_field_nodes": int(np.sum(np.abs(field) < 1.0 / BETA_MAX)),
+        "weak_field_nodes": [int(np.sum(np.abs(field) * BETA_MAX < bound)) for bound in (1 - 1e-6, 1 + 1e-6)],
         "axial_flux_spread": float(np.ptp(flux) / abs(flux.mean())),
-        "pressure_drop": float(result.pressure_drop),
         "x_over_L": x.tolist(),
         "pressure_observable": observable.tolist(),
     }
 
 
 def core_flow_failures(observed: dict[str, object]) -> list[str]:
+    weak = observed["weak_field_nodes"]  # |B| clearly below / not clearly above 1/beta_max
     passed = {
         "finite": observed["finite"],
-        "floored_nodes": observed["floored_nodes"] == observed["weak_field_nodes"],
+        "floored_nodes": min(weak) <= observed["floored_nodes"] <= max(weak),
         "axial_flux": observed["axial_flux_spread"] <= AXIAL_FLUX_SPREAD_MAX,
     }
     return [gate for gate, ok in passed.items() if not ok]

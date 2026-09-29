@@ -86,7 +86,8 @@ def test_the_observer_reads_native_output_and_applies_the_smoke_gates(tmp_path):
 def test_the_core_flow_side_passes_its_gates_on_a_coarse_mesh():
     coarse = freemhd.solve_core_flow(nx=100, nz=8, ny=8)
     assert freemhd.core_flow_failures(coarse) == []
-    assert coarse["floored_nodes"] == coarse["weak_field_nodes"] > 0
+    assert coarse["weak_field_nodes"][0] <= coarse["floored_nodes"] <= coarse["weak_field_nodes"][1]
+    assert coarse["floored_nodes"] > 0
     x, observable = np.asarray(coarse["x_over_L"]), np.asarray(coarse["pressure_observable"])
     assert 0.02 < observable.max() < 0.035 and -2.0 < x[observable.argmax()] < 0.0
     assert freemhd.core_flow_failures(coarse | {"axial_flux_spread": 1e-3}) == ["axial_flux"]
