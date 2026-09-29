@@ -11,9 +11,10 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from .grid import Grid
+from .grid import Field, Grid
 
 __all__ = [
+    "ShapeProgram",
     "Unbound",
     "attribute",
     "bound",
@@ -245,6 +246,88 @@ def problem_arrays(problem, keys, objects=None) -> list:
         value = build(resolve(origin), *static)
         values.append(float(value) if kind == "scalar" else jnp.asarray(value, dtype=kind))
     return values
+
+
+def _constants(closed) -> list:
+    """Every constant of a traced program, its inner programs' included."""
+    found = list(closed.consts)
+
+    def walk(jaxpr):
+        for equation in jaxpr.eqns:
+            for parameter in equation.params.values():
+                for inner in parameter if isinstance(parameter, (tuple, list)) else (parameter,):
+                    if hasattr(inner, "consts") and hasattr(inner, "jaxpr"):
+                        found.extend(inner.consts)
+                        walk(inner.jaxpr)
+                    elif hasattr(inner, "eqns"):
+                        walk(inner)
+
+    walk(closed.jaxpr)
+    return found
+
+
+def _regrid(tree, grid):
+    """Put the fields a program returns on ``grid``: the program was traced on another problem's."""
+    return jax.tree.map(
+        lambda leaf: Field(leaf.data, leaf.offset, grid) if isinstance(leaf, Field) else leaf,
+        tree,
+        is_leaf=lambda leaf: isinstance(leaf, Field),
+    )
+
+
+class ShapeProgram:
+    """A solve traced once per shape, whose problem arrays are its arguments (2b.1 stage 5).
+
+    ``build(problem)`` returns the function a program runs. It is traced on
+    one problem with every :func:`host_array`, :func:`host_scalar` and
+    :func:`bound` object an argument, keyed by how the host builds it from the
+    problem: ``keys``, the ones the first problem of the shape named. Another
+    problem of the shape then costs its host arrays (:func:`problem_arrays`) and
+    no trace. A traced array constant would be one problem's data in every
+    problem's program, so a trace that leaves a floating-point array constant
+    raises :class:`Unbound`, as does an array the keys do not name.
+    """
+
+    def __init__(self, build, problem, arguments, keys):
+        objects = {ROOT: problem}
+        values = problem_arrays(problem, keys, objects)
+
+        def traced(values, *arguments):
+            with _tracing(_Trace(problem, dict(zip(keys, values, strict=True)), objects)):
+                return build(problem)(*arguments)
+
+        with _constants_as_constvars():
+            staged = jax.jit(traced).trace(values, *arguments)
+        leaked = [
+            value
+            for value in _constants(staged.jaxpr)
+            if np.issubdtype(np.asarray(value).dtype, np.inexact) and np.size(value) > 1
+        ]
+        if leaked:
+            raise Unbound(f"the trace kept {len(leaked)} floating-point array constants")
+        self.keys = keys
+        self.signature = [(np.shape(value), _signature_dtype(value)) for value in values]
+        lowered = staged.lower()
+        # Equal for every problem of the shape; a problem's value in the program would change it.
+        self.fingerprint = hashlib.sha256(lowered.as_text().encode()).hexdigest()
+        self.executable = lowered.compile()
+        self._first = (problem, values)
+
+    def bind(self, problem):
+        """Return the program of ``problem`` as a function of the arguments; raise if its arrays differ in shape."""
+        if self._first is not None and self._first[0] is problem:
+            values = self._first[1]
+        else:
+            values = problem_arrays(problem, self.keys)
+        self._first = None
+        if [(np.shape(value), _signature_dtype(value)) for value in values] != self.signature:
+            raise Unbound("the problem's arrays differ in shape from the program's")
+        executable, grid = self.executable, problem.grid
+        return lambda *arguments: _regrid(executable(values, *arguments), grid)
+
+
+def _signature_dtype(value) -> str:
+    return "scalar" if isinstance(value, float) else str(value.dtype)
 
 
 def discovering(problem):

@@ -245,7 +245,11 @@ def _driven(problem: ChannelProblem, fixed_flow: bool, drive, field_scale):
 @functools.lru_cache(maxsize=16)
 def _executable(problem: ChannelProblem, dtype: str):
     """The compiled unit-drive program itself, which runs on concrete inputs even inside a trace."""
-    return shared_or_embedded(problem, _compiled(problem).__wrapped__, jax.ShapeDtypeStruct((), dtype))
+    return shared_or_embedded(problem, _unit_drive, jax.ShapeDtypeStruct((), dtype))
+
+
+def _unit_drive(problem: ChannelProblem):
+    return _compiled(problem).__wrapped__
 
 
 @functools.lru_cache(maxsize=16)

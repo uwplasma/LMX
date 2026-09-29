@@ -48,6 +48,7 @@ import jax.numpy as jnp
 import numpy as np
 import solvax
 
+from . import _programs
 from ._programs import attribute, bound, host_array, host_scalar, shape_program
 from .advect import momentum_advection
 from .core3d import (
@@ -716,21 +717,29 @@ def solve_compiled(problem: ChannelProblem) -> SteadySolution:
 
 @functools.lru_cache(maxsize=16)
 def _program(problem: ChannelProblem):
+    return shared_or_embedded(problem, _solve_program)
+
+
+def _solve_program(problem: ChannelProblem):
     def run():
         solution = solve_steady_state(problem, max_steps=_MAX_STEPS)
         return solution.velocity, solution.pressure, solution.potential, solution.residual_norm
 
-    return shared_or_embedded(problem, run)
+    return run
 
 
-_SHAPES_SEEN: set = set()
+# Per program shape: the keys of its problem arrays, then its shared program; None keeps #175's route.
+_SHAPES: dict = {}
 _EMBED_AFTER_CALLS = 400
 
 
 def shape_key(problem: ChannelProblem) -> tuple:
     """What fixes the structure of a problem's program: shapes, conditions and flags, not values."""
     field = problem.magnetic_field
-    pattern = type(field).__name__ if isinstance(field, ImposedField) else tuple(bool(b) for b in field)
+    if isinstance(field, ImposedField):
+        pattern = (type(field).__name__, field.faces is None)
+    else:
+        pattern = tuple(bool(b) for b in field)
     return (
         problem.grid.shape,
         problem.grid.is_polar,
@@ -740,33 +749,50 @@ def shape_key(problem: ChannelProblem) -> tuple:
         pattern,
         tuple(bool(c) for c in problem.wall_conductance),
         bool(problem.conductivity),
+        jax.default_backend(),
     )
 
 
-def shared_or_embedded(problem: ChannelProblem, function, *arguments):
+def _shareable(problem: ChannelProblem) -> bool:
+    """The problems whose programs read every array through :mod:`lmhdx._programs` (2b.1 stage 5)."""
+    return problem.advection == "off" and not problem.grid.is_polar and problem.open_axis is None
+
+
+def shared_or_embedded(problem: ChannelProblem, build, *arguments):
     """Compile the first problem of a shape with its constants embedded, later ones shared (2b.1).
 
-    Embedded constants compile faster and run up to half again faster warm on a
-    CPU, because XLA folds them; a shared program (:func:`shape_program`) saves
-    the compile of every further problem of the shape, 2-4 s on a 48-cell duct.
-    A single solve takes the first. In a sweep of fields or conductances on one
-    mesh the second problem compiles the shared program and the later ones reuse it. A shared
-    program runs a warm solve up to 40 % slower on a CPU (XLA cannot fold the
-    arithmetic on arrays it receives as arguments: on the steady residual, 144
-    fusions and 54 divides against 96 and none), so a problem solved more than
-    ``_EMBED_AFTER_CALLS`` times compiles its own embedded program, bounding
-    that loss by about the compile it saved.
+    ``build(problem)`` returns the function to compile, of ``arguments``
+    (shapes and dtypes). Embedded constants compile faster and run up to a
+    third faster warm on a CPU, because XLA folds them, so a single solve takes
+    the first. Its trace notes the key of every host array the solve reads; the
+    second problem of the shape traces the program once more with those arrays
+    as arguments (:class:`lmhdx._programs.ShapeProgram`), and every later one
+    builds its arrays on the host and runs that executable, with no trace.
+    Programs that do not read every array that way trace each problem and share
+    its lowered program (:func:`shape_program`). A shared program runs a warm
+    solve slower on a CPU (XLA cannot fold arrays it receives as arguments), so a
+    problem solved more than ``_EMBED_AFTER_CALLS`` times compiles its own
+    embedded program, bounding that loss by about the compile it saved.
     """
-    key = (shape_key(problem), tuple((a.shape, str(a.dtype)) for a in arguments))
+    key = (build, shape_key(problem), tuple((a.shape, str(a.dtype)) for a in arguments))
+    function = build(problem)
 
     def embedded():
         compiled = jax.jit(function).lower(*arguments).compile()
         return lambda *values: compiled(*values)
 
-    if key not in _SHAPES_SEEN:
-        _SHAPES_SEEN.add(key)
-        return embedded()
-    shared, calls, program = shape_program(function, *arguments), [0], [None]
+    if key not in _SHAPES:
+        _SHAPES[key] = None
+        if not _shareable(problem):
+            return embedded()
+        with _programs.discovering(problem) as trace:
+            lowered = jax.jit(function).lower(*arguments)
+        _SHAPES[key] = list(trace.keys) if trace.complete else None
+        compiled = lowered.compile()
+        return lambda *values: compiled(*values)
+    shared, calls, program = _shared(key, problem, build, arguments), [0], [None]
+    if shared is None:
+        shared = shape_program(function, *arguments)
 
     def run(*values):
         # A problem solved many times earns its own embedded program: its compile (4-5 s on a
@@ -777,6 +803,21 @@ def shared_or_embedded(problem: ChannelProblem, function, *arguments):
         return (program[0] or shared)(*values)
 
     return run
+
+
+def _shared(key, problem: ChannelProblem, build, arguments):
+    """The shape's program bound to ``problem``, compiling it on the second problem; None if it cannot be."""
+    entry = _SHAPES[key]
+    if entry is None:
+        return None
+    try:
+        if not isinstance(entry, _programs.ShapeProgram):
+            entry = _SHAPES[key] = _programs.ShapeProgram(build, problem, arguments, entry)
+        return entry.bind(problem)
+    except _programs.Unbound:
+        if not isinstance(entry, _programs.ShapeProgram):
+            _SHAPES[key] = None
+        return None
 
 
 def _finish(
