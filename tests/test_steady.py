@@ -520,7 +520,7 @@ def test_field_line_inverses_match_the_banded_solve(monkeypatch):
     dense = steady._FieldLine(problem, 0, 1, 1.0e3)
     monkeypatch.setattr(steady, "_LINE_INVERSE_BYTES", -1)
     banded = steady._FieldLine(problem, 0, 1, 1.0e3)
-    assert dense.factors is None and banded.factors is not None
+    assert dense.dense and not banded.dense
     rhs = zero_velocity(problem)[0]
     rhs = rhs.replace_data(jnp.asarray(np.random.default_rng(0).standard_normal(rhs.data.shape)))
     for route in (lambda solve: solve(rhs), lambda solve: jax.vjp(solve, rhs)[1](rhs)[0]):
