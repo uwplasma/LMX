@@ -243,28 +243,55 @@ def _preconditioner(
     return apply
 
 
-def _isotropic_viscous(problem: ChannelProblem, pseudo_step: float) -> tuple[FastDiagonalHelmholtz, ...]:
-    """Viscous factorizations damping every component at ``sigma |B|^2 / rho``, for both routes.
+def _isotropic_viscous(
+    problem: ChannelProblem, pseudo_step: float, rate: float | None = None
+) -> tuple[FastDiagonalHelmholtz, ...]:
+    """Viscous factorizations damping every component at one ``rate``, for both routes.
 
-    Damping only the components normal to the field, as the time step does,
-    leaves a Schur-complement deficit once projected: on
-    ``duct_problem(hartmann=300, cells=40)`` the preconditioned spectrum spans
-    ``[2.2e-3, 2.0e3]`` and CG takes 3638 iterations; with one shift it spans
-    ``[2.2e-3, 8.5]`` and CG takes 399.
+    The rate defaults to the peak ``sigma |B|^2 / rho``. Damping only the components
+    normal to the field, as the time step does, leaves a Schur-complement deficit
+    once projected: on ``duct_problem(hartmann=300, cells=40)`` the preconditioned
+    spectrum spans ``[2.2e-3, 2.0e3]`` and CG takes 3638 iterations; with one shift
+    it spans ``[2.2e-3, 8.5]`` and CG takes 399.
     """
-    rate = float(problem.conductivity) * problem.peak_field_squared
+    if rate is None:
+        rate = float(problem.conductivity) * problem.peak_field_squared / float(problem.density)
     conditions = tuple(velocity_condition(problem.conditions, axis) for axis in range(3))
     return tuple(
         fast_diagonal_helmholtz(
             problem.grid,
             velocity_offset(component),
             conditions,
-            shift=1.0 + pseudo_step * rate / float(problem.density),
+            shift=1.0 + pseudo_step * rate,
             coefficient=pseudo_step * float(problem.viscosity),
             precision=problem.precision,
         )
         for component in range(3)
     )
+
+
+def _varying_field_rate(problem: ChannelProblem) -> float:
+    """The damping of the varying-field preconditioner: ``(nu lambda_1)^(3/4) (sigma |B|^2 / rho)^(1/4)``.
+
+    Damping every component at the peak Joule rate ``sigma |B|^2 / rho`` treats the
+    flows the Lorentz force does not brake -- where the field is weak or absent,
+    and the axial odd-even modes its face averages cancel -- as braked, so they
+    sit at ``nu k^2 / (sigma B^2)`` in the preconditioned spectrum: the continuum
+    that 2b.0 found growing with Ha. Any damping that varies in space or by
+    component reopens the Schur-complement deficit (2b.4 measured 3-4x more
+    iterations), so the lever is one smaller rate: the geometric mean of the
+    slowest viscous rate ``nu lambda_1`` of the cross-section and the Hartmann
+    braking rate ``sqrt(nu lambda_1 sigma |B|^2 / rho)``. On the ANL fringe the
+    iteration count is flat within 10 % for rates from 3e-4 to 3e-2 of the peak
+    at Ha 100 and 1e-6 to 1e-3 at Ha 1600, and this rate sits inside both.
+    """
+    joule = float(problem.conductivity) * problem.peak_field_squared / float(problem.density)
+    conditions = tuple(velocity_condition(problem.conditions, axis) for axis in range(3))
+    viscous = fast_diagonal_helmholtz(
+        problem.grid, velocity_offset(0), conditions, coefficient=float(problem.viscosity)
+    )
+    slowest = float(problem.viscosity) * sum(float(np.min(np.abs(values))) for values in viscous.values)
+    return min(joule, slowest**0.75 * joule**0.25)
 
 
 def _factor_lines(bands: np.ndarray) -> np.ndarray:
@@ -449,7 +476,7 @@ def _projection_solves(problem: ChannelProblem, pseudo_step: float) -> tuple:
     1408 instead of 540 on the Ha 1000 test mesh.
     """
     if isinstance(problem.magnetic_field, ImposedField):
-        return _isotropic_viscous(problem, pseudo_step)
+        return _isotropic_viscous(problem, pseudo_step, _varying_field_rate(problem))
     solves = list(_isotropic_viscous(problem, pseudo_step))
     field = np.asarray(problem.magnetic_field, dtype=float) * float(problem.conductivity)
     axis = int(np.argmax(np.abs(field)))
