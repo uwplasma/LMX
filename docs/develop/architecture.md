@@ -3,11 +3,9 @@
 LMhdX is organized by physical ownership:
 
 ```text
-CaseSpec
-  ├─ fully developed duct ──> mesh + MHD coefficients ──> SOLVAX ──> Solution
-  └─ extruded/fringing ─────> mapped metrics + MHD coupling ─> SOLVAX ─> ExtrudedSolution
-                                                                  │
-                                       diagnostics + validation <─┘
+ChannelProblem ──> staggered core (grid, ops, em, poisson) ──> steady / timeloop / axial
+CaseSpec ── fully developed ──> the core where it applies ──────> Solution
+                           └──> cell-centred solver (mesh, solvers) otherwise
 Q2DProblem ──> vorticity dynamics ──> SOLVAX periodic Poisson ──> Q2DResult
 ```
 
@@ -17,12 +15,10 @@ modules. Imports remain one-way: specifications and data containers do not
 depend on solvers; plotting dependencies load only when an output function
 requests them.
 
-`lmhdx.fringing` is the public 3-D interface. Its private implementation is
-partitioned by mathematical ownership: the public module owns solve
-orchestration, while private modules hold shared mapped, rectangular, and
-cylindrical operators. The private modules are not separate user APIs, and
-architecture gates prevent the numerical kernels from becoming an
-undifferentiated mega-module.
+`lmhdx.core3d` and `lmhdx.steady` are the 3-D interface; `lmhdx.axial` adds
+an inlet and an outlet, and `lmhdx.coreflow` the inertialess core-flow model.
+The cell-centred fully developed solver (`lmhdx.mesh`, `lmhdx.solvers`,
+`lmhdx.cases`) serves the cases the core does not represent yet.
 
 Package sources live under `src/lmhdx`, so an editable installation and a wheel
 resolve the same module tree. The wheel includes `lmhdx/py.typed`; every root API

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from lmhdx import cli
-from lmhdx.specs import FringingSpec, LoggingSpec, RestartSpec, RunConfig
+from lmhdx.specs import LoggingSpec, RestartSpec, RunConfig
 
 pytestmark = pytest.mark.unit
 
@@ -33,23 +33,6 @@ def _stub_validation_cli(
         lambda payload, path: recorded.update(metrics=payload, metrics_path=path) or path,
     )
     return recorded
-
-
-def _extruded_solution() -> SimpleNamespace:
-    return SimpleNamespace(
-        bundle=SimpleNamespace(
-            x=cli.jnp.asarray([0.0, 1.0]),
-            u=cli.jnp.asarray([[[1.0]], [[0.5]]]),
-        ),
-        validation=SimpleNamespace(
-            max_residual=1.0e-4,
-            max_charge_balance_residual=1.0e-6,
-            max_wall_current_leakage=2.0e-6,
-            net_boundary_current_residual=3.0e-6,
-            field_mean_velocity_correlation=-0.8,
-        ),
-        station_history=(),
-    )
 
 
 @pytest.mark.parametrize(
@@ -174,60 +157,6 @@ def test_cli_run_branch_uses_case_builder_and_solver(
     assert f'"case": "{case.name}"' in capsys.readouterr().out
 
 
-def test_cli_run_branch_dispatches_extruded_case(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-):
-    output_dir = tmp_path / "fringing"
-    case = SimpleNamespace(
-        name="fringing_rect_demo",
-        forcing=1.0,
-        geometry=SimpleNamespace(kind="rect_duct"),
-        solver=SimpleNamespace(kind="extruded_inductionless", mode="steady"),
-        output=SimpleNamespace(
-            directory=str(output_dir),
-            write_npz=True,
-            write_json_summary=True,
-            write_plots=False,
-        ),
-    )
-    problem = SimpleNamespace(case=case, profile=SimpleNamespace())
-    solution = _extruded_solution()
-    recorded: dict[str, object] = {}
-
-    monkeypatch.setattr(cli, "_build_extruded_problem", lambda args: problem)
-    monkeypatch.setattr(cli, "solve_extruded_inductionless", lambda built_problem: solution)
-    monkeypatch.setattr(
-        cli,
-        "write_extruded_solution_outputs",
-        lambda solved, built_case, out_dir, write_npz, write_plots=False: (
-            recorded.update(out_dir=Path(out_dir), write_npz=write_npz, write_plots=write_plots)
-            or {
-                "csv": [Path(out_dir) / "stations.csv"],
-                "npz": [Path(out_dir) / "bundle.npz"],
-                "plots": [],
-            }
-        ),
-    )
-
-    exit_code = cli.main(
-        [
-            "run",
-            "fringing_rect",
-            "--output",
-            str(output_dir),
-            "--nx-stations",
-            "5",
-            "--plots",
-        ]
-    )
-
-    assert exit_code == 0
-    assert recorded["out_dir"] == output_dir
-    assert recorded["write_npz"] is True
-    assert recorded["write_plots"] is True
-    assert '"solver_kind": "extruded_inductionless"' in capsys.readouterr().out
-
-
 def test_cli_dispatches_direct_toml_run(monkeypatch: pytest.MonkeyPatch):
     recorded: dict[str, object] = {}
     monkeypatch.setattr(
@@ -258,27 +187,6 @@ def test_fully_developed_cli_resolution_reaches_case(name):
 def test_cli_case_builders_reject_unknown_case():
     with pytest.raises(ValueError):
         cli._build_case(SimpleNamespace(case="unknown", ha=5.0, output="out"))
-    with pytest.raises(ValueError):
-        cli._build_extruded_problem(
-            SimpleNamespace(
-                case="unknown",
-                ha=5.0,
-                width=2.0,
-                height=2.0,
-                ny=4,
-                nz=4,
-                length=6.0,
-                nx_stations=5,
-                entry_center=1.0,
-                exit_center=4.0,
-                transition_width=0.5,
-                wall_cells=1,
-                insulator_cells=1,
-                radius=0.5,
-                nr=4,
-                ntheta=8,
-            )
-        )
 
 
 def test_python_module_entrypoint_delegates_to_cli_main(
@@ -377,216 +285,6 @@ def test_run_config_uses_restart_bundle_and_writes_restart_output(
     assert summary["restart"]["start_time"] == pytest.approx(0.2)
     assert summary["restart"]["output"] == "resume_state.npz"
     assert summary["execution_seconds"] == pytest.approx(3.5)
-    assert '"restart"' in capsys.readouterr().out
-
-
-def test_run_config_dispatches_extruded_solver_kind(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-):
-    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path / "run")))
-    case = case.__class__(
-        **{
-            **case.__dict__,
-            "name": "fringing_rect_demo",
-            "geometry": case.geometry.__class__(**{**case.geometry.__dict__, "length": 6.0, "nx": 5}),
-            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
-            "output": case.output.__class__(**{**case.output.__dict__, "directory": str(tmp_path / "run")}),
-        }
-    )
-    config = RunConfig(
-        case=case,
-        logging=LoggingSpec(enabled=False),
-        fringing=FringingSpec(
-            enabled=True,
-            entry_center=1.0,
-            exit_center=4.0,
-            transition_width=0.5,
-            axis="z",
-        ),
-    )
-    recorded: dict[str, object] = {}
-    solution = _extruded_solution()
-
-    monkeypatch.setattr(
-        cli,
-        "build_extruded_problem_from_case",
-        lambda built_case, **kwargs: (
-            recorded.update(problem_kwargs=kwargs) or SimpleNamespace(case=built_case)
-        ),
-    )
-    perf_values = iter([20.0, 26.0])
-    monkeypatch.setattr(cli.time, "perf_counter", lambda: next(perf_values))
-    monkeypatch.setattr(
-        cli,
-        "solve_extruded_inductionless",
-        lambda problem, initial_bundle=None: solution,
-    )
-    monkeypatch.setattr(
-        cli,
-        "write_extruded_solution_outputs",
-        lambda solved, built_case, out_dir, write_npz, write_plots=False: (
-            recorded.update(out_dir=Path(out_dir), write_npz=write_npz, write_plots=write_plots)
-            or {
-                "csv": [Path(out_dir) / "stations.csv"],
-                "npz": [Path(out_dir) / "bundle.npz"],
-                "plots": [],
-            }
-        ),
-    )
-
-    summary = cli._run_config(config)
-
-    assert recorded["problem_kwargs"]["entry_center"] == pytest.approx(1.0)
-    assert recorded["problem_kwargs"]["exit_center"] == pytest.approx(4.0)
-    assert summary["solver_kind"] == "extruded_inductionless"
-    assert summary["station_count"] == 2
-    assert summary["execution_seconds"] == pytest.approx(6.0)
-    assert '"solver_kind": "extruded_inductionless"' in capsys.readouterr().out
-
-
-def test_run_config_extruded_requires_restart_path_when_restart_enabled(tmp_path: Path):
-    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path / "run")))
-    case = case.__class__(
-        **{
-            **case.__dict__,
-            "name": "fringing_rect_demo",
-            "geometry": case.geometry.__class__(**{**case.geometry.__dict__, "length": 6.0, "nx": 5}),
-            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
-        }
-    )
-    config = RunConfig(
-        case=case,
-        logging=LoggingSpec(enabled=False),
-        fringing=FringingSpec(
-            enabled=True,
-            entry_center=1.0,
-            exit_center=4.0,
-            transition_width=0.5,
-            axis="z",
-        ),
-        restart=RestartSpec(enabled=True),
-    )
-    with pytest.raises(ValueError, match="restart.path"):
-        cli._run_config(config)
-
-
-def test_run_config_extruded_requires_fringing_block(tmp_path: Path):
-    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(tmp_path / "run")))
-    case = case.__class__(
-        **{
-            **case.__dict__,
-            "name": "fringing_rect_demo",
-            "geometry": case.geometry.__class__(**{**case.geometry.__dict__, "length": 6.0, "nx": 5}),
-            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
-        }
-    )
-    config = RunConfig(case=case, logging=LoggingSpec(enabled=False))
-    with pytest.raises(ValueError, match="\\[fringing\\] block"):
-        cli._run_config(config)
-
-
-def test_run_config_supports_extruded_restart_and_structured_output_layout(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-):
-    output_dir = tmp_path / "fringing_run"
-    input_path = tmp_path / "fringing_case.toml"
-    input_path.write_text("[case]\nname='demo'\n", encoding="utf-8")
-    case = cli._build_case(SimpleNamespace(case="hartmann", ha=5.0, output=str(output_dir)))
-    case = case.__class__(
-        **{
-            **case.__dict__,
-            "name": "fringing_layered_demo",
-            "geometry": case.geometry.__class__(
-                **{
-                    **case.geometry.__dict__,
-                    "kind": "layered_duct",
-                    "length": 6.0,
-                    "nx": 5,
-                }
-            ),
-            "solver": case.solver.__class__(**{**case.solver.__dict__, "kind": "extruded_inductionless"}),
-            "output": case.output.__class__(
-                **{
-                    **case.output.__dict__,
-                    "directory": str(output_dir),
-                    "write_npz": True,
-                    "copy_input_file": True,
-                }
-            ),
-        }
-    )
-    config = RunConfig(
-        case=case,
-        logging=LoggingSpec(enabled=True),
-        restart=RestartSpec(
-            enabled=True,
-            path=tmp_path / "extruded_restart.npz",
-            reset_histories=False,
-            write_restart=True,
-            restart_filename="fringing_resume.npz",
-        ),
-        fringing=FringingSpec(
-            enabled=True,
-            entry_center=1.0,
-            exit_center=4.0,
-            transition_width=0.5,
-            axis="z",
-        ),
-        input_path=input_path,
-    )
-    restart_bundle = SimpleNamespace(
-        path=(tmp_path / "extruded_restart.npz").resolve(),
-        bundle=SimpleNamespace(
-            x=cli.jnp.asarray([0.0, 1.0]),
-            y=cli.jnp.asarray([0.0]),
-            z=cli.jnp.asarray([0.0]),
-        ),
-    )
-    solution = _extruded_solution()
-    recorded: dict[str, object] = {}
-
-    monkeypatch.setattr(cli, "load_extruded_restart_bundle", lambda path: restart_bundle)
-    monkeypatch.setattr(
-        cli,
-        "validate_extruded_restart_bundle",
-        lambda bundle, case: recorded.update(validated_case=case.name),
-    )
-    monkeypatch.setattr(
-        cli,
-        "build_extruded_problem_from_case",
-        lambda built_case, **kwargs: (
-            recorded.update(problem_kwargs=kwargs) or SimpleNamespace(case=built_case)
-        ),
-    )
-    monkeypatch.setattr(
-        cli,
-        "solve_extruded_inductionless",
-        lambda problem, initial_bundle=None: recorded.update(initial_bundle=initial_bundle) or solution,
-    )
-    monkeypatch.setattr(
-        cli,
-        "write_extruded_solution_outputs",
-        lambda solved, built_case, out_dir, write_npz, write_plots=False: {
-            "csv": [Path(out_dir) / "postProcessing" / "stations.csv"],
-            "npz": [Path(out_dir) / "fields" / "bundle.npz"],
-            "plots": [],
-        },
-    )
-    monkeypatch.setattr(
-        cli,
-        "write_extruded_restart_npz",
-        lambda solved, built_case, path: Path(path),
-    )
-
-    summary = cli._run_config(config)
-
-    assert recorded["validated_case"] == case.name
-    assert recorded["initial_bundle"] is restart_bundle.bundle
-    assert summary["restart"]["enabled"] is True
-    assert summary["restart"]["output"] == "fringing_resume.npz"
-    assert (output_dir / "system" / input_path.name).exists()
     assert '"restart"' in capsys.readouterr().out
 
 

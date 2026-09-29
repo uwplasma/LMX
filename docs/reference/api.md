@@ -39,15 +39,13 @@ live in the module that owns their concepts.
 | Evidence | Power balance in `lmhdx.solvers` and the analytical, conservation, and packaged benchmark tools in `lmhdx.validation` |
 | Runtime | `enable_compilation_cache` |
 
-`solve(model)` accepts a `ChannelProblem`, `CaseSpec`,
-`ExtrudedInductionlessProblem`, or `Q2DProblem`. A steady fully developed
-`CaseSpec` runs on the staggered core through `lmhdx.fully_developed`, as does
-`solve_fully_developed_fields`; a case the core does not represent (thick or
-mismatched conducting walls, several fluids, a varying field, an odd cell count
-across a field) keeps the cell-centred solver of `lmhdx.cases`, the validation
-lane plan step 4.6 retires. A transient `CaseSpec` runs its pseudo-time loop,
-and an extruded fringing problem runs
-`lmhdx.fringing.solve_extruded_inductionless`.
+`solve(model)` accepts a `ChannelProblem`, `CaseSpec` or `Q2DProblem`. A
+steady fully developed `CaseSpec` runs on the staggered core through
+`lmhdx.fully_developed`, as does `solve_fully_developed_fields`; a case the core
+does not represent (thick or mismatched conducting walls, several fluids, a
+varying field, an odd cell count across a field) keeps the cell-centred solver
+of `lmhdx.cases`. A transient `CaseSpec` runs its pseudo-time loop. A duct with
+an inlet and an outlet is solved by `lmhdx.axial.solve_open_duct`.
 
 `duct_problem(hartmann=..., cells=..., wall_conductance=...)` builds a square
 insulating or Hunt duct with meshes that resolve the layers that exist -- `a/Ha`
@@ -66,17 +64,17 @@ restart, progress, logging, and timing hooks in their owning modules.
    :show-inheritance:
 ```
 
-## Three-dimensional fringing
-
-```{eval-rst}
-.. automodule:: lmhdx.fringing
-   :members:
-```
-
 ## Inertialess core flow
 
 ```{eval-rst}
 .. automodule:: lmhdx.coreflow
+   :members:
+```
+
+## Ducts with an inlet and an outlet
+
+```{eval-rst}
+.. automodule:: lmhdx.axial
    :members:
 ```
 

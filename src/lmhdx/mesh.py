@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
-from math import pi
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Sequence
+from typing import TYPE_CHECKING, Sequence
 
 import jax.numpy as jnp
 import numpy as np
@@ -11,7 +10,6 @@ from jax.scipy.interpolate import RegularGridInterpolator
 
 if TYPE_CHECKING:
     from .physics import WallLayer
-    from .specs import CaseSpec
 
 
 @dataclass(frozen=True)
@@ -564,72 +562,6 @@ def _multilayer_region_assignment(
     return region_names, region_sigmas, region_ids
 
 
-def generate_pipe_ogrid_mesh(
-    radius: float,
-    length: float = 1.0,
-    nx: int = 8,
-    nr: int = 24,
-    ntheta: int = 64,
-    wall_thickness: float = 0.0,
-    wall_cells: int = 0,
-    target_ha: float | None = None,
-    hartmann_layer_cells: int | None = None,
-) -> StructuredMesh:
-    """Build a straight pipe O-grid, optionally including an annular wall.
-
-    ``radius`` is always the fluid radius.  When an explicit wall is requested,
-    ``nr`` continues to count fluid cells and ``wall_cells`` counts additional
-    solid cells.  This convention prevents a wall refinement from silently
-    coarsening the fluid domain.
-    """
-
-    if radius <= 0.0 or length <= 0.0:
-        raise ValueError("radius and length must be positive")
-    if nx <= 0 or nr <= 0 or ntheta <= 0:
-        raise ValueError("nx, nr, and ntheta must be positive")
-    if wall_thickness < 0.0 or wall_cells < 0:
-        raise ValueError("wall_thickness and wall_cells cannot be negative")
-    if (wall_thickness > 0.0) != (wall_cells > 0):
-        raise ValueError("wall_thickness and wall_cells must be enabled together")
-
-    x_faces = jnp.linspace(0.0, length, nx + 1)
-    if target_ha is not None and target_ha > 0.0:
-        layer_cells = max(5, int(round(0.10 * nr))) if hartmann_layer_cells is None else hartmann_layer_cells
-        if layer_cells <= 0 or 2 * layer_cells >= nr:
-            raise ValueError("hartmann_layer_cells must fit twice within nr")
-        r_faces = _smooth_boundary_layer_segment(
-            0.0,
-            radius,
-            nr,
-            layer_thickness=radius / target_ha,
-            layer_cells=layer_cells,
-        )
-    else:
-        r_faces = _clustered_segment(0.0, radius, nr, beta=2.0)
-    if wall_cells:
-        wall_faces = jnp.linspace(radius, radius + wall_thickness, wall_cells + 1)
-        r_faces = jnp.concatenate([r_faces, wall_faces[1:]])
-    theta_faces = jnp.linspace(0.0, 2.0 * pi, ntheta + 1)
-    y_faces = r_faces
-    z_faces = theta_faces
-
-    xx, rr, tt = jnp.meshgrid(x_faces, r_faces, theta_faces, indexing="ij")
-    point_coordinates = jnp.stack([xx, rr * jnp.cos(tt), rr * jnp.sin(tt)], axis=-1)
-    radial_centers = 0.5 * (r_faces[:-1] + r_faces[1:])
-    fluid_mask = jnp.broadcast_to(
-        (radial_centers <= radius + 1.0e-12)[:, None],
-        (radial_centers.size, ntheta),
-    )
-    return StructuredMesh(
-        x_faces=x_faces,
-        y_faces=y_faces,
-        z_faces=z_faces,
-        geometry="pipe_ogrid",
-        point_coordinates=point_coordinates,
-        fluid_mask=fluid_mask,
-    )
-
-
 def apply_five_point_operator(
     diagonal: jnp.ndarray,
     west: jnp.ndarray,
@@ -699,14 +631,6 @@ def poisson_residual_norm(
     return numerator / jnp.maximum(scale, 1e-12)
 
 
-def _broadcast_spacing_y(mesh: StructuredMesh) -> jnp.ndarray:
-    return mesh.dy[:, None]
-
-
-def _broadcast_spacing_z(mesh: StructuredMesh) -> jnp.ndarray:
-    return mesh.dz[None, :]
-
-
 def center_coordinates(mesh: StructuredMesh) -> tuple[jnp.ndarray, jnp.ndarray]:
     return jnp.meshgrid(mesh.y_centers, mesh.z_centers, indexing="ij")
 
@@ -743,18 +667,6 @@ def gradient_scalar(field: jnp.ndarray, mesh: StructuredMesh) -> tuple[jnp.ndarr
     return fy, fz
 
 
-def face_divergence(
-    face_flux_y: jnp.ndarray,
-    face_flux_z: jnp.ndarray,
-    mesh: StructuredMesh,
-) -> jnp.ndarray:
-    dy = _broadcast_spacing_y(mesh)
-    dz = _broadcast_spacing_z(mesh)
-    diff_y = (face_flux_y[1:, :] - face_flux_y[:-1, :]) / dy
-    diff_z = (face_flux_z[:, 1:] - face_flux_z[:, :-1]) / dz
-    return diff_y + diff_z
-
-
 def make_divergence_free_cross_section_field(
     *,
     width: float,
@@ -777,29 +689,6 @@ def make_divergence_free_cross_section_field(
     return field
 
 
-def make_localized_divergence_free_obstacle_field(
-    *,
-    width: float,
-    height: float,
-    base_bz: float,
-    core_fraction_y: float = 0.35,
-    core_fraction_z: float = 0.35,
-):
-    """Return a localized divergence-free field with a central Bz-dominant obstacle."""
-
-    ay = max(0.5 * width * core_fraction_y, 1.0e-6)
-    az = max(0.5 * height * core_fraction_z, 1.0e-6)
-
-    def field(y: jnp.ndarray, z: jnp.ndarray) -> jnp.ndarray:
-        gaussian = jnp.exp(-((y / ay) ** 2 + (z / az) ** 2))
-        by = 2.0 * base_bz * y * z * gaussian / (az**2)
-        bz = base_bz * gaussian * (1.0 - 2.0 * (y / ay) ** 2)
-        bx = jnp.zeros_like(by)
-        return jnp.stack([bx, by, bz], axis=-1)
-
-    return field
-
-
 def sample_cross_section_field(
     field_fn,
     *,
@@ -813,30 +702,6 @@ def sample_cross_section_field(
     yy, zz = np.meshgrid(y, z, indexing="ij")
     field = np.asarray(field_fn(jnp.asarray(yy), jnp.asarray(zz)), dtype=float)
     return y, z, field
-
-
-def cross_section_divergence_metrics(
-    field_fn,
-    *,
-    width: float,
-    height: float,
-    ny: int = 81,
-    nz: int = 81,
-) -> dict[str, float]:
-    y, z, field = sample_cross_section_field(field_fn, width=width, height=height, ny=ny, nz=nz)
-    dy = float(y[1] - y[0]) if len(y) > 1 else 1.0
-    dz = float(z[1] - z[0]) if len(z) > 1 else 1.0
-    by = field[..., 1]
-    bz = field[..., 2]
-    dby_dy = np.gradient(by, dy, axis=0)
-    dbz_dz = np.gradient(bz, dz, axis=1)
-    div = dby_dy + dbz_dz
-    magnitude = np.sqrt(by**2 + bz**2)
-    return {
-        "max_abs_divergence": float(np.max(np.abs(div))),
-        "rms_divergence": float(np.sqrt(np.mean(div**2))),
-        "mean_field_magnitude": float(np.mean(magnitude)),
-    }
 
 
 def write_tabulated_field_npz(
@@ -900,20 +765,6 @@ def sample_tabulated_cross_section_field(
     return _interpolate_tabulated_field(data, y=y, z=z)
 
 
-def sample_tabulated_field_volume(
-    path: str | Path,
-    *,
-    x: np.ndarray,
-    y: np.ndarray,
-    z: np.ndarray,
-) -> np.ndarray:
-    data = load_tabulated_field(path)
-    if "x" not in data:
-        sampled = _interpolate_tabulated_field(data, y=y, z=z)
-        return sampled
-    return _interpolate_tabulated_field(data, x=x, y=y, z=z)
-
-
 def _interpolate_tabulated_field(data: dict[str, np.ndarray], **coordinates: np.ndarray) -> np.ndarray:
     axes = tuple(np.asarray(data[name], dtype=float) for name in coordinates)
     values = tuple(np.asarray(value, dtype=float) for value in coordinates.values())
@@ -923,101 +774,3 @@ def _interpolate_tabulated_field(data: dict[str, np.ndarray], **coordinates: np.
     field = np.stack([data[key] for key in ("bx", "by", "bz")], axis=-1)
     sampled = RegularGridInterpolator(axes, field, bounds_error=False, fill_value=jnp.nan)(points)
     return np.asarray(sampled).reshape((*values[0].shape, 3))
-
-
-def _cross_section_mesh(case: CaseSpec) -> StructuredMesh:
-    geometry = case.geometry
-    if geometry.kind == "rect_duct":
-        mesh = generate_rect_duct_mesh(
-            width=geometry.width,
-            height=geometry.height,
-            length=geometry.length,
-            nx=geometry.nx,
-            ny=geometry.ny,
-            nz=geometry.nz,
-        )
-    elif geometry.kind == "layered_duct":
-        mesh = generate_layered_duct_mesh(
-            width=geometry.width,
-            height=geometry.height,
-            length=geometry.length,
-            nx=geometry.nx,
-            ny=geometry.ny,
-            nz=geometry.nz,
-            wall_thickness=geometry.wall_thickness,
-            wall_cells=geometry.wall_cells,
-            target_ha=geometry.target_ha,
-        )
-    elif geometry.kind == "pipe_ogrid":
-        mesh = generate_pipe_ogrid_mesh(
-            radius=geometry.radius or 0.5 * geometry.width,
-            length=geometry.length,
-            nx=geometry.nx,
-            nr=geometry.nr or geometry.ny,
-            ntheta=geometry.ntheta or geometry.nz,
-            wall_thickness=max(geometry.wall_thickness),
-            wall_cells=max(geometry.wall_cells),
-            target_ha=geometry.target_ha,
-            hartmann_layer_cells=geometry.hartmann_layer_cells,
-        )
-    else:
-        raise ValueError(f"Unsupported extruded geometry {geometry.kind!r}")
-    if geometry.axial_origin != 0.0:
-        points = mesh.point_coordinates
-        mesh = replace(
-            mesh,
-            x_faces=mesh.x_faces + geometry.axial_origin,
-            point_coordinates=(None if points is None else points.at[..., 0].add(geometry.axial_origin)),
-        )
-    return mesh
-
-
-def _sample_volume_field(volume_field, x, y, z):
-    sampled = jnp.asarray(volume_field(x, y, z), dtype=float)
-    if sampled.shape != (*x.shape, 3):
-        raise ValueError("Fringing volume field must append one three-component axis")
-    return tuple(sampled[..., index] for index in range(3))
-
-
-def _sample_station_magnetic_field(
-    case: CaseSpec,
-    *,
-    field_scale: jnp.ndarray,
-    x: jnp.ndarray,
-    y: jnp.ndarray,
-    z: jnp.ndarray,
-    volume_field: Callable[..., jnp.ndarray] | None = None,
-) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    nx, (ny, nz) = field_scale.shape[0], y.shape
-    shape = (nx, ny, nz)
-    if volume_field is not None:
-        return _sample_volume_field(
-            volume_field,
-            jnp.broadcast_to(x[:, None, None], shape),
-            jnp.broadcast_to(y[None], shape),
-            jnp.broadcast_to(z[None], shape),
-        )
-    if case.magnetic_field.kind == "constant":
-        return tuple(
-            jnp.broadcast_to(field_scale[:, None, None] * float(value), shape)
-            for value in case.magnetic_field.value or (0.0, 0.0, 0.0)
-        )
-    if case.magnetic_field.kind == "analytic":
-        if case.magnetic_field.fn is None:
-            raise ValueError("Analytic magnetic field requires fn")
-        sampled = jnp.asarray(case.magnetic_field.fn(y, z), dtype=float)
-        return tuple(field_scale[:, None, None] * sampled[None, ..., index] for index in range(3))
-    if case.magnetic_field.kind == "tabulated":
-        if case.magnetic_field.table_path is None:
-            raise ValueError("Tabulated magnetic field requires table_path")
-        data = load_tabulated_field(case.magnetic_field.table_path)
-        coordinates = {
-            "y": np.broadcast_to(np.asarray(y)[None], shape),
-            "z": np.broadcast_to(np.asarray(z)[None], shape),
-        }
-        if "x" in data:
-            coordinates = {"x": np.broadcast_to(np.asarray(x)[:, None, None], shape), **coordinates}
-        sampled = _interpolate_tabulated_field(data, **coordinates)
-        sampled = sampled if "x" in data else sampled * np.asarray(field_scale[:, None, None, None])
-        return tuple(jnp.asarray(sampled[..., index], dtype=float) for index in range(3))
-    raise ValueError(f"Unsupported magnetic-field kind {case.magnetic_field.kind!r}")

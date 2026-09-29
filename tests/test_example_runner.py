@@ -45,46 +45,6 @@ def test_portable_duct_tutorials_and_toml_first_run(tmp_path: Path):
     assert summary["residual"] < 1.0e-8
 
 
-def test_fringing_benchmark_demo_runs_real_bounded_diagnostic(tmp_path: Path):
-    script = Path(__file__).resolve().parents[1] / "examples/fringing_benchmark_demo.py"
-    subprocess.run([sys.executable, script], cwd=tmp_path, timeout=60, check=True)
-    summary_path = next((tmp_path / "artifacts").rglob("fringing_benchmark_summary.json"))
-    summary = json.loads(summary_path.read_text())
-    assert summary["status"] == "research-stage internal diagnostic"
-    assert summary["geometry_kind"] == "rect_duct"
-    assert summary["shape"] == [5, 6, 6]
-    assert summary["validation"]["station_count"] == 5
-    assert summary["validation"]["max_charge_balance_residual"] < 1.0e-10
-    assert len(summary["mean_velocity"]) == len(summary["field_scale"]) == 5
-    assert all((summary_path.parent / name).is_file() for name in summary["plots"])
-
-
-def test_variable_field_extruded_demo_optimizes_with_checked_gradients(tmp_path: Path):
-    script = Path(__file__).resolve().parents[1] / "examples/variable_field_extruded_demo.py"
-    # The pull-request lanes pin one thread per process and run four workers, so this
-    # demo takes about 48 s of CPU rather than the 22 s it takes with threads. Its own
-    # limit has to leave room inside the tier's 300 s per-test timeout, not sit at 120.
-    subprocess.run([sys.executable, script], cwd=tmp_path, timeout=240, check=True)
-    summary_path = next((tmp_path / "artifacts").rglob("variable_field_extruded_summary.json"))
-    summary = json.loads(summary_path.read_text())
-    assert summary["shape"] == [7, 6, 6]
-    assert summary["controls"]["field_mean"] == pytest.approx(1.0, abs=1.0e-12)
-    assert all(0.8 < value < 1.2 for value in summary["controls"]["field_scale"])
-    assert 0.5 < summary["controls"]["wall_conductivity_scale"] < 1.5
-    assert all(
-        1.0 - half_range < value < 1.0 + half_range
-        for value, half_range in zip(summary["controls"]["geometry_scale"], (0.10, 0.05, 0.05), strict=True)
-    )
-    assert summary["optimization"]["final_loss"] < 0.8 * summary["optimization"]["initial_loss"]
-    assert summary["gradient_check"]["relative_l2_error"] < 2.0e-3
-    assert (
-        min(summary["improvements"][name] for name in ("pumping_power_magnitude", "wall_current_density_rms"))
-        > 0.4
-    )
-    assert abs(summary["improvements"]["flow_rate_relative_change"]) < 0.01
-    assert (summary_path.parent / summary["plot"]).is_file()
-
-
 def test_li_aln_wall_stack_example_runs_explicit_models(tmp_path: Path):
     script = Path(__file__).resolve().parents[1] / "examples/li_aln_wall_stack_example.py"
     subprocess.run([sys.executable, script], cwd=tmp_path, timeout=60, check=True)
@@ -104,3 +64,16 @@ def test_li_aln_wall_stack_example_runs_explicit_models(tmp_path: Path):
         for model in summary["models"].values()
     )
     assert (summary_path.parent / "li_aln_wall_stack.png").is_file()
+
+
+def test_fringe_duct_example_conserves_and_checks_its_gradient(tmp_path: Path):
+    script = Path(__file__).resolve().parents[1] / "examples/fringe_duct_example.py"
+    subprocess.run([sys.executable, script], cwd=tmp_path, timeout=180, check=True)
+    summary = json.loads(next((tmp_path / "artifacts").rglob("fringe_duct_summary.json")).read_text())
+
+    checks = summary["checks"]
+    assert checks["relative_residual"] <= 1e-9
+    assert max(checks["relative_flow_rate_error"], checks["mass_balance"], checks["charge_balance"]) < 1e-12
+    assert summary["upstream_gradient_relative_error"] < 5e-3
+    assert summary["fringe_pressure_drop"] > 0.0
+    assert summary["derivative_relative_error"] < 1e-6

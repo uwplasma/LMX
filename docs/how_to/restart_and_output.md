@@ -1,7 +1,7 @@
 # Restart and write output
 
-Two-dimensional and extruded solves use separate typed restart bundles because
-their state and face-flux contracts differ.
+A fully developed solve writes a typed restart bundle that records its state,
+diagnostics and mesh.
 
 ```python
 from lmhdx.io import write_restart_npz, load_restart_bundle, validate_restart_bundle
@@ -11,17 +11,11 @@ restart = load_restart_bundle("restart.npz")
 validate_restart_bundle(restart, case=case)
 ```
 
-For a three-dimensional result, use `write_extruded_restart_npz`,
-`load_extruded_restart_bundle`, and `validate_extruded_restart_bundle`. The
-validation rejects mismatched geometry, mesh shape, material arrays, or field
-metadata before a restart enters the solver.
+The validation rejects a mismatched geometry, mesh shape or case before a
+restart enters the solver. A staggered-core trajectory is resumed from its
+state with `lmhdx.advance`, which takes a run in chunks.
 
-B2 restart files retain the compact conservative face fluxes and only the
-three-component mechanical accelerator state. Electric potential is already
-closed on the accepted velocity and does not require a duplicate accelerator
-history.
-
-`write_solution_outputs` and `write_extruded_solution_outputs` honor the
+`write_solution_outputs` honors the
 case's `OutputSpec`. Prefer NPZ plus JSON for repeatable studies. Enable VTK
 only when a downstream visualization tool needs it, and keep generated output
 outside the repository.
@@ -32,6 +26,4 @@ first sample, every requested interval, and the terminal sample; use `1` only
 when every iteration is needed. Positive-stride restart segments preserve
 retained samples and add samples from the resumed segment; stride `0` keeps
 only the latest terminal. Restart state and compact diagnostics are independent,
-while benchmark builders retain every iteration required by their published
-evidence contracts. `write_stride` controls station-field output and
-`checkpoint_interval` controls in-progress 3-D restart callbacks.
+

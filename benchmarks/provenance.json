@@ -100,9 +100,7 @@
         "smolentsev-vv"
       ],
       "status": "verified-bounded",
-      "tests": [
-        "tests/test_freemhd.py::test_samper_table_i_reference_is_complete_and_exact"
-      ],
+      "tests": [],
       "tier": "A",
       "title": "High-Hartmann-number duct integral checks",
       "workflows": [
@@ -129,10 +127,8 @@
         "freemhd"
       ],
       "spec_path": "lmhdx/data/benchmarks/specs/alex-b1-pipe.toml",
-      "status": "specification-frozen",
-      "tests": [
-        "tests/test_benchmarks.py::test_benchmark_b1_reduced_production_path_closes_fixed_flow_and_is_finite"
-      ],
+      "status": "specification-frozen; solver lane at tag lmx-b2-lane-v1",
+      "tests": [],
       "tier": "B",
       "title": "Conducting pipe through a fringing magnetic field",
       "workflows": []
@@ -159,7 +155,7 @@
       "spec_path": "lmhdx/data/benchmarks/specs/alex-b2-square.toml",
       "status": "specification-frozen",
       "tests": [
-        "tests/test_benchmarks.py::test_benchmark_b2_reduced_path_closes_boundaries_and_restarts_exactly"
+        "tests/test_freemhd.py"
       ],
       "tier": "B",
       "title": "Conducting square duct through a fringing magnetic field",
@@ -172,7 +168,7 @@
   "sources": [
     {
       "availability": "external",
-      "filename": "U. Müller, L. Bühler - Magnetofluiddynamics in channels and containers.pdf",
+      "filename": "U. Mu\u0308ller, L. Bu\u0308hler - Magnetofluiddynamics in channels and containers.pdf",
       "id": "muller-buhler-book",
       "kind": "book",
       "sha256": "6f54c642f265fd115fce3abbc9f0edbae629e7c4be480b7418037cb56a02ce54",

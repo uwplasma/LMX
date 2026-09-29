@@ -1,32 +1,22 @@
-from types import SimpleNamespace
-
 import jax.numpy as jnp
 import numpy as np
 import pytest
 
 from lmhdx.mesh import (
-    _broadcast_spacing_y,
-    _broadcast_spacing_z,
-    _sample_station_magnetic_field,
     _smooth_boundary_layer_segment,
     center_coordinates,
     center_spacing_y,
     center_spacing_z,
-    cross_section_divergence_metrics,
-    face_divergence,
     generate_layered_duct_mesh,
     generate_layered_duct_mesh_from_fluid_faces,
     generate_multilayer_duct_mesh,
-    generate_pipe_ogrid_mesh,
     generate_rect_duct_mesh,
     generate_rect_duct_mesh_from_faces,
     gradient_scalar,
     load_tabulated_field,
     make_divergence_free_cross_section_field,
-    make_localized_divergence_free_obstacle_field,
     sample_cross_section_field,
     sample_tabulated_cross_section_field,
-    sample_tabulated_field_volume,
     write_tabulated_field_npz,
 )
 from lmhdx.physics import WallLayer
@@ -79,61 +69,6 @@ def test_layered_duct_mesh_has_solid_cells():
     )
     assert mesh.fluid_mask is not None
     assert (~mesh.fluid_mask).sum() > 0
-
-
-def test_pipe_ogrid_points_exist():
-    mesh = generate_pipe_ogrid_mesh(radius=1.0, nx=2, nr=4, ntheta=8)
-    assert mesh.point_coordinates is not None
-    assert mesh.point_coordinates.shape[-1] == 3
-
-
-def test_pipe_ogrid_explicit_wall_preserves_fluid_resolution():
-    mesh = generate_pipe_ogrid_mesh(
-        radius=1.0,
-        nx=2,
-        nr=4,
-        ntheta=8,
-        wall_thickness=0.1,
-        wall_cells=2,
-    )
-
-    assert mesh.ny == 6
-    assert mesh.fluid_mask.shape == (6, 8)
-    assert bool(jnp.all(mesh.fluid_mask[:4]))
-    assert not bool(jnp.any(mesh.fluid_mask[4:]))
-    assert float(mesh.y_faces[4]) == pytest.approx(1.0)
-    assert float(mesh.y_faces[-1]) == pytest.approx(1.1)
-    assert mesh.point_coordinates.shape == (3, 7, 9, 3)
-
-
-@pytest.mark.parametrize(
-    "wall_thickness, wall_cells",
-    [(0.1, 0), (0.0, 2), (-0.1, 2), (0.1, -2)],
-)
-def test_pipe_ogrid_rejects_inconsistent_wall_request(wall_thickness, wall_cells):
-    with pytest.raises(ValueError):
-        generate_pipe_ogrid_mesh(
-            radius=1.0,
-            nr=4,
-            ntheta=8,
-            wall_thickness=wall_thickness,
-            wall_cells=wall_cells,
-        )
-
-
-@pytest.mark.parametrize(
-    "kwargs",
-    [
-        {"radius": 0.0},
-        {"radius": 1.0, "length": 0.0},
-        {"radius": 1.0, "nx": 0},
-        {"radius": 1.0, "nr": 0},
-        {"radius": 1.0, "ntheta": 0},
-    ],
-)
-def test_pipe_ogrid_rejects_nonpositive_domain_or_resolution(kwargs):
-    with pytest.raises(ValueError, match="positive"):
-        generate_pipe_ogrid_mesh(**kwargs)
 
 
 def test_moderate_ha_rect_mesh_clusters_boundary_layers():
@@ -223,12 +158,6 @@ def test_multilayer_duct_mesh_rejects_invalid_inputs(kwargs):
         generate_multilayer_duct_mesh(**request)
 
 
-@pytest.mark.parametrize("layer_cells", [0, 2])
-def test_pipe_ogrid_rejects_invalid_hartmann_layer_resolution(layer_cells):
-    with pytest.raises(ValueError, match="fit twice"):
-        generate_pipe_ogrid_mesh(radius=1.0, nr=4, ntheta=8, target_ha=20.0, hartmann_layer_cells=layer_cells)
-
-
 def test_generate_multilayer_duct_mesh_aligns_interfaces_and_sigma():
     wall_layers = {
         side: (
@@ -305,22 +234,13 @@ def test_gradient_of_linear_field_on_clustered_mesh_is_exact_near_boundaries():
     assert jnp.allclose(gz[2:-2, :], -3.0, atol=5e-2)
 
 
-def test_operator_helpers_cover_spacings_and_face_divergence():
+def test_operator_helpers_cover_spacings():
     mesh = generate_rect_duct_mesh(width=2.0, height=3.0, ny=3, nz=4)
     yy, zz = center_coordinates(mesh)
     assert yy.shape == mesh.yz_shape
     assert zz.shape == mesh.yz_shape
-    assert _broadcast_spacing_y(mesh).shape == (mesh.ny, 1)
-    assert _broadcast_spacing_z(mesh).shape == (1, mesh.nz)
     assert center_spacing_y(mesh).shape == (mesh.ny - 1,)
     assert center_spacing_z(mesh).shape == (mesh.nz - 1,)
-
-    face_flux_y = jnp.zeros((mesh.ny + 1, mesh.nz))
-    face_flux_z = jnp.zeros((mesh.ny, mesh.nz + 1))
-    face_flux_y = face_flux_y.at[1:-1, :].set(1.0)
-    face_flux_z = face_flux_z.at[:, 1:-1].set(-0.5)
-    div_faces = face_divergence(face_flux_y, face_flux_z, mesh)
-    assert div_faces.shape == mesh.yz_shape
 
 
 def test_center_spacing_returns_empty_for_single_cell_axes():
@@ -355,9 +275,10 @@ def test_gradient_observed_order_for_smooth_manufactured_solution():
 
 def test_divergence_free_cross_section_field_has_small_discrete_divergence():
     field_fn = make_divergence_free_cross_section_field(width=2.0, height=1.5, base_bz=10.0, perturbation=0.1)
-    metrics = cross_section_divergence_metrics(field_fn, width=2.0, height=1.5, ny=61, nz=61)
-    assert metrics["max_abs_divergence"] < 0.2
-    assert metrics["rms_divergence"] < 0.05
+    y, z, field = sample_cross_section_field(field_fn, width=2.0, height=1.5, ny=61, nz=61)
+    divergence = np.gradient(field[..., 1], y, axis=0) + np.gradient(field[..., 2], z, axis=1)
+    assert np.max(np.abs(divergence)) < 0.2
+    assert np.sqrt(np.mean(divergence**2)) < 0.05
 
 
 def test_sample_cross_section_field_returns_expected_shape():
@@ -366,13 +287,6 @@ def test_sample_cross_section_field_returns_expected_shape():
     assert y.shape == (21,)
     assert z.shape == (25,)
     assert field.shape == (21, 25, 3)
-
-
-def test_localized_divergence_free_obstacle_field_has_small_discrete_divergence():
-    field_fn = make_localized_divergence_free_obstacle_field(width=2.0, height=2.0, base_bz=10.0)
-    metrics = cross_section_divergence_metrics(field_fn, width=2.0, height=2.0, ny=61, nz=61)
-    assert metrics["max_abs_divergence"] < 0.2
-    assert metrics["rms_divergence"] < 0.05
 
 
 def test_tabulated_field_npz_round_trip_and_sampling(tmp_path):
@@ -393,29 +307,6 @@ def test_tabulated_field_npz_round_trip_and_sampling(tmp_path):
     )
     assert sampled.shape == field.shape
     assert abs(float(sampled[..., 2].mean()) - float(field[..., 2].mean())) < 1.0e-8
-
-
-def test_tabulated_field_volume_sampling_supports_3d_npz(tmp_path):
-    x = np.asarray([-3.0, -2.0, -0.5, 0.0, 2.0])
-    y = np.linspace(-1.0, 1.0, 7)
-    z = np.linspace(-0.5, 0.5, 9)
-    xx, yy, zz = np.meshgrid(x, y, z, indexing="ij")
-    bx = 2.0 * xx + yy - zz
-    by = -0.25 * zz
-    bz = 1.0 + 0.25 * yy
-    path = write_tabulated_field_npz(tmp_path / "field3d.npz", x=x, y=y, z=z, bx=bx, by=by, bz=bz)
-    sampled = sample_tabulated_field_volume(path, x=xx, y=yy, z=zz)
-    assert sampled.shape == xx.shape + (3,)
-    assert sampled[..., 0] == pytest.approx(bx)
-    stations = jnp.asarray([-2.4, -0.7, 1.3])
-    grid_y, grid_z = np.meshgrid(y, z, indexing="ij")
-    case = SimpleNamespace(magnetic_field=SimpleNamespace(kind="tabulated", table_path=str(path)))
-    actual = _sample_station_magnetic_field(case, field_scale=jnp.ones(3), x=stations, y=grid_y, z=grid_z)
-    assert actual[0] == pytest.approx(2 * stations[:, None, None] + grid_y[None] - grid_z[None])
-    assert actual[1] == pytest.approx(np.broadcast_to(-0.25 * grid_z, actual[1].shape))
-    for invalid in (-3.01, 2.01, np.nan, np.inf):
-        with pytest.raises(ValueError, match="inside the tabulated domain"):
-            sample_tabulated_field_volume(path, x=np.asarray([invalid]), y=np.zeros(1), z=np.zeros(1))
 
 
 def test_tabulated_field_validation_and_dimension_mismatch_paths(tmp_path):
@@ -440,9 +331,7 @@ def test_tabulated_field_validation_and_dimension_mismatch_paths(tmp_path):
     field2d = write_tabulated_field_npz(
         tmp_path / "field2d.npz", y=y, z=z, bx=zeros[0], by=zeros[0], bz=zeros[0]
     )
-    sampled = sample_tabulated_field_volume(
-        field2d, x=np.asarray([[0.0]]), y=np.asarray([[0.5]]), z=np.asarray([[0.5]])
-    )
+    sampled = sample_tabulated_cross_section_field(field2d, y=np.asarray([[0.5]]), z=np.asarray([[0.5]]))
     assert sampled.shape == (1, 1, 3)
     for axis in ([0.0], [0.0, 0.0], [1.0, 0.0], [0.0, np.nan], [[0.0, 1.0]]):
         np.savez(incomplete, y=axis, z=z, bx=zeros[0], by=zeros[0], bz=zeros[0])

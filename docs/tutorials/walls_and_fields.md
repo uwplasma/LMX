@@ -1,7 +1,7 @@
 # Walls and imposed fields
 
 This tutorial builds explicit wall stacks and imposed magnetic fields, then
-uses the same case/result model as the named duct and fringing workflows.
+uses the same case/result model as the named duct workflows.
 
 ## Wall layers
 
@@ -67,15 +67,14 @@ case = replace(make_hartmann_case(), magnetic_field=MagneticFieldSpec(
 ))
 ```
 
-For 3-D data also provide `x` and component arrays shaped `(nx, ny, nz)`;
-extruded sampling uses the supplied physical axial stations, including their
-origin and spacing. Axes must be finite, strictly increasing vectors with at
+A file with an `x` axis and components shaped `(nx, ny, nz)` is refused by the
+cross-section sampler; a field that varies along the duct is an
+`lmhdx.core3d.ImposedField` on the 3-D grid (see the
+[fringe tutorial](fringing.md)). Axes must be finite, strictly increasing vectors with at
 least two points; component shapes must match. Out-of-domain/nonfinite queries
 raise `ValueError`, never silently extrapolate. The file-loading interface is
 host-side setup, not a differentiable live coil/geometry interface. Keep source
 provenance, interpolation error and independent Maxwell checks with each run.
 
 Run `python examples/li_aln_wall_stack_example.py` for explicit conducting and
-insulating layers. The differentiated field/wall design workflow is executable
-as `python examples/variable_field_extruded_demo.py`; it writes a compact JSON
-record and optimization figure under `artifacts/examples/`.
+insulating layers.

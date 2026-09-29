@@ -9,19 +9,18 @@ validation result.
 | Hartmann duct | analytical profile, charge closure, power balance, refinement | validated within documented mesh/tolerance gates |
 | Shercliff and Hunt ducts | packaged benchmark values, symmetry, wall/interface current, mesh trends | validated within documented mesh/tolerance gates |
 | High-$Ha$ fully developed flow | layer resolution, Richardson trend, integral balances | bounded accepted campaign cases |
-| Rectangular 3-D fringe | manufactured operators, projection, restart, refinement, FreeMHD B2 | active validation; each artifact states the gates it passes |
-| Straight-pipe 3-D fringe | production-field and derivative parity, mapped operators, fixed flow, annular current, Benchmark B1 data | differentiable generic core accepted; external production validation requires the complete matched gate |
+| Duct through a fringe, inlet and outlet (`lmhdx.axial`) | flow rate, mass and charge to round-off, upstream fully developed gradient, buffer doubling, adjoint against central differences, ANL fringe on three meshes | inertialess limit only; the ANL excess extrapolates 6–11 % below the core-flow model, so the 1 % gate is open until Ha ≥ 10⁴ |
+| Inertialess core-flow model (`lmhdx.coreflow`) | Walker's thin-wall limits at second order, symmetry, adjoint, ANL excess against TM-228 | ANL excess within 0.19 % of TM-228; ALEX B2 against experiment open (plan 4.3) |
 | Periodic Q2D | analytical decay, energy identity, spectral incompressibility, spatial refinement, CPU/GPU parity | verified for the documented SM82 model and numerical gates |
-| Magnetic obstacle | divergence-free field sampling, conservation, symmetry, and bounded-response observables | development application, not an externally validated benchmark |
 
 For 2-D cases, `validation_summary` reports convergence, current continuity,
 gauge, interface, flow, and profile metrics. `hartmann_validation` compares
 the computed profile with the analytical Hartmann solution.
 
-For 3-D cases, `ExtrudedInductionlessValidation` reports maximum update,
-charge-balance and divergence residuals, boundary-current closure, stationwise
-flow variation, pressure variation, and response correlations. Mesh and solver
-independence remain separate required checks.
+For a duct with an inlet and an outlet, `lmhdx.axial` reports the flow rate
+through every station, the mass and charge balance of every cell, and the
+certified residual of the solve. Mesh and buffer independence remain separate
+required checks.
 
 The benchmark specifications and reference arrays shipped under `src/lmhdx/data/benchmarks`
 are versioned package data. `benchmarks/provenance.json` records bibliographic
@@ -35,32 +34,12 @@ $24\times24$ cross-section. Its analytical errors are 0.02276 in $L_2$ and
 $4.24\times10^{-19}$ and final velocity update $9.48\times10^{-9}$. The
 documented profile-error limits are 0.05 and 0.10.
 
-The pinned two-update B2 Docker comparison executes LMhdX and FreeMHD from the
-same observed contract. It passes execution, artifact identity, contract,
-native-output observation, and comparison gates. The normalized transverse
-pressure difference has RMS error 0.004518 and maximum error 0.01092 against
-FreeMHD on the harness mesh, below its frozen 0.16 and 0.32 bounds. This is an
-executable integration check, not a production-mesh validation result.
-
-Production Benchmark B records keep numerical and external evidence separate.
-Each baseline stores the exact coordinate hashes, full and fluid mesh shapes,
-physical cell count, and a three-dimensional characteristic spacing. Combining
-coarse, medium, and fine campaigns reports solver/wall independence,
-literature-weighted errors, unequal-ratio observed order, and the fine-grid
-Grid Convergence Index (GCI), using a 1.25 safety factor only when both
-three-dimensional refinement ratios are at least 1.3. The machine-readable
-record also retains the B2 post-map momentum defect and requires it to be below
-the frozen electromagnetic-force-normalized balance limit. Its status is:
-
-- `mesh_incomplete` until all frozen grids are present;
-- `numerical_rejected` when a conservation, independence, literature, or
-  refinement gate fails;
-- `external_validation_open` when every numerical gate passes but the required
-  matched independent solve is absent or fails; or
-- `accepted` only when numerical and matched external gates both pass.
-
-Thus a converged mesh campaign can be reported without being mislabeled as an
-externally validated result. Final `pass` remains fail-closed.
+The weekly FreeMHD workflow runs the frozen B2 inputs in the pinned FreeMHD
+image and LMhdX's inertialess core-flow model on the same measured field, and
+gates each code's own execution. Their transverse pressure difference is
+reported, not gated: FreeMHD runs a two-update transient smoke from a uniform
+plug, and the core-flow model is the steady inertialess limit. The
+[FreeMHD guide](freemhd.md) states what the record contains.
 
 The Q2D Taylor--Green case matches its exact viscous/Hartmann decay, and a
 nonlinear three-grid test compares $12^2$ and $24^2$ solutions with a $48^2$

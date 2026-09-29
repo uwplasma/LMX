@@ -15,7 +15,6 @@ import sys
 import tempfile
 import time
 
-_HEAVY_FRINGING_TEST = "test_alex_b1_production_map_has_bounded_implicit_gradient"
 _TEST_TIERS = {
     "unit": "unit and not (regression or slow or gpu or external)",
     "regression": "regression and not (slow or gpu or external)",
@@ -46,16 +45,6 @@ _TEST_SHARDS = {
         "tests/test_em.py",
         "tests/test_momentum_placement_oracle.py",
     ),
-    "fringing": ("tests/test_fringing.py",),
-    "fringing_pipe": tuple(
-        f"tests/test_fringing.py::{name}"
-        for name in (
-            "test_steady_pipe_stokes_projection_closes_compatible_divergence_and_flow",
-            "test_pipe_fields_share_the_production_update_and_checked_derivative",
-            "test_pipe_projection_supports_explicit_conducting_annulus_and_fixed_flow",
-            "test_solvax_pipe_poisson_reconstructs_discrete_manufactured_field_and_gradient",
-        )
-    ),
     "channel": ("tests/test_core3d.py", "tests/test_pipe.py", "tests/test_axial.py"),
     "plane": (
         *(
@@ -85,7 +74,6 @@ _TEST_SHARDS = {
         "tests/test_physics.py",
         "tests/test_q2d_identities.py",
         "tests/test_solver.py",
-        f"tests/test_fringing.py::{_HEAVY_FRINGING_TEST}",
     ),
 }
 
@@ -93,10 +81,10 @@ _ALL_TESTS = tuple(dict.fromkeys(path.split("::")[0] for shard in _TEST_SHARDS.v
 _CHANGE_TEST_NAMES = {
     "__init__": "config cli example_runner",
     "__main__": "cli",
-    "cases": "config solver physics fringing benchmarks fully_developed",
+    "cases": "config solver physics fully_developed",
     "cli": "cli example_runner",
     "advect": "advect core3d",
-    "axial": "axial",
+    "axial": "axial example_runner",
     "core3d": "core3d timeloop advect steady coreflow axial",
     "coreflow": "coreflow freemhd",
     "design": "design fully_developed",
@@ -109,24 +97,18 @@ _CHANGE_TEST_NAMES = {
     "em": "em",
     "poisson": "poisson core3d timeloop steady pipe axial",
     "pipe": "pipe",
-    "io": "io cli fringing freemhd example_runner",
-    "mesh": "mesh solver physics fringing benchmarks",
-    "physics": "solver physics fringing",
+    "io": "io cli example_runner",
+    "mesh": "mesh solver physics",
+    "physics": "solver physics",
     "q2d": "physics q2d_identities example_runner",
-    "solvers": "solver physics fringing",
-    "specs": "config solver physics fringing benchmarks cli",
-    "validation": "benchmarks freemhd physics solver example_runner",
+    "solvers": "solver physics",
+    "specs": "config solver physics cli",
+    "validation": "benchmarks physics solver example_runner cli",
 }
 _CHANGE_TESTS = {
     module: tuple(f"tests/test_{name}.py" for name in names.split())
     for module, names in _CHANGE_TEST_NAMES.items()
 }
-_FRINGING_TESTS = (
-    "tests/test_fringing.py",
-    "tests/test_benchmarks.py",
-    "tests/test_freemhd.py",
-    "tests/test_example_runner.py",
-)
 _NO_PYTHON_TEST_PREFIXES = ("docs/", ".github/")
 _NO_PYTHON_TEST_FILES = {
     ".gitignore",
@@ -163,12 +145,10 @@ def _tests_for_changes(paths: tuple[str, ...]) -> tuple[str, ...]:
         if path.startswith("tests/") and path.endswith(".py"):
             selected.append(path)
         elif path.startswith("src/lmhdx/data/benchmarks/"):
-            selected.extend(("tests/test_benchmarks.py", "tests/test_freemhd.py"))
+            selected.append("tests/test_freemhd.py")
         elif path.startswith("src/lmhdx/") and path.endswith(".py"):
             module = path.removeprefix("src/lmhdx/").removesuffix(".py")
-            if module == "fringing" or module.startswith("_fringing_"):
-                selected.extend(_FRINGING_TESTS)
-            elif module in _CHANGE_TESTS:
+            if module in _CHANGE_TESTS:
                 selected.extend(_CHANGE_TESTS[module])
             else:
                 return _ALL_TESTS

@@ -51,139 +51,35 @@ histories are absent from the reverse tape. The continuous inputs are pressure
 forcing and a scalar multiplier on the imposed magnetic field. Rectangular
 Hartmann/Shercliff and thin-wall Hunt cases pass central-difference gates; a
 prescribed flow rate is met by scaling the unit-drive solution, which keeps it
-differentiable. 3-D cases remain outside this API until their own gates pass.
+differentiable.
 
 ## Three-dimensional fringe response
 
-`evolve_extruded_fields` returns the production generic-duct or straight-pipe
-velocity, pressure, potential, current, and Lorentz-force fields after a static
-number of steps. Pressure forcing, material conductivity, fixed-topology
-geometry scales, and either a scalar or one coefficient per axial station for
-the imposed field are continuous. Duct geometry uses axial/width/height scales;
-pipe geometry uses axial/radial scales. The accompanying reducer keeps
-engineering objectives in the same traced program:
+`lmhdx.axial.solve_open_duct` solves a duct with an inlet and an outlet through
+a field that varies along it, and is differentiable in the field scale. The
+derivative is one more conjugate-gradient solve with the same operator, as for
+a periodic duct:
 
 ```python
 import jax
-import jax.numpy as jnp
-from lmhdx.fringing import (
-    build_layered_duct_extruded_problem,
-    evolve_extruded_fields,
-    extruded_engineering_objectives,
-)
+from lmhdx.axial import fringe_duct, pressure_drop, solve_open_duct
 
-problem = build_layered_duct_extruded_problem(
-    nx_stations=7, ny=6, nz=6, wall_cells=1
-)
+problem = fringe_duct(hartmann=20.0, wall_conductance=0.02, upstream=6.0, downstream=3.0,
+                      spacing=0.5, cells=12, cells_in_layer=3)
 
 
-def objective(parameters):
-    field_coefficients = parameters[:7]
-    material_scale, geometry_scale = parameters[7:9], parameters[9:]
-    fields = evolve_extruded_fields(
-        problem,
-        magnetic_field_scale=field_coefficients,
-        material_conductivity_scale=material_scale,
-        geometry_scale=geometry_scale,
-        steps=8,
-    )
-    metrics = extruded_engineering_objectives(problem, fields, geometry_scale=geometry_scale)
-    return metrics["pumping_power"] + 0.1 * metrics["flow_nonuniformity"]
+def drop(field_scale):
+    return pressure_drop(solve_open_duct(problem, field_scale=field_scale).pressure, -3.0, 3.0)
 
 
-value, gradient = jax.jit(jax.value_and_grad(objective))(jnp.ones(12))
-
-# Evaluate independent designs in bounded vectorized chunks.
-designs = jnp.stack((jnp.ones(12), jnp.linspace(0.9, 1.1, 12)))
-batched = jax.jit(
-    lambda batch: jax.lax.map(jax.value_and_grad(objective), batch, batch_size=2)
-)
-values, gradients = batched(designs)
+value, derivative = jax.value_and_grad(drop)(1.0)
 ```
 
-Electric closure uses an implicit SOLVAX VJP. The finite collocated projection
-and outer recurrence use exact two-level checkpoint schedules with
-`O(N/C + C)` retained states and square-root defaults. Tests require parity
-with the ordinary production solve, independent finite differences, JVP/VJP
-duality, and lower compiled reverse temporary memory than a full tape.
-The material coefficients are ``(fluid, solid)`` multipliers, so a layered
-case exposes wall conductance without rebuilding its mesh or region topology.
-`jax.vmap` and bounded `jax.lax.map` compose directly, so LMhdX needs no ensemble
-API. Choose the chunk size from measured accelerator memory; each row retains
-its own exact production derivative. For spatial parallelism, pass
-`num_devices` to `evolve_extruded_fields`; generic rectangular, layered, and
-straight-pipe fields shard an evenly divisible axial mesh, including inside
-`jax.value_and_grad`. Small global coarse solves remain replicated while the
-full 3-D state stays partitioned. Specialized ALEX B1 sharding remains gated.
-Geometry, material layout, step count, and checkpoint width are static. Choose
-the case timestep for the largest field and conductivity scales in the design
-domain so every differentiated evaluation uses the same stable recurrence.
-The specialized ALEX B1 pipe uses its production finite-volume momentum,
-retained-modal fixed-flow projection, and conservative electric-current map.
-Its SOLVAX implicit VJPs differentiate forcing, field, conductivity, and mapped
-axial/radial geometry without retaining Krylov iterations. Specialized ALEX B2
-design fields remain unavailable until the sharded production recurrence has
-the same bounded reverse-memory contract.
-`extruded_engineering_objectives` also
-reports signed pressure drop, outlet flow rate, wall-current-density RMS, and a
-smooth recirculation fraction. Its wall-current quantity is a cell-centered
-design proxy; use the conservative boundary-flux diagnostics for validation.
-Its `pumping_power` quantity is pressure-tap difference times flow and excludes
-prescribed body-drive work. It is not a certified total pump-work objective;
-do not interpret reductions in this quantity as blanket pumping efficiency.
-For nonuniform profiles, `pressure_tap_flux_power` instead integrates pressure
-times axial velocity at each tap, with inlet-minus-outlet sign. These are
-cell-center planes, not reconstructed domain boundaries. See the
-{ref}`work conventions <pressure-taps-and-mechanical-work>`
-for gauge dependence and the additional terms needed for a pump-work balance.
-Use the same force density and geometry in the evolution and work reduction:
-
-```python
-drive, scale = 1.2, 1.0
-fields = evolve_extruded_fields(problem, forcing=drive, geometry_scale=scale, steps=4)
-metrics = extruded_engineering_objectives(problem, fields, forcing=drive, geometry_scale=scale)
-print(metrics["pressure_tap_flux_power"], metrics["tap_body_drive_power"])
-print(metrics["tap_kinetic_energy"])  # State energy, not a storage rate.
-```
-
-These three quantities use the same tap-to-tap slab. Body work uses the axial
-force density, not acceleration; the kinetic energy includes all three
-velocity components and fluid density. They exclude fixed-flow constraint
-work, and do not by themselves establish a closed mechanical balance.
-Generic evolution omits convective momentum transport and holds base magnetic
-samples fixed under geometry scaling. Live field resampling and complete
-coil/equilibrium/shape derivatives are outside this interface's contract.
-
-For a straight pipe, construct the problem with
-`build_pipe_ogrid_extruded_problem`, pass `(fluid, wall)` conductivity scales
-when the case contains a conducting annulus, and pass `(axial, radial)` geometry
-scales. The same `jax.jit`, `jax.value_and_grad`, `jax.vmap`, and bounded
-`jax.lax.map` composition shown above applies to generic and ALEX B1 pipes
-without a pipe-specific optimizer or derivative API.
-
-## Reproduce a bounded field, wall, and geometry design
-
-```console
-python examples/variable_field_extruded_demo.py
-```
-
-The executable study uses seven axial field coefficients with an exactly fixed
-mean, one wall-conductivity scale constrained to 0.5–1.5, and axial/width/height
-scales constrained to ±10%/±5%/±5%. Geometry maps the fixed reference mesh;
-topology and imposed-field samples remain separate static/continuous controls.
-Its normalized loss balances pumping-power magnitude, outlet nonuniformity,
-wall-current RMS, and a flow-preservation penalty. The example runs 40 compiled
-gradient steps and independently checks every design derivative with centered
-differences.
-
-On the portable 7×6×6 demonstration mesh, the loss falls from 0.900 to 0.554,
-pumping-power magnitude falls by 68%, wall-current RMS falls by 47%, and flow
-changes by 0.34%. This is workflow and derivative evidence, not a
-resolution-independent blanket optimum. A physical
-claim requires mesh refinement, uncertainty bands, production GPU evidence,
-and independent B1/B2 validation.
-
-![Bounded field, wall, and geometry design](../_static/blanket_design_optimization.webp)
+`python examples/fringe_duct_example.py` checks this derivative against central
+differences (relative difference about 1e-9 on that mesh; the test gate is
+1e-6). Only the inertialess flow is solved, and the wall conductance, geometry
+and flow rate are fixed when the problem is built; see the
+[fringe tutorial](fringing.md).
 
 ## Transient Q2D response
 
@@ -227,6 +123,6 @@ the full tape. The analytical decay, JVP/VJP identity, and compiled reverse
 memory tests in `tests/test_physics.py` are the executable acceptance contract.
 
 The explicit field-level optimization surfaces are
-`solve_fully_developed_fields`, `evolve_extruded_fields`, and `evolve_q2d`.
+`solve_fully_developed_fields`, `lmhdx.axial.solve_open_duct`, and `evolve_q2d`.
 Other result objects are host orchestration unless their API reference
 explicitly identifies a traced field core and derivative evidence.

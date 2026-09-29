@@ -45,12 +45,8 @@ from lmhdx.specs import (
     TimeStepperConfig,
 )
 from lmhdx.validation import (
-    combined_profile_error,
-    compare_normalized_profiles,
-    compare_profiles_with_shared_scale,
-    duct_layer_resolution_gate,
     duct_layer_resolution_metrics,
-    extract_midplane_scalar_profile,
+    extract_midplane_profile,
     hartmann_acceptance,
     hartmann_analytic_profile,
     hartmann_validation,
@@ -165,83 +161,13 @@ def test_validation_api_reports_profiles_metrics_and_artifacts(tmp_path: Path):
     )
     metrics = validation_summary(solution, case.name, ha=5.0)
     assert "l2_error" not in validation_summary(solution, "shercliff")
-    scalar = extract_midplane_scalar_profile(solution, solution.state.jy, axis="z", fluid_only=True)
-    coordinate = jnp.asarray([-0.5, 0.0, 0.5])
-    reference_coordinate = jnp.asarray([-1.0, 0.0, 1.0])
-    normalized = compare_normalized_profiles(
-        coordinate,
-        jnp.asarray([0.0, 1.0, 0.0]),
-        reference_coordinate,
-        jnp.asarray([0.0, 2.0, 0.0]),
-        simulated_boundary_values=(0.0, 0.0),
-    )
-    assert compare_normalized_profiles(
-        reference_coordinate,
-        normalized.simulated,
-        reference_coordinate,
-        normalized.reference,
-    ).l2_error == pytest.approx(0.0)
-    shared = compare_profiles_with_shared_scale(
-        reference_coordinate,
-        normalized.simulated,
-        reference_coordinate,
-        normalized.reference,
-        coordinate_scale=1.0,
-        value_scale=1.0,
-        simulated_boundary_values=(0.0, 0.0),
-    )
-    assert compare_profiles_with_shared_scale(
-        reference_coordinate,
-        normalized.simulated,
-        reference_coordinate,
-        normalized.reference,
-        coordinate_scale=1.0,
-        value_scale=1.0,
-    ).l2_error == pytest.approx(0.0)
-    unsupported = replace(case, magnetic_field=replace(case.magnetic_field, value=(1.0, 0.0, 0.0)))
+    comparison = hartmann_validation(solution, ha=5.0)
 
     assert metrics["potential_residual"] == pytest.approx(1.0e-7)
     assert metrics["linear_residual"] is None  # not recorded by this solve
-    assert scalar["coordinate"].shape == scalar["value"].shape
-    assert shared.l2_error == pytest.approx(0.0)
-    assert combined_profile_error() == pytest.approx(0.0)
-    assert combined_profile_error(3.0, 4.0) == pytest.approx(12.5**0.5)
     assert write_metrics_json(metrics, tmp_path / "metrics.json").exists()
-    assert write_profile_csv(tmp_path / "profile.csv", scalar).exists()
-    assert write_analytic_comparison(shared, tmp_path / "profile.json").exists()
-    assert duct_layer_resolution_gate(case, solution.mesh)["layer_resolution_supported"]
-    assert not duct_layer_resolution_gate(unsupported, solution.mesh)["layer_resolution_supported"]
-
-
-@pytest.mark.unit
-def test_validation_profiles_cover_walls_singletons_and_invalid_inputs():
-    hunt = make_hunt_case(ha=5.0, ny=8, nz=8, wall_cells=1)
-    hunt_mesh = _build_mesh(hunt)
-    hunt_solution = _synthetic_solution(hunt, jnp.ones(hunt_mesh.yz_shape))
-    profile = extract_midplane_scalar_profile(
-        hunt_solution, hunt_solution.state.jy, axis="y", fluid_only=True
-    )
-    assert profile["coordinate"].size < hunt_mesh.y_centers.size
-    assert duct_layer_resolution_gate(hunt, hunt_mesh)["layer_resolution_supported"]
-    unsupported = replace(
-        hunt,
-        magnetic_field=replace(hunt.magnetic_field, kind="analytic", value=None),
-    )
-    assert not duct_layer_resolution_gate(unsupported, hunt_mesh)["layer_resolution_supported"]
-
-    singleton = make_hartmann_case(ha=5.0, ny=3, nz=1)
-    singleton_solution = _synthetic_solution(singleton, jnp.ones((3, 1)))
-    for axis in ("y", "z"):
-        result = extract_midplane_scalar_profile(singleton_solution, singleton_solution.state.jy, axis=axis)
-        assert result["coordinate"].shape == result["value"].shape
-    with pytest.raises(ValueError, match="Unsupported axis"):
-        extract_midplane_scalar_profile(singleton_solution, singleton_solution.state.jy, axis="x")
-
-    values = jnp.ones((1,))
-    for name in ("coordinate_scale", "value_scale"):
-        kwargs = {"coordinate_scale": 1.0, "value_scale": 1.0, name: 0.0}
-        with pytest.raises(ValueError, match=f"{name} must be positive"):
-            compare_profiles_with_shared_scale(values, values, values, values, **kwargs)
+    assert write_profile_csv(tmp_path / "profile.csv", extract_midplane_profile(solution, axis="z")).exists()
+    assert write_analytic_comparison(comparison, tmp_path / "profile.json").exists()
 
 
 @pytest.mark.unit

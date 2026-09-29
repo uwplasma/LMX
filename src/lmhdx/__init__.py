@@ -1,7 +1,7 @@
 """Small, lazy convenience API for LMhdX.
 
 Research and advanced APIs live in their named modules, for example
-``lmhdx.fringing`` and ``lmhdx.cases``. Keeping the package root deliberately
+``lmhdx.axial`` and ``lmhdx.cases``. Keeping the package root deliberately
 small makes supported concepts discoverable and avoids importing JAX-heavy
 solver modules until a symbol is used.
 """
