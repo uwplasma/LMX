@@ -135,9 +135,7 @@
       ],
       "tier": "B",
       "title": "Conducting pipe through a fringing magnetic field",
-      "workflows": [
-        "scripts/run_benchmark_b_independence.py"
-      ]
+      "workflows": []
     },
     {
       "acceptance": {
@@ -166,7 +164,7 @@
       "tier": "B",
       "title": "Conducting square duct through a fringing magnetic field",
       "workflows": [
-        "scripts/run_freemhd_parity_suite.py"
+        "validation/freemhd.py"
       ]
     }
   ],

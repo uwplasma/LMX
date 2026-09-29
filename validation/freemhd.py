@@ -1,1744 +1,599 @@
+"""FreeMHD and LMhdX on the ALEX B2 fringing-field duct, with provenance.
+
+``python -m validation.freemhd --output DIR`` writes the pinned FreeMHD B2
+input, checks the FreeMHD source snapshot against
+``[free_mhd_discretization_reference]`` of ``alex-b2-square.toml``, runs FreeMHD
+in Docker, observes its native output, solves the same geometry with
+:class:`lmhdx.coreflow.CoreFlow` and writes ``record.json``. ``--preflight``
+stops after materializing and hashing the inputs, without Docker.
+
+The two sides are not the same state. FreeMHD runs the frozen two-update
+transient harness smoke from a uniform plug (Ha 2900, N 540, a 5x5 grid);
+LMhdX solves the steady inertialess core flow (TM-228, the ``N -> infinity``
+limit). Each side is gated only on its own execution: FreeMHD on the
+``[harness_smoke_execution]`` limits that apply to it, LMhdX on a finite
+solution, on flooring only where the tabulated field is below ``1/beta_max``
+and on a constant axial flux. The cross-code pressure difference and LMhdX
+against the ALEX ``pressure_observable`` column are reported, not gated; the
+gated experimental comparison belongs to the steady 3-D solver.
+
+The observable is the side-wall tap (``y = 0, |z| = 1``) minus the top tap
+(``y = a, z = 0``) in units ``sigma U B0^2 L``, minus its mean over the
+plateau ``x <= -7.5`` or ``x >= 5``.
+"""
+
 from __future__ import annotations
 
+import argparse
+import csv
 import hashlib
 import json
 import math
 import os
 import re
+import shutil
 import stat
-import unicodedata
+import subprocess
+import sys
+import time
+from itertools import pairwise
 from pathlib import Path, PurePosixPath
 
 import numpy as np
 
-from lmhdx.physics import (
-    dynamic_to_kinematic_viscosity,
-    hartmann_number,
-    interaction_parameter,
-    reynolds_number,
-    wall_conductance_ratio,
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10
+    import tomli as tomllib
+
+_DATA = Path(__file__).resolve().parents[1] / "src" / "lmhdx" / "data" / "benchmarks"
+SPEC = _DATA / "specs" / "alex-b2-square.toml"
+REFERENCE = _DATA / "references" / "alex-b2-square.csv"
+CASE_ID = "B2-fringing-square"
+DT = 1.0 / 540000.0
+PLATEAU = (-7.5, 5.0)
+BETA_MAX = 1000.0
+AXIAL_FLUX_SPREAD_MAX = 1.0e-4
+_SOURCE_NAMES = "momentum electric limiter scheme_macro limiter_registration nvd vector_transform".split()
+_SKELETON = "blockMeshDict controlDict liquid/fvSchemes liquid/fvSolution".split()
+_OBJECTS = (
+    "b2PressureTaps massIn massOut currentIn currentOut currentIntoSolid currentIntoSolidMagnitude".split()
 )
-
-_PACKAGE_DATA = Path(__file__).resolve().parents[1] / "src" / "lmhdx" / "data"
-BENCHMARK_A_SPEC_DIR = _PACKAGE_DATA / "benchmarks" / "specs"
-_MATCHED_B_ARTIFACT_NAMES = (
-    "lmx_source",
-    "freemhd_source",
-    "lmx_input",
-    "freemhd_input",
-    "evaluator",
-    "lmx_output",
-    "freemhd_output",
-)
-_MATCHED_B_ARTIFACT_KINDS = {
-    "lmx_source": "tree",
-    "freemhd_source": "tree",
-    "lmx_input": "file",
-    "freemhd_input": "tree",
-    "evaluator": "file",
-    "lmx_output": "file",
-    "freemhd_output": "file",
-}
-_TREE_HASH_TAG = b"LMX-ARTIFACT-TREE-v1\0"
+_NUMBER = r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?"
 
 
-def _frame(value: bytes) -> bytes:
-    return len(value).to_bytes(8, "big") + value
+def load_spec() -> dict:
+    return tomllib.loads(SPEC.read_text(encoding="utf-8"))
 
 
-def _file_sha256(path: Path) -> str:
-    before = os.stat(path, follow_symlinks=False)
-    if not stat.S_ISREG(before.st_mode) or before.st_size == 0:
-        raise ValueError("content.empty")
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    after = os.stat(path, follow_symlinks=False)
-    before_signature = (
-        before.st_dev,
-        before.st_ino,
-        before.st_size,
-        before.st_mtime_ns,
-    )
-    after_signature = (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
-    if before_signature != after_signature:
-        raise ValueError("content.changed")
-    return digest.hexdigest()
+def load_reference() -> dict[str, np.ndarray]:
+    with REFERENCE.open(newline="", encoding="utf-8") as stream:
+        rows = list(csv.DictReader(stream))
+    return {key: np.asarray([float(row[key]) for row in rows]) for key in rows[0]}
 
 
-def _tree_entries(root: Path) -> list[tuple[str, Path, bytes]]:
-    entries, aliases, files = [], set(), set()
-    for path in root.rglob("*"):
-        relative = path.relative_to(root).as_posix()
-        alias = unicodedata.normalize("NFC", relative).casefold()
-        if alias in aliases:
-            raise ValueError("tree.name_collision")
-        aliases.add(alias)
-        metadata = os.lstat(path)
-        mode = metadata.st_mode
-        if stat.S_ISLNK(mode):
-            raise ValueError("tree.symlink")
-        if stat.S_ISDIR(mode):
-            kind = b"d"
-        elif stat.S_ISREG(mode):
-            kind = b"f"
-            identity = (metadata.st_dev, metadata.st_ino)
-            if identity in files:
-                raise ValueError("tree.hardlink")
-            files.add(identity)
-        else:
-            raise ValueError("tree.special")
-        entries.append((relative, path, kind))
-    if not entries:
-        raise ValueError("content.empty")
-    return sorted(entries)
+def artifact_sha256(path: str | Path, kind: str | None = None) -> str:
+    """SHA-256 of a regular file, or of a tree: sorted ``(kind, relative path, file hash)`` frames."""
 
-
-def artifact_sha256(path: str | Path, kind: str) -> str:
-    """Hash one immutable evidence file or portable directory tree."""
-
-    source = Path(path)
-    mode = os.lstat(source).st_mode
-    if stat.S_ISLNK(mode):
-        raise ValueError("path.symlink")
+    path = Path(path)
+    kind = kind or ("tree" if path.is_dir() else "file")
+    if path.is_symlink():
+        raise ValueError(f"refusing to hash a symlink: {path.name}")
     if kind == "file":
-        return _file_sha256(source)
-    if kind != "tree" or not stat.S_ISDIR(mode):
-        raise ValueError("kind")
-    entries = _tree_entries(source)
-    digest = hashlib.sha256(_TREE_HASH_TAG)
-    for relative, child, entry_kind in entries:
-        digest.update(_frame(entry_kind))
-        digest.update(_frame(relative.encode("utf-8")))
-        if entry_kind == b"f":
-            digest.update(_frame(bytes.fromhex(_file_sha256(child))))
-    if [(name, kind) for name, _, kind in entries] != [
-        (name, kind) for name, _, kind in _tree_entries(source)
-    ]:
-        raise ValueError("tree.changed")
+        if not path.is_file():
+            raise ValueError(f"not a regular file: {path.name}")
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    if kind != "tree" or not path.is_dir():
+        raise ValueError(f"not a {kind}: {path.name}")
+    digest = hashlib.sha256(b"LMX-ARTIFACT-TREE-v1\0")
+    for child in sorted(path.rglob("*"), key=lambda item: item.relative_to(path).as_posix()):
+        mode = os.lstat(child).st_mode
+        if not (stat.S_ISDIR(mode) or stat.S_ISREG(mode)):
+            raise ValueError(f"tree holds a link or special file: {child.name}")
+        kind_tag = b"d" if stat.S_ISDIR(mode) else b"f"
+        name = child.relative_to(path).as_posix().encode()
+        payload = kind_tag + len(name).to_bytes(8, "big") + name
+        if kind_tag == b"f":
+            payload += bytes.fromhex(artifact_sha256(child, "file"))
+        digest.update(len(payload).to_bytes(8, "big") + payload)
     return digest.hexdigest()
 
 
-def _resolve_artifact(root: Path, entry: object) -> tuple[Path, str, str]:
-    if not isinstance(entry, dict) or set(entry) != {"path", "kind", "sha256"}:
-        raise ValueError("entry")
-    raw, kind, expected = entry["path"], entry["kind"], entry["sha256"]
-    if not isinstance(raw, str) or not isinstance(kind, str) or not isinstance(expected, str):
-        raise ValueError("entry")
-    portable = PurePosixPath(raw)
-    if portable.is_absolute() or not portable.parts or portable.parts[0].endswith(":"):
-        raise ValueError("path.absolute")
-    if "\\" in raw or any(part in {"", ".", ".."} for part in portable.parts) or portable.as_posix() != raw:
-        raise ValueError("path.noncanonical")
-    candidate = root.joinpath(*portable.parts)
-    current = root
-    for part in portable.parts:
-        current /= part
-        if current.is_symlink():
-            raise ValueError("path.symlink")
+def snapshot_freemhd_source(source_repo: str | Path, output_dir: str | Path) -> dict[str, object]:
+    """Copy the pinned, clean, tracked FreeMHD/OpenFOAM sources after checking their SHA-256."""
+
+    repository, destination = Path(source_repo).resolve(), Path(output_dir)
+    reference = load_spec()["free_mhd_discretization_reference"]
+
+    def git(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(["git", "-C", str(repository), *args], capture_output=True, text=True)
+
+    top = git("rev-parse", "--show-toplevel")
+    if top.returncode or Path(top.stdout.strip()).resolve() != repository:
+        raise ValueError("the FreeMHD source must be a Git worktree root")
+    if git("rev-parse", "HEAD").stdout.strip() != reference["repository_commit"]:
+        raise ValueError("the FreeMHD HEAD is not the pinned commit")
+    files = {}
+    for name in _SOURCE_NAMES:
+        relative = reference[f"{name}_source"]
+        pure = PurePosixPath(relative)
+        if pure.is_absolute() or ".." in pure.parts or pure.as_posix() != relative:
+            raise ValueError(f"noncanonical pinned source path {relative}")
+        tracked = git("ls-files", "--stage", "--error-unmatch", "--", relative)
+        if tracked.returncode or not tracked.stdout.startswith("100"):
+            raise ValueError(f"pinned source is not a tracked regular file: {relative}")
+        files[relative] = reference[f"{name}_source_sha256"]
+        if artifact_sha256(repository / relative, "file") != files[relative]:
+            raise ValueError(f"pinned source SHA-256 differs: {relative}")
+    for relative in files:
+        (destination / relative).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(repository / relative, destination / relative)
+    manifest = {"commit": reference["repository_commit"], "files": dict(sorted(files.items()))}
+    manifest["openfoam_release"] = reference["openfoam_release"]
+    (destination / "source-pin.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    return manifest
+
+
+def _foam(path: Path, body: str, class_name: str = "dictionary") -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    header = f"FoamFile\n{{\n    version 2.0;\n    format ascii;\n    class {class_name};\n    object {path.name};\n}}\n\n"
+    path.write_text(header + body.strip() + "\n", encoding="utf-8")
+
+
+def _field_expression(count: int) -> str:
+    """Piecewise-linear ``B_y(x)`` through the anchors ``(xa, ba), (xb, bb), ...`` as ramp sums."""
+
+    labels = [chr(97 + index) for index in range(count)]
+    slopes = [f"(b{right}-b{left})/(x{right}-x{left})" for left, right in pairwise(labels)]
+    terms = [f"b{labels[0]}", f"{slopes[0]}*(x-x{labels[0]})"]
+    terms += [
+        f"({slopes[i]}-{slopes[i - 1]})*pos(x-x{labels[i]})*(x-x{labels[i]})" for i in range(1, count - 1)
+    ]
+    return "+".join(terms)
+
+
+_BLOCK_MESH = """
+scale 1;
+xMin -15; xMax 10; Ly 1; Ly_wall 1.02; physicalHalfWidth 0.0439;
+Nx 8; Ny 5; Nz 5; N_wall 1;
+vertices
+(
+ ($xMin -$Ly -$Ly) ($xMax -$Ly -$Ly) ($xMax $Ly -$Ly) ($xMin $Ly -$Ly)
+ ($xMin -$Ly $Ly) ($xMax -$Ly $Ly) ($xMax $Ly $Ly) ($xMin $Ly $Ly)
+ ($xMin -$Ly -$Ly_wall) ($xMax -$Ly -$Ly_wall) ($xMax $Ly -$Ly_wall) ($xMin $Ly -$Ly_wall)
+ ($xMin -$Ly_wall -$Ly_wall) ($xMax -$Ly_wall -$Ly_wall) ($xMax $Ly_wall -$Ly_wall) ($xMin $Ly_wall -$Ly_wall)
+ ($xMin -$Ly_wall -$Ly) ($xMax -$Ly_wall -$Ly) ($xMax $Ly_wall -$Ly) ($xMin $Ly_wall -$Ly)
+ ($xMin -$Ly $Ly_wall) ($xMax -$Ly $Ly_wall) ($xMax $Ly $Ly_wall) ($xMin $Ly $Ly_wall)
+ ($xMin -$Ly_wall $Ly_wall) ($xMax -$Ly_wall $Ly_wall) ($xMax $Ly_wall $Ly_wall) ($xMin $Ly_wall $Ly_wall)
+ ($xMin -$Ly_wall $Ly) ($xMax -$Ly_wall $Ly) ($xMax $Ly_wall $Ly) ($xMin $Ly_wall $Ly)
+);
+blocks
+(
+ hex (0 1 2 3 4 5 6 7) liquid ($Nx $Ny $Nz) simpleGrading (1 1 1)
+ hex (12 13 9 8 16 17 1 0) solidWalls ($Nx $N_wall $N_wall) simpleGrading (1 1 1)
+ hex (11 10 14 15 3 2 18 19) solidWalls ($Nx $N_wall $N_wall) simpleGrading (1 1 1)
+ hex (8 9 10 11 0 1 2 3) solidWalls ($Nx $Ny $N_wall) simpleGrading (1 1 1)
+ hex (28 29 5 4 24 25 21 20) solidWalls ($Nx $N_wall $N_wall) simpleGrading (1 1 1)
+ hex (7 6 30 31 23 22 26 27) solidWalls ($Nx $N_wall $N_wall) simpleGrading (1 1 1)
+ hex (4 5 6 7 20 21 22 23) solidWalls ($Nx $Ny $N_wall) simpleGrading (1 1 1)
+ hex (16 17 1 0 28 29 5 4) solidWalls ($Nx $N_wall $Nz) simpleGrading (1 1 1)
+ hex (3 2 18 19 7 6 30 31) solidWalls ($Nx $N_wall $Nz) simpleGrading (1 1 1)
+);
+edges ();
+boundary
+(
+ inlet { type patch; faces ((0 4 7 3)); }
+ sink { type patch; faces ((2 6 5 1)); }
+ outerWalls
+ {
+  type wall;
+  faces
+  (
+   (12 16 0 8) (8 0 3 11) (11 3 19 15) (3 7 31 19) (7 23 27 31) (4 20 23 7) (28 24 20 4)
+   (16 28 4 0) (13 17 16 12) (17 29 28 16) (29 25 24 28) (25 21 20 24) (21 22 23 20)
+   (22 26 27 23) (30 26 27 31) (18 30 31 19) (14 18 19 15) (10 14 15 11) (9 10 11 8)
+   (13 9 8 12) (13 17 1 9) (9 1 2 10) (10 2 18 14) (17 29 5 1) (2 6 30 18) (29 25 21 5)
+   (5 21 22 6) (6 22 26 30)
+  );
+ }
+);
+mergePatchPairs ();
+"""
+_LIQUID_SCHEMES = """
+ddtSchemes { default Euler; }
+gradSchemes { default cellLimited leastSquares 1.0; }
+divSchemes { default Gauss linear; div(rhoPhi,U) Gauss limitedLinear 1.0; div(phi,alpha) Gauss vanLeer; div(phirb,alpha) Gauss interfaceCompression; div(((rho*nuEff)*dev2(T(grad(U))))) Gauss linear; }
+laplacianSchemes { default Gauss linear uncorrected; } interpolationSchemes { default linear; } snGradSchemes { default uncorrected; }
+"""
+_LIQUID_SOLUTION = """
+solvers {
+ "alpha.liquidMetal.*" { nAlphaCorr 1; nAlphaSubCycles 1; cAlpha 1; solver PBiCG; preconditioner DILU; tolerance 1e-12; relTol 0; }
+ p_rgh { solver PCG; preconditioner DIC; tolerance 1e-10; relTol 0; maxIter 4000; }
+ p_rghFinal { $p_rgh; }
+ "(U).*" { solver PBiCG; preconditioner DILU; tolerance 1e-10; relTol 0; maxIter 400; }
+ "(h|T).*" { solver PBiCG; preconditioner DILU; tolerance 1e-12; relTol 0; maxIter 0; }
+ potE { solver PCG; preconditioner DIC; tolerance 1e-12; relTol 0; maxIter 600; }
+ potEFinal { $potE; }
+}
+PIMPLE { correctPhi yes; momentumPredictor yes; nCorrectors 1; nOuterCorrectors 1; nNonOrthogonalCorrectors 0; }
+potentialFlow { nNonOrthogonalCorrectors 0; PhiRefCell 0; PhiRefValue 0; }
+potE { nCorrectors 0; nNonOrthogonalCorrectors 0; PotERefCell 0; PotERefValue 0; }
+"""
+_SOLID_SCHEMES = """
+ddtSchemes { default Euler; } gradSchemes { default Gauss linear; } divSchemes { default Gauss linear; }
+laplacianSchemes { default Gauss linear corrected; } interpolationSchemes { default linear; } snGradSchemes { default corrected; }
+"""
+_SOLID_SOLUTION = """
+solvers { "(h|T).*" { solver PBiCG; preconditioner DILU; tolerance 1e-12; relTol 0; maxIter 0; } potE { solver PCG; preconditioner DIC; tolerance 1e-12; relTol 0; maxIter 600; } potEFinal { $potE; } }
+PIMPLE { nNonOrthogonalCorrectors 0; } potE { nCorrectors 0; nNonOrthogonalCorrectors 0; PotERefCell 0; PotERefValue 0; }
+"""
+_B0 = 'B0 { internalField uniform (0 23.2379000772445 0); boundaryField { ".*" { type zeroGradient; value $internalField; } } }'
+_COUPLED = "type compressible::turbulentTemperatureCoupledBaffleMixed;"
+_LIQUID_CHANGE = f"""
+alpha.liquidMetal {{ internalField uniform 1; boundaryField {{ inlet {{ type fixedValue; value uniform 1; }} ".*" {{ type zeroGradient; }} }} }}
+U {{ internalField uniform (1 0 0); boundaryField {{ inlet {{ type flowRateInletVelocity; volumetricFlowRate 4; extrapolateProfile yes; value uniform (1 0 0); }} sink {{ type zeroGradient; value uniform (1 0 0); }} ".*" {{ type noSlip; }} }} }}
+T {{ internalField uniform 300; boundaryField {{ ".*" {{ type fixedValue; value uniform 300; }} "liquid_to_.*" {{ {_COUPLED} Tnbr T; kappaMethod fluidThermo; value uniform 300; }} inlet {{ type fixedValue; value uniform 300; }} sink {{ type fixedValue; value uniform 300; }} }} }}
+p_rgh {{ internalField uniform 0; boundaryField {{ sink {{ type fixedValue; value uniform 0; }} inlet {{ type zeroGradient; }} ".*" {{ type fixedFluxPressure; value uniform 0; }} }} }}
+p {{ internalField uniform 0; boundaryField {{ ".*" {{ type calculated; value uniform 0; }} }} }}
+{_B0}
+potE {{ internalField uniform 0; boundaryField {{ inlet {{ type zeroGradient; }} sink {{ type zeroGradient; }} "liquid_to_.*" {{ {_COUPLED} Tnbr potE; kappaMethod lookup; kappa elcond; kappaName elcond; value uniform 0; }} }} }}
+"""
+_SOLID_CHANGE = f"""
+T {{ internalField uniform 300; boundaryField {{ outerWalls {{ type fixedValue; value uniform 300; }} "solidWalls_to_.*" {{ {_COUPLED} Tnbr T; kappaMethod solidThermo; value uniform 300; }} }} }}
+{_B0}
+potE {{ internalField uniform 0; boundaryField {{ outerWalls {{ type zeroGradient; value uniform 0; }} "solidWalls_to_.*" {{ {_COUPLED} Tnbr potE; kappaMethod lookup; kappa elcond; kappaName elcond; value uniform 0; }} }} }}
+"""
+
+
+_INITIAL_FIELDS = """
+B0|volVectorField|[1 0 -2 0 0 -1 0]|uniform (0 23.2379000772445 0)
+JxB|volVectorField|[1 -2 -2 0 0 0 0]|uniform (0 0 0)
+T|volScalarField|[0 0 0 1 0 0 0]|uniform 300
+U|volVectorField|[0 1 -1 0 0 0 0]|uniform (1 0 0)
+alpha.liquidMetal|volScalarField|[0 0 0 0 0 0 0]|uniform 1
+p|volScalarField|[1 -1 -2 0 0 0 0]|uniform 0
+p_rgh|volScalarField|[1 -1 -2 0 0 0 0]|uniform 0
+potE|volScalarField|[1 2 -3 0 0 -1 0]|uniform 0
+"""
+
+
+def _set_expr(reference: dict[str, np.ndarray]) -> str:
+    x, b = reference["x_over_L"].tolist(), reference["b_over_B0"].tolist()
+    variables = ['"x=pos().x()"', '"Bscale=sqrt(540)"']
+    variables += [f'"x{chr(97 + i)}={value:.17g}"' for i, value in enumerate(x)]
+    variables += [f'"b{chr(97 + i)}={value:.17g}"' for i, value in enumerate(b)]
+    anchors = json.dumps({"b_over_B0": b, "x_over_L": x}, sort_keys=True, separators=(",", ":"))
+    return f"""
+lmxFieldSource "{REFERENCE.name}";
+lmxFieldSourceSHA256 "{artifact_sha256(REFERENCE, "file")}";
+lmxFieldAnchorsSHA256 "{hashlib.sha256(anchors.encode()).hexdigest()}";
+lmxInterpolation linear;
+lmxExtrapolation forbidden;
+expressions
+(
+ B0
+ {{
+  field B0;
+  dimensions [1 0 -2 0 0 -1 0];
+  variables ({" ".join(variables)});
+  expression #{{ vector(0,Bscale*({_field_expression(len(x))}),0) #}};
+ }}
+);
+"""
+
+
+def _function_objects(sample_x: list[float]) -> str:
+    """Pressure taps at ``(x, 0.8, 0)`` (top) then ``(x, 0, 0.8)`` (side), and boundary fluxes."""
+
+    points = "\n  ".join(
+        f"({x:.17g} {y:.17g} {z:.17g})" for y, z in ((0.8, 0.0), (0.0, 0.8)) for x in sample_x
+    )
+    every = "executeControl timeStep; executeInterval 1; writeControl timeStep; writeInterval 1;"
+    blocks = [
+        f"b2PressureTaps\n {{\n  type probes; libs (sampling); region liquid;\n  {every}\n"
+        f"  fixedLocations true; interpolationScheme cell; fields (p);\n  probeLocations\n (\n  {points}\n );\n }}"
+    ]
+    patches = "inlet sink inlet sink liquid_to_solidWalls liquid_to_solidWalls".split()
+    fields = "rhoPhi rhoPhi jn jn jn jn".split()
+    for name, patch, field in zip(_OBJECTS[1:], patches, fields):
+        operation = "sumMag" if name.endswith("Magnitude") else "sum"
+        blocks.append(
+            f"{name}\n {{\n  type surfaceFieldValue; libs (fieldFunctionObjects); region liquid;\n  {every}\n"
+            f"  regionType patch; name {patch}; operation {operation}; fields ({field}); writeFields false;\n }}"
+        )
+    return "functions\n{\n " + "\n ".join(blocks) + "\n}"
+
+
+def materialize_freemhd_input(output_dir: str | Path) -> str:
+    """Write the deterministic two-update FreeMHD B2 case and return its tree SHA-256."""
+
+    destination = Path(output_dir)
+    if destination.exists():
+        raise FileExistsError(f"refusing to overwrite {destination.name}")
+    mu = 540.0 / 2900.0**2  # rho = U = L = sigma = 1: mu = N / Ha^2, B0 = sqrt(N)
+    fluid = f"""
+thermoType {{ type heRhoThermo; mixture pureMixture; transport const; thermo hConst; equationOfState rhoConst; specie specie; energy sensibleInternalEnergy; }}
+mixture {{ specie {{ molWeight 1; }} equationOfState {{ rho 1; }} thermodynamics {{ Cp 1; Cv 1; Hf 0; }} transport {{ mu {mu:.17g}; Pr 1; }} }}
+elcond [-1 -3 3 0 0 2 0] 1;"""
+    # c_w = elcond * thickness = 3.5 * 0.02 = 0.07.
+    solid = """
+thermoType { type heSolidThermo; mixture pureMixture; transport constIso; thermo hConst; equationOfState rhoConst; specie specie; energy sensibleEnthalpy; }
+mixture { specie { molWeight 1; } transport { kappa 1; } thermodynamics { Hf 0; Cp 1; } equationOfState { rho 1; } }
+elcond 3.5;"""
+    sample_x = np.linspace(-15.0 + 25.0 / 16.0, 10.0 - 25.0 / 16.0, 8).tolist()
+    control = f"""
+application epotMultiRegionInterFoam; startFrom startTime; startTime 0; stopAt endTime;
+endTime {2 * DT:.17g}; deltaT {DT:.17g}; adjustTimeStep off; maxCo 0.4; maxAlphaCo 0.3; maxDeltaT {DT:.17g};
+writeControl timeStep; writeInterval 2; purgeWrite 0; writeFormat ascii; writePrecision 16; timeFormat general; timePrecision 16;
+runTimeModifiable false; BtStartTime 0; BtDuration 0; JConservativeForm true;
+lmxSteadyStepsRequired 3; {_function_objects(sample_x)}
+"""
+    files = {
+        "constant/g": ("dimensions [0 1 -2 0 0 0 0];\nvalue (0 0 0);", "uniformDimensionedVectorField"),
+        "constant/regionProperties": "regions ( fluid (liquid) solid (solidWalls) );",
+        "constant/liquid/fvOptions": "{}",
+        "constant/liquid/turbulenceProperties": "simulationType laminar;",
+        "constant/liquid/thermophysicalProperties": "phases (liquidMetal air);\npMin 0;\nsigma [1 0 -2 0 0 0 0] 0;",
+        "constant/liquid/thermophysicalProperties.liquidMetal": fluid,
+        "constant/liquid/thermophysicalProperties.air": fluid.replace("0 0 2 0] 1;", "0 0 2 0] 0;"),
+        "constant/solidWalls/thermophysicalProperties": solid,
+        "system/controlDict": control,
+        "system/blockMeshDict": _BLOCK_MESH,
+        "system/fvSchemes": "ddtSchemes {} gradSchemes {} divSchemes {} laplacianSchemes {} "
+        "interpolationSchemes {} snGradSchemes {}",
+        "system/fvSolution": "PIMPLE { nOuterCorrectors 1; }",
+    }
+    for line in _INITIAL_FIELDS.strip().splitlines():
+        name, class_name, dimensions, internal = line.split("|")
+        boundary = 'boundaryField { ".*" { type calculated; value $internalField; } }'
+        files[f"0/{name}"] = (f"dimensions {dimensions};\ninternalField {internal};\n{boundary}", class_name)
+    field = _set_expr(load_reference())
+    for region, bodies in (
+        ("liquid", (_LIQUID_SCHEMES, _LIQUID_SOLUTION, _LIQUID_CHANGE, field)),
+        ("solidWalls", (_SOLID_SCHEMES, _SOLID_SOLUTION, _SOLID_CHANGE, field)),
+    ):
+        names = ("fvSchemes", "fvSolution", "changeDictionaryDict", "setExprFieldsDict")
+        files |= {f"system/{region}/{name}": body for name, body in zip(names, bodies)}
+    for region in ("", "liquid/", "solidWalls/"):
+        files[f"system/{region}decomposeParDict"] = "numberOfSubdomains 2;\nmethod scotch;"
+    for relative, body in files.items():
+        _foam(destination / relative, *((body,) if isinstance(body, str) else body))
+    return artifact_sha256(destination, "tree")
+
+
+def run_freemhd(input_dir: Path, output_dir: Path, image: str, nproc: int, timeout: float) -> float:
+    """Run the case in the pinned image; copy the log, controls and function-object tables out."""
+
+    output_dir.mkdir(parents=True)
+    container = f"lmhdx-b2-{os.getpid()}-{time.time_ns()}"
+    shell = f"""
+source /usr/lib/openfoam/openfoam2206/etc/bashrc
+set -euo pipefail
+work=/tmp/lmx-b2-case
+rm -rf "$work" && mkdir -p "$work"
+rsync -a /input/ "$work/" && cd "$work"
+blockMesh -fileHandler collated
+splitMeshRegions -cellZonesOnly -overwrite -fileHandler collated
+for region in liquid solidWalls; do
+  changeDictionary -region "$region" -fileHandler collated
+  setExprFields -region "$region" -fileHandler collated
+done
+decomposePar -allRegions -force -fileHandler collated
+cp system/controlDict /output/controlDict.used
+export OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+mpirun --oversubscribe -np {nproc} epotMultiRegionInterFoam -parallel 2>&1 | tee /output/run.log
+mkdir /output/postProcessing
+for name in {" ".join(_OBJECTS)}; do
+  path="$(find postProcessing -type d -name "$name" -print -quit)"
+  test -n "$path" && cp -a "$path" "/output/postProcessing/$name"
+done
+"""
+    command = ["docker", "run", "--rm", "--name", container, "--entrypoint", "/bin/bash"]
+    command += ["--mount", f"type=bind,src={input_dir.resolve()},dst=/input,readonly"]
+    command += ["--mount", f"type=bind,src={output_dir.resolve()},dst=/output", image, "-lc", shell]
+    started = time.perf_counter()
     try:
-        resolved = candidate.resolve(strict=True)
-        resolved.relative_to(root)
-    except (FileNotFoundError, ValueError) as error:
-        raise ValueError("path.missing_or_escape") from error
-    return resolved, kind, expected
+        done = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+    finally:
+        subprocess.run(["docker", "rm", "-f", container], capture_output=True, check=False)
+    if done.returncode:
+        raise RuntimeError(f"FreeMHD exited {done.returncode}:\n{(done.stdout + done.stderr)[-4000:]}")
+    return time.perf_counter() - started
 
 
-def _first_existing(case_dir: str | Path, *relative_paths: str) -> Path | None:
-    for relative in relative_paths:
-        path = Path(case_dir) / relative
-        if path.exists():
-            return path
-    return None
+def _table(path: Path, width: int, times: np.ndarray) -> np.ndarray:
+    rows = [
+        [float(value) for value in re.findall(_NUMBER, line)]
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    values = np.asarray(rows, dtype=float)
+    if values.shape != (times.size, width) or not np.allclose(values[:, 0], times, rtol=0, atol=1e-18):
+        raise ValueError(f"FreeMHD table {path.parent.name}/{path.name} has an unexpected shape or times")
+    return values[:, 1:]
 
 
-def _extract_first_scalar(text: str, *patterns: str) -> float | None:
-    for pattern in patterns:
-        match = re.search(pattern, text, flags=re.MULTILINE)
-        if match is not None:
-            return float(match.group(1))
-    return None
-
-
-def _extract_foam_block(text: str, name: str) -> str | None:
-    match = re.search(rf"(?<![\w.]){re.escape(name)}\s*\{{", text)
-    if match is None:
-        return None
-    start = match.end()
-    depth = 1
-    index = start
-    while index < len(text) and depth > 0:
-        char = text[index]
-        if char == "{":
-            depth += 1
-        elif char == "}":
-            depth -= 1
-        index += 1
-    return None if depth else text[start : index - 1]
-
-
-def _infer_inlet_value(case_dir: str | Path, pattern: str) -> str | None:
-    root = Path(case_dir)
-    expression = re.compile(pattern)
-    for base in ("case/0", "0", "latestTime"):
-        for region in ("liquid", "fluid", ""):
-            path = root / base / region / "U"
-            if not path.exists():
-                continue
-            boundary = _extract_foam_block(path.read_text(), "boundaryField")
-            inlet = None if boundary is None else _extract_foam_block(boundary, "inlet")
-            match = expression.search(inlet) if inlet is not None else None
-            if match is not None:
-                return match.group(1)
-    return None
-
-
-def infer_inlet_flow_rate(case_dir: str | Path) -> float | None:
-    value = _infer_inlet_value(case_dir, r"volumetricFlowRate\s+(?:constant\s+)?([0-9eE+.\-]+)\s*;")
-    return None if value is None else float(value)
-
-
-def infer_inlet_drive_mode(case_dir: str | Path) -> str | None:
-    inlet_type = _infer_inlet_value(case_dir, r"type\s+(\S+)\s*;")
-    return (
-        None
-        if inlet_type is None
-        else ("inlet_flow_rate" if inlet_type == "flowRateInletVelocity" else "inlet_velocity")
-    )
-
-
-def infer_liquid_material_properties(case_dir: str | Path) -> dict[str, float] | None:
-    """Read FreeMHD liquid properties and convert OpenFOAM ``mu`` to LMhdX ``nu``."""
-
-    path = _first_existing(
-        case_dir,
-        "case/constant/liquid/thermophysicalProperties.liquidMetal",
-        "constant/liquid/thermophysicalProperties.liquidMetal",
-        "case/constant/liquid/thermophysicalProperties",
-        "constant/liquid/thermophysicalProperties",
-    )
-    if path is None:
-        return None
-    text = path.read_text()
-    conductivity = _extract_first_scalar(text, r"\belcond\s+(?:\[[^\]]*\])?\s*([0-9eE+.\-]+)\s*;")
-    if conductivity is None:
-        conductivity = _extract_first_scalar(text, r"\bsigma\s+(?:\[[^\]]*\])?\s*([0-9eE+.\-]+)\s*;")
-    density = _extract_first_scalar(text, r"\brho\s+([0-9eE+.\-]+)\s*;")
-    dynamic_viscosity = _extract_first_scalar(text, r"\bmu\s+([0-9eE+.\-]+)\s*;")
-    kinematic_viscosity = _extract_first_scalar(text, r"\bnu\s+([0-9eE+.\-]+)\s*;")
-    if conductivity is None or density is None:
-        return None
-    if kinematic_viscosity is None:
-        if dynamic_viscosity is None:
-            return None
-        kinematic_viscosity = dynamic_to_kinematic_viscosity(dynamic_viscosity, density)
-    if dynamic_viscosity is None:
-        dynamic_viscosity = kinematic_viscosity * density
-    return {
-        "conductivity": float(conductivity),
-        "density": float(density),
-        "dynamic_viscosity": float(dynamic_viscosity),
-        "kinematic_viscosity": float(kinematic_viscosity),
-    }
-
-
-def infer_solid_conductivities(
-    case_dir: str | Path,
-) -> tuple[float | None, float | None]:
-    def conductivity(region: str) -> float | None:
-        path = _first_existing(
-            case_dir,
-            f"case/constant/{region}/thermophysicalProperties",
-            f"constant/{region}/thermophysicalProperties",
-        )
-        return (
-            None
-            if path is None
-            else _extract_first_scalar(path.read_text(), r"\belcond\s+(?:\[[^\]]*\])?\s*([0-9eE+.\-]+)\s*;")
-        )
-
-    return conductivity("solidWalls"), conductivity("insulator")
-
-
-def infer_uniform_b0(case_dir: str | Path) -> tuple[float, float, float] | None:
-    path = _first_existing(
-        case_dir,
-        "case/0/liquid/B0",
-        "0/liquid/B0",
-        "latestTime/liquid/B0",
-        "case/0/B0",
-        "0/B0",
-        "latestTime/B0",
-    )
-    if path is None:
-        return None
-    match = re.search(r"internalField\s+uniform\s+\(\s*(\S+)\s+(\S+)\s+(\S+)\s*\)", path.read_text())
-    if match is None:
-        return None
-    return float(match.group(1)), float(match.group(2)), float(match.group(3))
-
-
-def infer_rectangular_geometry(
-    case_dir: str | Path,
-) -> tuple[float, float, float | None, int | None] | None:
-    path = _first_existing(case_dir, "case/system/blockMeshDict", "system/blockMeshDict")
-    if path is None:
-        return None
-    text = path.read_text()
-    half_width = _extract_first_scalar(text, r"\bLy\s+([0-9eE+.\-]+)\s*;")
-    outer_half_width = _extract_first_scalar(text, r"\bLy_wall\s+([0-9eE+.\-]+)\s*;")
-    wall_cells = _extract_first_scalar(text, r"\bN_wall\s+([0-9eE+.\-]+)\s*;")
-    if half_width is None:
-        return None
-    wall_thickness = None
-    if outer_half_width is not None and outer_half_width >= half_width:
-        wall_thickness = outer_half_width - half_width
-    return (
-        2.0 * half_width,
-        2.0 * half_width,
-        wall_thickness,
-        None if wall_cells is None else int(round(wall_cells)),
-    )
-
-
-def _decode_matched_b2_lmx_input(path: str | Path):
-    from dataclasses import fields
-
-    from lmhdx.mesh import _cross_section_mesh
-    from lmhdx.specs import (
-        BoundaryCondition,
-        CaseSpec,
-        ExtrudedInductionlessProblem,
-        FringingProfile,
-        GeometrySpec,
-        MagneticFieldSpec,
-        OutputSpec,
-        RegionSpec,
-        SolverConfig,
-        TimeStepperConfig,
-    )
-
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    expected_top = {
-        "schema_version",
-        "kind",
-        "case_id",
-        "case",
-        "scaling",
-        "mesh",
-        "field_profile",
-        "effective_controls",
-    }
-    if (
-        not isinstance(payload, dict)
-        or set(payload) != expected_top
-        or (payload.get("schema_version"), payload.get("kind"), payload.get("case_id"))
-        != (1, "lmx-matched-b2-input", "B2-fringing-square")
-    ):
-        raise ValueError("Invalid matched B2 LMhdX input schema")
-
-    def checked(cls, value, name):
-        if not isinstance(value, dict) or set(value) != {item.name for item in fields(cls)}:
-            raise ValueError(f"Invalid matched B2 {name} schema")
-        return dict(value)
-
-    raw = checked(CaseSpec, payload["case"], "case")
-    geometry = checked(GeometrySpec, raw.pop("geometry"), "geometry")
-    geometry["wall_thickness"], geometry["wall_cells"] = (
-        tuple(geometry["wall_thickness"]),
-        tuple(geometry["wall_cells"]),
-    )
-    magnetic = checked(MagneticFieldSpec, raw.pop("magnetic_field"), "magnetic field")
-    magnetic["value"] = None if magnetic["value"] is None else tuple(magnetic["value"])
-    boundary_payload = raw.pop("boundary_conditions")
-    region_payload = raw.pop("regions")
-    if not isinstance(boundary_payload, list) or not isinstance(region_payload, list):
-        raise ValueError("Invalid matched B2 region or boundary schema")
-    boundaries = []
-    for item in boundary_payload:
-        item = checked(BoundaryCondition, item, "boundary")
-        item["value"] = tuple(item["value"]) if isinstance(item["value"], list) else item["value"]
-        boundaries.append(BoundaryCondition(**item))
-    regions = tuple(RegionSpec(**checked(RegionSpec, item, "region")) for item in region_payload)
-    time_stepper = TimeStepperConfig(**checked(TimeStepperConfig, raw.pop("time_stepper"), "time stepper"))
-    solver = SolverConfig(**checked(SolverConfig, raw.pop("solver"), "solver"))
-    output = OutputSpec(**checked(OutputSpec, raw.pop("output"), "output"))
-    raw["reference_phi_cell"] = tuple(raw["reference_phi_cell"])
-    case = CaseSpec(
-        **raw,
-        geometry=GeometrySpec(**geometry),
-        regions=regions,
-        magnetic_field=MagneticFieldSpec(**magnetic),
-        boundary_conditions=tuple(boundaries),
-        time_stepper=time_stepper,
-        solver=solver,
-        output=output,
-    )
-    canonical_names = {
-        "alex_b2-fringing-square_harness-smoke",
-        "alex_b2-fringing-square_scaling-calibration",
-    }
-    if case.name not in canonical_names or case.geometry.kind != "layered_duct":
-        raise ValueError("Matched B2 LMhdX input does not select the canonical solver path")
-    mesh = _cross_section_mesh(case)
-    mesh_payload = payload["mesh"]
-    if (
-        not isinstance(mesh_payload, dict)
-        or set(mesh_payload) != {"coordinate_system", "x_faces", "y_faces", "z_faces"}
-        or mesh_payload["coordinate_system"] != "Cartesian x-y-z faces in duct-half-width units"
-    ):
-        raise ValueError("Invalid matched B2 mesh schema")
-    if any(
-        not np.allclose(
-            np.asarray(mesh_payload[f"{axis}_faces"], dtype=float),
-            np.asarray(getattr(mesh, f"{axis}_faces")),
-            rtol=0.0,
-            atol=1.0e-15,
-        )
-        for axis in "xyz"
-    ):
-        raise ValueError("Matched B2 stored mesh faces do not reproduce the case")
-
-    profile = payload["field_profile"]
-    profile_keys = {
-        "axis",
-        "interpolation",
-        "extrapolation",
-        "source_name",
-        "source_sha256",
-        "anchors_sha256",
-        "anchor_x_over_L",
-        "anchor_b_over_B0",
-        "sample_x_over_L",
-        "sample_b_over_B0",
-    }
-    if (
-        not isinstance(profile, dict)
-        or set(profile) != profile_keys
-        or (profile["axis"], profile["interpolation"], profile["extrapolation"])
-        != ("y", "linear", "forbidden")
-    ):
-        raise ValueError("Invalid matched B2 field-profile schema")
-    anchors_x = np.asarray(profile["anchor_x_over_L"], dtype=float)
-    anchors_b = np.asarray(profile["anchor_b_over_B0"], dtype=float)
-    sample_x = np.asarray(mesh.x_centers, dtype=float)
-    sample_b = np.asarray(profile["sample_b_over_B0"], dtype=float)
-    encoded = json.dumps(
-        {"x_over_L": anchors_x.tolist(), "b_over_B0": anchors_b.tolist()},
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode()
-    if (
-        anchors_x.ndim != 1
-        or anchors_x.shape != anchors_b.shape
-        or anchors_x.size < 2
-        or np.any(~np.isfinite(anchors_x))
-        or np.any(~np.isfinite(anchors_b))
-        or np.any(np.diff(anchors_x) <= 0.0)
-        or np.any(np.diff(anchors_b) > 1.0e-12)
-        or sample_x[0] < anchors_x[0]
-        or sample_x[-1] > anchors_x[-1]
-        or not np.array_equal(np.asarray(profile["sample_x_over_L"], dtype=float), sample_x)
-        or not np.allclose(sample_b, np.interp(sample_x, anchors_x, anchors_b), rtol=0.0, atol=1.0e-15)
-        or hashlib.sha256(encoded).hexdigest() != profile["anchors_sha256"]
-        or re.fullmatch(r"[0-9a-f]{64}", str(profile["source_sha256"])) is None
-    ):
-        raise ValueError("Matched B2 field samples do not reproduce their anchors and mesh")
-
-    scaling, controls = payload["scaling"], payload["effective_controls"]
-    if (
-        not isinstance(scaling, dict)
-        or set(scaling)
-        != {
-            "length_scale",
-            "half_width_m",
-            "nondimensional_length",
-            "velocity",
-            "density",
-            "conductivity",
-        }
-        or scaling["length_scale"] != "duct half-width"
-    ):
-        raise ValueError("Invalid matched B2 scaling schema")
-    fluid = [region for region in regions if region.kind == "fluid"]
-    wall = [region for region in regions if region.kind == "solid"]
-    inlet = [bc for bc in boundaries if bc.kind == "inlet_flow_rate"]
-    outlet = [bc for bc in boundaries if bc.kind == "outlet_pressure"]
-    if len(fluid) != 1 or len(wall) != 1 or len(inlet) != 1 or len(outlet) != 1:
-        raise ValueError("Matched B2 input requires one fluid, wall, and inlet-flow region")
-    length, velocity = (
-        float(scaling["nondimensional_length"]),
-        float(scaling["velocity"]),
-    )
-    field_vector = np.asarray(case.magnetic_field.value, dtype=float)
-    base_b = float(np.linalg.norm(field_vector))
-    mean_velocity = float(inlet[0].value) / (case.geometry.width * case.geometry.height)
-    ha = hartmann_number(
-        magnetic_field=base_b,
-        length_scale=length,
-        conductivity=float(fluid[0].conductivity),
-        density=float(fluid[0].density),
-        kinematic_viscosity=float(fluid[0].viscosity),
-    )
-    interaction = interaction_parameter(
-        magnetic_field=base_b,
-        length_scale=length,
-        conductivity=float(fluid[0].conductivity),
-        density=float(fluid[0].density),
-        velocity=velocity,
-    )
-    reynolds = reynolds_number(
-        velocity=velocity,
-        length_scale=length,
-        kinematic_viscosity=float(fluid[0].viscosity),
-    )
-    conductance = wall_conductance_ratio(
-        wall_conductivity=wall[0].conductivity,
-        wall_thickness=float(wall[0].wall_thickness),
-        fluid_conductivity=fluid[0].conductivity,
-        length_scale=length,
-    )
-    if not (
-        math.isclose(length, case.geometry.width / 2.0)
-        and math.isclose(velocity, mean_velocity)
-        and math.isclose(float(scaling["density"]), float(fluid[0].density))
-        and math.isclose(float(scaling["conductivity"]), float(fluid[0].conductivity))
-        and float(scaling["half_width_m"]) > 0.0
-        and np.array_equal(field_vector[[0, 2]], np.zeros(2))
-        and math.isclose(float(case.geometry.target_ha), ha)
-        and math.isclose(ha * ha / interaction, reynolds)
-        and conductance > 0.0
-        and outlet[0].value == 0.0
-    ):
-        raise ValueError("Matched B2 materials, drive, and scaling are inconsistent")
-    expected_controls = {
-        "dt": min(float(case.time_stepper.dt), 0.001 / interaction),
-        "electric_iterations": max(case.time_stepper.potential_iterations, 600),
-        "electric_tolerance": min(case.solver.coupling_tolerance, 1.0e-12),
-        "projection_iterations": max(case.time_stepper.potential_iterations, 4000),
-        "projection_tolerance": min(case.solver.coupling_tolerance, 1.0e-10),
-        "momentum_iterations": max(case.time_stepper.potential_iterations, 400),
-        "momentum_tolerance": min(case.solver.coupling_tolerance, 1.0e-10),
-        "executed_steps": case.time_stepper.max_steps,
-        "steady_steps_required": 3,
-        "expected_stop_reason": "step_limit",
-    }
-    expected_name = (
-        "alex_b2-fringing-square_harness-smoke"
-        if case.time_stepper.max_steps == 2
-        else "alex_b2-fringing-square_scaling-calibration"
-    )
-    if (
-        controls != expected_controls
-        or not math.isclose(float(case.time_stepper.dt), float(controls.get("dt", math.nan)))
-        or case.name != expected_name
-    ):
-        raise ValueError("Matched B2 effective controls do not reproduce the solver contract")
-    problem = ExtrudedInductionlessProblem(
-        case=case,
-        profile=FringingProfile(x=sample_x, field_scale=sample_b, axis="y"),
-    )
-    return problem, mesh, payload
-
-
-def load_matched_b2_lmx_input(path: str | Path):
-    """Return the real solver input after independently validating stored facts."""
-
-    return _decode_matched_b2_lmx_input(path)[0]
-
-
-def _matched_b2_evaluator(
-    path: str | Path | None,
-) -> tuple[dict[str, object], dict[str, object]]:
-    if path is None:
-        return (
-            {
-                "primary": "excess transverse pressure difference between published A/B taps",
-                "tap_geometry": "top and side wall midpoints at each axial station",
-                "signed_orientation": "side (+z) minus top (+y)",
-            },
-            {
-                "field": "B_y / B0",
-                "pressure": "Delta p_AB / (sigma * U * B0^2 * half-width) minus plateau",
-                "coordinate": "x / half-width",
-            },
-        )
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(payload, dict) or set(payload) != {
-        "schema_version",
-        "case_id",
-        "observable",
-        "normalization",
-    }:
-        raise ValueError("Invalid matched B2 evaluator schema")
-    if (payload["schema_version"], payload["case_id"]) != (1, "B2-fringing-square"):
-        raise ValueError("Invalid matched B2 evaluator identity")
-    observable, normalization = payload["observable"], payload["normalization"]
-    if not isinstance(observable, dict) or not isinstance(normalization, dict):
-        raise ValueError("Invalid matched B2 evaluator sections")
-    return observable, normalization
-
-
-def _contract_array(values) -> list[float]:
-    return [float(f"{float(value):.15g}") for value in values]
-
-
-def _contract_scalar(value: float) -> float:
-    return float(f"{float(value):.14g}")
-
-
-def observe_lmx_b2_contract(path: str | Path, evaluator: str | Path | None = None) -> dict[str, object]:
-    """Derive the matched-B2 contract from a real LMhdX input, never its expected spec."""
-
-    problem, mesh, payload = _decode_matched_b2_lmx_input(path)
-    case, scaling, profile, controls = (
-        problem.case,
-        payload["scaling"],
-        payload["field_profile"],
-        payload["effective_controls"],
-    )
-    fluid = next(region for region in case.regions if region.kind == "fluid")
-    wall = next(region for region in case.regions if region.kind == "solid")
-    inlet = next(bc for bc in case.boundary_conditions if bc.kind == "inlet_flow_rate")
-    length, velocity = (
-        float(scaling["nondimensional_length"]),
-        float(scaling["velocity"]),
-    )
-    magnetic_field = float(np.linalg.norm(np.asarray(case.magnetic_field.value, dtype=float)))
-    ha = hartmann_number(
-        magnetic_field=magnetic_field,
-        length_scale=length,
-        conductivity=fluid.conductivity,
-        density=fluid.density,
-        kinematic_viscosity=fluid.viscosity,
-    )
-    interaction = interaction_parameter(
-        magnetic_field=magnetic_field,
-        length_scale=length,
-        conductivity=fluid.conductivity,
-        density=fluid.density,
-        velocity=velocity,
-    )
-    observable, normalization = _matched_b2_evaluator(evaluator)
-    contract: dict[str, object] = {
-        "equations": {
-            "momentum": "transient incompressible Navier-Stokes-Lorentz",
-            "inertia": "conservative div(rhoPhi,U)",
-            "time_discretization": "Euler",
-            "advection_discretization": "Gauss limitedLinear 1.0",
-            "advection_assembly": "implicit fvm::div with frozen rhoPhi and limiter weights",
-            "advection_vector_limiter": "single magSqr(U) limiter applied to all components",
-            "gradient_discretization": "cellLimited leastSquares 1.0",
-            "viscous_stress": "laminar divDevRhoReff",
-            "electric_model": "inductionless Ohm law with div(J)=0",
-            "phase_reduction": "alpha=1 invariant",
-            "thermal_reduction": "constant temperature and properties",
-        },
-        "nondimensional_groups": {
-            "hartmann_number": ha,
-            "interaction_parameter": interaction,
-            "reynolds_number": reynolds_number(
-                velocity=velocity,
-                length_scale=length,
-                kinematic_viscosity=fluid.viscosity,
-            ),
-            "magnetic_reynolds_number_assumption": "Rm << 1",
-        },
-        "geometry": {
-            "kind": "square_duct",
-            "length_scale": scaling["length_scale"],
-            "half_width_m": scaling["half_width_m"],
-            "x_over_L_min": float(mesh.x_faces[0]),
-            "x_over_L_max": float(mesh.x_faces[-1]),
-            "constant_cross_section": True,
-        },
-        "magnetic_field": {
-            "representation": "tabulated monotone interpolation",
-            "components": "B = (0, B_y(x), 0) in the global Cartesian frame",
-            "coordinate": "x / half-width",
-            "normalization": "B_y / B0",
-            "no_extrapolation": profile["extrapolation"] == "forbidden",
-            "normal_current_at_axial_ends": 0.0,
-        },
-        "wall": {
-            "model": "uniform thin conducting wall",
-            "wall_conductance_ratio": wall_conductance_ratio(
-                wall_conductivity=wall.conductivity,
-                wall_thickness=wall.wall_thickness,
-                fluid_conductivity=fluid.conductivity,
-                length_scale=length,
-            ),
-            "numerical_realization": "explicit volumetric shell preserving c_w",
-            "thickness_over_L": wall.wall_thickness / length,
-            "outer_electric_boundary": "zero normal current",
-        },
-        "boundary_drive": {
-            "velocity_inlet": "integral flow rate with extrapolated profile",
-            "velocity_outlet": "zero normal gradient",
-            "velocity_walls": "no slip",
-            "pressure_inlet": "zero normal gradient",
-            "pressure_outlet": "fixed gauge",
-            "pressure_outlet_gauge": 0.0,
-            "flow_constraint_scope": "inlet face only",
-            "nondimensional_flow_rate": float(inlet.value),
-            "electric_axial_ends": "zero normal current",
-        },
-        "observable": observable,
-        "normalization": normalization,
-        "mesh_coordinates": {
-            "coordinate_system": payload["mesh"]["coordinate_system"],
-            "family": "uniform 5x5 fluid grid with one explicit wall cell per side",
-            "exact_coordinate_arrays_required": True,
-            **{f"{axis}_faces": _contract_array(getattr(mesh, f"{axis}_faces")) for axis in "xyz"},
-            "field_source": profile["source_name"],
-            "field_source_sha256": profile["source_sha256"],
-            "field_anchors_sha256": profile["anchors_sha256"],
-            "field_sample_x_over_L": _contract_array(profile["sample_x_over_L"]),
-            "field_sample_b_over_B0": _contract_array(profile["sample_b_over_B0"]),
-        },
-        "stopping_rules": dict(controls),
-    }
-    return contract
-
-
-def observe_lmx_b2_output(
-    output_dir: str | Path, input_path: str | Path, evaluator: str | Path
-) -> dict[str, object]:
-    """Replay compact LMhdX B2 restart evidence without trusting summary metrics."""
-
-    from types import SimpleNamespace
-
-    from lmhdx.io import (
-        load_extruded_restart_bundle,
-        validate_extruded_restart_bundle,
-    )
-    from lmhdx.validation import benchmark_b_pressure_observable
+def observe_freemhd(output_dir: str | Path) -> dict[str, object]:
+    """Read the native FreeMHD log and function-object tables into the smoke observables."""
 
     root = Path(output_dir)
-    required = {"run.json", "checkpoint.npz", "direct.npz", "resumed.npz"}
-    if not root.is_dir() or {path.name for path in root.iterdir()} != required:
-        raise ValueError("LMhdX B2 output tree is incomplete")
-    metadata = json.loads((root / "run.json").read_text())
-    keys = {
-        "schema_version",
-        "code",
-        "case_id",
-        "input_sha256",
-        "evaluator_sha256",
-        "wall_seconds",
-        "num_devices",
-        "float_precision",
-    }
-    if set(metadata) != keys or metadata.get("schema_version") != 1 or metadata.get("code") != "LMhdX":
-        raise ValueError("LMhdX B2 output metadata are invalid")
-    if (
-        metadata.get("case_id") != "B2-fringing-square"
-        or metadata.get("input_sha256") != artifact_sha256(input_path, "file")
-        or metadata.get("evaluator_sha256") != artifact_sha256(evaluator, "file")
-        or metadata.get("float_precision") != "float64"
-        or int(metadata.get("num_devices", 0)) < 1
-        or not math.isfinite(float(metadata.get("wall_seconds", math.nan)))
-    ):
-        raise ValueError("LMhdX B2 output provenance differs")
-    problem = load_matched_b2_lmx_input(input_path)
-    requested_steps = int(problem.case.time_stepper.max_steps)
-    checkpoint_step = (requested_steps + 1) // 2
-    checkpoint, direct, resumed = (
-        load_extruded_restart_bundle(root / name) for name in ("checkpoint.npz", "direct.npz", "resumed.npz")
-    )
-    for restart in (checkpoint, direct, resumed):
-        validate_extruded_restart_bundle(restart, case=problem.case)
-    acceleration = problem.case.solver.coupling_acceleration
-    if acceleration == "anderson":
-        acceleration_name, schema, label = (
-            "anderson_state",
-            "extruded_anderson_v1",
-            "Anderson",
-        )
-    elif acceleration == "aitken":
-        acceleration_name, schema, label = (
-            "aitken_state",
-            "extruded_aitken_v1",
-            "Aitken",
-        )
-    else:
-        raise ValueError("LMhdX B2 output acceleration is unsupported")
-    if any(
-        restart.metadata.get("restart_schema") != schema or getattr(restart.bundle, acceleration_name) is None
-        for restart in (checkpoint, direct, resumed)
-    ):
-        raise ValueError(f"LMhdX B2 output {label} restart state is invalid")
-    if (
-        checkpoint.bundle.stopping_state[0] != checkpoint_step
-        or direct.bundle.stopping_state != resumed.bundle.stopping_state
-        or direct.bundle.stopping_state[0] != requested_steps
-        or direct.bundle.stopping_state[2] != "step_limit"
-    ):
-        raise ValueError("LMhdX B2 restart stopping state differs")
-    # Keep replay-driving state separate from recomputed fields and solver histories.
-    state_names = """x y z field_scale u v w p phi
-        axial_pressure_loss_gradient""".split()
-    flux_names = "rho_phi_plus rho_phi_inlet".split()
-    derived_names = """residual volumetric_flow_rate mean_velocity
-        transverse_pressure_difference jx jy jz lorentz_x lorentz_y lorentz_z axial_current
-        wall_current_leakage current_scaled_pressure_proxy charge_balance_residual
-        boundary_current_residual""".split()
-    history_names = """iteration_component_residual_history
-        iteration_pressure_linear_history iteration_electric_linear_history
-        iteration_potential_residual_history iteration_residual_history
-        iteration_pressure_residual_history iteration_courant_history""".split()
-    grouped_differences = {name: [] for name in ("state", "flux", "derived", "history")}
-    state_relative, state_tolerance_ratio, flux_relative = [], [], []
-    state_tolerance_by_array = {}
-    for group, names in (
-        ("state", state_names),
-        ("flux", flux_names),
-        ("derived", derived_names),
-        ("history", history_names),
-    ):
-        for name in names:
-            left, right = (np.asarray(getattr(bundle.bundle, name)) for bundle in (direct, resumed))
-            if left.shape != right.shape or not np.all(np.isfinite(left)) or not np.all(np.isfinite(right)):
-                raise ValueError(f"LMhdX B2 output array {name} is invalid")
-            if left.size:
-                grouped_differences[group].append(float(np.max(np.abs(left - right))))
-                if group in {"state", "flux"}:
-                    scale = max(np.linalg.norm(left), np.linalg.norm(right), 1.0e-30)
-                    relative = float(np.linalg.norm(left - right) / scale)
-                    (state_relative if group == "state" else flux_relative).append(relative)
-                    if group == "state":
-                        tolerance = 2.0e-9 + 2.0e-8 * np.maximum(np.abs(left), np.abs(right))
-                        ratio = float(np.max(np.abs(left - right) / tolerance))
-                        state_tolerance_ratio.append(ratio)
-                        state_tolerance_by_array[name] = ratio
-    acceleration_components = (
-        ("mapped", "residual", "rho_phi_plus", "rho_phi_inlet")
-        if acceleration == "anderson"
-        else ("residual", "relaxation", "steady_streak")
-    )
-    for component, left, right in zip(
-        acceleration_components,
-        getattr(direct.bundle, acceleration_name),
-        getattr(resumed.bundle, acceleration_name),
-        strict=True,
-    ):
-        left, right = (np.asarray(()) if value is None else np.asarray(value) for value in (left, right))
-        if left.shape != right.shape or not np.all(np.isfinite(left)) or not np.all(np.isfinite(right)):
-            raise ValueError(f"LMhdX B2 output {label} state is invalid")
-        if left.size:
-            grouped_differences["state"].append(float(np.max(np.abs(left - right))))
-            scale = max(np.linalg.norm(left), np.linalg.norm(right), 1.0e-30)
-            state_relative.append(float(np.linalg.norm(left - right) / scale))
-            tolerance = 2.0e-9 + 2.0e-8 * np.maximum(np.abs(left), np.abs(right))
-            ratio = float(np.max(np.abs(left - right) / tolerance))
-            state_tolerance_ratio.append(ratio)
-            state_tolerance_by_array[f"{label.lower()}_{component}"] = ratio
-    restart_differences = {name: max(values, default=0.0) for name, values in grouped_differences.items()}
-    courant = np.asarray(direct.bundle.iteration_courant_history, dtype=float)
-    pressure = np.asarray(
-        benchmark_b_pressure_observable(SimpleNamespace(bundle=direct.bundle), "B2-fringing-square")
-    )
-    if (
-        courant.shape != (requested_steps, 3)
-        or pressure.shape != (problem.case.geometry.nx,)
-        or direct.bundle.stopping_state[0] != requested_steps
-    ):
-        raise ValueError("LMhdX B2 output execution shape differs")
-    return {
-        "steps": requested_steps,
-        "stop_reason": direct.bundle.stopping_state[2],
-        "steady_streak": direct.bundle.stopping_state[1],
-        "dt": courant[:, 0].tolist(),
-        "courant_mean": courant[:, 1].tolist(),
-        "courant_max": courant[:, 2].tolist(),
-        "mass_balance": float(np.max(np.abs(np.asarray(direct.bundle.volumetric_flow_rate) - 4.0)) / 4.0),
-        "current_balance": float(np.max(np.abs(np.asarray(direct.bundle.boundary_current_residual)))),
-        "interface_current_balance": float(np.max(np.abs(np.asarray(direct.bundle.charge_balance_residual)))),
-        "interface_current_activity": float(
-            max(
-                np.max(np.abs(np.asarray(direct.bundle.jx))),
-                np.max(np.abs(np.asarray(direct.bundle.jz))),
-            )
-        ),
-        "x_over_L": np.asarray(direct.bundle.x).tolist(),
-        "pressure_observable": pressure.tolist(),
-        "restart_max_abs": max(restart_differences.values()),
-        **{f"restart_{name}_max_abs": value for name, value in restart_differences.items()},
-        "restart_state_relative_l2": max(state_relative, default=0.0),
-        "restart_state_tolerance_ratio": max(state_tolerance_ratio, default=0.0),
-        "restart_state_tolerance_ratio_by_array": state_tolerance_by_array,
-        "restart_flux_relative_l2": max(flux_relative, default=0.0),
-        "wall_seconds": float(metadata["wall_seconds"]),
-    }
-
-
-def observe_freemhd_b2_output(
-    output_dir: str | Path, input_dir: str | Path, evaluator: str | Path
-) -> dict[str, object]:
-    """Recompute the two-update FreeMHD smoke observables from native text output."""
-
-    root, case = Path(output_dir), Path(input_dir)
-    required = {"run.json", "controlDict.used", "run.log", "postProcessing"}
-    if not root.is_dir() or {path.name for path in root.iterdir()} != required:
-        raise ValueError("FreeMHD B2 output tree is incomplete")
-    metadata = json.loads((root / "run.json").read_text(encoding="utf-8"))
-    keys = {
-        "schema_version",
-        "code",
-        "case_id",
-        "input_sha256",
-        "evaluator_sha256",
-        "wall_seconds",
-        "nproc",
-        "image",
-        "float_precision",
-    }
-    control = root / "controlDict.used"
-    if set(metadata) != keys or (
-        metadata.get("schema_version"),
-        metadata.get("code"),
-        metadata.get("case_id"),
-    ) != (1, "FreeMHD", "B2-fringing-square"):
-        raise ValueError("FreeMHD B2 output metadata are invalid")
-    if (
-        metadata.get("input_sha256") != artifact_sha256(case, "tree")
-        or metadata.get("evaluator_sha256") != artifact_sha256(evaluator, "file")
-        or control.read_bytes() != (case / "system/controlDict").read_bytes()
-        or int(metadata.get("nproc", 0)) < 1
-        or not str(metadata.get("image", "")).strip()
-        or metadata.get("float_precision") != "float64"
-        or not math.isfinite(float(metadata.get("wall_seconds", math.nan)))
-        or float(metadata["wall_seconds"]) < 0.0
-    ):
-        raise ValueError("FreeMHD B2 output provenance differs")
-
-    control_text = control.read_text(encoding="utf-8")
-    dt_expected = 1.0 / 540000.0
-    control_scalars = {
-        name: _extract_first_scalar(control_text, rf"\b{name}\s+([0-9eE+.\-]+)\s*;")
-        for name in ("startTime", "endTime", "deltaT", "maxDeltaT", "writeInterval")
-    }
-    if (
-        re.search(r"\bapplication\s+epotMultiRegionInterFoam\s*;", control_text) is None
-        or re.search(r"\badjustTimeStep\s+off\s*;", control_text) is None
-        or re.search(r"\bwriteControl\s+timeStep\s*;", control_text) is None
-        or control_scalars
-        != {
-            "startTime": 0.0,
-            "endTime": 2.0 * dt_expected,
-            "deltaT": dt_expected,
-            "maxDeltaT": dt_expected,
-            "writeInterval": 2.0,
-        }
-    ):
-        raise ValueError("FreeMHD B2 effective controls differ")
-
     log = (root / "run.log").read_text(encoding="utf-8")
-    if (
-        any(
-            marker.lower() in log.lower()
-            for marker in ("FOAM FATAL", "Segmentation fault", "MPI_ABORT", "killed")
-        )
-        or re.search(r"(?im)^(?!.*trapping enabled).*Floating point exception", log)
-        or re.search(r"(?i)(?:^|[\s=,(])(?:nan|[-+]?inf)(?:$|[\s,;)])", log)
-    ):
-        raise ValueError("FreeMHD B2 log reports a fatal failure")
-    times = np.asarray([float(value) for value in re.findall(r"(?m)^Time = ([0-9eE+.\-]+)\s*$", log)])
+    markers = ("FOAM FATAL", "Segmentation fault", "MPI_ABORT", "killed")
+    fatal = [marker for marker in markers if marker.lower() in log.lower()]
+    if re.search(r"(?im)^(?!.*trapping enabled).*Floating point exception", log):
+        fatal.append("Floating point exception")
+    if re.search(r"(?i)(?:^|[\s=,(])(?:nan|[-+]?inf)(?:$|[\s,;)])", log):
+        fatal.append("non-finite value")
+    if fatal or re.search(r"(?m)^End\s*$", log) is None:
+        raise ValueError(f"FreeMHD log reports a failure: {fatal or ['no End']}")
+    times = np.asarray([float(value) for value in re.findall(r"(?m)^Time = (\S+)\s*$", log)])
     courant = np.asarray(
-        [
-            [float(mean), float(maximum)]
-            for line in log.splitlines()
-            if line.startswith("Region: liquid Courant Number mean:")
-            for mean, maximum in re.findall(
-                r"Courant Number mean:\s*([0-9eE+.\-]+)\s+max:\s*([0-9eE+.\-]+)", line
-            )
-        ]
-    )[-2:]
-    if (
-        times.shape != (2,)
-        or not np.all(np.isfinite(times))
-        or np.any(np.diff(times) <= 0.0)
-        or courant.shape != (2, 2)
-        or not np.all(np.isfinite(courant))
-        or re.search(r"(?m)^End\s*$", log) is None
-    ):
-        raise ValueError("FreeMHD B2 log execution shape differs")
-    dt = np.diff(np.concatenate(([0.0], times)))
-
+        re.findall(rf"(?m)^Region: liquid Courant Number mean:\s*({_NUMBER})\s+max:\s*({_NUMBER})", log),
+        dtype=float,
+    )[-times.size :]
     post = root / "postProcessing"
-    objects = {
-        "b2PressureTaps",
-        "massIn",
-        "massOut",
-        "currentIn",
-        "currentOut",
-        "currentIntoSolid",
-        "currentIntoSolidMagnitude",
+    (probe,) = (post / "b2PressureTaps").rglob("p")
+    headers = re.findall(r"(?m)^# Probe \d+ \(([^)]+)\)$", probe.read_text())
+    points = np.asarray([[float(value) for value in point.split()] for point in headers])
+    if points.shape != (16, 3) or not (
+        np.allclose(points[:8, 1:], (0.8, 0.0)) and np.allclose(points[8:, 1:], (0.0, 0.8))
+    ):
+        raise ValueError("FreeMHD pressure taps are not the materialized top/side pairs")
+    taps = _table(probe, 17, times)[-1]
+    fluxes = {
+        name: _table(next((post / name).rglob("surfaceFieldValue.dat")), 2, times)[:, 0]
+        for name in _OBJECTS[1:]
     }
-    if not post.is_dir() or {path.name for path in post.iterdir()} != objects:
-        raise ValueError("FreeMHD B2 postprocessing tree differs")
-
-    def table(
-        name: str,
-        filename: str = "surfaceFieldValue.dat",
-        width: int = 2,
-        header: str | None = None,
-    ) -> np.ndarray:
-        matches = list((post / name).rglob(filename))
-        if len(matches) != 1 or matches[0].is_symlink() or not matches[0].is_file():
-            raise ValueError(f"FreeMHD B2 output table {name} is unavailable")
-        if (
-            header is not None
-            and re.search(rf"(?m)^# Time\s+{re.escape(header)}\s*$", matches[0].read_text()) is None
-        ):
-            raise ValueError(f"FreeMHD B2 output table {name} header differs")
-        rows = [
-            [float(value) for value in re.findall(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?", line)]
-            for line in matches[0].read_text(encoding="utf-8").splitlines()
-            if line.strip() and not line.lstrip().startswith("#")
-        ]
-        if any(len(row) != width for row in rows):
-            raise ValueError(f"FreeMHD B2 table width differs: {matches[0].name}")
-        values = np.asarray(rows, dtype=float)
-        if (
-            values.shape != (2, width)
-            or not np.all(np.isfinite(values))
-            or np.any(np.diff(values[:, 0]) <= 0.0)
-        ):
-            raise ValueError(f"FreeMHD B2 table rows differ: {matches[0].name}")
-        if not np.array_equal(values[:, 0], times):
-            raise ValueError(f"FreeMHD B2 output table {name} times differ")
-        return values[:, 1:]
-
-    probe_files = list((post / "b2PressureTaps").rglob("p"))
-    if len(probe_files) != 1 or probe_files[0].is_symlink() or not probe_files[0].is_file():
-        raise ValueError("FreeMHD B2 pressure probe table is unavailable")
-    probe_path = probe_files[0]
-    probe_text = probe_path.read_text(encoding="utf-8")
-    locations = re.findall(r"(?m)^# Probe (\d+) \(([^)]+)\)$", probe_text)
-    if len(locations) != 16 or [int(index) for index, _ in locations] != list(range(16)):
-        raise ValueError("FreeMHD B2 pressure probe headers differ")
-    time_header = re.search(r"(?m)^#[ \t]+Time(?:[ \t]+(.*))?$", probe_text)
-    if time_header is None or (
-        time_header.group(1) and time_header.group(1).split() != list(map(str, range(16)))
-    ):
-        raise ValueError("FreeMHD B2 pressure probe columns differ")
-    probe_points = np.asarray([[float(value) for value in point.split()] for _, point in locations])
-    if not (
-        np.all(np.diff(probe_points[:8, 0]) > 0.0)
-        and np.array_equal(probe_points[:8, 0], probe_points[8:, 0])
-        and np.allclose(probe_points[:8, 1:], (0.8, 0.0))
-        and np.allclose(probe_points[8:, 1:], (0.0, 0.8))
-    ):
-        raise ValueError("FreeMHD B2 pressure probe geometry differs")
-    probes = table("b2PressureTaps", "p", 17)
-    fields = {
-        "massIn": "sum(rhoPhi)",
-        "massOut": "sum(rhoPhi)",
-        "currentIn": "sum(jn)",
-        "currentOut": "sum(jn)",
-        "currentIntoSolid": "sum(jn)",
-        "currentIntoSolidMagnitude": "sumMag(jn)",
-    }
-    fluxes = {name: table(name, header=header)[:, 0] for name, header in fields.items()}
-    if np.any(fluxes["currentIntoSolidMagnitude"] < 0.0):
-        raise ValueError("FreeMHD B2 interface current magnitude is negative")
-    mesh = (case / "system/blockMeshDict").read_text(encoding="utf-8")
-    x_min, x_max, nx = (
-        _extract_first_scalar(mesh, rf"\b{name}\s+([0-9eE+.\-]+)\s*;") for name in ("xMin", "xMax", "Nx")
-    )
-    if None in (x_min, x_max, nx) or int(nx) != 8:
-        raise ValueError("FreeMHD B2 pressure stations differ")
-    x = np.linspace(float(x_min), float(x_max), int(nx) + 1)
-    x = 0.5 * (x[:-1] + x[1:])
-    pressure = probes[-1, 8:] - probes[-1, :8]
-    pressure = (pressure - np.mean(pressure[(x <= -7.5) | (x >= 5.0)])) / 540.0
-    activity = np.abs(fluxes["currentIntoSolidMagnitude"]) / math.sqrt(540.0)
-    residuals: dict[str, float] = {}
-    for field, value in re.findall(
-        r"Solving for ([^,\n]+), Initial residual =\s*[0-9eE+.\-]+, Final residual =\s*([0-9eE+.\-]+)",
-        log,
-    ):
-        residuals[field] = max(residuals.get(field, 0.0), float(value))
+    x = points[:8, 0]
+    observable = taps[8:] - taps[:8]  # side minus top, in rho U^2 = sigma U B0^2 L / N
+    observable = (observable - observable[(x <= PLATEAU[0]) | (x >= PLATEAU[1])].mean()) / 540.0
+    magnitude = np.abs(fluxes["currentIntoSolidMagnitude"])
     return {
-        "steps": 2,
-        "stop_reason": "step_limit",
-        "dt": dt.tolist(),
-        "courant_mean": courant[:, 0].tolist(),
-        "courant_max": courant[:, 1].tolist(),
+        "steps": int(times.size),
+        "dt": np.diff(np.concatenate(([0.0], times))).tolist(),
+        "courant_max": courant[:, 1].tolist() if courant.size else [],
         "mass_balance": float(np.max(np.abs(fluxes["massIn"] + fluxes["massOut"])) / 4.0),
         "current_balance": float(
             np.max(np.abs(fluxes["currentIn"] + fluxes["currentOut"])) / math.sqrt(540.0)
         ),
         "interface_current_balance": float(
-            np.max(
-                np.abs(fluxes["currentIntoSolid"])
-                / np.maximum(np.abs(fluxes["currentIntoSolidMagnitude"]), 1.0e-30)
-            )
+            np.max(np.abs(fluxes["currentIntoSolid"]) / np.maximum(magnitude, 1e-30))
         ),
-        "interface_current_activity": float(np.max(activity)),
+        "interface_current_activity": float(np.max(magnitude) / math.sqrt(540.0)),
         "x_over_L": x.tolist(),
-        "pressure_observable": pressure.tolist(),
-        "residual_max": residuals,
-        "wall_seconds": float(metadata["wall_seconds"]),
+        "pressure_observable": observable.tolist(),
     }
 
 
-def observe_freemhd_b2_contract(
-    case_dir: str | Path, source_dir: str | Path, evaluator: str | Path | None = None
-) -> dict[str, object]:
-    """Derive the tiny B2 contract from effective OpenFOAM dictionaries and source bytes."""
+def freemhd_failures(observed: dict[str, object], limits: dict[str, float]) -> list[str]:
+    """The ``[harness_smoke_execution]`` gates that apply to the FreeMHD run."""
 
-    case, source = Path(case_dir), Path(source_dir)
-
-    def read(relative: str) -> str:
-        return (case / relative).read_text(encoding="utf-8")
-
-    def scalar(text: str, key: str) -> float:
-        value = _extract_first_scalar(text, rf"\b{re.escape(key)}\s+([0-9eE+.\-]+)\s*;")
-        if value is None:
-            raise ValueError(f"FreeMHD B2 input omits {key}")
-        return value
-
-    def block(text: str, name: str) -> str:
-        value = _extract_foam_block(text, name)
-        if value is None:
-            raise ValueError(f"FreeMHD B2 input omits {name}")
-        return value
-
-    source_pin = json.loads((source / "source-pin.json").read_text(encoding="utf-8"))
-    files = source_pin.get("files") if isinstance(source_pin, dict) else None
-    if not isinstance(files, dict) or not files:
-        raise ValueError("FreeMHD B2 source snapshot is incomplete")
-    source_text: dict[str, str] = {}
-    for relative, expected in files.items():
-        path = source / relative
-        if artifact_sha256(path, "file") != expected:
-            raise ValueError(f"FreeMHD B2 source snapshot changed: {relative}")
-        source_text[Path(relative).name] = path.read_text(encoding="utf-8")
-    required_sources = {
-        "mhdUEqn.H",
-        "ePotEqn.H",
-        "limitedLinear.H",
-        "limitedLinear.C",
-        "LimitedScheme.H",
-        "NVDTVD.H",
-        "LimitFuncs.C",
+    dt, courant = np.asarray(observed["dt"]), np.asarray(observed["courant_max"])
+    balances = ("mass_balance", "current_balance", "interface_current_balance")
+    passed = {
+        "steps": observed["steps"] == limits["executed_steps"]
+        and np.all(np.abs(dt - DT) <= limits["dt_absolute_tolerance"]),
+        "courant": courant.shape == dt.shape and np.all(courant <= limits["courant_max"]),
+        **{gate: observed[gate] <= limits[f"{gate}_max"] for gate in balances},
+        "interface_current_activity": observed["interface_current_activity"]
+        >= limits["interface_current_activity_min"],
+        "pressure": np.all(np.isfinite(observed["pressure_observable"])),
     }
-    if not required_sources <= set(source_text):
-        raise ValueError("FreeMHD B2 source snapshot lacks solver or limiter evidence")
-    momentum, electric = source_text["mhdUEqn.H"], source_text["ePotEqn.H"]
-    source_semantics = all(
-        (
-            "fvm::ddt(rho, U) + fvm::div(rhoPhi, U)" in momentum,
-            "turbulence.divDevRhoReff(U)" in momentum,
-            "fvm::laplacian(elcond,potE)" in electric,
-            "fvc::div(psiub)" in electric,
-            "JConservativeForm" in electric,
-            "makeLimitedSurfaceInterpolationScheme(limitedLinear, limitedLinearLimiter)"
-            in source_text["limitedLinear.C"],
-            "makeLimitedSurfaceInterpolationTypeScheme(SS,LIMITER,NVDTVD,magSqr,vector)"
-            in source_text["LimitedScheme.H"],
-            "return Foam::magSqr(phi);" in source_text["LimitFuncs.C"],
-        )
-    )
-    if not source_semantics:
-        raise ValueError("FreeMHD B2 pinned sources do not implement the matched equations")
+    return [gate for gate, ok in passed.items() if not ok]
 
-    mesh_text, schemes = read("system/blockMeshDict"), read("system/liquid/fvSchemes")
-    x_min, x_max, half, outer = (scalar(mesh_text, key) for key in ("xMin", "xMax", "Ly", "Ly_wall"))
-    nx, ny, nz, wall_cells = (int(scalar(mesh_text, key)) for key in ("Nx", "Ny", "Nz", "N_wall"))
-    if (
-        len(re.findall(r"\bhex\s*\(", mesh_text)) != 9
-        or len(re.findall(r"\bsolidWalls\s*\(", mesh_text)) != 8
-    ):
-        raise ValueError("FreeMHD B2 block zones do not form one fluid plus one shell")
-    x_faces = np.linspace(x_min, x_max, nx + 1)
-    fluid_faces = np.linspace(-half, half, ny + 1)
-    y_faces = np.concatenate(([-outer], fluid_faces, [outer]))
-    z_faces = np.concatenate(([-outer], np.linspace(-half, half, nz + 1), [outer]))
 
-    field_text = read("system/liquid/setExprFieldsDict")
-    if field_text != read("system/solidWalls/setExprFieldsDict"):
-        raise ValueError("FreeMHD B2 fluid and wall fields differ")
-    variables = dict(re.findall(r'"([A-Za-z][A-Za-z0-9]*)=([^";]+)"', field_text))
-    labels = sorted(name[1:] for name in variables if re.fullmatch(r"x[a-z]", name))
-    if labels != [chr(97 + index) for index in range(len(labels))] or {f"b{label}" for label in labels} - set(
-        variables
-    ):
-        raise ValueError("FreeMHD B2 field anchors are incomplete")
-    anchors_x = np.asarray([float(variables[f"x{label}"]) for label in labels])
-    anchors_b = np.asarray([float(variables[f"b{label}"]) for label in labels])
-    slopes = [f"(b{right}-b{left})/(x{right}-x{left})" for left, right in zip(labels, labels[1:])]
-    terms = [f"b{labels[0]}", f"{slopes[0]}*(x-x{labels[0]})"]
-    terms += [
-        f"({slopes[index]}-{slopes[index - 1]})*pos(x-x{labels[index]})*(x-x{labels[index]})"
-        for index in range(1, len(labels) - 1)
-    ]
-    expression = "+".join(terms)
-    actual_expression = re.search(
-        r"expression\s*#\{\s*vector\(0,Bscale\*\((.*)\),0\)\s*#\};",
-        field_text,
-        re.DOTALL,
-    )
-    if actual_expression is None or re.sub(r"\s+", "", actual_expression.group(1)) != expression:
-        raise ValueError("FreeMHD B2 field expression differs from its anchors")
-    field_scale = math.sqrt(float(re.fullmatch(r"sqrt\(([^)]+)\)", variables["Bscale"]).group(1)))
-    sample_x = 0.5 * (x_faces[:-1] + x_faces[1:])
-    sample_b = np.interp(sample_x, anchors_x, anchors_b)
-    anchors_sha = hashlib.sha256(
-        json.dumps(
-            {"x_over_L": anchors_x.tolist(), "b_over_B0": anchors_b.tolist()},
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode()
-    ).hexdigest()
+def solve_core_flow(nx: int = 400, nz: int = 32, ny: int = 32) -> dict[str, object]:
+    """Steady inertialess core flow in the B2 duct (aspect 1, ``c_t = c_s`` from ``[wall]``, unit mean velocity)."""
 
-    def quoted(key):
-        return re.search(rf"\b{key}\s+\"([^\"]+)\"\s*;", field_text).group(1)
+    from lmhdx.coreflow import CoreFlow
 
-    if quoted("lmxFieldAnchorsSHA256") != anchors_sha:
-        raise ValueError("FreeMHD B2 field anchor hash differs")
-
-    fluid = infer_liquid_material_properties(case)
-    wall_conductivity, insulator = infer_solid_conductivities(case)
-    if fluid is None or wall_conductivity is None or insulator is not None:
-        raise ValueError("FreeMHD B2 material topology is incomplete")
-    change, solution, control = (
-        read("system/liquid/changeDictionaryDict"),
-        read("system/liquid/fvSolution"),
-        read("system/controlDict"),
+    spec, reference = load_spec(), load_reference()
+    geometry, c_w = spec["geometry"], spec["wall"]["wall_conductance_ratio"]
+    x = np.linspace(geometry["x_over_L_min"], geometry["x_over_L_max"], nx + 1)
+    field = np.interp(x, reference["x_over_L"], reference["b_over_B0"])
+    started = time.perf_counter()
+    result = CoreFlow(x, aspect=1.0, nz=nz, ny=ny).solve(
+        field, c_t=c_w, c_s=c_w, mean_velocity=1.0, beta_max=BETA_MAX
     )
-    u, pressure, potential = (block(change, name) for name in ("U", "p_rgh", "potE"))
-    inlet, sink = (
-        block(block(u, "boundaryField"), "inlet"),
-        block(block(u, "boundaryField"), "sink"),
-    )
-    flow_rate = scalar(inlet, "volumetricFlowRate")
-    velocity = flow_rate / (4.0 * half * half)
-    length = half
-    ha = hartmann_number(
-        magnetic_field=field_scale,
-        length_scale=length,
-        conductivity=fluid["conductivity"],
-        density=fluid["density"],
-        kinematic_viscosity=fluid["kinematic_viscosity"],
-    )
-    interaction = interaction_parameter(
-        magnetic_field=field_scale,
-        length_scale=length,
-        conductivity=fluid["conductivity"],
-        density=fluid["density"],
-        velocity=velocity,
-    )
-    solvers = block(solution, "solvers")
-    p_solver, u_solver, e_solver = (
-        block(solvers, "p_rgh"),
-        block(solvers, '"(U).*"'),
-        block(solvers, "potE"),
-    )
-    solid_e_solver = block(block(read("system/solidWalls/fvSolution"), "solvers"), "potE")
-    alpha, temperature = block(change, "alpha.liquidMetal"), block(change, "T")
-    solid_potential = block(read("system/solidWalls/changeDictionaryDict"), "potE")
-    reductions_hold = all(
-        (
-            "internalField uniform 1;" in alpha,
-            "internalField uniform 300;" in temperature,
-            "simulationType laminar;" in read("constant/liquid/turbulenceProperties"),
-            "limitVelocity" not in read("constant/liquid/fvOptions"),
-            "value (0 0 0);" in read("constant/g"),
-            scalar(control, "BtStartTime") == scalar(control, "BtDuration") == 0.0,
-            "JConservativeForm true;" in control and "adjustTimeStep off;" in control,
-            scalar(solid_e_solver, "maxIter") == scalar(e_solver, "maxIter"),
-            scalar(solid_e_solver, "tolerance") == scalar(e_solver, "tolerance"),
-            "type zeroGradient" in block(block(solid_potential, "boundaryField"), "outerWalls"),
-        )
-    )
-    if not reductions_hold:
-        raise ValueError("FreeMHD B2 phase, thermal, electric, or fixed-step reduction differs")
-    observable, normalization = _matched_b2_evaluator(evaluator)
-    zero_current = all(
-        "type zeroGradient" in block(block(potential, "boundaryField"), name) for name in ("inlet", "sink")
-    )
+    pressure, flux = np.asarray(result.pressure), np.asarray(result.axial_flux)
+    wall_seconds = time.perf_counter() - started
+    # Pressure is constant along B: the side tap is the first z centre (half a cell from z = -1,
+    # not extrapolated), the top tap the last z centre (half a cell from z = 0).
+    observable = pressure[:, 0] - pressure[:, -1]
+    observable = observable - observable[(x <= PLATEAU[0]) | (x >= PLATEAU[1])].mean()
     return {
-        "equations": {
-            "momentum": "transient incompressible Navier-Stokes-Lorentz",
-            "inertia": "conservative div(rhoPhi,U)",
-            "time_discretization": "Euler" if re.search(r"default\s+Euler\s*;", schemes) else "unmatched",
-            "advection_discretization": "Gauss limitedLinear 1.0"
-            if "div(rhoPhi,U) Gauss limitedLinear 1.0;" in schemes
-            else "unmatched",
-            "advection_assembly": "implicit fvm::div with frozen rhoPhi and limiter weights",
-            "advection_vector_limiter": "single magSqr(U) limiter applied to all components",
-            "gradient_discretization": "cellLimited leastSquares 1.0"
-            if "default cellLimited leastSquares 1.0;" in schemes
-            else "unmatched",
-            "viscous_stress": "laminar divDevRhoReff",
-            "electric_model": "inductionless Ohm law with div(J)=0",
-            "phase_reduction": "alpha=1 invariant",
-            "thermal_reduction": "constant temperature and properties",
-        },
-        "nondimensional_groups": {
-            "hartmann_number": ha,
-            "interaction_parameter": interaction,
-            "reynolds_number": reynolds_number(
-                velocity=velocity,
-                length_scale=length,
-                kinematic_viscosity=fluid["kinematic_viscosity"],
-            ),
-            "magnetic_reynolds_number_assumption": "Rm << 1",
-        },
-        "geometry": {
-            "kind": "square_duct",
-            "length_scale": "duct half-width",
-            "half_width_m": scalar(mesh_text, "physicalHalfWidth"),
-            "x_over_L_min": x_min,
-            "x_over_L_max": x_max,
-            "constant_cross_section": True,
-        },
-        "magnetic_field": {
-            "representation": "tabulated monotone interpolation",
-            "components": "B = (0, B_y(x), 0) in the global Cartesian frame",
-            "coordinate": "x / half-width",
-            "normalization": "B_y / B0",
-            "no_extrapolation": bool(re.search(r"\blmxExtrapolation\s+forbidden\s*;", field_text)),
-            "normal_current_at_axial_ends": 0.0 if zero_current else math.nan,
-        },
-        "wall": {
-            "model": "uniform thin conducting wall",
-            "wall_conductance_ratio": _contract_scalar(
-                wall_conductance_ratio(
-                    wall_conductivity=wall_conductivity,
-                    wall_thickness=outer - half,
-                    fluid_conductivity=fluid["conductivity"],
-                    length_scale=length,
-                )
-            ),
-            "numerical_realization": "explicit volumetric shell preserving c_w",
-            "thickness_over_L": _contract_scalar((outer - half) / length),
-            "outer_electric_boundary": "zero normal current",
-        },
-        "boundary_drive": {
-            "velocity_inlet": "integral flow rate with extrapolated profile",
-            "velocity_outlet": "zero normal gradient" if "type zeroGradient" in sink else "unmatched",
-            "velocity_walls": "no slip",
-            "pressure_inlet": "zero normal gradient",
-            "pressure_outlet": "fixed gauge",
-            "pressure_outlet_gauge": scalar(block(block(pressure, "boundaryField"), "sink"), "value uniform"),
-            "flow_constraint_scope": "inlet face only",
-            "nondimensional_flow_rate": flow_rate,
-            "electric_axial_ends": "zero normal current" if zero_current else "unmatched",
-        },
-        "observable": observable,
-        "normalization": normalization,
-        "mesh_coordinates": {
-            "coordinate_system": "Cartesian x-y-z faces in duct-half-width units",
-            "family": "uniform 5x5 fluid grid with one explicit wall cell per side",
-            "exact_coordinate_arrays_required": True,
-            "x_faces": _contract_array(x_faces),
-            "y_faces": _contract_array(y_faces),
-            "z_faces": _contract_array(z_faces),
-            "field_source": quoted("lmxFieldSource"),
-            "field_source_sha256": quoted("lmxFieldSourceSHA256"),
-            "field_anchors_sha256": anchors_sha,
-            "field_sample_x_over_L": _contract_array(sample_x),
-            "field_sample_b_over_B0": _contract_array(sample_b),
-        },
-        "stopping_rules": {
-            "dt": scalar(control, "deltaT"),
-            "electric_iterations": int(scalar(e_solver, "maxIter")),
-            "electric_tolerance": scalar(e_solver, "tolerance"),
-            "projection_iterations": int(scalar(p_solver, "maxIter")),
-            "projection_tolerance": scalar(p_solver, "tolerance"),
-            "momentum_iterations": int(scalar(u_solver, "maxIter")),
-            "momentum_tolerance": scalar(u_solver, "tolerance"),
-            "executed_steps": round(scalar(control, "endTime") / scalar(control, "deltaT")),
-            "steady_steps_required": int(scalar(control, "lmxSteadyStepsRequired")),
-            "expected_stop_reason": "step_limit",
-        },
+        "mesh": {"nx": nx, "nz": nz, "ny": ny},
+        "wall_seconds": wall_seconds,
+        "finite": bool(np.all(np.isfinite(pressure)) and np.all(np.isfinite(flux))),
+        "floored_nodes": int(result.floored_nodes),
+        "weak_field_nodes": [int(np.sum(np.abs(field) * BETA_MAX < bound)) for bound in (1 - 1e-6, 1 + 1e-6)],
+        "axial_flux_spread": float(np.ptp(flux) / abs(flux.mean())),
+        "x_over_L": x.tolist(),
+        "pressure_observable": observable.tolist(),
     }
 
 
-def _validate_b2_smoke_execution(
-    lmhdx: dict[str, object], freemhd: dict[str, object], limits: dict[str, object]
-) -> tuple[list[str], list[str], dict[str, float]]:
-    execution_failed: list[str] = []
-    expected_dt = 1.0 / 540000.0
-    for name, observed in (("lmhdx", lmhdx), ("freemhd", freemhd)):
+def core_flow_failures(observed: dict[str, object]) -> list[str]:
+    weak = observed["weak_field_nodes"]  # |B| clearly below / not clearly above 1/beta_max
+    passed = {
+        "finite": observed["finite"],
+        "floored_nodes": min(weak) <= observed["floored_nodes"] <= max(weak),
+        "axial_flux": observed["axial_flux_spread"] <= AXIAL_FLUX_SPREAD_MAX,
+    }
+    return [gate for gate, ok in passed.items() if not ok]
 
-        def fail(gate: str) -> None:
-            execution_failed.append(f"execution.{name}.{gate}")
 
-        try:
-            dt = np.asarray(observed["dt"], dtype=float)
-            co_mean = np.asarray(observed["courant_mean"], dtype=float)
-            co_max = np.asarray(observed["courant_max"], dtype=float)
-            if observed["steps"] != limits["executed_steps"] or observed["stop_reason"] != "step_limit":
-                fail("stopping")
-            if (
-                dt.shape != (2,)
-                or not np.all(np.isfinite(dt))
-                or np.any(np.abs(dt - expected_dt) > limits["dt_absolute_tolerance"])
-            ):
-                fail("dt")
-            courant = np.concatenate((co_mean, co_max))
-            if (
-                co_mean.shape != (2,)
-                or co_max.shape != (2,)
-                or not np.all(np.isfinite(courant))
-                or np.any(co_max > limits["courant_max"])
-            ):
-                fail("courant")
-            for gate in (
-                "mass_balance",
-                "current_balance",
-                "interface_current_balance",
-            ):
-                if not math.isfinite(float(observed[gate])) or float(observed[gate]) > limits[f"{gate}_max"]:
-                    fail(gate)
-            activity = float(observed["interface_current_activity"])
-            if not math.isfinite(activity) or activity < limits["interface_current_activity_min"]:
-                fail("interface_current_activity")
-            if name == "lmhdx":
-                restart = float(observed["restart_max_abs"])
-                if not math.isfinite(restart) or restart > limits["restart_absolute_tolerance"]:
-                    fail("restart")
-        except (KeyError, TypeError, ValueError):
-            fail("schema")
+def _difference(lmhdx: dict, x_ref, reference) -> dict[str, float]:
+    delta = np.interp(x_ref, lmhdx["x_over_L"], lmhdx["pressure_observable"]) - np.asarray(reference)
+    return {"rms": float(np.sqrt(np.mean(delta**2))), "linf": float(np.max(np.abs(delta)))}
 
-    comparison_failed: list[str] = []
-    metrics: dict[str, float] = {}
-    try:
-        x_lmx, x_freemhd = (np.asarray(item["x_over_L"], dtype=float) for item in (lmhdx, freemhd))
-        p_lmx, p_freemhd = (np.asarray(item["pressure_observable"], dtype=float) for item in (lmhdx, freemhd))
-        if not np.array_equal(x_lmx, x_freemhd):
-            comparison_failed.append("x")
-        for key in ("courant_mean", "courant_max"):
-            if not np.allclose(
-                np.asarray(lmhdx[key]),
-                np.asarray(freemhd[key]),
-                rtol=limits["cross_code_courant_relative_tolerance"],
-                atol=limits["cross_code_courant_absolute_tolerance"],
-            ):
-                comparison_failed.append(key)
-        if (
-            p_lmx.shape != x_lmx.shape
-            or p_freemhd.shape != x_freemhd.shape
-            or not np.all(np.isfinite(np.concatenate((x_lmx, x_freemhd, p_lmx, p_freemhd))))
-        ):
-            raise ValueError
-        delta = p_lmx - p_freemhd
-        metrics = {
-            "pressure_rms": float(np.sqrt(np.mean(delta**2))),
-            "pressure_linf": float(np.max(np.abs(delta))),
+
+def run(args: argparse.Namespace) -> int:
+    root = args.output
+    root.mkdir(parents=True, exist_ok=False)
+    limits = load_spec()["harness_smoke_execution"]
+    artifacts = {"spec": artifact_sha256(SPEC), "reference": artifact_sha256(REFERENCE)}
+    artifacts["lmhdx_coreflow"] = artifact_sha256(_DATA.parents[1] / "coreflow.py")
+    artifacts["freemhd_input"] = materialize_freemhd_input(root / "freemhd_input")
+    skeleton = args.freemhd_install_dir / "cases" / "hunt_demo"
+    if skeleton.is_dir():
+        artifacts["freemhd_install_skeleton"] = {
+            name: artifact_sha256(skeleton / "system" / name, "file") for name in _SKELETON
         }
-        for key in metrics:
-            if metrics[key] > limits[f"cross_code_{key}_max"]:
-                comparison_failed.append(key)
-    except (KeyError, TypeError, ValueError):
-        comparison_failed.append("arrays")
-    return execution_failed, comparison_failed, metrics
-
-
-def validate_matched_b_record(
-    record: dict[str, object],
-    *,
-    expected_case_id: str,
-    artifact_root: str | Path | None = None,
-) -> dict[str, object]:
-    """Validate matched Benchmark-B semantics and recompute comparison gates."""
-
-    from lmhdx.validation import (
-        _MATCHED_CONTRACT_SECTIONS,
-        BENCHMARK_B_SPEC_FILES,
-        canonical_matched_b_contract,
-        load_benchmark_b_reference,
-        load_benchmark_b_spec,
+    if args.freemhd_source_repo.is_dir():
+        snapshot_freemhd_source(args.freemhd_source_repo, root / "freemhd_source")
+        artifacts["freemhd_source"] = artifact_sha256(root / "freemhd_source")
+    elif not args.preflight:
+        raise FileNotFoundError("the pinned FreeMHD source repository is required")
+    record: dict[str, object] = {"schema_version": 4, "case_id": CASE_ID, "artifacts": artifacts}
+    if args.preflight:
+        (root / "preflight.json").write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+        print(json.dumps(record, indent=2, sort_keys=True))
+        return 0
+    lmhdx = solve_core_flow()
+    lmhdx["failures"] = core_flow_failures(lmhdx)
+    seconds = run_freemhd(
+        root / "freemhd_input", root / "freemhd_output", args.freemhd_image, args.nproc, args.timeout
     )
-
-    spec = load_benchmark_b_spec(expected_case_id)
-    expected_role = {
-        "B1-fringing-pipe": "b1-production",
-        "B2-fringing-square": "b2-production",
-    }[expected_case_id]
-    schema_failed: list[str] = []
-    required = {
-        "schema_version",
-        "case_id",
-        "acceptance_role",
-        "contract",
-        "comparison",
-        "provenance",
+    if artifact_sha256(root / "freemhd_input", "tree") != artifacts["freemhd_input"]:
+        raise ValueError("the FreeMHD input changed during the run")
+    freemhd = observe_freemhd(root / "freemhd_output") | {
+        "wall_seconds": seconds,
+        "image": args.freemhd_image,
     }
-    schema_version = record.get("schema_version")
-    role = record.get("acceptance_role")
-    executed_smoke = (
-        schema_version == 3 and expected_case_id == "B2-fringing-square" and role == "harness-smoke"
-    )
-    if (
-        set(record) != required
-        or schema_version not in {2, 3}
-        or (schema_version == 3 and not executed_smoke)
-    ):
-        schema_failed.append("schema")
-    if record.get("case_id") != expected_case_id:
-        schema_failed.append("case_id")
-    if role not in {"harness-smoke", "b1-production", "b2-production"}:
-        schema_failed.append("acceptance_role")
-    if "exact_case_match" in record:
-        schema_failed.append("schema.exact_case_match")
-
-    contract = record.get("contract")
-    lmhdx = contract.get("lmhdx") if isinstance(contract, dict) else None
-    freemhd = contract.get("freemhd") if isinstance(contract, dict) else None
-    contract_failed: list[str] = []
-    try:
-        expected_contract = canonical_matched_b_contract(spec, str(role))
-    except ValueError:
-        expected_contract = None
-        contract_failed.append("contract.acceptance_role.unavailable")
-    for section in _MATCHED_CONTRACT_SECTIONS:
-        left = lmhdx.get(section) if isinstance(lmhdx, dict) else None
-        right = freemhd.get(section) if isinstance(freemhd, dict) else None
-        if not isinstance(left, dict) or not left or not isinstance(right, dict) or not right:
-            contract_failed.append(f"contract.{section}.missing")
-        elif left != right:
-            contract_failed.append(f"contract.{section}.mismatch")
-        elif expected_contract is not None and left != expected_contract[section]:
-            contract_failed.append(f"contract.{section}.canonical")
-
-    provenance = record.get("provenance") if isinstance(record.get("provenance"), dict) else {}
-    artifacts = provenance.get("artifacts") if isinstance(provenance, dict) else None
-    artifact_failed: list[str] = []
-    calculated_artifacts: dict[str, str] = {}
-    resolved_artifacts: dict[str, Path] = {}
-    if artifact_root is None:
-        artifact_failed.append("provenance.artifact_root")
-    else:
-        try:
-            root = Path(artifact_root).resolve(strict=True)
-            if not root.is_dir():
-                raise ValueError
-        except (FileNotFoundError, ValueError):
-            artifact_failed.append("provenance.artifact_root")
-        else:
-            if not isinstance(artifacts, dict) or set(artifacts) != set(_MATCHED_B_ARTIFACT_NAMES):
-                artifact_failed.append("provenance.artifacts")
-            else:
-                for name in _MATCHED_B_ARTIFACT_NAMES:
-                    try:
-                        path, kind, expected_hash = _resolve_artifact(root, artifacts[name])
-                        expected_kind = (
-                            "tree"
-                            if executed_smoke and name in {"lmx_output", "freemhd_output"}
-                            else _MATCHED_B_ARTIFACT_KINDS[name]
-                        )
-                        if kind != expected_kind:
-                            raise ValueError("kind")
-                        calculated = artifact_sha256(path, kind)
-                    except (OSError, ValueError) as error:
-                        artifact_failed.append(f"provenance.{name}.{error}")
-                        continue
-                    resolved_artifacts[name] = path
-                    calculated_artifacts[name] = calculated
-                    if calculated != expected_hash:
-                        artifact_failed.append(f"provenance.{name}.sha256.current")
-                paths = list(resolved_artifacts.values())
-                identities = [(os.stat(path).st_dev, os.stat(path).st_ino) for path in paths]
-                overlap = len(set(identities)) != len(identities) or any(
-                    left in right.parents or right in left.parents
-                    for index, left in enumerate(paths)
-                    for right in paths[index + 1 :]
-                )
-                if overlap:
-                    artifact_failed.append("provenance.artifacts.overlap")
-    spec_path = BENCHMARK_A_SPEC_DIR / BENCHMARK_B_SPEC_FILES[expected_case_id]
-    if provenance.get("benchmark_spec_sha256") != hashlib.sha256(spec_path.read_bytes()).hexdigest():
-        artifact_failed.append("provenance.benchmark_spec_sha256.current")
-    if role == "harness-smoke" and "freemhd_source" in resolved_artifacts:
-        try:
-            source_pin = json.loads((resolved_artifacts["freemhd_source"] / "source-pin.json").read_text())
-            reference = spec["free_mhd_discretization_reference"]
-            expected_files = {
-                reference[key]: reference[f"{key}_sha256"] for key in reference if key.endswith("_source")
-            }
-            if (
-                source_pin.get("commit") != reference["repository_commit"]
-                or source_pin.get("openfoam_release") != reference["openfoam_release"]
-                or source_pin.get("files") != dict(sorted(expected_files.items()))
-            ):
-                raise ValueError
-        except (
-            AttributeError,
-            KeyError,
-            OSError,
-            TypeError,
-            ValueError,
-            json.JSONDecodeError,
-        ):
-            artifact_failed.append("provenance.freemhd_source.pin")
-
-    comparison = record.get("comparison")
-    comparison = comparison if isinstance(comparison, dict) else {}
-    metrics: dict[str, float] = {}
-    comparison_failed: list[str] = []
-    if executed_smoke:
-        if comparison != {"source": "independent-output-observers"}:
-            schema_failed.append("comparison.source")
-    else:
-        try:
-            x = np.asarray(comparison["x_over_L"], dtype=float)
-            lmx_values = np.asarray(comparison["lmx_observable"], dtype=float)
-            freemhd_values = np.asarray(comparison["freemhd_observable"], dtype=float)
-            reference = load_benchmark_b_reference(expected_case_id)
-            reference_x = np.asarray(reference["x_over_L"], dtype=float)
-            valid = (
-                x.ndim == 1
-                and x.size >= 2
-                and lmx_values.shape == x.shape == freemhd_values.shape
-                and np.all(np.isfinite(x))
-                and np.all(np.isfinite(lmx_values))
-                and np.all(np.isfinite(freemhd_values))
-                and np.all(np.diff(x) > 0.0)
-                and x[0] >= reference_x[0]
-                and x[-1] <= reference_x[-1]
-            )
-            if not valid:
-                raise ValueError
-            uncertainty = np.interp(
-                x,
-                reference_x,
-                np.asarray(reference["pressure_uncertainty"], dtype=float),
-            )
-            delta = lmx_values - freemhd_values
-            metrics = {
-                "weighted_rms": float(np.sqrt(np.mean((delta / uncertainty) ** 2))),
-                "weighted_linf": float(np.max(np.abs(delta / uncertainty))),
-                "integrated_relative": float(
-                    abs(np.trapezoid(delta, x))
-                    / max(
-                        abs(np.trapezoid(freemhd_values, x)),
-                        float(np.trapezoid(uncertainty, x)),
-                    )
-                ),
-            }
-        except (KeyError, TypeError, ValueError):
-            comparison_failed.append("arrays")
-        if metrics:
-            acceptance = spec["acceptance"]
-            limits = {
-                "weighted_rms": float(acceptance["weighted_rms_max"]),
-                "weighted_linf": float(acceptance["weighted_linf_max"]),
-                "integrated_relative": float(acceptance["integrated_pressure_relative_error_max"]),
-            }
-            comparison_failed = [name for name, value in metrics.items() if value > limits[name]]
-
-    schema_complete = not schema_failed
-    artifact_pass = not artifact_failed
-    contract_pass = schema_complete and not contract_failed
-    comparison_pass = bool(metrics) and not comparison_failed
-    observation_failed: list[str] = []
-    observed_outputs: dict[str, dict[str, object]] = {}
-    if (
-        expected_case_id == "B2-fringing-square"
-        and role == "harness-smoke"
-        and all(
-            name in resolved_artifacts
-            for name in ("lmx_input", "freemhd_input", "freemhd_source", "evaluator")
-        )
-    ):
-        try:
-            observed_lmx = observe_lmx_b2_contract(
-                resolved_artifacts["lmx_input"], resolved_artifacts["evaluator"]
-            )
-            observed_freemhd = observe_freemhd_b2_contract(
-                resolved_artifacts["freemhd_input"],
-                resolved_artifacts["freemhd_source"],
-                resolved_artifacts["evaluator"],
-            )
-
-            def differences(left: object, right: object, prefix: str) -> list[str]:
-                if isinstance(left, dict) and isinstance(right, dict):
-                    keys = sorted(set(left) | set(right))
-                    return [
-                        item
-                        for key in keys
-                        for item in differences(left.get(key), right.get(key), f"{prefix}.{key}")
-                    ]
-                if isinstance(left, list) and isinstance(right, list):
-                    return [] if left == right else [prefix]
-                return [] if left == right else [prefix]
-
-            observation_failed += [
-                f"{path}.lmx_observed" for path in differences(lmhdx, observed_lmx, "contract")
-            ]
-            observation_failed += [
-                f"{path}.freemhd_observed" for path in differences(freemhd, observed_freemhd, "contract")
-            ]
-            observation_failed += [
-                f"{path}.observer_mismatch"
-                for path in differences(observed_lmx, observed_freemhd, "contract")
-            ]
-            if executed_smoke:
-                observed_outputs = {
-                    "lmhdx": observe_lmx_b2_output(
-                        resolved_artifacts["lmx_output"],
-                        resolved_artifacts["lmx_input"],
-                        resolved_artifacts["evaluator"],
-                    ),
-                    "freemhd": observe_freemhd_b2_output(
-                        resolved_artifacts["freemhd_output"],
-                        resolved_artifacts["freemhd_input"],
-                        resolved_artifacts["evaluator"],
-                    ),
-                }
-        except (
-            KeyError,
-            OSError,
-            TypeError,
-            ValueError,
-            json.JSONDecodeError,
-        ) as error:
-            observation_failed.append(f"contract.observers.error.{type(error).__name__}")
-    else:
-        observation_failed.append("contract.observers.unavailable")
-    observation_pass = not observation_failed
-    execution_failed: list[str] = []
-    if executed_smoke:
-        execution_failed, comparison_failed, metrics = _validate_b2_smoke_execution(
-            observed_outputs.get("lmhdx", {}),
-            observed_outputs.get("freemhd", {}),
-            spec["harness_smoke_execution"],
-        )
-        comparison_pass = not comparison_failed
-    role_allows_acceptance = role == expected_role
-    all_failed = (
-        schema_failed
-        + contract_failed
-        + artifact_failed
-        + observation_failed
-        + execution_failed
-        + [f"comparison.{name}" for name in comparison_failed]
-    )
-    report = {
-        "schema_complete": schema_complete,
-        "artifact_pass": artifact_pass,
-        "contract_pass": contract_pass,
-        "observation_pass": observation_pass,
-        "comparison_pass": comparison_pass,
-        "role_allows_acceptance": role_allows_acceptance,
-        "acceptance_pass": contract_pass
-        and artifact_pass
-        and observation_pass
-        and comparison_pass
-        and role_allows_acceptance,
-        "failed_checks": all_failed,
-        "metrics": metrics,
-        "calculated_artifact_sha256": calculated_artifacts,
+    freemhd["failures"] = freemhd_failures(freemhd, limits)
+    artifacts["freemhd_output"] = artifact_sha256(root / "freemhd_output")
+    reference = load_reference()
+    record |= {
+        "freemhd": freemhd,
+        "lmhdx": lmhdx,
+        "reported_not_gated": {
+            "lmhdx_minus_freemhd": _difference(lmhdx, freemhd["x_over_L"], freemhd["pressure_observable"]),
+            "lmhdx_minus_alex": _difference(lmhdx, reference["x_over_L"], reference["pressure_observable"]),
+            "reason": "FreeMHD is a two-update transient smoke from a plug; LMhdX is the steady inertialess core flow.",
+        },
+        "execution_pass": not (lmhdx["failures"] or freemhd["failures"]),
     }
-    if executed_smoke:
-        report["execution_pass"] = (
-            schema_complete and artifact_pass and contract_pass and observation_pass and not execution_failed
-        )
-    return report
+    (root / "record.json").write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+    failures = {"lmhdx": lmhdx["failures"], "freemhd": freemhd["failures"]}
+    print(json.dumps({"failures": failures, "reported_not_gated": record["reported_not_gated"]}, indent=2))
+    return 0 if record["execution_pass"] else 2
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="python -m validation.freemhd", description=__doc__.splitlines()[0])
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--preflight", action="store_true", help="materialize and hash the inputs; no Docker")
+    parser.add_argument(
+        "--freemhd-image", default=os.environ.get("LMHDX_FREEMHD_IMAGE", "freemhd-install:latest")
+    )
+    for flag, default in (("install-dir", "freemhd_install"), ("source-repo", "lmx_external_codes/FreeMHD")):
+        variable = "LMHDX_FREEMHD_" + flag.upper().replace("-", "_")
+        parser.add_argument(f"--freemhd-{flag}", type=Path, default=Path(os.environ.get(variable, default)))
+    parser.add_argument("--nproc", type=int, default=2)
+    parser.add_argument("--timeout", type=float, default=1200.0)
+    return run(parser.parse_args(argv))
+
+
+if __name__ == "__main__":
+    sys.exit(main())

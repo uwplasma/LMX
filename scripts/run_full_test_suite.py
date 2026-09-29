@@ -32,7 +32,6 @@ _TEST_SHARDS = {
         "tests/test_runtime_logging.py",
         "tests/test_units_and_wall_models.py",
         "tests/test_freemhd.py",
-        "tests/test_run_benchmark_b_independence.py",
         "tests/test_benchmarks.py",
         "tests/test_example_runner.py",
         "tests/test_design.py",
@@ -99,7 +98,7 @@ _CHANGE_TEST_NAMES = {
     "advect": "advect core3d",
     "axial": "axial",
     "core3d": "core3d timeloop advect steady coreflow axial",
-    "coreflow": "coreflow",
+    "coreflow": "coreflow freemhd",
     "design": "design fully_developed",
     "fully_developed": "fully_developed design config cli solver example_runner",
     "steady": "steady fully_developed axial",
@@ -175,11 +174,9 @@ def _tests_for_changes(paths: tuple[str, ...]) -> tuple[str, ...]:
                 return _ALL_TESTS
         elif path.startswith("examples/"):
             selected.append("tests/test_example_runner.py")
-        elif path == "scripts/run_benchmark_b_independence.py":
-            selected.append("tests/test_run_benchmark_b_independence.py")
         elif path == "scripts/run_benchmarks.py":
             selected.append("tests/test_benchmarks.py")
-        elif path in {"scripts/run_freemhd_parity_suite.py", "validation/freemhd.py"}:
+        elif path == "validation/freemhd.py":
             selected.append("tests/test_freemhd.py")
         elif path in {
             "scripts/audit_architecture.py",
