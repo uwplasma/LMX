@@ -40,6 +40,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from ._programs import host_array
 from .bc import NEUMANN, PERIODIC, BoundaryCondition
 from .core3d import ChannelProblem
 from .em import lorentz_force, wall_insulated
@@ -267,8 +268,8 @@ def _compiled(problem: ChannelProblem):
             tolerance=_TOLERANCE[jnp.result_type(float).name],
         )
         velocity = solution.velocity
-        _, dy, dz = problem.grid.widths
-        weights = jnp.asarray(dy)[:, None] * jnp.asarray(dz)[None, :]
+        dy, dz = (host_array(problem.grid, _widths, axis) for axis in (1, 2))
+        weights = dy[:, None] * dz[None, :]
         fields, currents = _fields(problem, solution)
         # The solve's own residuals, at rest and at the root: evaluating them again doubled the program.
         scale = solution.initial_residual_norm
@@ -279,6 +280,10 @@ def _compiled(problem: ChannelProblem):
         return fields, jnp.sum(weights * velocity[0].data[0]), evidence
 
     return jax.jit(run)
+
+
+def _widths(grid: Grid, axis: int) -> np.ndarray:
+    return grid.widths[axis]
 
 
 def _fields(problem: ChannelProblem, solution):
