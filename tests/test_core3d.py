@@ -287,14 +287,14 @@ def test_a_constant_field_given_as_arrays_is_the_uniform_field_bit_for_bit():
 
 def test_a_uniform_field_and_conductivity_are_broadcast_not_captured():
     """Under tracing both are broadcast scalars: captured, they were six cell-sized constants per step."""
-    from lmhdx.core3d import _constant, _imposed_field
+    from lmhdx.core3d import _attribute_value, _constant, _imposed_field
     from lmhdx.em import face_conductivity, face_electromotive_force
 
     problem = _problem(_duct(), magnetic_field=(0.0, 20.0, 0.0))
     scalar = problem.scalar_conditions
 
     def electric(velocity):
-        conductivity = _constant(problem.grid, problem.conductivity)
+        conductivity = _constant(problem, _attribute_value, "conductivity")
         return [
             (face_electromotive_force(velocity, _imposed_field(problem), axis, scalar).data, conductivity)
             for axis in range(3)

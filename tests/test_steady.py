@@ -814,7 +814,7 @@ def test_a_new_mesh_of_a_known_shape_is_solved_without_a_trace(monkeypatch, cond
     assert counts == [1, 1, 0]
 
 
-def _extruded(hartmann: float) -> ChannelProblem:
+def _extruded_duct(hartmann: float) -> ChannelProblem:
     duct = duct_problem(hartmann=hartmann, cells=10, cells_in_layer=1)
     return dataclasses.replace(
         duct, grid=Grid(uniform_faces(4, 0.0, 4.0), duct.grid.y_faces, duct.grid.z_faces)
@@ -835,7 +835,7 @@ _FAMILIES = {
     "hunt": lambda hartmann: duct_problem(
         hartmann=hartmann, cells=12, cells_in_layer=2, wall_conductance=0.027
     ),
-    "three-dimensional": _extruded,
+    "three-dimensional": _extruded_duct,
     "varying field": _varying,
     "mixed precision": lambda hartmann: dataclasses.replace(
         duct_problem(hartmann=hartmann, cells=12, cells_in_layer=2), precision="mixed"

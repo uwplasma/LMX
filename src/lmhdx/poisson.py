@@ -393,7 +393,7 @@ class FastDiagonalPolarPoisson:
 
         if self.wall_conductance:
             return self.solve_with_wall(rhs)[0]
-        volumes = self.grid.cell_volumes() if self.singular else None
+        volumes = (self.grid, _cell_volumes) if self.singular else None
         return rhs.replace_data(_refined(self, self._direct, operator, rhs.data, volumes))
 
     def solve_with_wall(self, rhs: Field) -> tuple[Field, Field]:
