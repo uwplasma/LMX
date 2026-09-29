@@ -337,20 +337,27 @@ def test_the_fringe_certifies_at_the_tolerance_rule(hartmann, tolerance):
 def test_a_varying_field_takes_the_damped_preconditioner_and_still_converges():
     """The field-line solve is exact only for a uniform axis-aligned field, so a varying one falls back.
 
-    Every component then takes the damped inverse at the peak ``|B|^2``; the operator stays symmetric to
-    the round-off of this layer mesh (8e-12 for a uniform field) and CG certifies the solve at the default
-    tolerance, which took 1e-8 before #145.
+    Every component then takes one damped inverse, at the rate of :func:`lmhdx.steady._varying_field_rate`:
+    well below the peak ``|B|^2`` (2b.4), and the same for all three, since a damping that differs by
+    component reopens the Schur-complement deficit. The operator stays symmetric to the round-off of this
+    layer mesh (8e-12 for a uniform field) and CG certifies the solve at the default tolerance, which took
+    1e-8 before #145.
     """
     from lmhdx.poisson import FastDiagonalHelmholtz
-    from lmhdx.steady import _projection_solves
+    from lmhdx.steady import _projection_solves, _varying_field_rate
 
     problem = _varying_duct()
     solves = _projection_solves(problem, 1.0e3)
-    peak = 1.0 + 1.0e3 * float(
+    peak = float(
         np.max(problem.magnetic_field.components[0] ** 2 + problem.magnetic_field.components[1] ** 2)
     )
+    rate = _varying_field_rate(problem)
+    # Walls at y, z = +-1 and a periodic axis: the slowest viscous rate is about 2 (pi/2)^2.
+    slowest = 2.0 * (np.pi / 2.0) ** 2
+    assert rate == pytest.approx(slowest**0.75 * peak**0.25, rel=0.05) and rate < 0.1 * peak
     assert all(
-        isinstance(solve, FastDiagonalHelmholtz) and solve.shift == pytest.approx(peak) for solve in solves
+        isinstance(solve, FastDiagonalHelmholtz) and solve.shift == pytest.approx(1.0 + 1.0e3 * rate)
+        for solve in solves
     )
     forward, backward, energy = _stokes_operator_samples(problem)
     assert abs(forward - backward) <= 1e-11 * max(abs(forward), abs(backward)) and energy < 0.0

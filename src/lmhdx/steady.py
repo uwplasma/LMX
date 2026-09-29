@@ -271,19 +271,15 @@ def _isotropic_viscous(
 
 
 def _varying_field_rate(problem: ChannelProblem) -> float:
-    """The damping of the varying-field preconditioner: ``(nu lambda_1)^(3/4) (sigma |B|^2 / rho)^(1/4)``.
+    """The varying-field damping: ``(nu lambda_1)^(3/4) (sigma |B|^2 / rho)^(1/4)`` (plan 2b.4).
 
-    Damping every component at the peak Joule rate ``sigma |B|^2 / rho`` treats the
-    flows the Lorentz force does not brake -- where the field is weak or absent,
-    and the axial odd-even modes its face averages cancel -- as braked, so they
-    sit at ``nu k^2 / (sigma B^2)`` in the preconditioned spectrum: the continuum
-    that 2b.0 found growing with Ha. Any damping that varies in space or by
-    component reopens the Schur-complement deficit (2b.4 measured 3-4x more
-    iterations), so the lever is one smaller rate: the geometric mean of the
-    slowest viscous rate ``nu lambda_1`` of the cross-section and the Hartmann
-    braking rate ``sqrt(nu lambda_1 sigma |B|^2 / rho)``. On the ANL fringe the
-    iteration count is flat within 10 % for rates from 3e-4 to 3e-2 of the peak
-    at Ha 100 and 1e-6 to 1e-3 at Ha 1600, and this rate sits inside both.
+    The peak Joule rate over-damps what the Lorentz force does not brake (a weak or
+    absent field, axial odd-even modes its face averages cancel), which left the
+    continuum 2b.0 found; damping that varies in space or by component reopens the
+    Schur-complement deficit instead. One rate between the slowest viscous rate
+    ``nu lambda_1`` and the Hartmann braking rate, their geometric mean, sits in
+    the measured optimum: ANL fringe iterations flat within 10 % from 3e-4 to 3e-2
+    of the peak at Ha 100 and from 2e-6 to 1e-3 at Ha 1600.
     """
     joule = float(problem.conductivity) * problem.peak_field_squared / float(problem.density)
     conditions = tuple(velocity_condition(problem.conditions, axis) for axis in range(3))
