@@ -11,14 +11,14 @@ Documentation: **<https://lmhdx.readthedocs.io/>** · Install: `pip install lmhd
 
 LMhdX solves the flow of liquid metals in strong magnetic fields — the physics of
 fusion blanket channels. Ducts and pipes with insulating or thin conducting
-walls, three-dimensional channels entering a fringing field, and
+walls, three-dimensional ducts with an inlet and an outlet leaving a magnet, and
 quasi-two-dimensional vortex dynamics, all differentiable end to end.
 Reusable solvers and implicit derivatives come from
 [SOLVAX](https://github.com/uwplasma/SOLVAX).
 
 - **Resolve the layers:** meshes chosen from `a/Ha` and `a/√Ha`, not from a cell count.
 - **Skip the transient:** the steady state as a differentiable root, not a march.
-- **Differentiate the continuous inputs:** drive and field strength on the duct solves; wall conductance and geometry on the extruded fringing route.
+- **Differentiate the continuous inputs:** drive and field strength on the duct solves, and the field strength across a fringe.
 - **Check against something else:** an independent spectral solve that shares no code.
 - **Run where you like:** CPU or GPU, one compiled trajectory per run.
 
@@ -27,8 +27,8 @@ Reusable solvers and implicit derivatives come from
 *Decaying quasi-2D MHD turbulence with Hartmann-layer friction — 256², 3,000 steps, about 20 s on a laptop CPU with `python scripts/make_showcase_figures.py --only q2d`.*
 
 Scope: fully developed duct and pipe flows are validated; three-dimensional
-convective transport, the ALEX fringing benchmarks and multi-device execution
-are research stage (see [What is validated, what is research](#what-is-validated-what-is-research)).
+convective transport, the fringe in the inertialess limit, the ALEX benchmarks
+and multi-device execution are research stage (see [What is validated, what is research](#what-is-validated-what-is-research)).
 
 ## Installation
 
@@ -135,27 +135,26 @@ python scripts/make_showcase_figures.py --only pipe
   to 100 — a Fourier–Chebyshev solve on the diameter, which removes the axis
   singularity by construction rather than treating it.
 
-## Three-dimensional fringing fields
+## A duct leaving a magnet
 
 ```console
-python examples/fringing_benchmark_demo.py
+python examples/fringe_duct_example.py
 ```
 
-- `lmhdx.fringing` extrudes a duct cross-section along the channel and applies a
-  smooth field envelope (`smooth_fringing_profile`), so the flow enters and leaves
-  the magnet; the demo writes plots and JSON to `artifacts/examples/`.
-- Research stage: the demo checks response and conservation trends; it is not an
-  ALEX/FreeMHD comparison or a mesh-converged validation result. The
-  [fringing tutorial](https://lmhdx.readthedocs.io/en/latest/tutorials/fringing.html)
+- `lmhdx.axial` gives the duct an inlet and an outlet: the inlet carries
+  LMhdX's own fully developed profile at the imposed flow rate, the outlet a
+  zero gradient and `p = 0`, and `fringe_duct` builds the ANL fringe
+  (ANL/FPP/TM-228) with uniform-field and field-free buffers.
+- The flow rate through every station, mass and charge hold to round-off; the
+  upstream gradient is the fully developed one; the pressure drop across the
+  fringe and its derivative with respect to the field strength are outputs.
+- Research stage: only the inertialess (Stokes-limit) flow is solved. On the ANL
+  case the excess drop falls as Ha^-0.35 from Ha 100 to 3,200 and extrapolates
+  6–11 % below the core-flow model's; the 1 % gate needs Ha ≥ 10⁴. The
+  [fringe tutorial](https://lmhdx.readthedocs.io/en/latest/tutorials/fringing.html)
   walks through it.
 
 ## Design with gradients
-
-![Field, wall and geometry design with gradient descent](docs/_static/blanket_design_optimization.webp)
-
-```console
-python examples/variable_field_extruded_demo.py
-```
 
 ```python
 import jax, jax.numpy as jnp, lmhdx
@@ -175,8 +174,9 @@ print(jax.grad(throughput, argnums=(0, 1))(1.0, 1.0))
 - Agrees with central differences to **7e-12** in the drive and **1.2e-10** in
   the field scale on the Ha ≤ 5 test ducts, where the test gate is 1e-6.
 - `solve_steady_state` and `solve_fully_developed_fields` differentiate the drive
-  and the field scale. Wall conductance and geometry are differentiable on the
-  extruded fringing route of `lmhdx.fringing`, which the demo command above optimizes.
+  and the field scale, and `lmhdx.axial.solve_open_duct` the field scale across
+  a fringe (`python examples/fringe_duct_example.py` checks it against central
+  differences).
 - A solve that stops short raises, rather than returning a plausible field and a
   gradient taken away from a root.
 
@@ -251,8 +251,8 @@ PCIe. Correct, not yet faster — the numbers are in
   3.6e-14 insulating, 6.3e-14 at wall conductance 0.027); Q2D decay identities.
 - **Research stage:** three-dimensional convective transport (`advection="central"`
   or `"limited"`, from `lmhdx.advect`) is tested for conservation, order and
-  boundedness but not validated against a reference flow, the
-  ALEX B1/B2 fringing benchmarks have production acceptance open, and
+  boundedness but not validated against a reference flow, the fringe is solved
+  in the inertialess limit only, the ALEX B1/B2 benchmarks are open, and
   multi-device execution is not yet established. The
   [validation matrix](https://lmhdx.readthedocs.io/en/latest/validation/index.html)
   and the [plan](plan.md) state each gate.
@@ -264,7 +264,7 @@ PCIe. Correct, not yet faster — the numbers are in
 | [`validation/shercliff.py`](validation/shercliff.py) spectral solve | Duct flow rates, insulating and Hunt walls, Ha 0 → 1000 | independent of the package; 0.4 – 2.3 % on the meshes above |
 | [`validation/pipe.py`](validation/pipe.py) spectral solve | Pipe flow rates, insulating and conducting walls, Ha 0 → 100 | independent of the package; 0.04 – 0.43 % |
 | Analytic Hartmann, Shercliff, Hunt and Poiseuille | Profiles and flow rates in every limit that has a closed form | `python examples/hartmann_example.py` |
-| FreeMHD (OpenFOAM `epotFoam`), pinned [`freemhd_install`](https://github.com/rogeriojorge/freemhd_install) image, B2 case | Same observed contract, executed by both codes | passes: transverse pressure difference RMS 0.0045, max 0.0109, against frozen bounds 0.16 and 0.32 — an integration check on a harness mesh, **not** a production result |
+| FreeMHD (OpenFOAM `epotFoam`), pinned [`freemhd_install`](https://github.com/rogeriojorge/freemhd_install) image, B2 case | Both codes run the frozen B2 inputs weekly ([`validation/freemhd.py`](validation/freemhd.py)); LMhdX through the inertialess core-flow model | executions gated; the cross-code pressure comparison is reported, not gated — **not** a production result |
 | ALEX B1 pipe and B2 square duct experiments | Fringing-field pressure drop | production acceptance **open**; specs and digitised references are frozen in [`src/lmhdx/data/benchmarks`](src/lmhdx/data/benchmarks) |
 
 The [validation record](https://lmhdx.readthedocs.io/en/latest/validation/index.html)
@@ -278,8 +278,7 @@ states each gate and what it does not cover.
 | `python examples/hartmann_example.py` | analytical error, conservation, mesh convergence |
 | `python examples/hunt_example.py` | conducting walls, prescribed throughput and hydraulic power |
 | `python examples/li_aln_wall_stack_example.py` | explicit wall material layers and interface currents |
-| `python examples/fringing_benchmark_demo.py` | 3-D duct entering a magnetic field |
-| `python examples/variable_field_extruded_demo.py` | gradient-based field, wall and geometry design |
+| `python examples/fringe_duct_example.py` | 3-D duct leaving a magnet, drop and its field derivative |
 | `python examples/q2d_turbulence_demo.py` | Q2D vorticity evolution, energy decay, movie |
 
 Each example is one editable file that writes to `artifacts/examples/`;

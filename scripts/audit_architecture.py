@@ -35,12 +35,7 @@ EXCLUDED_PARTS = {
 EXCLUDED_FILES = {".coverage", "coverage.xml"}
 CURRENT_STATE_TERMS = ("legacy", "deprecated", "previously", "no longer", "backward compat")
 
-RESEARCH_STAGE = {
-    "_fringing_common.py",
-    "_fringing_duct.py",
-    "_fringing_pipe.py",
-    "fringing.py",
-}
+RESEARCH_STAGE: set[str] = set()
 COMPATIBILITY: set[str] = set()
 VISUALIZATION = {"io.py"}
 VALIDATION = {

@@ -1,8 +1,9 @@
 # LMhdX
 
 LMhdX solves inductionless liquid-metal MHD with JAX. It provides
-analytical-reference fully developed flows, three-dimensional extruded duct
-and pipe models for spatially varying magnetic fields, and periodic Q2D flow
+analytical-reference fully developed flows, three-dimensional ducts and pipes
+on a staggered core, ducts with an inlet and an outlet through a field that
+varies along them, and periodic Q2D flow
 with Hartmann-layer damping. LMhdX builds the physics;
 [SOLVAX](https://github.com/uwplasma/SOLVAX) supplies reusable numerical solvers.
 
@@ -28,10 +29,10 @@ Install LMhdX, select a JAX backend, and check the command line.
 Solve and validate a Hartmann duct from Python or TOML.
 :::
 
-:::{grid-item-card} Three-dimensional fringing
+:::{grid-item-card} A duct leaving a magnet
 :link: tutorials/fringing
 :link-type: doc
-Build a spatially varying field and inspect charge and flow diagnostics.
+Solve the flow through the ANL fringe with an inlet and an outlet, and differentiate its pressure drop.
 :::
 
 :::{grid-item-card} Q2D vortex dynamics

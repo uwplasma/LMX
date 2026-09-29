@@ -50,19 +50,14 @@ jobs:
           import jax.numpy as jnp
 
           from lmhdx import make_hartmann_case, solve, solve_fully_developed_fields
-          from lmhdx.validation import (
-              load_benchmark_a_spec,
-              load_benchmark_b_reference,
-              load_benchmark_b_spec,
-              load_samper_table_i,
-          )
+          import tomllib
+          from importlib.resources import files
 
-          for name in ("shercliff", "hunt"):
-              load_benchmark_a_spec(name)
-          for name in ("B1-fringing-pipe", "B2-fringing-square"):
-              load_benchmark_b_spec(name)
-              load_benchmark_b_reference(name)
-          load_samper_table_i()
+          data = files("lmhdx") / "data" / "benchmarks"
+          for name in ("shercliff-ha20", "hunt-ha20", "alex-b1-pipe", "alex-b2-square"):
+              assert tomllib.loads((data / "specs" / f"{name}.toml").read_text())["id"]
+          for name in ("alex-b1-pipe.csv", "alex-b2-square.csv", "samper-table-i.toml"):
+              assert (data / "references" / name).read_text()
           solution = solve(make_hartmann_case(ha=5, ny=4, nz=4))
           assert solution.state.residual < 1e-7
           case = make_hartmann_case(ha=5, ny=4, nz=4)

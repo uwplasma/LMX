@@ -20,8 +20,8 @@ if TYPE_CHECKING:
     from .mesh import StructuredMesh
 
 RegionKind = Literal["fluid", "solid"]
-GeometryKind = Literal["rect_duct", "layered_duct", "pipe_ogrid"]
-SolverKind = Literal["fully_developed_inductionless", "extruded_inductionless"]
+GeometryKind = Literal["rect_duct", "layered_duct"]
+SolverKind = Literal["fully_developed_inductionless"]
 SolveMode = Literal["steady", "transient"]
 BoundaryKind = Literal[
     "no_slip",
@@ -37,7 +37,6 @@ PotentialSolverKind = Literal["auto", "jacobi", "cg", "cg_volume"]
 PreconditionerKind = Literal["none", "jacobi"]
 TimeSchemeKind = Literal["implicit_euler", "crank_nicolson"]
 CouplingAccelerationKind = Literal["none", "aitken", "anderson"]
-MagneticAxisKind = Literal["x", "y", "z"]
 
 
 @dataclass(frozen=True)
@@ -90,13 +89,6 @@ class SolverConfig:
     coupling_history_depth: int = 6
     coupling_regularization: float = 1.0e-8
     coupling_damping: float = 1.0
-    extruded_formulation: Literal["stokes_projection", "b1_finite_volume", "b2_finite_volume"] = (
-        "stokes_projection"
-    )
-
-    def __post_init__(self):
-        if self.extruded_formulation not in {"stokes_projection", "b1_finite_volume", "b2_finite_volume"}:
-            raise ValueError(f"Unsupported extruded formulation {self.extruded_formulation!r}")
 
 
 @dataclass(frozen=True)
@@ -128,27 +120,14 @@ class OutputSpec:
 
 
 @dataclass(frozen=True)
-class FringingSpec:
-    enabled: bool = False
-    entry_center: float = 1.5
-    exit_center: float = 4.5
-    transition_width: float = 0.35
-    axis: MagneticAxisKind = "z"
-
-
-@dataclass(frozen=True)
 class GeometrySpec:
     kind: GeometryKind
     width: float
     height: float
     length: float = 1.0
-    axial_origin: float = 0.0
     nx: int = 1
     ny: int = 64
     nz: int = 64
-    radius: float | None = None
-    nr: int | None = None
-    ntheta: int | None = None
     wall_thickness: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
     wall_cells: tuple[int, int, int, int] = (0, 0, 0, 0)
     target_ha: float | None = None
@@ -196,193 +175,6 @@ class CaseSpec:
         if self.output.directory is None:
             return None
         return Path(self.output.directory)
-
-
-EXTRUDED_HISTORY_WIDTHS = (
-    ("iteration_residual_history", 0),
-    ("iteration_momentum_defect_history", 0),
-    ("iteration_component_residual_history", 6),
-    ("iteration_pressure_residual_history", 0),
-    ("iteration_pressure_linear_history", 5),
-    ("iteration_electric_linear_history", 6),
-    ("iteration_potential_residual_history", 0),
-    ("iteration_courant_history", 3),
-)
-
-EXTRUDED_RESULT_FIELDS = tuple(
-    """x y z field_scale u v w p phi jx jy jz lorentz_x lorentz_y lorentz_z residual
-    volumetric_flow_rate mean_velocity axial_current wall_current_leakage current_scaled_pressure_proxy
-    charge_balance_residual boundary_current_residual axial_pressure_loss_gradient
-    transverse_pressure_difference""".split()
-)
-
-
-@dataclass(frozen=True)
-class FringingProfile:
-    """Axial field scale and optional full vector field for extruded problems."""
-
-    x: jnp.ndarray
-    field_scale: jnp.ndarray
-    axis: str
-    volume_field: Callable[..., jnp.ndarray] | None = None
-
-
-@dataclass(frozen=True)
-class ExtrudedFieldBundle:
-    """Stationwise field bundle returned by the extruded inductionless solver."""
-
-    x: jnp.ndarray
-    y: jnp.ndarray
-    z: jnp.ndarray
-    field_scale: jnp.ndarray
-    u: jnp.ndarray
-    v: jnp.ndarray
-    w: jnp.ndarray
-    p: jnp.ndarray
-    phi: jnp.ndarray
-    geometry_kind: str
-    solver_kind: str
-    rho_phi_plus: jnp.ndarray | None = None
-    rho_phi_inlet: jnp.ndarray | None = None
-    aitken_state: tuple[jnp.ndarray | None, float, int] | None = None
-    anderson_state: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray] | None = None
-    stopping_state: tuple[int, int, str] = (0, 0, "not_recorded")
-    jx: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    jy: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    jz: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    lorentz_x: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    lorentz_y: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    lorentz_z: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    residual: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    volumetric_flow_rate: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    mean_velocity: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    axial_current: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    wall_current_leakage: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    current_scaled_pressure_proxy: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    charge_balance_residual: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    boundary_current_residual: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    axial_pressure_loss_gradient: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    transverse_pressure_difference: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    iteration_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    iteration_momentum_defect_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    iteration_component_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0, 6)))
-    iteration_pressure_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    iteration_pressure_linear_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0, 5)))
-    iteration_electric_linear_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0, 6)))
-    iteration_potential_residual_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0,)))
-    iteration_courant_history: jnp.ndarray = field(default_factory=lambda: jnp.zeros((0, 3)))
-
-    @classmethod
-    def from_groups(
-        cls,
-        coordinates,
-        fields,
-        current,
-        lorentz,
-        diagnostics,
-        *,
-        geometry_kind: str,
-        solver_kind: str,
-        **metadata,
-    ) -> ExtrudedFieldBundle:
-        """Assemble the grouped field and station diagnostics produced by a solver."""
-        values = dict(
-            zip(
-                EXTRUDED_RESULT_FIELDS,
-                (*coordinates, *fields, *current, *lorentz, *diagnostics),
-                strict=True,
-            )
-        )
-        return cls(geometry_kind=geometry_kind, solver_kind=solver_kind, **values, **metadata)
-
-
-@dataclass(frozen=True)
-class ExtrudedIterationProgress:
-    """One completed outer iteration and an optional resumable state."""
-
-    step: int
-    total_steps: int
-    residual: float
-    component_residuals: tuple[float, ...]
-    pressure_residual: float
-    potential_residual: float
-    checkpoint: ExtrudedFieldBundle | None = None
-
-
-@dataclass(frozen=True)
-class ExtrudedInductionlessProblem:
-    """Case specification plus imposed fringing-field profile."""
-
-    case: CaseSpec
-    profile: FringingProfile
-
-
-@dataclass(frozen=True)
-class ExtrudedInductionlessValidation:
-    """Compact validation metrics for an extruded inductionless solution."""
-
-    station_count: int
-    max_residual: float
-    max_charge_balance_residual: float
-    mean_velocity_span: float
-    volumetric_flow_rate_span: float
-    axial_current_span: float
-    max_wall_current_leakage: float
-    net_boundary_current_residual: float
-    field_mean_velocity_correlation: float
-    axial_current_mirror_residual: float = 0.0
-    peak_velocity_span: float = 0.0
-    pressure_span_range: float = 0.0
-    pressure_span_mirror_residual: float = 0.0
-    center_axial_current: float = 0.0
-    center_pressure_span: float = 0.0
-    max_divergence_residual: float = 0.0
-
-
-@dataclass(frozen=True)
-class ExtrudedInductionlessSolution:
-    """Solved fringing problem with fields, station history, and validation."""
-
-    problem: ExtrudedInductionlessProblem
-    bundle: ExtrudedFieldBundle
-    station_history: tuple[dict[str, float], ...]
-    validation: ExtrudedInductionlessValidation
-
-    @property
-    def steps(self) -> int:
-        """Number of completed outer iterations."""
-
-        return int(self.bundle.stopping_state[0])
-
-    @property
-    def status(self) -> str:
-        """Terminal solver status."""
-
-        return str(self.bundle.stopping_state[2])
-
-    @property
-    def converged(self) -> bool:
-        """Whether the configured steady gates passed."""
-
-        return self.status == "converged"
-
-    @property
-    def residual(self) -> float:
-        """Terminal normalized outer residual."""
-
-        return float(self.validation.max_residual)
-
-    @property
-    def fields(self) -> ExtrudedFieldBundle:
-        """Final three-dimensional fields and restart state."""
-
-        return self.bundle
-
-    @property
-    def diagnostics(self) -> ExtrudedInductionlessValidation:
-        """Compact physical and numerical acceptance metrics."""
-
-        return self.validation
 
 
 class NumericalFailure(RuntimeError):
@@ -458,19 +250,6 @@ class Solution:
         return self.state
 
 
-def zeros_state(mesh: StructuredMesh) -> MHDState:
-    zeros = jnp.zeros(mesh.yz_shape)
-    return MHDState(
-        u=zeros,
-        phi=zeros,
-        jy=zeros,
-        jz=zeros,
-        lorentz_x=zeros,
-        time=0.0,
-        residual=0.0,
-    )
-
-
 @dataclass(frozen=True)
 class LoggingSpec:
     enabled: bool = True
@@ -497,7 +276,6 @@ class RunConfig:
     case: CaseSpec
     logging: LoggingSpec = field(default_factory=LoggingSpec)
     restart: RestartSpec = field(default_factory=RestartSpec)
-    fringing: FringingSpec = field(default_factory=FringingSpec)
     input_path: Path | None = None
 
 
@@ -576,7 +354,6 @@ def load_run_config(path: str | Path) -> RunConfig:
     output_table = root.get("output", {})
     logging_table = root.get("logging", {})
     restart_table = root.get("restart", {})
-    fringing_table = root.get("fringing", {})
     regions_table = root.get("regions", [])
     boundaries_table = root.get("boundary_conditions", [])
 
@@ -593,9 +370,6 @@ def load_run_config(path: str | Path) -> RunConfig:
         nx=int(geometry_table.get("nx", 1)),
         ny=int(_require(geometry_table, "ny")),
         nz=int(_require(geometry_table, "nz")),
-        radius=None if geometry_table.get("radius") is None else float(geometry_table["radius"]),
-        nr=None if geometry_table.get("nr") is None else int(geometry_table["nr"]),
-        ntheta=None if geometry_table.get("ntheta") is None else int(geometry_table["ntheta"]),
         wall_thickness=_optional_tuple(geometry_table, "wall_thickness", length=4, cast=float)
         or (0.0, 0.0, 0.0, 0.0),
         wall_cells=_optional_tuple(geometry_table, "wall_cells", length=4, cast=int) or (0, 0, 0, 0),
@@ -638,14 +412,10 @@ def load_run_config(path: str | Path) -> RunConfig:
     if solver_mode not in {"steady", "transient"}:
         raise ValueError(f"Unsupported solve mode {solver_mode!r}")
     solver_kind = str(solver_table.get("kind", "fully_developed_inductionless"))
-    if solver_kind not in {
-        "fully_developed_inductionless",
-        "extruded_inductionless",
-    }:
+    if solver_kind != "fully_developed_inductionless":
         raise ValueError(f"Unsupported solver kind {solver_kind!r}")
     solver = SolverConfig(
         kind=solver_kind,
-        extruded_formulation=str(solver_table.get("extruded_formulation", "stokes_projection")),
         mode=solver_mode,
         preconditioner=str(solver_table.get("preconditioner", "jacobi")),
         time_scheme=str(solver_table.get("time_scheme", "implicit_euler")),
@@ -709,19 +479,10 @@ def load_run_config(path: str | Path) -> RunConfig:
         if restart_table.get("restart_filename") is None
         else str(restart_table["restart_filename"]),
     )
-    fringing = FringingSpec(
-        enabled=bool(fringing_table.get("enabled", solver.kind == "extruded_inductionless")),
-        entry_center=float(fringing_table.get("entry_center", 0.25 * geometry.length)),
-        exit_center=float(fringing_table.get("exit_center", 0.75 * geometry.length)),
-        transition_width=float(fringing_table.get("transition_width", max(0.05, 0.1 * geometry.length))),
-        axis=str(fringing_table.get("axis", "z")),
-    )
-
     return RunConfig(
         case=case,
         logging=logging,
         restart=restart,
-        fringing=fringing,
         input_path=input_path,
     )
 

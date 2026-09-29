@@ -121,7 +121,7 @@ import jax
 import jax.numpy as jnp
 import lmhdx
 from dataclasses import replace
-from lmhdx import cases, mesh, physics, fringing, q2d
+from lmhdx import axial, cases, mesh, physics, q2d
 initial = jax.config.x64_enabled
 assert initial == EXPECTED
 assert jax.config.jax_default_matmul_precision is None
@@ -510,70 +510,8 @@ side = "max"
     assert config.restart.reset_histories is False
     assert config.restart.write_restart is True
     assert config.restart.restart_filename == "hartmann_restart.npz"
-    assert config.fringing.enabled is False
     assert len(config.case.regions) == 1
     assert len(config.case.boundary_conditions) == 4
-
-
-@pytest.mark.parametrize("formulation", ["stokes_projection", "b1_finite_volume", "b2_finite_volume"])
-def test_load_run_config_reads_extruded_fringing_controls(tmp_path: Path, formulation):
-    input_file = tmp_path / "fringing.toml"
-    input_file.write_text(
-        """
-[case]
-name = "fringing_rect_demo"
-
-[geometry]
-kind = "rect_duct"
-width = 2.0
-height = 2.0
-length = 6.0
-nx = 7
-ny = 6
-nz = 6
-
-[magnetic_field]
-kind = "constant"
-value = [0.0, 0.0, 8.0]
-
-[solver]
-kind = "extruded_inductionless"
-mode = "steady"
-
-[fringing]
-enabled = true
-entry_center = 1.0
-exit_center = 4.0
-transition_width = 0.5
-axis = "z"
-
-[time_stepper]
-dt = 0.01
-t_final = 0.1
-max_steps = 8
-
-[[regions]]
-name = "fluid"
-kind = "fluid"
-conductivity = 1.0
-density = 1.0
-viscosity = 0.05
-
-[[boundary_conditions]]
-name = "wall"
-kind = "no_slip"
-""".strip().replace('mode = "steady"', f'mode = "steady"\nextruded_formulation = "{formulation}"')
-    )
-
-    config = load_run_config(input_file)
-
-    assert config.case.solver.kind == "extruded_inductionless"
-    assert config.case.solver.extruded_formulation == formulation
-    assert config.fringing.enabled is True
-    assert config.fringing.entry_center == pytest.approx(1.0)
-    assert config.fringing.exit_center == pytest.approx(4.0)
-    assert config.fringing.transition_width == pytest.approx(0.5)
-    assert config.fringing.axis == "z"
 
 
 @pytest.mark.parametrize(
@@ -581,7 +519,6 @@ kind = "no_slip"
     [
         ({"magnetic_kind": "analytic"}, "analytic magnetic-field"),
         ({"solver": 'kind = "invalid"'}, "Unsupported solver kind"),
-        ({"solver": 'extruded_formulation = "invalid"'}, "Unsupported extruded formulation"),
         ({"geometry_kind": None}, "Missing required TOML key 'kind'"),
         ({"geometry_extra": "wall_thickness = [0.1, 0.2]"}, "must have length 4"),
         ({"solver": 'mode = "invalid"'}, "Unsupported solve mode"),
@@ -732,10 +669,8 @@ def test_architecture_inventory_is_deterministic_without_timing() -> None:
 
 def test_change_gate_selects_affected_tests_and_fails_closed() -> None:
     assert _tests_for_changes(("docs/index.md", "plan.md")) == ()
-    assert _tests_for_changes(("src/lmhdx/_fringing_pipe.py",)) == (
-        "tests/test_fringing.py",
-        "tests/test_benchmarks.py",
-        "tests/test_freemhd.py",
+    assert _tests_for_changes(("src/lmhdx/axial.py",)) == (
+        "tests/test_axial.py",
         "tests/test_example_runner.py",
     )
     assert _tests_for_changes(("src/lmhdx/q2d.py", "examples/q2d_vortex.py")) == (
@@ -775,10 +710,10 @@ def test_stable_root_api_is_small_lazy_and_resolvable(
 
 
 def test_advanced_api_uses_owning_module() -> None:
-    assert not hasattr(lmhdx, "solve_extruded_inductionless")
-    from lmhdx.fringing import solve_extruded_inductionless
+    assert not hasattr(lmhdx, "solve_open_duct")
+    from lmhdx.axial import solve_open_duct
 
-    assert callable(solve_extruded_inductionless)
+    assert callable(solve_open_duct)
 
 
 def test_unknown_root_attribute_has_standard_error() -> None:
@@ -869,12 +804,11 @@ def test_curated_examples_use_submodules_and_linear_scripts_are_editable() -> No
         root_imports = {alias.name for node in imports for alias in node.names}
         assert root_imports <= stable, f"{path} imports unsupported root APIs: {root_imports - stable}"
         linear_limits = {
-            "fringing_benchmark_demo.py": 160,
+            "fringe_duct_example.py": 160,
             "hartmann_example.py": 160,
             "hunt_example.py": 160,
             "li_aln_wall_stack_example.py": 260,
             "q2d_turbulence_demo.py": 140,
-            "variable_field_extruded_demo.py": 190,
         }
         if path.name in linear_limits:
             assert ast.get_docstring(tree)
@@ -889,7 +823,7 @@ def test_curated_examples_declare_user_facing_contracts(tmp_path: Path) -> None:
     inventory = build_inventory()["inventory"]
     curated = inventory["curated_examples"]
     assert {item["path"] for item in curated} == set(inventory["examples"])
-    assert len(curated) == 7
+    assert len(curated) == 6
     for item in curated:
         assert item["command"]
         assert item["outputs"]

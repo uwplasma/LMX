@@ -19,6 +19,7 @@ keywords:
 abstract: >-
   LMhdX solves incompressible, inductionless liquid-metal MHD in fully developed
   duct cross-sections, periodic quasi-two-dimensional flow, and three-dimensional
-  extruded ducts and pipes with spatially varying imposed magnetic fields. It
+  ducts and pipes on a staggered core, including ducts with an inlet and an
+  outlet through a field that varies along them. It
   provides JAX execution, analytical and manufactured verification, and
   reproducible FreeMHD comparison.

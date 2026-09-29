@@ -9,17 +9,18 @@ lmhdx validate CASE [OPTIONS]
 lmhdx benchmark [OPTIONS]
 ```
 
-`run` accepts `hartmann`, `shercliff`, `hunt`, `fringing_rect`,
-`fringing_layered`, and `fringing_pipe`. Use `lmhdx run --help` for geometry,
-field-transition, resolution, output, and logging controls.
+`run` accepts `hartmann`, `shercliff` and `hunt`. Use `lmhdx run --help` for
+geometry, resolution, output, and logging controls.
 For rectangular cases, `--ny` and `--nz` set the fluid-cell counts (48 each
 by default), including fully developed Hartmann, Shercliff, and Hunt flows;
 `--width` and `--height` set the fluid dimensions. Hunt wall cells are additional.
 
 ```console
-lmhdx run fringing_rect --ha 20 --nx-stations 21 --ny 24 --nz 24 \
-  --length 6 --entry-center 1.5 --exit-center 4.5 --plots
+lmhdx run hunt --ha 20 --ny 24 --nz 24 --plots
 ```
+
+A duct with an inlet and an outlet has no command; it is solved from Python with
+`lmhdx.axial` (see the fringe tutorial).
 
 `validate` solves a Hartmann, Shercliff, or Hunt case and writes profiles and
 validation metrics. `benchmark` reports cold time, warm median, and warm
@@ -40,17 +41,7 @@ The schema maps directly to the Python dataclasses:
 | `[solver]` | `SolverConfig` | model, mode, coupling, SOLVAX selection |
 | `[time_stepper]` | `TimeStepperConfig` | step sizes, iteration limits, physical tolerances |
 | `[output]` | `OutputSpec` | NPZ, JSON, VTK, CSV, plots, and diagnostic-history stride |
-| `[fringing]` | `FringingSpec` | axial entry/exit envelope |
 
 Start from `examples/hartmann_case.toml`. Unknown keys, inconsistent geometry,
 nonphysical material values, and unsupported solver combinations fail during
 configuration rather than entering the numerical solve.
-
-For extruded flow, `[solver].extruded_formulation` explicitly selects
-`"stokes_projection"` (default), `"b1_finite_volume"` (ALEX pipe), or
-`"b2_finite_volume"` (ALEX layered duct). Benchmark builders set their own
-formulation. Names are labels and do not select equations. The B1/B2 options
-retain the benchmark-specific boundary, material and numerical contracts;
-selecting one is not certification for arbitrary research conditions.
-Restart metadata must match the selected formulation; unspecified formulation
-metadata is accepted only for `stokes_projection`.

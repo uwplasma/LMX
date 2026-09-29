@@ -23,8 +23,6 @@ from lmhdx.physics import (
 )
 from lmhdx.specs import (
     BoundaryCondition,
-    ExtrudedInductionlessProblem,
-    FringingProfile,
     GeometrySpec,
     MHDState,
     NumericalFailure,
@@ -162,7 +160,7 @@ def test_hartmann_solver_runs(monkeypatch: pytest.MonkeyPatch):
 
 def test_build_mesh_rejects_unsupported_geometry_kind():
     case = make_hartmann_case(ha=10.0, ny=8, nz=8)
-    unsupported = replace(case, geometry=replace(case.geometry, kind="pipe_ogrid"))
+    unsupported = replace(case, geometry=replace(case.geometry, kind="annulus"))
 
     with pytest.raises(NotImplementedError, match="not supported"):
         solvers._build_mesh(unsupported)
@@ -462,7 +460,7 @@ def test_public_solvers_reject_unknown_solver_kind(solver, mode):
 
 def test_common_solve_routes_cases_to_the_core_and_keeps_every_dispatch(monkeypatch: pytest.MonkeyPatch):
     case = make_hartmann_case(ha=5.0, ny=8, nz=8)
-    core_result, steady_result, transient_result, extruded_result = object(), object(), object(), object()
+    core_result, steady_result, transient_result = object(), object(), object()
     monkeypatch.setattr("lmhdx.fully_developed.solve_fully_developed", lambda model: core_result)
     monkeypatch.setattr(cases_impl, "solve_steady", lambda model: steady_result)
     monkeypatch.setattr(cases_impl, "solve_transient", lambda model: transient_result)
@@ -470,12 +468,7 @@ def test_common_solve_routes_cases_to_the_core_and_keeps_every_dispatch(monkeypa
     # A case the core does not represent keeps the cell-centred solve.
     assert cases_impl.solve(make_hartmann_case(ha=5.0, ny=7, nz=8)) is steady_result
     assert cases_impl.solve(replace(case, solver=replace(case.solver, mode="transient"))) is transient_result
-
-    profile = FringingProfile(x=jnp.ones(1), field_scale=jnp.ones(1), axis="z")
-    problem = ExtrudedInductionlessProblem(case=case, profile=profile)
-    monkeypatch.setattr("lmhdx.fringing.solve_extruded_inductionless", lambda model: extruded_result)
-    assert cases_impl.solve(problem) is extruded_result
-    with pytest.raises(TypeError, match="CaseSpec, ExtrudedInductionlessProblem, or Q2DProblem"):
+    with pytest.raises(TypeError, match="ChannelProblem, CaseSpec, or Q2DProblem"):
         cases_impl.solve(SimpleNamespace())
 
 
@@ -1225,17 +1218,17 @@ def test_build_mesh_rejects_unsupported_geometry():
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
     bad_case = replace(
         case,
-        geometry=GeometrySpec(kind="pipe_ogrid", width=1.0, height=1.0, radius=0.5, nr=4, ntheta=8),
+        geometry=GeometrySpec(kind="annulus", width=1.0, height=1.0),
     )
     with pytest.raises(NotImplementedError, match="not supported"):
         solvers._build_mesh(bad_case)
 
 
-def test_fully_developed_solver_rejects_pipe_geometry():
+def test_fully_developed_solver_rejects_an_unknown_geometry():
     case = make_hartmann_case(ha=5.0, ny=4, nz=4)
     bad_case = replace(
         case,
-        geometry=GeometrySpec(kind="pipe_ogrid", width=1.0, height=1.0, radius=0.5, nr=4, ntheta=8),
+        geometry=GeometrySpec(kind="annulus", width=1.0, height=1.0),
     )
     with pytest.raises(NotImplementedError, match="not supported by the laminar solver"):
         cases_impl._solve_fully_developed(bad_case)
@@ -2487,7 +2480,7 @@ def test_fully_developed_solver_rejects_unsupported_geometry_after_mesh_build(
 ):
     case = replace(
         make_hartmann_case(ha=5.0, ny=4, nz=4),
-        geometry=GeometrySpec(kind="pipe_ogrid", width=1.0, height=1.0, radius=0.5, nr=4, ntheta=8),
+        geometry=GeometrySpec(kind="annulus", width=1.0, height=1.0),
     )
     fake_mesh = generate_rect_duct_mesh(width=1.0, height=1.0, ny=4, nz=4)
     monkeypatch.setattr(cases_impl, "_build_mesh", lambda case: fake_mesh)

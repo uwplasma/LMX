@@ -102,7 +102,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [support, operators, fringing, fringing_pipe, physics, channel, plane, steady, gradients]
+        shard: [support, operators, physics, channel, plane, steady, gradients]
         include:
           # Coverage on the steady shard peaks near 12 GB of resident memory with four
           # workers, against 16 GB on a hosted runner; two workers keep it well inside.
@@ -114,8 +114,6 @@ jobs:
           # A split shard starts from its parent's compilation cache.
           - shard: operators
             cache: support
-          - shard: fringing_pipe
-            cache: fringing
           - shard: plane
             cache: channel
     steps:
@@ -161,12 +159,6 @@ jobs:
           path: artifacts/test-evidence/support
           key: lmx-test-evidence-${{ github.run_id }}-support
           fail-on-cache-miss: true
-      - name: Restore fringing evidence
-        uses: actions/cache/restore@v6
-        with:
-          path: artifacts/test-evidence/fringing
-          key: lmx-test-evidence-${{ github.run_id }}-fringing
-          fail-on-cache-miss: true
       - name: Restore physics evidence
         uses: actions/cache/restore@v6
         with:
@@ -190,12 +182,6 @@ jobs:
         with:
           path: artifacts/test-evidence/operators
           key: lmx-test-evidence-${{ github.run_id }}-operators
-          fail-on-cache-miss: true
-      - name: Restore fringing_pipe evidence
-        uses: actions/cache/restore@v6
-        with:
-          path: artifacts/test-evidence/fringing_pipe
-          key: lmx-test-evidence-${{ github.run_id }}-fringing_pipe
           fail-on-cache-miss: true
       - name: Restore plane evidence
         uses: actions/cache/restore@v6
@@ -233,17 +219,10 @@ jobs:
             budget: 300
             cache: pr-unit
           - tier: unit
-            shard: "operators fringing fringing_pipe physics channel plane steady gradients"
+            shard: "operators physics channel plane steady gradients"
             label: numerics
             budget: 300
             cache: pr-unit
-          - tier: regression
-            shard: fringing
-            budget: 420
-          - tier: regression
-            shard: fringing_pipe
-            budget: 420
-            cache: pr-regressionfringing
           - tier: regression
             shard: "physics operators"
             label: physics

@@ -11,23 +11,11 @@ from pathlib import Path
 import jax.numpy as jnp
 
 from .cases import make_hartmann_case, make_hunt_case, make_shercliff_case, solve_steady, solve_transient
-from .fringing import (
-    build_extruded_problem_from_case,
-    build_layered_duct_extruded_problem,
-    build_pipe_ogrid_extruded_problem,
-    build_square_duct_extruded_problem,
-    solve_extruded_inductionless,
-)
 from .fully_developed import case_mesh, core_applies, solve_fully_developed
 from .io import (
     _portable_path,
-    load_extruded_restart_bundle,
     load_restart_bundle,
-    prepare_extruded_output_layout,
-    validate_extruded_restart_bundle,
     validate_restart_bundle,
-    write_extruded_restart_npz,
-    write_extruded_solution_outputs,
     write_paraview,
     write_restart_npz,
     write_solution_outputs,
@@ -62,50 +50,6 @@ def _build_case(args: argparse.Namespace):
         raise ValueError(args.case)
     geometry = {key: getattr(args, key) for key in ("width", "height", "ny", "nz") if hasattr(args, key)}
     return builders[args.case](ha=args.ha, output_dir=args.output, **geometry)
-
-
-def _build_extruded_problem(args: argparse.Namespace):
-    if args.case == "fringing_rect":
-        return build_square_duct_extruded_problem(
-            ha_peak=args.ha,
-            width=args.width,
-            height=args.height,
-            ny=args.ny,
-            nz=args.nz,
-            length=args.length,
-            nx_stations=args.nx_stations,
-            entry_center=args.entry_center,
-            exit_center=args.exit_center,
-            transition_width=args.transition_width,
-        )
-    if args.case == "fringing_layered":
-        return build_layered_duct_extruded_problem(
-            ha_peak=args.ha,
-            width=args.width,
-            height=args.height,
-            ny=args.ny,
-            nz=args.nz,
-            wall_cells=args.wall_cells,
-            insulator_cells=args.insulator_cells,
-            length=args.length,
-            nx_stations=args.nx_stations,
-            entry_center=args.entry_center,
-            exit_center=args.exit_center,
-            transition_width=args.transition_width,
-        )
-    if args.case == "fringing_pipe":
-        return build_pipe_ogrid_extruded_problem(
-            ha_peak=args.ha,
-            radius=args.radius,
-            nr=args.nr,
-            ntheta=args.ntheta,
-            length=args.length,
-            nx_stations=args.nx_stations,
-            entry_center=args.entry_center,
-            exit_center=args.exit_center,
-            transition_width=args.transition_width,
-        )
-    raise ValueError(args.case)
 
 
 def _solve_case_with_optional_logger(
@@ -191,47 +135,6 @@ def _runtime_summary(
     return summary
 
 
-def _runtime_summary_extruded(
-    solution,
-    case,
-    out_dir: Path,
-    outputs: dict[str, list[Path]],
-    *,
-    restart_info: dict[str, object] | None = None,
-) -> dict[str, object]:
-    bundle = solution.bundle
-    validation = solution.validation
-    stopping_state = getattr(bundle, "stopping_state", (0, 0, "not_recorded"))
-    status = str(stopping_state[2])
-    summary = {
-        "case": case.name,
-        "geometry": case.geometry.kind,
-        "solver_kind": case.solver.kind,
-        "solver_mode": case.solver.mode,
-        "converged": getattr(
-            solution,
-            "converged",
-            status == "converged" if status != "not_recorded" else None,
-        ),
-        "status": getattr(solution, "status", status),
-        "steps": int(getattr(solution, "steps", stopping_state[0])),
-        "station_count": int(bundle.x.shape[0]),
-        "u_max": float(jnp.max(jnp.abs(bundle.u))),
-        "max_residual": float(validation.max_residual),
-        "max_charge_balance_residual": float(validation.max_charge_balance_residual),
-        "max_wall_current_leakage": float(validation.max_wall_current_leakage),
-        "net_boundary_current_residual": float(validation.net_boundary_current_residual),
-        "field_mean_velocity_correlation": float(validation.field_mean_velocity_correlation),
-        "output": _portable_path(out_dir),
-        "generated_files": {
-            key: [_portable_path(path) for path in paths] for key, paths in outputs.items() if paths
-        },
-    }
-    if restart_info is not None:
-        summary["restart"] = restart_info
-    return summary
-
-
 def _write_run_summary(summary: dict[str, object], case, out_dir: Path) -> Path | None:
     if not getattr(case.output, "write_json_summary", True):
         return None
@@ -248,86 +151,19 @@ def _summary_exit_code(summary: dict[str, object]) -> int:
 
 def _run_config(config: RunConfig) -> dict[str, object]:
     case = config.case
-    solver_kind = getattr(getattr(case, "solver", None), "kind", "fully_developed_inductionless")
     output_dir = getattr(case, "output_dir", None)
     if output_dir is None and getattr(case, "output", None) is not None:
         output_dir = getattr(case.output, "directory", None)
     out_dir = Path(output_dir) if output_dir else Path.cwd() / "out" / case.name
     out_dir.mkdir(parents=True, exist_ok=True)
-    extruded_layout = (
-        prepare_extruded_output_layout(out_dir) if solver_kind == "extruded_inductionless" else None
-    )
     logger = StreamingSolverLogger(config.logging) if config.logging.enabled else None
     log_handle = None
     log_path: Path | None = None
     if logger is not None:
-        log_root = extruded_layout.logs_dir if extruded_layout is not None else out_dir
-        log_path = default_log_path(log_root, case.name)
+        log_path = default_log_path(out_dir, case.name)
         log_handle = open(log_path, "w", encoding="utf-8")  # noqa: SIM115
         logger.add_stream(log_handle)
     solve_start = time.perf_counter()
-    if solver_kind == "extruded_inductionless":
-        restart_summary: dict[str, object] | None = None
-        initial_bundle = None
-        if config.restart.enabled:
-            if config.restart.path is None:
-                raise ValueError("Restart is enabled but no restart.path was provided")
-            restart_bundle = load_extruded_restart_bundle(config.restart.path)
-            validate_extruded_restart_bundle(restart_bundle, case=case)
-            initial_bundle = restart_bundle.bundle
-            restart_summary = {
-                "enabled": True,
-                "input": str(restart_bundle.path),
-                "station_count": int(restart_bundle.bundle.x.shape[0]),
-                "reset_histories": bool(config.restart.reset_histories),
-            }
-        try:
-            if not config.fringing.enabled:
-                raise ValueError(
-                    "extruded_inductionless TOML runs require a [fringing] block or fringing.enabled = true"
-                )
-            problem = build_extruded_problem_from_case(
-                case,
-                entry_center=config.fringing.entry_center,
-                exit_center=config.fringing.exit_center,
-                transition_width=config.fringing.transition_width,
-                axis=config.fringing.axis,
-            )
-            solution = solve_extruded_inductionless(problem, initial_bundle=initial_bundle)
-        finally:
-            if log_handle is not None:
-                log_handle.close()
-        outputs = write_extruded_solution_outputs(
-            solution,
-            case,
-            out_dir,
-            write_npz=getattr(case.output, "write_npz", True),
-            write_plots=getattr(case.output, "write_plots", False),
-        )
-        if config.restart.write_restart:
-            restart_filename = config.restart.restart_filename or f"{case.name}_extruded_restart.npz"
-            restart_path = write_extruded_restart_npz(
-                solution, case, extruded_layout.restart_dir / restart_filename
-            )
-            outputs.setdefault("restart", []).append(restart_path)
-            if restart_summary is None:
-                restart_summary = {"enabled": False}
-            restart_summary["output"] = _portable_path(restart_path)
-        if log_path is not None:
-            outputs.setdefault("log", []).append(log_path)
-        if config.input_path is not None and getattr(case.output, "copy_input_file", True):
-            copied_input = extruded_layout.system_dir / config.input_path.name
-            shutil.copy2(config.input_path, copied_input)
-            outputs.setdefault("input", []).append(copied_input)
-        summary = _runtime_summary_extruded(solution, case, out_dir, outputs, restart_info=restart_summary)
-        summary["execution_seconds"] = time.perf_counter() - solve_start
-        summary_path = _write_run_summary(summary, case, out_dir)
-        if summary_path is not None:
-            outputs.setdefault("json", []).append(summary_path)
-            summary["generated_files"]["json"] = [_portable_path(summary_path)]
-        print(json.dumps(summary, indent=2))
-        return summary
-
     initial_state = None
     initial_diagnostics = None
     restart_log_info = RestartLogInfo(enabled=False)
@@ -423,7 +259,7 @@ def main(argv: list[str] | None = None) -> int:
     run_parser = subparsers.add_parser(
         "run",
         help="Run a named built-in case.",
-        description="Run a fully developed or three-dimensional fringing-field case.",
+        description="Run a fully developed duct case.",
         formatter_class=formatter,
     )
     run_parser.add_argument(
@@ -432,13 +268,10 @@ def main(argv: list[str] | None = None) -> int:
             "hartmann",
             "shercliff",
             "hunt",
-            "fringing_rect",
-            "fringing_layered",
-            "fringing_pipe",
         ],
         help="Built-in case or solver family.",
     )
-    run_parser.add_argument("--ha", type=float, default=20.0, help="Peak Hartmann number.")
+    run_parser.add_argument("--ha", type=float, default=20.0, help="Hartmann number.")
     run_parser.add_argument("--output", default="./out", help="Output directory.")
     run_parser.add_argument(
         "--mode",
@@ -453,16 +286,6 @@ def main(argv: list[str] | None = None) -> int:
     geometry.add_argument("--height", type=float, default=2.0, help="Duct height.")
     geometry.add_argument("--ny", type=int, default=48, help="Cross-stream y cells.")
     geometry.add_argument("--nz", type=int, default=48, help="Cross-stream z cells.")
-    geometry.add_argument("--length", type=float, default=6.0, help="Extruded length.")
-    geometry.add_argument("--nx-stations", type=int, default=21, help="Axial stations.")
-    geometry.add_argument("--entry-center", type=float, default=1.5, help="Field entry center.")
-    geometry.add_argument("--exit-center", type=float, default=4.5, help="Field exit center.")
-    geometry.add_argument("--transition-width", type=float, default=0.35, help="Field ramp width.")
-    geometry.add_argument("--wall-cells", type=int, default=4, help="Conducting-wall cells.")
-    geometry.add_argument("--insulator-cells", type=int, default=4, help="Insulating-wall cells.")
-    geometry.add_argument("--radius", type=float, default=0.5, help="Pipe radius.")
-    geometry.add_argument("--nr", type=int, default=24, help="Pipe radial cells.")
-    geometry.add_argument("--ntheta", type=int, default=48, help="Pipe azimuthal cells.")
 
     bench_parser = subparsers.add_parser(
         "benchmark",
@@ -532,42 +355,6 @@ def main(argv: list[str] | None = None) -> int:
         write_metrics_json(payload, out_dir / f"{case.name}_metrics.json")
         print(json.dumps(payload, indent=2))
         return 2 if getattr(solution, "converged", None) is False else 0
-
-    if args.case.startswith("fringing_"):
-        problem = _build_extruded_problem(args)
-        case = problem.case
-        case = case.__class__(
-            **{
-                **case.__dict__,
-                "output": case.output.__class__(
-                    **{
-                        **case.output.__dict__,
-                        "directory": args.output,
-                        "write_npz": True,
-                        "write_json_summary": True,
-                        "write_plots": args.plots,
-                    }
-                ),
-            }
-        )
-        problem = problem.__class__(case=case, profile=problem.profile)
-        solution = solve_extruded_inductionless(problem)
-        out_dir = Path(args.output)
-        out_dir.mkdir(parents=True, exist_ok=True)
-        outputs = write_extruded_solution_outputs(
-            solution,
-            case,
-            out_dir,
-            write_npz=getattr(case.output, "write_npz", True),
-            write_plots=getattr(case.output, "write_plots", False),
-        )
-        summary = _runtime_summary_extruded(solution, case, out_dir, outputs)
-        summary_path = _write_run_summary(summary, case, out_dir)
-        if summary_path is not None:
-            outputs.setdefault("json", []).append(summary_path)
-            summary["generated_files"]["json"] = [_portable_path(summary_path)]
-        print(json.dumps(summary, indent=2))
-        return _summary_exit_code(summary)
 
     case = _build_case(args)
     case = replace(

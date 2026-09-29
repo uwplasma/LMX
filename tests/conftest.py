@@ -38,7 +38,6 @@ def pytest_collection_modifyitems(items):
             item.add_marker(pytest.mark.slow)
         if marks & {"numerical", "physics", "regression", "validation"} or item.path.name in {
             "test_solver.py",
-            "test_fringing.py",
             "test_benchmarks.py",
             "test_physics.py",
         }:

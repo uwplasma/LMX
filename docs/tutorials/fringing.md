@@ -1,72 +1,77 @@
-# Three-dimensional fringing fields
+# A duct leaving a magnet
 
-An extruded problem combines a `CaseSpec` with an axial imposed-field profile.
-The convenience builder supplies a rectangular duct with a smooth entry and
-exit fringe:
+`lmhdx.axial` gives the staggered core an inlet and an outlet along its first
+axis, so the flow can pass through a field that changes along the duct. The
+conditions follow HIMAG, FreeMHD, GridapMHD and the 2025 six-code benchmark:
+
+- **Inlet:** LMhdX's own fully developed profile at the inlet field, solved on
+  the duct's cross-section and scaled to the imposed flow rate. The flow rate is
+  exact and the pressure drop is an output.
+- **Outlet:** zero axial gradient of the velocity and `p = 0`.
+- **Both ends:** no normal current.
+
+`fringe_duct` builds the ANL fringe of ANL/FPP/TM-228 in a square duct: the
+field falls as `B_y = Ha (1 - sin(pi x / 2 x0)) / 2` over `|x| <= x0`, uniform
+upstream and zero downstream, with buffers of uniform field before and after.
 
 ```python
-from lmhdx.fringing import build_square_duct_extruded_problem, solve_extruded_inductionless
+from lmhdx.axial import fringe_duct, pressure_drop, solve_open_duct, station_flow_rates
 
-problem = build_square_duct_extruded_problem(
-    ha_peak=20,
-    width=2,
-    height=2,
-    length=6,
-    nx_stations=21,
-    ny=24,
-    nz=24,
-    entry_center=1.5,
-    exit_center=4.5,
-    transition_width=0.35,
+problem = fringe_duct(
+    hartmann=20.0,
+    wall_conductance=0.02,  # all four walls
+    half_length=3.0,  # x0
+    upstream=6.0,
+    downstream=3.0,
+    spacing=0.5,  # axial cell size over the fringe
+    cells=12,
+    cells_in_layer=3,
+    flow_rate=4.0,  # a unit mean velocity
 )
-result = solve_extruded_inductionless(problem)
+solution = solve_open_duct(problem)
+print(station_flow_rates(solution.velocity))  # 4.0 at every station
+print(pressure_drop(solution.pressure, -3.0, 3.0))
 ```
 
-`problem.case.time_stepper.max_steps` is the maximum number of additional
-outer updates, also after a restart. A primal solve can stop on convergence;
-`evolve_extruded_fields` instead executes exactly this count unless `steps=`
-overrides it. `solver.coupling_iterations` does not cap either count. Set an
-explicit small `max_steps` for a smoke run and inspect `result.status`;
-reaching the step limit is not evidence of a steady solution.
-
-The returned fields contain velocity, pressure, potential, current, Lorentz
-force, face fluxes, station coordinates, and the imposed field. Always inspect
-termination and conservation together:
+The solve is one preconditioned conjugate-gradient solve, certified on its
+residual; it raises if the residual is not reached. Check the balances it
+guarantees before reading a pressure:
 
 ```python
-gate = result.validation
-print(result.converged, result.status)
-print(gate.max_charge_balance_residual)
-print(gate.max_divergence_residual)
-print(gate.net_boundary_current_residual)
+from lmhdx.axial import charge_balance, mass_balance
+
+print(float(solution.residual_norm / solution.initial_residual_norm))  # <= 1e-9
+print(float(mass_balance(solution.velocity)), float(charge_balance(solution, problem)))  # round-off
 ```
 
-Use `build_layered_duct_extruded_problem` for explicit wall regions and
-`build_pipe_ogrid_extruded_problem` for a straight conducting pipe.
-`build_extruded_problem_from_case` is the general entry point when the complete
-case is already available.
+The drop is differentiable in the field strength through the same implicit
+solve as a periodic duct:
 
-For differentiable blanket or duct design, call `evolve_extruded_fields` on a
-generic rectangular/layered duct or straight pipe. It returns only traced
-fields and accepts continuous pressure forcing, imposed-field scale, fluid/wall
-conductivity, and fixed-topology geometry scales. Electric closure is implicit
-while finite projection and outer iterations are checkpointed, so reverse
-memory does not grow as a full trajectory tape. Pass `num_devices` to shard an
-evenly divisible axial mesh for generic duct, layered, and straight-pipe primal
-or gradient runs. Mesh and step controls remain static. The field scale may be
-scalar or one coefficient per axial station; pipe geometry uses `(axial,
-radial)`. `extruded_engineering_objectives` reduces
-the fields to pressure drop, flow rate, pumping power, outlet nonuniformity,
-wall-current RMS, and recirculation without leaving the differentiated program.
-The specialized ALEX B1 pipe shares its production finite-volume map with this
-API; specialized ALEX B2 design fields remain unavailable. See the
-[differentiation tutorial](differentiation.md).
+```python
+import jax
 
-The axial, cross-section, and wall meshes are refined independently. A reported
-fringing result should demonstrate stable primary observables under all three
-refinements and under tighter linear and coupling tolerances. The
+drop = jax.grad(lambda scale: pressure_drop(solve_open_duct(problem, field_scale=scale).pressure, -3.0, 3.0))
+print(drop(1.0))
+```
+
+`open_duct` turns any `ChannelProblem` with a field that is uniform over the
+inlet cross-section, including an `ImposedField` of arrays, into an
+inflow-outflow duct; `axial_faces` grades the axial mesh from the fringe into
+the buffers.
+
+What is and is not established:
+
+- The flow rate at every station, mass and charge hold to round-off, and far
+  upstream the gradient is the fully developed one (within 0.5 % in the tests).
+- Doubling the buffers moves the drop over TM-228's window `[-6, 2]` by
+  3.5e-9 at Ha 100.
+- Only the inertialess (Stokes-limit) flow is solved: `advection="off"`.
+- On the ANL case the excess drop over the locally fully developed drop falls
+  as Ha^-0.35 from Ha 100 to 3,200 and extrapolates 6–11 % below the
+  inertialess core-flow model (`lmhdx.coreflow`, TM-228 eqs. 4a–4c); the 1 %
+  agreement needs Ha ≥ 10⁴ on the 3-D core.
+- There is no straight pipe with an open axis yet, and no thick or layered wall.
+
+Run `python examples/fringe_duct_example.py` for the case above with its
+conservation checks and a central-difference check of the derivative. The
 [FreeMHD guide](../validation/freemhd.md) describes the external comparison.
-
-Run `python examples/fringing_benchmark_demo.py` for a bounded rectangular
-diagnostic or `python examples/variable_field_extruded_demo.py` for a bounded
-field-profile and wall-conductance design using production-field gradients.

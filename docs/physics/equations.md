@@ -30,13 +30,14 @@ $$
 $$
 
 Fully developed models set $\mathbf u=(u(y,z),0,0)$ and solve the coupled
-cross-section equations. Extruded models retain all three velocity, current,
-and Lorentz-force components. The generic duct and pipe recurrences omit
-$\mathbf u\cdot\nabla\mathbf u$ and use a collocated projection with flow
-adjustments; they are Stokes-like models, not general inertial 3-D flow.
-Specialized ALEX paths use separate finite-volume momentum and pressure
-operators. Their reduced verification and open production-acceptance gates
-are distinguished in the [validation matrix](../validation/index.md).
+cross-section equations. The three-dimensional staggered core
+(`lmhdx.core3d`, `lmhdx.steady`) retains all three velocity, current and
+Lorentz-force components; a duct with an inlet and an outlet (`lmhdx.axial`)
+is solved in the inertialess limit, without $\mathbf u\cdot\nabla\mathbf u$.
+The inertialess core-flow model (`lmhdx.coreflow`) reduces the core of a
+thin-walled duct in a field $B_y(x)$ to three two-dimensional equations
+(ANL/FPP/TM-228, eqs. 4a–4c). Their verification and open gates are in the
+[validation matrix](../validation/index.md).
 
 No-slip walls set velocity to zero. Insulating walls impose zero normal
 current. Conducting solid regions solve potential with their own conductivity
@@ -57,43 +58,6 @@ $$
 
 The inductionless model requires $Rm\ll1$. Geometry length, field orientation,
 wall conductance ratio, and velocity scale must accompany any reported value.
-
-(pressure-taps-and-mechanical-work)=
-## Pressure taps and mechanical work
-
-For outward normal $\mathbf n$, pressure supplies power
-$-\int_{\partial V}p\mathbf u\cdot\mathbf n\,dA$ to a control volume;
-see the [MIT integral energy derivation](https://ocw.mit.edu/courses/16-01-unified-engineering-i-ii-iii-iv-fall-2005-spring-2006/017b07723e0687d3025ba25a4f5d50ee_f12_sp.pdf).
-The extruded reducer's `pressure_tap_flux_power` evaluates only the two
-cell-center tap-plane contributions with fluid-area quadrature:
-
-$$
-P_{\rm taps}=\sum_i A_i(p_{0i}u_{0i}-p_{Ni}u_{Ni}).
-$$
-
-It differs from `pumping_power`, $(\bar p_0-\bar p_N)Q_N$, for correlated
-nonuniform pressure/velocity profiles or unequal station flows. A pressure
-gauge shift $p\mapsto p+c$ changes $P_{\rm taps}$ by $c(Q_0-Q_N)$; check mass
-balance before interpreting it. Both quantities have power units when inputs
-are SI, but neither is certified total pump power.
-
-`tap_body_drive_power` integrates the scalar axial force density times axial
-velocity, and `tap_kinetic_energy` integrates $\rho|\mathbf u|^2/2$, over
-the **same slab between tap centers**. They use the fluid-area weights above
-and trapezoidal axial quadrature. For uniform axial cells, the two outer half
-cells are excluded; the slab length is $L-\Delta x$. Kinetic energy is a state
-quantity, not its time derivative. Pass `forcing=` when overriding the case
-drive in `evolve_extruded_fields`, and pass the same `geometry_scale` to both
-functions. Force density is in N/m³ for SI inputs, giving watts and joules.
-
-A complete mechanical balance also needs body-drive work
-$\int_V\mathbf f\cdot\mathbf u\,dV$, kinetic-energy storage, viscous and
-electrical work, and any advective boundary flux of the chosen model. Use
-one common control volume: whole-domain body work cannot simply be added to
-cell-center tap work. A prescribed pressure gradient represented as body drive
-must not also be counted as boundary pressure work. Fixed-flow constraints
-require their imposed-drive work. These terms and a discrete balance are not
-fully supplied by this reducer; the generic recurrence is not energy certified.
 
 ## Quasi-two-dimensional model
 
@@ -131,4 +95,4 @@ when the IFRK4 field evolution is more accurate. Refine the time step when it
 fails; `completed` still does not certify mesh independence or steady flow.
 The Q2D model is a
 depth-averaged strong-field approximation; it does not resolve Hartmann-layer
-profiles or replace the 3-D formulation in fringing regions.
+profiles or replace the 3-D formulation where the field varies along the flow.
