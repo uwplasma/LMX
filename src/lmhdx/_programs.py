@@ -241,14 +241,15 @@ def problem_arrays(problem, keys, objects=None) -> list:
     def resolve(origin):
         if origin not in objects:
             parent, build, static = origin
-            with jax.ensure_compile_time_eval():
-                objects[origin] = build(resolve(parent), *static)
+            objects[origin] = build(resolve(parent), *static)
         return objects[origin]
 
     values = []
-    for origin, build, static, kind in keys:
-        value = build(resolve(origin), *static)
-        values.append(float(value) if kind == "scalar" else jnp.asarray(value, dtype=kind))
+    # Concrete even inside an enclosing trace, as the executable they are passed to runs.
+    with _tracing(None), jax.ensure_compile_time_eval():
+        for origin, build, static, kind in keys:
+            value = build(resolve(origin), *static)
+            values.append(float(value) if kind == "scalar" else jnp.asarray(value, dtype=kind))
     return values
 
 

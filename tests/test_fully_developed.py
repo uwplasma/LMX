@@ -247,3 +247,18 @@ def test_a_derivative_in_the_drive_differentiates_no_solve():
     assert traced.count("while[") > 0
     value, gradient = jax.value_and_grad(objective)(2.0)
     assert float(gradient) == pytest.approx(float(value) / 2.0, rel=1e-12)
+
+
+def test_a_sweep_inside_a_trace_runs_the_shape_program():
+    """2b.1 stage 5: an objective traced in the drive runs each Hartmann number's solve on concrete arrays.
+
+    From the third Hartmann number on the mesh shape the solve is the shape's program on
+    arrays built on the host, which stay concrete inside the enclosing trace.
+    """
+    for hartmann in (2.0, 3.0, 4.5):
+        case = lmhdx.make_hartmann_case(ha=hartmann, ny=8, nz=8)
+
+        def objective(drive, case=case):
+            return jnp.mean(lmhdx.solve_fully_developed_fields(case, forcing=drive)[0])
+
+        assert float(jax.jit(objective)(2.0)) == pytest.approx(float(objective(2.0)), rel=1e-12)
