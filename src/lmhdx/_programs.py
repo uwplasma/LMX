@@ -19,6 +19,7 @@ __all__ = [
     "attribute",
     "bound",
     "discovering",
+    "grid_program",
     "host_array",
     "host_scalar",
     "problem_arrays",
@@ -131,7 +132,10 @@ class _Trace:
         self.keys: dict[tuple, None] = {}
         self.complete = True
         self._register(problem, ROOT)
-        self._register(problem.grid, (ROOT, _grid, ()))
+        # A problem, or a grid on its own (a stencil probe).
+        self.grid = problem if isinstance(problem, Grid) else problem.grid
+        if self.grid is not problem:
+            self._register(self.grid, (ROOT, _grid, ()))
 
     def _register(self, value, origin) -> None:
         self.origins[id(value)] = origin
@@ -142,8 +146,8 @@ class _Trace:
 
     def origin(self, owner):
         origin = self.origins.get(id(owner))
-        if origin is None and isinstance(owner, Grid) and owner == self.problem.grid:
-            origin = self.origins[id(self.problem.grid)]
+        if origin is None and isinstance(owner, Grid) and owner == self.grid:
+            origin = self.origins[id(self.grid)]
         return origin
 
     def key(self, owner, build, static, kind):
@@ -322,7 +326,7 @@ class ShapeProgram:
         self._first = None
         if [(np.shape(value), _signature_dtype(value)) for value in values] != self.signature:
             raise Unbound("the problem's arrays differ in shape from the program's")
-        executable, grid = self.executable, problem.grid
+        executable, grid = self.executable, problem if isinstance(problem, Grid) else problem.grid
         return lambda *arguments: _regrid(executable(values, *arguments), grid)
 
 
@@ -333,3 +337,33 @@ def _signature_dtype(value) -> str:
 def discovering(problem):
     """Note the keys of every problem array a trace reads (the first problem of a shape)."""
     return _tracing(_Trace(problem))
+
+
+_GRID_PROGRAMS: dict = {}
+
+
+def grid_program(key, build, grid: Grid, *arguments):
+    """``build(grid)`` of ``arguments``, traced once per ``key`` with the grid's arrays as arguments.
+
+    ``key`` names the stencil and fixes everything but the grid's values (its
+    shape, conditions and positions). A probe of a new mesh of a known shape
+    then builds its arrays on the host and runs the executable; a stencil whose
+    arrays are not all named keeps :func:`shape_program`.
+    """
+    entry = _GRID_PROGRAMS.get(key, ROOT)
+    if entry is ROOT:
+        entry = None
+        with discovering(grid) as trace:
+            jax.make_jaxpr(build(grid))(*arguments)
+        if trace.complete:
+            try:
+                entry = ShapeProgram(build, grid, arguments, list(trace.keys))
+            except Unbound:
+                entry = None
+        _GRID_PROGRAMS[key] = entry
+    if entry is not None:
+        try:
+            return entry.bind(grid)
+        except Unbound:
+            pass
+    return shape_program(build(grid), *arguments)

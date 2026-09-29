@@ -44,7 +44,7 @@ import jax.numpy as jnp
 import numpy as np
 import solvax
 
-from ._programs import attribute, host_array, shape_program
+from ._programs import attribute, grid_program, host_array
 from .bc import DIRICHLET, NEUMANN, PERIODIC, BoundaryCondition
 from .grid import CENTER, FACE, POLAR, Field, Grid, uniform_faces
 from .ops import foldable, laplacian, staggered_laplacian
@@ -258,22 +258,26 @@ def _require_separable(grid: Grid) -> None:
 
 
 def _probe(
-    apply, line: Grid, offset: tuple[float, float, float], positions, selection=slice(None)
+    apply, key: tuple, line: Grid, offset: tuple[float, float, float], positions, selection=slice(None)
 ) -> np.ndarray:
     """Return the matrix of a linear stencil, one column per unit vector at ``positions``.
 
     All unit vectors go through the stencil in one batched, compiled call on the
     host CPU. Probing them one by one as eager operations dispatched hundreds of
     small kernels, which was most of the cold start (4 s on a CPU, 20 s on a GPU
-    host, for a 48-cell duct).
+    host, for a 48-cell duct). ``key`` names the stencil ``apply`` applies.
     """
     units = np.zeros((len(positions),) + line.offset_shape(offset))
     for column, position in enumerate(positions):
         units[(column,) + tuple(position)] = 1.0
+
+    def build(grid: Grid):
+        return jax.vmap(lambda data: apply(Field(data, offset, grid)).data)
+
+    program = (key, line.shape, line.geometry, offset, tuple(map(tuple, positions)), jax.devices("cpu")[0])
     with jax.default_device(jax.devices("cpu")[0]):
-        # One compiled probe per stencil shape: a new mesh of the same shape reuses it (2b.1).
-        batched = jax.vmap(lambda data: apply(Field(data, offset, line)).data)
-        applied = shape_program(batched, jax.ShapeDtypeStruct(units.shape, units.dtype))(units)
+        # One program per stencil shape, the line's metric its arguments: a new mesh is not traced (2b.1).
+        applied = grid_program(program, build, line, jax.ShapeDtypeStruct(units.shape, units.dtype))(units)
     return np.asarray(applied).reshape(len(positions), -1)[:, selection].T
 
 
@@ -296,7 +300,9 @@ def _axis_laplacian(line: Grid, axis: int, condition: BoundaryCondition) -> np.n
         condition if position == axis else BoundaryCondition("neumann") for position in range(3)
     )
     positions = [(0,) * axis + (index,) + (0,) * (2 - axis) for index in range(line.shape[axis])]
-    return _probe(lambda field: laplacian(field, conditions), line, (CENTER,) * 3, positions)
+    return _probe(
+        lambda field: laplacian(field, conditions), ("laplacian", conditions), line, (CENTER,) * 3, positions
+    )
 
 
 def assemble_radial_laplacian(grid: Grid, condition: BoundaryCondition) -> np.ndarray:
@@ -322,7 +328,9 @@ def assemble_radial_laplacian(grid: Grid, condition: BoundaryCondition) -> np.nd
 def _radial_laplacian(line: Grid, condition: BoundaryCondition) -> np.ndarray:
     conditions = (condition, BoundaryCondition(PERIODIC), BoundaryCondition(NEUMANN))
     positions = [(index, 0, 0) for index in range(line.shape[0])]
-    return _probe(lambda field: laplacian(field, conditions), line, (CENTER,) * 3, positions)
+    return _probe(
+        lambda field: laplacian(field, conditions), ("laplacian", conditions), line, (CENTER,) * 3, positions
+    )
 
 
 def azimuthal_eigenvalues(grid: Grid) -> np.ndarray:
@@ -986,7 +994,12 @@ def _staggered_axis_operator(
     free = range(*selection.indices(line.offset_shape(line_offset)[axis]))
     positions = [tuple(index if position == axis else 0 for position in range(3)) for index in free]
     return _probe(
-        lambda field: staggered_laplacian(field, conditions), line, line_offset, positions, selection
+        lambda field: staggered_laplacian(field, conditions),
+        ("staggered", conditions),
+        line,
+        line_offset,
+        positions,
+        selection,
     )
 
 
