@@ -1,6 +1,6 @@
 {
   "environment": {
-    "host": "pop-os",
+    "host": "benchmark",
     "platform": "cpu",
     "device_kind": "cpu",
     "device_count": 1,

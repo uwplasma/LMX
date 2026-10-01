@@ -1,22 +1,22 @@
 {
   "environment": {
-    "host": "pop-os",
+    "host": "benchmark",
     "platform": "gpu",
     "device_kind": "NVIDIA RTX A4000",
     "device_count": 2,
     "cpu_count": 36,
     "python": "3.11.15",
     "jax": "0.10.2",
-    "x64": false,
+    "x64": true,
     "jax_default_matmul_precision": "highest",
     "nvidia_tf32_override": null,
     "xla_flags": null,
     "gpu_driver": "580.173.02",
     "cuda_version": "13.0",
     "load_average": [
-      3.93994140625,
-      5.8623046875,
-      6.27490234375
+      10.18994140625,
+      7.2919921875,
+      6.7373046875
     ],
     "lmx_commit": "79ba6e4",
     "harness_commit": "7f41f5b"
@@ -32,11 +32,11 @@
       "steps": 20,
       "devices": 2,
       "scaling_scope": "accelerator_devices",
-      "single_seconds": 0.025461632991209626,
-      "sharded_seconds": 0.11768645700067282,
-      "efficiency": 0.10817571384218008,
+      "single_seconds": 0.08635503053665161,
+      "sharded_seconds": 0.2437206613831222,
+      "efficiency": 0.17715984776707927,
       "agreement": 0.0,
-      "agreement_tolerance": 0.0017912831253852346,
+      "agreement_tolerance": 3.430696448756451e-12,
       "solver_status": [
         "completed",
         "completed"
@@ -45,9 +45,9 @@
       "device_state": [
         {
           "load_average": [
-            3.93994140625,
-            5.8623046875,
-            6.27490234375
+            10.18994140625,
+            7.2919921875,
+            6.7373046875
           ],
           "gpus": [
             [
@@ -65,20 +65,20 @@
         },
         {
           "load_average": [
-            3.7841796875,
-            5.7978515625,
-            6.25146484375
+            8.93017578125,
+            7.11767578125,
+            6.68603515625
           ],
           "gpus": [
             [
               0,
-              93,
-              403
+              100,
+              401
             ],
             [
               1,
-              91,
-              821
+              96,
+              849
             ]
           ],
           "other_processes": []
@@ -95,11 +95,11 @@
       "steps": 20,
       "devices": 2,
       "scaling_scope": "accelerator_devices",
-      "single_seconds": 0.0748701705597341,
-      "sharded_seconds": 0.39893639541696757,
-      "efficiency": 0.09383722746263842,
+      "single_seconds": 0.39218015992082655,
+      "sharded_seconds": 0.9827418784843758,
+      "efficiency": 0.1995336560428577,
       "agreement": 0.0,
-      "agreement_tolerance": 0.0019468216123641469,
+      "agreement_tolerance": 4.121896726905474e-12,
       "solver_status": [
         "completed",
         "completed"
@@ -108,40 +108,40 @@
       "device_state": [
         {
           "load_average": [
-            3.7841796875,
-            5.7978515625,
-            6.25146484375
+            8.93017578125,
+            7.11767578125,
+            6.68603515625
           ],
           "gpus": [
             [
               0,
-              93,
-              403
+              100,
+              401
             ],
             [
               1,
-              91,
-              821
+              96,
+              849
             ]
           ],
           "other_processes": []
         },
         {
           "load_average": [
-            3.58935546875,
-            5.68896484375,
-            6.2109375
+            6.7861328125,
+            6.75439453125,
+            6.57666015625
           ],
           "gpus": [
             [
               0,
               100,
-              471
+              597
             ],
             [
               1,
-              99,
-              919
+              100,
+              1043
             ]
           ],
           "other_processes": []
@@ -158,11 +158,11 @@
       "steps": 20,
       "devices": 2,
       "scaling_scope": "accelerator_devices",
-      "single_seconds": 0.3203111184993759,
-      "sharded_seconds": 1.568969005951658,
-      "efficiency": 0.10207694265607599,
+      "single_seconds": 1.517499677487649,
+      "sharded_seconds": 3.839270460070111,
+      "efficiency": 0.19762865019151804,
       "agreement": 0.0,
-      "agreement_tolerance": 0.0019176668502041139,
+      "agreement_tolerance": 3.718199575864368e-12,
       "solver_status": [
         "completed",
         "completed"
@@ -171,40 +171,40 @@
       "device_state": [
         {
           "load_average": [
-            3.58935546875,
-            5.68896484375,
-            6.2109375
+            6.7861328125,
+            6.75439453125,
+            6.57666015625
           ],
           "gpus": [
             [
               0,
-              73,
-              471
+              100,
+              597
             ],
             [
               1,
-              99,
-              919
+              100,
+              1043
             ]
           ],
           "other_processes": []
         },
         {
           "load_average": [
-            3.2666015625,
-            5.41357421875,
-            6.10205078125
+            4.10888671875,
+            5.927734375,
+            6.29833984375
           ],
           "gpus": [
             [
               0,
               100,
-              861
+              1369
             ],
             [
               1,
               100,
-              1303
+              1813
             ]
           ],
           "other_processes": []
