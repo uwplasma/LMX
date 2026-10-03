@@ -227,7 +227,7 @@ RTX A4000 (JAX 0.10.2, matmul precision `highest`, median of 12 timed runs;
   CPU solver. The 10× float64 target on an A4000 is withdrawn: GA10x runs float64
   at 1/64 of its float32 rate, which bounds a fair single-card float64 speed-up
   near the memory-bandwidth ratio.
-- **CPU reports:** `benchmarks/results/office-cpu-*.json` are from the 2026-09-07
+- **CPU reports:** `benchmarks/results/cpu-*.json` are from the 2026-09-07
   run, taken without load control or a recorded matmul precision; no ratio is
   quoted from them.
 - **Trajectory-length scaling:** per step, 80 steps against 20 cost 0.83 in float64
