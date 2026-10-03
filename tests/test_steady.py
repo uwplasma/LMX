@@ -301,7 +301,8 @@ def test_a_varying_field_certifies_at_the_default_tolerance(hartmann, conductanc
 
     The preconditioner cannot see that part of a residual, so CG stalled on it: 5e-10 of the right-hand
     side at Ha 20, 6.4e-7 at Ha 100, and no certificate at 1e-9 above Ha 20. Projecting the residual twice
-    measured 122 / 794 / 2886 iterations here, with the certificate at 0.90 / 0.60 / 0.81 of its bound.
+    measured 122 / 794 / 2886 iterations here, with the certificate at 0.90 / 0.60 / 0.81 of its bound;
+    the varying-field damping rate of 2b.4 takes them to 83 / 346 / 977.
     """
     from lmhdx.steady import _norm
 
@@ -319,7 +320,8 @@ def test_the_fringe_certifies_at_the_tolerance_rule(hartmann, tolerance):
     The ANL fringe on 24 cells with 16 axial ones: CG's floor with the residual projected twice is 1.5e-10 at
     Ha 300, 7.5e-10 at Ha 600 and 1.5e-8 at Ha 1000, where round-off in the potential solve leaves the operator
     asymmetric by 6e-7. Each tolerance is at least 6.7 times its floor; the solves took 5581 / 12,056 / 19,299
-    iterations, so the budget above Ha 300 keeps 1.9 times headroom.
+    iterations, so the budget above Ha 300 keeps 1.9 times headroom. With the varying-field damping rate
+    of 2b.4 they take 1361 / 2508 / 3822 iterations.
     """
     from lmhdx.core3d import fringe_field
 

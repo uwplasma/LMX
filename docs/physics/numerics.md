@@ -224,8 +224,9 @@ component, so a varying field takes the largest rate over the cells; in the
 diagonal model a cell of rate $r$ then updates by $1-\Delta t\,r/(1+\Delta t\,\lambda)$,
 inside $(0,1]$ wherever $r\le\lambda$, where a smaller shift such as the volume
 mean would overshoot past $-1$ once $\Delta t\,r>2(1+\Delta t\,\lambda)$. The
-steady preconditioner of `lmhdx.steady` takes the peak $|\mathbf B|^2$ for the same
-reason. Viscosity is left explicit and its
+steady preconditioner of `lmhdx.steady` took the peak $|\mathbf B|^2$ for the same
+reason; since plan step 2b.4 a varying field's steady preconditioner takes one
+much smaller rate instead (see "The varying-field preconditioner" below). Viscosity is left explicit and its
 limit is reported by `ChannelProblem.diffusive_step_limit` rather than enforced,
 so a caller sweeping a parameter sees the constraint instead of a silently
 clipped step. The magnetic stiffness grows as $Ha^2$ and must go; the viscous one
@@ -506,6 +507,88 @@ below the core-flow model's 0.01783 (and TM-228's 0.0178). The 1 % gate of rows
 excess is still 71 % above the core-flow value, and the extrapolation is not
 accurate to 1 %. The absolute drop falls from 0.228 to 0.121 over the same
 range, against TM-228's 0.0932.
+
+### The varying-field preconditioner (2b.4)
+
+Plan step 2b.4 asked for a two-level preconditioner whose coarse space is the
+core-flow model of 1.9c, on the premise (2b.0) that the continuum of small
+preconditioned eigenvalues is the core-flow space. Ritz vectors from CG's own
+Lanczos coefficients on the fringe duct (Ha 100, $31\times24^2$, 700 steps)
+say otherwise. The slowest modes carry almost no Joule dissipation: their
+preconditioned eigenvalue equals their viscous energy over the peak $\sigma B^2$.
+They lie where the field is weak or absent (the field-free outlet buffer and the
+end of the ramp) or are odd-even along the duct, a pattern the face averages of
+the electromotive force cancel. They are not y-invariant core flows: their
+velocity peaks mid-duct in $y$, and a uniform imposed field on the same open duct
+needs as many iterations (1,304 against 1,383).
+
+The core-flow coarse space was built and measured anyway: a streamfunction
+$\psi(x,z)$ on every axial and spanwise face, times a Hartmann or a parabolic
+profile in $y$, projected, 713 to 1,922 vectors, the coarse matrix probed with
+the real operator (an exact Galerkin matrix). Added to the damped preconditioner
+it takes Ha 100 from 1,383 to 1,316 iterations (balanced, BNN, 1,294); added to
+the preconditioner below it takes Ha 400 from 780 to 723–768, for a setup of
+one operator application per coarse vector. It is not adopted.
+
+What the slow modes need is less damping, and the projection sets how it may be
+reduced. A damping that varies in space (the local $\sigma B^2(x)$, alone, with a
+matching weighted projection, or as a partition of unity between two rates), by
+component (the field-line solve of the uniform duct on one or two components,
+extended to the open axis) or by mode (an anisotropic Joule symbol, or the
+electromotive average's symbol) measured 1.1 to 4.2 times *more* iterations on
+the Ha 100 fringe duct (1,474 to 5,784 against 1,383): each reopens the
+Schur-complement deficit of the projection, which moves the top of the spectrum
+up (from 34 to 2,124 with the local rate). One global rate does not; at that rate
+the anisotropic symbol is no better than the isotropic damping (511 against 455). The iteration count is flat within 10 % over a wide band of rates, from
+$3\times10^{-4}$ to $3\times10^{-2}$ of the peak Joule rate at Ha 100 and from
+$2\times10^{-6}$ to $10^{-3}$ at Ha 1600, and rises outside it. The rate chosen,
+`lmhdx.steady._varying_field_rate`, is
+
+$$
+r = (\nu\lambda_1)^{3/4}\,(\sigma|\mathbf B|^2_{\max}/\rho)^{1/4},
+$$
+
+the geometric mean of the slowest viscous rate $\nu\lambda_1$ of the mesh
+($\lambda_1$ the sum of the smallest Laplacian eigenvalues of the three axes,
+about $2(\pi/2)^2$ in a duct of half-width one) and the Hartmann braking rate
+$\sqrt{\nu\lambda_1\,\sigma|\mathbf B|^2_{\max}/\rho}$: 33, 66 and 132 at Ha 100,
+400 and 1600 against peak rates of $10^4$ to $2.6\times10^6$, inside the band
+each time. It applies only where the damped fallback applied, a varying field;
+uniform fields keep the field-line solve and the peak rate.
+
+A/B on the office host's CPU (JAX 0.6.2, SOLVAX 0.19.0, `main` 7e0042a against
+this branch, fresh processes, load 95–160 on 36 cores, so the times are
+comparable only within a row):
+
+| case | mesh | iterations before → after | warm (s) before → after |
+|---|---|---|---|
+| varying duct of the tests, Ha 20 | $4\times24^2$ | 122 → 83 | 0.36 → 0.15 |
+| varying duct, Ha 100, $c=0.05$ | $4\times24^2$ | 793 → 346 | 1.40 → 0.62 |
+| varying duct, Ha 300 | $4\times24^2$ | 2,903 → 977 | 6.0 → 1.8 |
+| periodic fringe of the tests, Ha 300 | $16\times24^2$ | 5,634 → 1,361 | 45 → 11.5 |
+| periodic fringe, Ha 600 | $16\times24^2$ | 12,095 → 2,508 | 129 → 29 |
+| periodic fringe, Ha 1000 | $16\times24^2$ | 19,632 → 3,822 | 217 → 40 |
+| ANL fringe duct, Ha 100 | $70\times32^2$ | 782 → 244 | 96 → 31 |
+| ANL fringe duct, Ha 400 | $70\times48^2$ | 2,047 → 731 | 568 → 161 |
+ANLROWS
+
+The fields agree to the solve tolerance (pressure drops to $2\times10^{-12}$,
+mean velocities to $10^{-10}$), and each solve certifies at the tolerance rule of
+#150. The compiled program is the same apart from one constant, so the cold
+compile is unchanged within the noise (cold minus warm 9.1 → 8.9 s on the
+varying duct at Ha 100); the host build gains one fast-diagonal factorization
+(43 s against 43 s on the Ha 100 fringe duct, dominated by the inlet solve).
+Derivatives take the same CG: `jax.value_and_grad` of the mean velocity in the
+field scale on the varying duct falls from 5.0 to 2.0 s warm at Ha 100 and from
+13.9 to 4.5 s at Ha 300, with gradients equal to $10^{-11}$ and $5\times10^{-10}$.
+
+The count still grows with the Hartmann number, as $Ha^{GROWTH}$ against
+$Ha^{0.6}$ before, because the band's two edges are the unbraked modes (bottom)
+and the under-damped y-oscillatory modes at the coarse mid-duct cells (top), and
+one rate can only balance them. Removing either edge needs a damping that is
+not global, which the projection forbids in this form; a preconditioner that
+solves the Schur complement (an inner iteration, so flexible CG) is the
+remaining route and is not attempted here.
 
 ## Derivative policy
 
