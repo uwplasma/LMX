@@ -58,7 +58,8 @@ _TEST_SHARDS = {
         ),
         "tests/test_coreflow.py",
     ),
-    "steady": ("tests/test_steady.py", "tests/test_fully_developed.py"),
+    "steady": ("tests/test_steady.py",),
+    "fully_developed": ("tests/test_fully_developed.py",),
     "gradients": tuple(
         f"tests/test_steady.py::{name}"
         for name in (
