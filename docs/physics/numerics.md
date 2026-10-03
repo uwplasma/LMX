@@ -556,34 +556,48 @@ $\sqrt{\nu\lambda_1\,\sigma|\mathbf B|^2_{\max}/\rho}$: 33, 66 and 132 at Ha 100
 each time. It applies only where the damped fallback applied, a varying field;
 uniform fields keep the field-line solve and the peak rate.
 
-A/B on the office host's CPU (JAX 0.6.2, SOLVAX 0.19.0, `main` 7e0042a against
-this branch, fresh processes, load 95–160 on 36 cores, so the times are
-comparable only within a row):
+A/B on the office host (JAX 0.6.2, SOLVAX 0.19.0, `main` adc0340 against this
+branch, fresh processes alternating A/B; test cases on the CPU at load 7–11, the
+ANL duct of #184 on one idle A4000):
 
-| case | mesh | iterations before → after | warm (s) before → after |
-|---|---|---|---|
-| varying duct of the tests, Ha 20 | $4\times24^2$ | 122 → 83 | 0.36 → 0.15 |
-| varying duct, Ha 100, $c=0.05$ | $4\times24^2$ | 793 → 346 | 1.40 → 0.62 |
-| varying duct, Ha 300 | $4\times24^2$ | 2,903 → 977 | 6.0 → 1.8 |
-| periodic fringe of the tests, Ha 300 | $16\times24^2$ | 5,634 → 1,361 | 45 → 11.5 |
-| periodic fringe, Ha 600 | $16\times24^2$ | 12,095 → 2,508 | 129 → 29 |
-| periodic fringe, Ha 1000 | $16\times24^2$ | 19,632 → 3,822 | 217 → 40 |
-| ANL fringe duct, Ha 100 | $70\times32^2$ | 782 → 244 | 96 → 31 |
-| ANL fringe duct, Ha 400 | $70\times48^2$ | 2,047 → 731 | 568 → 161 |
-ANLROWS
+| case | mesh | iterations before → after | warm (s) before → after | cold (s) before → after |
+|---|---|---|---|---|
+| uniform duct, Ha 300 (field lines) | $1\times48^2$ | 44 → 44 | 0.03 → 0.03 | 2.0 → 1.9 |
+| uniform duct, Ha 1000 (field lines) | $1\times48^2$ | 76 → 76 | 0.05 → 0.07 | 1.8 → 1.9 |
+| varying duct of the tests, Ha 20 | $4\times24^2$ | 122 → 83 | 0.16 → 0.10 | 1.9 → 1.9 |
+| varying duct, Ha 100, $c=0.05$ | $4\times24^2$ | 793 → 346 | 0.74 → 0.32 | 2.8 → 2.4 |
+| varying duct, Ha 300 | $4\times24^2$ | 2,903 → 977 | 2.9 → 0.84 | 5.3 → 3.0 |
+| periodic fringe of the tests, Ha 300 | $16\times24^2$ | 5,634 → 1,361 | 28 → 6.6 | 30 → 8.8 |
+| periodic fringe, Ha 600 | $16\times24^2$ | 12,092 → 2,489 | 59 → 13 | 62 → 16 |
+| periodic fringe, Ha 1000 | $16\times24^2$ | 19,585 → 3,874 | 95 → 19 | 99 → 22 |
+| ANL fringe duct, Ha 100 (A4000) | $70\times32^2$ | 783 → 244 | 3.8 → 1.2 | 23 → 20 |
+| ANL fringe duct, Ha 400 (A4000) | $70\times48^2$ | 2,047 → 728 | 24 → 8.6 | 46 → 30 |
+| ANL fringe duct, Ha 1600 (A4000) | $70\times96^2$ | 4,848 → 2,283 | 239 → 111 | 265 → 137 |
+| ANL fringe duct, Ha 3200 (A4000) | $70\times128^2$ | 8,307 → 4,353 | 810 → 425 | 841 → 456 |
+| ANL fringe duct, Ha $10^4$ (A4000, after only) | $70\times128^2$ | → 13,406 | → 1,307 | → 1,339 |
 
-The fields agree to the solve tolerance (pressure drops to $2\times10^{-12}$,
-mean velocities to $10^{-10}$), and each solve certifies at the tolerance rule of
-#150. The compiled program is the same apart from one constant, so the cold
-compile is unchanged within the noise (cold minus warm 9.1 → 8.9 s on the
-varying duct at Ha 100); the host build gains one fast-diagonal factorization
-(43 s against 43 s on the Ha 100 fringe duct, dominated by the inlet solve).
-Derivatives take the same CG: `jax.value_and_grad` of the mean velocity in the
-field scale on the varying duct falls from 5.0 to 2.0 s warm at Ha 100 and from
-13.9 to 4.5 s at Ha 300, with gradients equal to $10^{-11}$ and $5\times10^{-10}$.
+At Ha $10^4$ (this branch only; `main` would need an estimated 20,000+ iterations)
+the drop over $[-6,2]$ is 0.11152, the locally fully developed one 0.08575 and the
+excess 0.02576, 44 % above the core-flow model's 0.01783. The mesh is the Ha 3200
+one and its convergence at Ha $10^4$ was not checked; the balances hold (flow rate
+2e-16, mass 2e-16, charge 1.2e-13). The excess continues the series
+(0.03042 → 0.02576 for a factor 3.1 in Ha, $Ha^{-0.15}$, flatter than the
+$Ha^{-0.35}$ below), so the 1 % gate of rows 7 and 24 is still not met.
 
-The count still grows with the Hartmann number, as $Ha^{GROWTH}$ against
-$Ha^{0.6}$ before, because the band's two edges are the unbraked modes (bottom)
+Uniform fields are untouched: same preconditioner, same iteration counts and
+fields bit for bit. On the varying cases the fields agree to the solve tolerance
+(mean velocities to $10^{-13}$ relative, ANL drops to $3\times10^{-12}$), every
+solve certifies at the tolerance rule of #150, and the ANL excess is unchanged to
+five digits (0.06259, 0.04504, 0.03420, 0.03042), so rows 7 and 24 stand as
+#184 left them. Cold minus warm, the compile and setup, is unchanged within
+noise. Derivatives take the same CG: `jax.value_and_grad` of the mean velocity
+in the field scale on the varying duct falls from 1.77 to 0.80 s warm at Ha 100
+and from 5.98 to 2.40 s at Ha 300, gradients equal to $10^{-11}$ and
+$5\times10^{-10}$ relative; the adjoint tests against central differences
+(varying duct Ha 20 and 100, the open duct's field-scale adjoint) pass.
+
+The count still grows with the Hartmann number, as $Ha^{0.83}$ on the ANL meshes
+against $Ha^{0.68}$ before, so the gain falls from 3.2× at Ha 100 to 1.9× at Ha 3200, because the band's two edges are the unbraked modes (bottom)
 and the under-damped y-oscillatory modes at the coarse mid-duct cells (top), and
 one rate can only balance them. Removing either edge needs a damping that is
 not global, which the projection forbids in this form; a preconditioner that
