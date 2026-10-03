@@ -301,7 +301,8 @@ def test_a_varying_field_certifies_at_the_default_tolerance(hartmann, conductanc
 
     The preconditioner cannot see that part of a residual, so CG stalled on it: 5e-10 of the right-hand
     side at Ha 20, 6.4e-7 at Ha 100, and no certificate at 1e-9 above Ha 20. Projecting the residual twice
-    measured 122 / 794 / 2886 iterations here, with the certificate at 0.90 / 0.60 / 0.81 of its bound.
+    measured 122 / 794 / 2886 iterations here, with the certificate at 0.90 / 0.60 / 0.81 of its bound;
+    the varying-field damping rate of 2b.4 takes them to 83 / 346 / 977.
     """
     from lmhdx.steady import _norm
 
@@ -319,7 +320,8 @@ def test_the_fringe_certifies_at_the_tolerance_rule(hartmann, tolerance):
     The ANL fringe on 24 cells with 16 axial ones: CG's floor with the residual projected twice is 1.5e-10 at
     Ha 300, 7.5e-10 at Ha 600 and 1.5e-8 at Ha 1000, where round-off in the potential solve leaves the operator
     asymmetric by 6e-7. Each tolerance is at least 6.7 times its floor; the solves took 5581 / 12,056 / 19,299
-    iterations, so the budget above Ha 300 keeps 1.9 times headroom.
+    iterations, so the budget above Ha 300 keeps 1.9 times headroom. With the varying-field damping rate
+    of 2b.4 they take 1361 / 2508 / 3822 iterations.
     """
     from lmhdx.core3d import fringe_field
 
@@ -337,20 +339,27 @@ def test_the_fringe_certifies_at_the_tolerance_rule(hartmann, tolerance):
 def test_a_varying_field_takes_the_damped_preconditioner_and_still_converges():
     """The field-line solve is exact only for a uniform axis-aligned field, so a varying one falls back.
 
-    Every component then takes the damped inverse at the peak ``|B|^2``; the operator stays symmetric to
-    the round-off of this layer mesh (8e-12 for a uniform field) and CG certifies the solve at the default
-    tolerance, which took 1e-8 before #145.
+    Every component then takes one damped inverse, at the rate of :func:`lmhdx.steady._varying_field_rate`:
+    well below the peak ``|B|^2`` (2b.4), and the same for all three, since a damping that differs by
+    component reopens the Schur-complement deficit. The operator stays symmetric to the round-off of this
+    layer mesh (8e-12 for a uniform field) and CG certifies the solve at the default tolerance, which took
+    1e-8 before #145.
     """
     from lmhdx.poisson import FastDiagonalHelmholtz
-    from lmhdx.steady import _projection_solves
+    from lmhdx.steady import _projection_solves, _varying_field_rate
 
     problem = _varying_duct()
     solves = _projection_solves(problem, 1.0e3)
-    peak = 1.0 + 1.0e3 * float(
+    peak = float(
         np.max(problem.magnetic_field.components[0] ** 2 + problem.magnetic_field.components[1] ** 2)
     )
+    rate = _varying_field_rate(problem)
+    # Walls at y, z = +-1 and a periodic axis: the slowest viscous rate is about 2 (pi/2)^2.
+    slowest = 2.0 * (np.pi / 2.0) ** 2
+    assert rate == pytest.approx(slowest**0.75 * peak**0.25, rel=0.05) and rate < 0.1 * peak
     assert all(
-        isinstance(solve, FastDiagonalHelmholtz) and solve.shift == pytest.approx(peak) for solve in solves
+        isinstance(solve, FastDiagonalHelmholtz) and solve.shift == pytest.approx(1.0 + 1.0e3 * rate)
+        for solve in solves
     )
     forward, backward, energy = _stokes_operator_samples(problem)
     assert abs(forward - backward) <= 1e-11 * max(abs(forward), abs(backward)) and energy < 0.0
