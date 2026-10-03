@@ -102,7 +102,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [support, operators, physics, channel, plane, steady, gradients]
+        shard: [support, operators, physics, channel, plane, steady, fully_developed, gradients]
         include:
           # Coverage on the steady shard peaks near 12 GB of resident memory with four
           # workers, against 16 GB on a hosted runner; two workers keep it well inside.
@@ -116,6 +116,8 @@ jobs:
             cache: support
           - shard: plane
             cache: channel
+          - shard: fully_developed
+            cache: steady
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-lmhdx
@@ -177,6 +179,12 @@ jobs:
           path: artifacts/test-evidence/steady
           key: lmx-test-evidence-${{ github.run_id }}-steady
           fail-on-cache-miss: true
+      - name: Restore fully_developed evidence
+        uses: actions/cache/restore@v6
+        with:
+          path: artifacts/test-evidence/fully_developed
+          key: lmx-test-evidence-${{ github.run_id }}-fully_developed
+          fail-on-cache-miss: true
       - name: Restore operators evidence
         uses: actions/cache/restore@v6
         with:
@@ -219,7 +227,7 @@ jobs:
             budget: 300
             cache: pr-unit
           - tier: unit
-            shard: "operators physics channel plane steady gradients"
+            shard: "operators physics channel plane steady fully_developed gradients"
             label: numerics
             budget: 300
             cache: pr-unit
@@ -237,6 +245,10 @@ jobs:
           - tier: regression
             shard: steady
             budget: 420
+          - tier: regression
+            shard: fully_developed
+            budget: 420
+            cache: pr-regressionsteady
           - tier: regression
             shard: gradients
             budget: 420
